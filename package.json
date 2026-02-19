@@ -1,7 +1,7 @@
 {
   "name": "@kevinrabun/judges",
   "version": "1.0.0",
-  "description": "MCP server that provides a panel of 18 specialized judges to evaluate AI-generated code for security, cost, scalability, cloud readiness, and best practices.",
+  "description": "18 specialized judges that evaluate AI-generated code for security, cost, and quality.",
   "mcpName": "io.github.kevinrabun/judges",
   "type": "module",
   "main": "dist/index.js",
