@@ -31,7 +31,7 @@ import { JudgeDefinition } from "./types.js";
 
 const server = new McpServer({
   name: "judges",
-  version: "1.1.0",
+  version: "1.2.0",
 });
 
 // ─── Tool: get_judges ────────────────────────────────────────────────────────
