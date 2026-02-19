@@ -1,0 +1,13 @@
+# Default owner for everything in the repo
+* @KevinRabun
+
+# Judge definitions and evaluators
+/src/judges/ @KevinRabun
+/src/evaluators/ @KevinRabun
+
+# CI/CD and publishing
+/.github/ @KevinRabun
+
+# Security-sensitive files
+/server.json @KevinRabun
+/package.json @KevinRabun
