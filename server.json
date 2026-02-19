@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.kevinrabun/judges",
+  "name": "io.github.KevinRabun/judges",
   "title": "Judges Panel",
   "description": "18 specialized judges that evaluate AI-generated code for security, cost, and quality.",
   "repository": {
     "url": "https://github.com/kevinrabun/judges",
     "source": "github"
   },
-  "version": "1.0.1",
+  "version": "1.0.2",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@kevinrabun/judges",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "transport": {
         "type": "stdio"
       }
