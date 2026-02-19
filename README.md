@@ -2,28 +2,141 @@
 
 An MCP (Model Context Protocol) server that provides a panel of **18 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed.
 
+[![CI](https://github.com/KevinRabun/judges/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinRabun/judges/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+---
+
+## Quick Start
+
+### 1. Install and Build
+
+```bash
+git clone https://github.com/KevinRabun/judges.git
+cd judges
+npm install
+npm run build
+```
+
+### 2. Try the Demo
+
+Run the included demo to see all 18 judges evaluate a purposely flawed API server:
+
+```bash
+npm run demo
+```
+
+This evaluates [`examples/sample-vulnerable-api.ts`](examples/sample-vulnerable-api.ts) — a file intentionally packed with security holes, performance anti-patterns, and code quality issues — and prints a full verdict with per-judge scores and findings.
+
+**What you'll see:**
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║           Judges Panel — Full Tribunal Demo                 ║
+╚══════════════════════════════════════════════════════════════╝
+
+  Overall Verdict : FAIL
+  Overall Score   : 61/100
+  Critical Issues : 15
+  High Issues     : 17
+  Total Findings  : 81
+  Judges Run      : 18
+
+  Per-Judge Breakdown:
+  ────────────────────────────────────────────────────────────────
+  ❌ Judge Data Security              0/100    7 finding(s)
+  ❌ Judge Cybersecurity             24/100    6 finding(s)
+  ⚠️  Judge Cost Effectiveness       70/100    5 finding(s)
+  ⚠️  Judge Scalability              79/100    4 finding(s)
+  ❌ Judge Cloud Readiness           77/100    4 finding(s)
+  ⚠️  Judge Software Practices       73/100    5 finding(s)
+  ❌ Judge Accessibility             28/100    8 finding(s)
+  ❌ Judge API Design                35/100    9 finding(s)
+  ⚠️  Judge Reliability              70/100    3 finding(s)
+  ❌ Judge Observability             65/100    5 finding(s)
+  ❌ Judge Performance               53/100    5 finding(s)
+  ❌ Judge Compliance                34/100    4 finding(s)
+  ✅ Judge Testing                   94/100    1 finding(s)
+  ✅ Judge Documentation             82/100    4 finding(s)
+  ✅ Judge Internationalization      79/100    4 finding(s)
+  ✅ Judge Dependency Health         94/100    1 finding(s)
+  ⚠️  Judge Concurrency              64/100    4 finding(s)
+  ❌ Judge Ethics & Bias             77/100    2 finding(s)
+```
+
+### 3. Run the Tests
+
+```bash
+npm test
+```
+
+Runs 184 automated tests covering all 18 judges, markdown formatters, and edge cases.
+
+### 4. Connect to Your Editor
+
+Add the Judges Panel as an MCP server so your AI coding assistant can use it automatically.
+
+**VS Code** — create `.vscode/mcp.json` in your project:
+
+```json
+{
+  "servers": {
+    "judges": {
+      "command": "node",
+      "args": ["/absolute/path/to/judges/dist/index.js"]
+    }
+  }
+}
+```
+
+**Claude Desktop** — add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "judges": {
+      "command": "node",
+      "args": ["/absolute/path/to/judges/dist/index.js"]
+    }
+  }
+}
+```
+
+**Or install from npm** instead of cloning:
+
+```bash
+npm install -g @kevinrabun/judges
+```
+
+Then use `judges` as the command in your MCP config (no `args` needed).
+
+---
+
 ## The Judge Panel
 
 | Judge | Domain | Rule Prefix | What It Evaluates |
 |-------|--------|-------------|-------------------|
-| **Judge Data Security** | Data Security & Privacy | `DATA-` | Encryption, PII handling, secrets management, access controls, GDPR/CCPA/HIPAA compliance |
-| **Judge Cybersecurity** | Cybersecurity & Threat Defense | `CYBER-` | Injection attacks, XSS, CSRF, auth flaws, dependency CVEs, OWASP Top 10 |
-| **Judge Cost Effectiveness** | Cost Optimization | `COST-` | Algorithm efficiency, N+1 queries, memory waste, caching strategy, cloud spend |
-| **Judge Scalability** | Scalability & Performance | `SCALE-` | Statelessness, horizontal scaling, concurrency, bottlenecks, rate limiting |
-| **Judge Cloud Readiness** | Cloud-Native & DevOps | `CLOUD-` | 12-Factor compliance, containerization, observability, graceful shutdown, IaC |
-| **Judge Software Practices** | Engineering Best Practices | `SWDEV-` | SOLID principles, type safety, error handling, testing, input validation, clean code |
-| **Judge Accessibility** | Accessibility (a11y) | `A11Y-` | WCAG compliance, screen reader support, keyboard navigation, ARIA, color contrast |
-| **Judge API Design** | API Design & Contracts | `API-` | REST conventions, versioning, pagination, error responses, consistency |
-| **Judge Reliability** | Reliability & Resilience | `REL-` | Error handling, timeouts, retries, circuit breakers, graceful degradation |
-| **Judge Observability** | Observability & Monitoring | `OBS-` | Structured logging, health checks, metrics, tracing, correlation IDs |
-| **Judge Performance** | Performance & Efficiency | `PERF-` | N+1 queries, sync I/O, caching, memory leaks, algorithmic complexity |
-| **Judge Compliance** | Regulatory Compliance | `COMP-` | GDPR/CCPA, PII protection, consent, data retention, audit trails |
-| **Judge Testing** | Testing & Quality Assurance | `TEST-` | Test coverage, assertions, test isolation, naming, external dependencies |
-| **Judge Documentation** | Documentation & Readability | `DOC-` | JSDoc/docstrings, magic numbers, TODOs, code comments, module docs |
-| **Judge Internationalization** | Internationalization (i18n) | `I18N-` | Hardcoded strings, locale handling, currency formatting, RTL support |
-| **Judge Dependency Health** | Dependency Management | `DEPS-` | Version pinning, deprecated packages, supply chain, import hygiene |
-| **Judge Concurrency** | Concurrency & Async Safety | `CONC-` | Race conditions, unbounded parallelism, missing await, resource cleanup |
-| **Judge Ethics & Bias** | Ethics & Bias | `ETHICS-` | Demographic logic, explainability, dark patterns, inclusive language |
+| **Data Security** | Data Security & Privacy | `DATA-` | Encryption, PII handling, secrets management, access controls |
+| **Cybersecurity** | Cybersecurity & Threat Defense | `CYBER-` | Injection attacks, XSS, CSRF, auth flaws, OWASP Top 10 |
+| **Cost Effectiveness** | Cost Optimization | `COST-` | Algorithm efficiency, N+1 queries, memory waste, caching strategy |
+| **Scalability** | Scalability & Performance | `SCALE-` | Statelessness, horizontal scaling, concurrency, bottlenecks |
+| **Cloud Readiness** | Cloud-Native & DevOps | `CLOUD-` | 12-Factor compliance, containerization, graceful shutdown, IaC |
+| **Software Practices** | Engineering Best Practices | `SWDEV-` | SOLID principles, type safety, error handling, input validation |
+| **Accessibility** | Accessibility (a11y) | `A11Y-` | WCAG compliance, screen reader support, keyboard navigation, ARIA |
+| **API Design** | API Design & Contracts | `API-` | REST conventions, versioning, pagination, error responses |
+| **Reliability** | Reliability & Resilience | `REL-` | Error handling, timeouts, retries, circuit breakers |
+| **Observability** | Observability & Monitoring | `OBS-` | Structured logging, health checks, metrics, tracing |
+| **Performance** | Performance & Efficiency | `PERF-` | N+1 queries, sync I/O, caching, memory leaks |
+| **Compliance** | Regulatory Compliance | `COMP-` | GDPR/CCPA, PII protection, consent, data retention, audit trails |
+| **Testing** | Testing & Quality Assurance | `TEST-` | Test coverage, assertions, test isolation, naming |
+| **Documentation** | Documentation & Readability | `DOC-` | JSDoc/docstrings, magic numbers, TODOs, code comments |
+| **Internationalization** | Internationalization (i18n) | `I18N-` | Hardcoded strings, locale handling, currency formatting |
+| **Dependency Health** | Dependency Management | `DEPS-` | Version pinning, deprecated packages, supply chain |
+| **Concurrency** | Concurrency & Async Safety | `CONC-` | Race conditions, unbounded parallelism, missing await |
+| **Ethics & Bias** | Ethics & Bias | `ETHICS-` | Demographic logic, dark patterns, inclusive language |
+
+---
 
 ## How It Works
 
@@ -31,7 +144,9 @@ The tribunal operates in two modes:
 
 1. **Pattern-Based Analysis (Tools)** — The `evaluate_code` and `evaluate_code_single_judge` tools perform heuristic analysis using pattern matching to catch common anti-patterns. This works entirely offline with zero external API calls.
 
-2. **LLM-Powered Deep Analysis (Prompts)** — The server exposes MCP prompts (`judge-data-security`, `judge-cybersecurity`, etc., and `full-tribunal`) that provide each judge's expert persona as a system prompt. When used by an LLM-based client, this enables much deeper, context-aware analysis.
+2. **LLM-Powered Deep Analysis (Prompts)** — The server exposes MCP prompts (e.g., `judge-data-security`, `full-tribunal`) that provide each judge's expert persona as a system prompt. When used by an LLM-based client, this enables deeper, context-aware analysis beyond what pattern matching can detect.
+
+---
 
 ## MCP Tools
 
@@ -41,82 +156,55 @@ List all available judges with their domains and descriptions.
 ### `evaluate_code`
 Submit code to the **full judges panel**. All 18 judges evaluate independently and return a combined verdict.
 
-**Parameters:**
-- `code` (string, required) — The source code to evaluate
-- `language` (string, required) — Programming language (e.g., "typescript", "python")
-- `context` (string, optional) — Additional context about the code
-
-**Returns:** Combined verdict with overall score, per-judge scores, all findings, and recommendations.
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `code` | string | yes | The source code to evaluate |
+| `language` | string | yes | Programming language (e.g., `typescript`, `python`) |
+| `context` | string | no | Additional context about the code |
 
 ### `evaluate_code_single_judge`
 Submit code to a **specific judge** for targeted review.
 
-**Parameters:**
-- `code` (string, required) — The source code to evaluate
-- `language` (string, required) — Programming language
-- `judgeId` (string, required) — One of: `data-security`, `cybersecurity`, `cost-effectiveness`, `scalability`, `cloud-readiness`, `software-practices`, `accessibility`, `api-design`, `reliability`, `observability`, `performance`, `compliance`, `testing`, `documentation`, `internationalization`, `dependency-health`, `concurrency`, `ethics-bias`
-- `context` (string, optional) — Additional context
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `code` | string | yes | The source code to evaluate |
+| `language` | string | yes | Programming language |
+| `judgeId` | string | yes | See [judge IDs](#judge-ids) below |
+| `context` | string | no | Additional context |
+
+#### Judge IDs
+
+`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias`
+
+---
 
 ## MCP Prompts
 
-- `judge-data-security` — Deep data security review via LLM
-- `judge-cybersecurity` — Deep cybersecurity review via LLM
-- `judge-cost-effectiveness` — Deep cost optimization review via LLM
-- `judge-scalability` — Deep scalability review via LLM
-- `judge-cloud-readiness` — Deep cloud readiness review via LLM
-- `judge-software-practices` — Deep software practices review via LLM
-- `judge-accessibility` — Deep accessibility/WCAG review via LLM
-- `judge-api-design` — Deep API design review via LLM
-- `judge-reliability` — Deep reliability & resilience review via LLM
-- `judge-observability` — Deep observability & monitoring review via LLM
-- `judge-performance` — Deep performance optimization review via LLM
-- `judge-compliance` — Deep regulatory compliance review via LLM
-- `judge-testing` — Deep testing quality review via LLM
-- `judge-documentation` — Deep documentation quality review via LLM
-- `judge-internationalization` — Deep i18n review via LLM
-- `judge-dependency-health` — Deep dependency health review via LLM
-- `judge-concurrency` — Deep concurrency & async safety review via LLM
-- `judge-ethics-bias` — Deep ethics & bias review via LLM
-- `full-tribunal` — All 18 judges via LLM in a single prompt
+Each judge has a corresponding prompt for LLM-powered deep analysis:
 
-## Setup
+| Prompt | Description |
+|--------|-------------|
+| `judge-data-security` | Deep data security review |
+| `judge-cybersecurity` | Deep cybersecurity review |
+| `judge-cost-effectiveness` | Deep cost optimization review |
+| `judge-scalability` | Deep scalability review |
+| `judge-cloud-readiness` | Deep cloud readiness review |
+| `judge-software-practices` | Deep software practices review |
+| `judge-accessibility` | Deep accessibility/WCAG review |
+| `judge-api-design` | Deep API design review |
+| `judge-reliability` | Deep reliability & resilience review |
+| `judge-observability` | Deep observability & monitoring review |
+| `judge-performance` | Deep performance optimization review |
+| `judge-compliance` | Deep regulatory compliance review |
+| `judge-testing` | Deep testing quality review |
+| `judge-documentation` | Deep documentation quality review |
+| `judge-internationalization` | Deep i18n review |
+| `judge-dependency-health` | Deep dependency health review |
+| `judge-concurrency` | Deep concurrency & async safety review |
+| `judge-ethics-bias` | Deep ethics & bias review |
+| `full-tribunal` | All 18 judges in a single prompt |
 
-### Build
-
-```bash
-npm install
-npm run build
-```
-
-### Configure in VS Code (GitHub Copilot / Claude Desktop)
-
-Add to your MCP settings (`.vscode/mcp.json`, `claude_desktop_config.json`, etc.):
-
-```json
-{
-  "mcpServers": {
-    "judges": {
-      "command": "node",
-      "args": ["<path-to>/judges/dist/index.js"]
-    }
-  }
-}
-```
-
-### Configure in VS Code Settings (settings.json)
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "judges": {
-        "command": "node",
-        "args": ["<path-to>/judges/dist/index.js"]
-      }
-    }
-  }
-}
-```
+---
 
 ## Scoring
 
@@ -124,10 +212,10 @@ Each judge scores the code from **0 to 100**:
 
 | Severity | Score Deduction |
 |----------|----------------|
-| Critical | -20 points |
-| High | -12 points |
-| Medium | -6 points |
-| Low | -3 points |
+| Critical | −20 points |
+| High | −12 points |
+| Medium | −6 points |
+| Low | −3 points |
 | Info | 0 points |
 
 **Verdict logic:**
@@ -137,37 +225,47 @@ Each judge scores the code from **0 to 100**:
 
 The **overall tribunal score** is the average of all 18 judges. The overall verdict fails if **any** judge fails.
 
-## Example Output
-
-```
-# Judges Panel — Verdict
-
-**Overall Verdict: WARNING** | **Score: 68/100**
-Total critical findings: 1 | Total high findings: 3
-
-## Individual Judge Results
-
-❌ **Judge Data Security** (FAIL, 60/100) — 3 finding(s)
-⚠️ **Judge Cybersecurity** (WARNING, 76/100) — 2 finding(s)
-✅ **Judge Cost Effectiveness** (PASS, 88/100) — 1 finding(s)
-⚠️ **Judge Scalability** (WARNING, 70/100) — 2 finding(s)
-✅ **Judge Cloud Readiness** (PASS, 82/100) — 1 finding(s)
-⚠️ **Judge Software Practices** (WARNING, 72/100) — 3 finding(s)
-```
+---
 
 ## Project Structure
 
 ```
 judges/
 ├── src/
-│   ├── index.ts        # MCP server entry point — tools, prompts, transport
-│   ├── types.ts         # TypeScript interfaces for judges, findings, verdicts
-│   ├── judges.ts        # Judge definitions with expert system prompts
-│   └── evaluator.ts     # Pattern-based analysis engine + scoring
+│   ├── index.ts              # MCP server entry point — tools, prompts, transport
+│   ├── types.ts              # TypeScript interfaces (Finding, JudgeEvaluation, etc.)
+│   ├── evaluators/           # Pattern-based analysis engine for each judge
+│   │   ├── index.ts          # evaluateWithJudge(), evaluateWithTribunal()
+│   │   ├── shared.ts         # Scoring, verdict logic, markdown formatters
+│   │   └── *.ts              # One analyzer per judge (18 files)
+│   └── judges/               # Judge definitions (id, name, domain, system prompt)
+│       ├── index.ts          # JUDGES array, getJudge(), getJudgeSummaries()
+│       └── *.ts              # One definition per judge (18 files)
+├── examples/
+│   ├── sample-vulnerable-api.ts  # Intentionally flawed code (triggers all 18 judges)
+│   └── demo.ts                   # Run: npm run demo
+├── tests/
+│   └── judges.test.ts            # Run: npm test (184 tests)
+├── server.json               # MCP Registry manifest
 ├── package.json
 ├── tsconfig.json
 └── README.md
 ```
+
+---
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run build` | Compile TypeScript to `dist/` |
+| `npm run dev` | Watch mode — recompile on save |
+| `npm test` | Run the full test suite (184 tests) |
+| `npm run demo` | Run the sample tribunal demo |
+| `npm start` | Start the MCP server |
+| `npm run clean` | Remove `dist/` |
+
+---
 
 ## License
 
