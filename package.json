@@ -1,0 +1,53 @@
+{
+  "name": "@kevinrabun/judges",
+  "version": "1.0.0",
+  "description": "MCP server that provides a panel of 18 specialized judges to evaluate AI-generated code for security, cost, scalability, cloud readiness, and best practices.",
+  "mcpName": "io.github.kevinrabun/judges",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "judges": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "server.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "code-review",
+    "security",
+    "tribunal",
+    "ai-code-review",
+    "code-quality",
+    "static-analysis"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kevinrabun/judges.git"
+  },
+  "homepage": "https://github.com/kevinrabun/judges#readme",
+  "bugs": {
+    "url": "https://github.com/kevinrabun/judges/issues"
+  },
+  "author": "kevinrabun",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "typescript": "^5.9.3"
+  }
+}
