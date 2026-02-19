@@ -148,6 +148,61 @@ The tribunal operates in two modes:
 
 ---
 
+## Composable by Design
+
+Judges Panel is intentionally focused on **heuristic pattern detection** — fast, offline, zero-dependency. It does not try to be an AST parser, a CVE scanner, or a linter. Those capabilities belong in dedicated MCP servers that an AI agent can orchestrate alongside Judges.
+
+### Recommended MCP Stack
+
+When your AI coding assistant connects to multiple MCP servers, each one contributes its specialty:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   AI Coding Assistant                   │
+│              (Claude, Copilot, Cursor, etc.)            │
+└──────┬──────────┬──────────┬──────────┬────────────────┘
+       │          │          │          │
+       ▼          ▼          ▼          ▼
+  ┌─────────┐ ┌────────┐ ┌────────┐ ┌────────┐
+  │ Judges  │ │  AST   │ │  CVE / │ │ Linter │
+  │  Panel  │ │ Server │ │  SBOM  │ │ Server │
+  └─────────┘ └────────┘ └────────┘ └────────┘
+   Heuristic   Structural  Vuln DB    Style &
+   patterns    analysis    scanning   correctness
+```
+
+| Layer | What It Does | Example Servers |
+|-------|-------------|-----------------|
+| **Judges Panel** | 18-judge quality gate — security patterns, cost, scalability, a11y, compliance, ethics | This server |
+| **AST Analysis** | Deep structural analysis — data flow, complexity metrics, dead code, type tracking | Tree-sitter, Semgrep, SonarQube MCP servers |
+| **CVE / SBOM** | Vulnerability scanning against live databases — known CVEs, license risks, supply chain | OSV, Snyk, Trivy, Grype MCP servers |
+| **Linting** | Language-specific style and correctness rules | ESLint, Ruff, Clippy MCP servers |
+| **Runtime Profiling** | Memory, CPU, latency measurement on running code | Custom profiling MCP servers |
+
+### Why Orchestration Beats a Monolith
+
+| | Monolith | Orchestrated MCP Stack |
+|---|---|---|
+| **Maintenance** | One team owns everything | Each server evolves independently |
+| **Depth** | Shallow coverage of many domains | Deep expertise per server |
+| **Updates** | CVE data stale = full redeploy | CVE server updates on its own |
+| **Language support** | Must embed parsers for every language | AST server handles this |
+| **User choice** | All or nothing | Pick the servers you need |
+| **Offline capability** | Hard to achieve with CVE deps | Judges runs fully offline; CVE server handles network |
+
+### What This Means in Practice
+
+When you ask your AI assistant *"Is this code production-ready?"*, the agent can:
+
+1. **Judges Panel** → Scan for hardcoded secrets, missing error handling, N+1 queries, accessibility gaps, compliance issues
+2. **AST Server** → Analyze cyclomatic complexity, detect unreachable code, trace tainted data flows
+3. **CVE Server** → Check every dependency in `package.json` against known vulnerabilities
+4. **Linter Server** → Enforce team style rules, catch language-specific gotchas
+
+Each server returns structured findings. The AI synthesizes everything into a single, actionable review — no single server needs to do it all.
+
+---
+
 ## MCP Tools
 
 ### `get_judges`
