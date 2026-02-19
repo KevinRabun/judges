@@ -31,6 +31,8 @@ jobs:
 
       - name: Publish package to npm
         run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # ── Publish to MCP Registry ─────────────────────────────
 
