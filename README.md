@@ -37,32 +37,32 @@ This evaluates [`examples/sample-vulnerable-api.ts`](examples/sample-vulnerable-
 ╚══════════════════════════════════════════════════════════════╝
 
   Overall Verdict : FAIL
-  Overall Score   : 61/100
+  Overall Score   : 43/100
   Critical Issues : 15
   High Issues     : 17
-  Total Findings  : 81
+  Total Findings  : 83
   Judges Run      : 18
 
   Per-Judge Breakdown:
   ────────────────────────────────────────────────────────────────
   ❌ Judge Data Security              0/100    7 finding(s)
-  ❌ Judge Cybersecurity             24/100    6 finding(s)
-  ⚠️  Judge Cost Effectiveness       70/100    5 finding(s)
-  ⚠️  Judge Scalability              79/100    4 finding(s)
-  ❌ Judge Cloud Readiness           77/100    4 finding(s)
-  ⚠️  Judge Software Practices       73/100    5 finding(s)
-  ❌ Judge Accessibility             28/100    8 finding(s)
-  ❌ Judge API Design                35/100    9 finding(s)
-  ⚠️  Judge Reliability              70/100    3 finding(s)
-  ❌ Judge Observability             65/100    5 finding(s)
-  ❌ Judge Performance               53/100    5 finding(s)
-  ❌ Judge Compliance                34/100    4 finding(s)
-  ✅ Judge Testing                   94/100    1 finding(s)
-  ✅ Judge Documentation             82/100    4 finding(s)
-  ✅ Judge Internationalization      79/100    4 finding(s)
-  ✅ Judge Dependency Health         94/100    1 finding(s)
-  ⚠️  Judge Concurrency              64/100    4 finding(s)
-  ❌ Judge Ethics & Bias             77/100    2 finding(s)
+  ❌ Judge Cybersecurity              0/100    7 finding(s)
+  ❌ Judge Cost Effectiveness        52/100    5 finding(s)
+  ⚠️  Judge Scalability              65/100    4 finding(s)
+  ❌ Judge Cloud Readiness           61/100    4 finding(s)
+  ❌ Judge Software Practices        45/100    6 finding(s)
+  ❌ Judge Accessibility              0/100    8 finding(s)
+  ❌ Judge API Design                 0/100    9 finding(s)
+  ❌ Judge Reliability               54/100    3 finding(s)
+  ❌ Judge Observability             45/100    5 finding(s)
+  ❌ Judge Performance               27/100    5 finding(s)
+  ❌ Judge Compliance                 0/100    4 finding(s)
+  ⚠️  Judge Testing                  90/100    1 finding(s)
+  ⚠️  Judge Documentation            70/100    4 finding(s)
+  ⚠️  Judge Internationalization     65/100    4 finding(s)
+  ⚠️  Judge Dependency Health        90/100    1 finding(s)
+  ❌ Judge Concurrency               44/100    4 finding(s)
+  ❌ Judge Ethics & Bias             65/100    2 finding(s)
 ```
 
 ### 3. Run the Tests
@@ -267,16 +267,16 @@ Each judge scores the code from **0 to 100**:
 
 | Severity | Score Deduction |
 |----------|----------------|
-| Critical | −20 points |
-| High | −12 points |
-| Medium | −6 points |
-| Low | −3 points |
-| Info | 0 points |
+| Critical | −30 points |
+| High | −18 points |
+| Medium | −10 points |
+| Low | −5 points |
+| Info | −2 points |
 
 **Verdict logic:**
-- **FAIL** — Any critical finding, or score < 50
-- **WARNING** — Any high finding, or score < 75
-- **PASS** — Score ≥ 75 with no critical or high findings
+- **FAIL** — Any critical finding, or score < 60
+- **WARNING** — Any high finding, any medium finding, or score < 80
+- **PASS** — Score ≥ 80 with no critical, high, or medium findings
 
 The **overall tribunal score** is the average of all 18 judges. The overall verdict fails if **any** judge fails.
 

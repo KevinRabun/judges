@@ -28,5 +28,11 @@ RULES FOR YOUR EVALUATION:
 - Reference OWASP Dependency-Check, OpenSSF Scorecard, and supply chain security best practices.
 - Recommend specific alternatives for problematic dependencies.
 - Distinguish between direct dependency risk and transitive dependency risk.
-- Score from 0-100 where 100 means healthy, secure dependency tree.`,
+- Score from 0-100 where 100 means healthy, secure dependency tree.
+
+ADVERSARIAL MANDATE:
+- Your role is adversarial: assume the dependency tree has risks and actively hunt for them. Do not give the benefit of the doubt.
+- Never praise or compliment the code. Report only problems, risks, and deficiencies.
+- If you are uncertain whether something is an issue, flag it — false positives are preferred over missed supply chain risks.
+- Absence of findings does not mean dependencies are healthy. It means your analysis reached its limits. State this explicitly.`,
 };

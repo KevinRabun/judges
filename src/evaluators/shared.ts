@@ -32,19 +32,19 @@ export function calculateScore(findings: Finding[]): number {
   for (const f of findings) {
     switch (f.severity) {
       case "critical":
-        score -= 20;
+        score -= 30;
         break;
       case "high":
-        score -= 12;
+        score -= 18;
         break;
       case "medium":
-        score -= 6;
+        score -= 10;
         break;
       case "low":
-        score -= 3;
+        score -= 5;
         break;
       case "info":
-        score -= 0;
+        score -= 2;
         break;
     }
   }
@@ -53,8 +53,8 @@ export function calculateScore(findings: Finding[]): number {
 
 export function deriveVerdict(findings: Finding[], score: number): Verdict {
   if (findings.some((f) => f.severity === "critical")) return "fail";
-  if (score < 50) return "fail";
-  if (findings.some((f) => f.severity === "high") || score < 75) return "warning";
+  if (score < 60) return "fail";
+  if (findings.some((f) => f.severity === "high") || findings.some((f) => f.severity === "medium") || score < 80) return "warning";
   return "pass";
 }
 
@@ -76,7 +76,7 @@ export function buildSummary(
   summary += `Findings: ${critical} critical, ${high} high, ${medium} medium, ${low} low\n\n`;
 
   if (findings.length === 0) {
-    summary += "No issues detected. The code meets the expected standards for this domain.";
+    summary += "No pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.";
   } else {
     summary += "Key issues:\n";
     for (const f of findings.filter((f) =>
