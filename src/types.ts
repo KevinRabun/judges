@@ -152,6 +152,82 @@ export interface DependencyVerdict {
   summary: string;
 }
 
+// ─── App Builder Workflow Types ─────────────────────────────────────────────
+
+/**
+ * High-level release recommendation for non-technical stakeholders.
+ */
+export type ReleaseDecision =
+  | "ship-now"
+  | "ship-with-caution"
+  | "do-not-ship";
+
+/**
+ * Plain-language translation of a technical finding.
+ */
+export interface PlainLanguageFinding {
+  /** Rule ID from the originating judge */
+  ruleId: string;
+  /** Original severity */
+  severity: Severity;
+  /** Human-readable issue title */
+  title: string;
+  /** What is wrong in plain language */
+  whatIsWrong: string;
+  /** Why this matters to users/business */
+  whyItMatters: string;
+  /** Single next action */
+  nextAction: string;
+}
+
+/**
+ * Prioritized remediation task item.
+ */
+export interface WorkflowTask {
+  /** Priority bucket */
+  priority: "P0" | "P1" | "P2";
+  /** Suggested owner */
+  owner: "ai" | "developer" | "product";
+  /** Relative effort estimate */
+  effort: "S" | "M" | "L";
+  /** Rule ID for traceability */
+  ruleId: string;
+  /** Action-oriented task text */
+  task: string;
+  /** Acceptance criterion */
+  doneWhen: string;
+  /** Whether the task is suitable for AI-first implementation */
+  aiFixable: boolean;
+}
+
+/**
+ * End-to-end output for the non-technical app-builder workflow.
+ */
+export interface AppBuilderWorkflowResult {
+  /** Source mode used for analysis */
+  mode: "code" | "project" | "diff";
+  /** Final tribunal/diff verdict */
+  verdict: Verdict;
+  /** Score in range 0-100 */
+  score: number;
+  /** Count of critical findings considered */
+  criticalCount: number;
+  /** Count of high findings considered */
+  highCount: number;
+  /** Count of medium findings considered */
+  mediumCount: number;
+  /** Release recommendation for decision makers */
+  releaseDecision: ReleaseDecision;
+  /** Concise recommendation summary */
+  summary: string;
+  /** Top findings translated for non-technical readers */
+  plainLanguageFindings: PlainLanguageFinding[];
+  /** Prioritized remediation tasks */
+  tasks: WorkflowTask[];
+  /** AI-fixable tasks at P0/P1 priority */
+  aiFixableNow: WorkflowTask[];
+}
+
 /**
  * The complete evaluation result from a single judge.
  */

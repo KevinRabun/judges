@@ -2,6 +2,9 @@
 
 An MCP (Model Context Protocol) server that provides a panel of **31 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Includes **built-in AST analysis** powered by the TypeScript Compiler API — no separate parser server needed.
 
+**Highlights:**
+- Includes an **App Builder Workflow (3-step)** demo for release decisions, plain-language risk summaries, and prioritized fixes — see [Try the Demo](#2-try-the-demo).
+
 [![CI](https://github.com/KevinRabun/judges/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinRabun/judges/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -29,7 +32,38 @@ npm run demo
 
 This evaluates [`examples/sample-vulnerable-api.ts`](examples/sample-vulnerable-api.ts) — a file intentionally packed with security holes, performance anti-patterns, and code quality issues — and prints a full verdict with per-judge scores and findings.
 
-**What you'll see:**
+The demo now also includes an **App Builder Workflow (3-step)** section. In a single run, you get both tribunal output and workflow output:
+- Release decision (`Ship now` / `Ship with caution` / `Do not ship`)
+- Plain-language summaries of top risks
+- Prioritized remediation tasks and AI-fixable `P0/P1` items
+
+**Sample workflow output (truncated):**
+
+```text
+╔══════════════════════════════════════════════════════════════╗
+║             App Builder Workflow Demo (3-Step)             ║
+╚══════════════════════════════════════════════════════════════╝
+
+  Decision       : Do not ship
+  Verdict        : FAIL (47/100)
+  Risk Counts    : Critical 24 | High 27 | Medium 55
+
+  Step 2 — Plain-Language Findings:
+  - [CRITICAL] DATA-001: Hardcoded password detected
+      What: ...
+      Why : ...
+      Next: ...
+
+  Step 3 — Prioritized Tasks:
+  - P0 | DEVELOPER | Effort L | DATA-001
+      Task: ...
+      Done: ...
+
+  AI-Fixable Now (P0/P1):
+  - P0 DATA-001: ...
+```
+
+**Sample tribunal output (truncated):**
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
@@ -245,6 +279,28 @@ Each server returns structured findings. The AI synthesizes everything into a si
 ---
 
 ## MCP Tools
+
+### `evaluate_app_builder_flow`
+Run a **3-step app-builder workflow** for technical and non-technical stakeholders:
+
+1. Tribunal review (code/project/diff)
+2. Plain-language translation of top risks
+3. Prioritized remediation tasks with AI-fixable P0/P1 extraction
+
+Supports:
+- **Code mode**: `code` + `language`
+- **Project mode**: `files[]`
+- **Diff mode**: `code` + `language` + `changedLines[]`
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `code` | string | conditional | Full source content (code/diff mode) |
+| `language` | string | conditional | Programming language (code/diff mode) |
+| `files` | array | conditional | `{ path, content, language }[]` for project mode |
+| `changedLines` | number[] | no | 1-based changed lines for diff mode |
+| `context` | string | no | Optional business/technical context |
+| `maxFindings` | number | no | Max translated top findings (default: 10) |
+| `maxTasks` | number | no | Max generated tasks (default: 20) |
 
 ### `get_judges`
 List all available judges with their domains and descriptions.

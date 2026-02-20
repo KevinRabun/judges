@@ -16,6 +16,7 @@ import { fileURLToPath } from "url";
 
 import {
   evaluateWithTribunal,
+  runAppBuilderWorkflow,
   formatVerdictAsMarkdown,
 } from "../src/evaluators/index.js";
 
@@ -77,4 +78,73 @@ for (const evaluation of verdict.evaluations) {
 
 console.log();
 console.log(`  Timestamp: ${verdict.timestamp}`);
+console.log();
+
+// ─── Run App Builder Workflow Demo ──────────────────────────────────────────
+
+const workflow = runAppBuilderWorkflow({
+  code: sampleCode,
+  language: "typescript",
+  context:
+    "Demo API service used to illustrate production-readiness checks and remediation planning.",
+  maxFindings: 5,
+  maxTasks: 8,
+});
+
+const decisionLabel =
+  workflow.releaseDecision === "do-not-ship"
+    ? "Do not ship"
+    : workflow.releaseDecision === "ship-with-caution"
+    ? "Ship with caution"
+    : "Ship now";
+
+console.log("╔══════════════════════════════════════════════════════════════╗");
+console.log("║             App Builder Workflow Demo (3-Step)             ║");
+console.log("╚══════════════════════════════════════════════════════════════╝");
+console.log();
+console.log(`  Decision       : ${decisionLabel}`);
+console.log(`  Verdict        : ${workflow.verdict.toUpperCase()} (${workflow.score}/100)`);
+console.log(
+  `  Risk Counts    : Critical ${workflow.criticalCount} | High ${workflow.highCount} | Medium ${workflow.mediumCount}`
+);
+console.log(`  Summary        : ${workflow.summary}`);
+console.log();
+
+console.log("  Step 2 — Plain-Language Findings:");
+if (workflow.plainLanguageFindings.length === 0) {
+  console.log("  - No critical/high/medium findings detected.");
+} else {
+  for (const finding of workflow.plainLanguageFindings) {
+    console.log(
+      `  - [${finding.severity.toUpperCase()}] ${finding.ruleId}: ${finding.title}`
+    );
+    console.log(`      What: ${finding.whatIsWrong}`);
+    console.log(`      Why : ${finding.whyItMatters}`);
+    console.log(`      Next: ${finding.nextAction}`);
+  }
+}
+console.log();
+
+console.log("  Step 3 — Prioritized Tasks:");
+if (workflow.tasks.length === 0) {
+  console.log("  - No tasks generated.");
+} else {
+  for (const task of workflow.tasks) {
+    console.log(
+      `  - ${task.priority} | ${task.owner.toUpperCase()} | Effort ${task.effort} | ${task.ruleId}`
+    );
+    console.log(`      Task: ${task.task}`);
+    console.log(`      Done: ${task.doneWhen}`);
+  }
+}
+console.log();
+
+console.log("  AI-Fixable Now (P0/P1):");
+if (workflow.aiFixableNow.length === 0) {
+  console.log("  - None in this run.");
+} else {
+  for (const task of workflow.aiFixableNow) {
+    console.log(`  - ${task.priority} ${task.ruleId}: ${task.task}`);
+  }
+}
 console.log();

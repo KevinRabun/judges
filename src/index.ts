@@ -9,6 +9,7 @@
  * to perform thorough contextual analysis beyond what static patterns catch.
  *
  * Tools exposed:
+ *   - evaluate_app_builder_flow:  3-step workflow (review, translate, tasks)
  *   - evaluate_code:              Full panel review (all 31 judges)
  *   - evaluate_code_single_judge: Review by a specific judge
  *   - get_judges:                 List all available judges
@@ -25,6 +26,7 @@ import {
   evaluateProject,
   evaluateDiff,
   analyzeDependencies,
+  runAppBuilderWorkflow,
   formatVerdictAsMarkdown,
   formatEvaluationAsMarkdown,
 } from "./evaluators/index.js";
@@ -34,7 +36,7 @@ import { JudgeDefinition } from "./types.js";
 
 const server = new McpServer({
   name: "judges",
-  version: "1.6.0",
+  version: "1.7.0",
 });
 
 // ─── Tool: get_judges ────────────────────────────────────────────────────────
@@ -60,6 +62,126 @@ server.tool(
         },
       ],
     };
+  }
+);
+
+// ─── Tool: evaluate_code ─────────────────────────────────────────────────────
+
+server.tool(
+  "evaluate_app_builder_flow",
+  "Run a 3-step app-builder workflow: tribunal review, plain-language risk translation, and prioritized remediation tasks with AI-fixable P0/P1 items.",
+  {
+    code: z
+      .string()
+      .optional()
+      .describe("Source code to evaluate (use with language for single-file mode)"),
+    language: z
+      .string()
+      .optional()
+      .describe("Programming language for single-file or diff mode"),
+    files: z
+      .array(
+        z.object({
+          path: z.string().describe("Relative file path"),
+          content: z.string().describe("File content"),
+          language: z.string().describe("Programming language"),
+        })
+      )
+      .optional()
+      .describe("Project files for multi-file mode"),
+    changedLines: z
+      .array(z.number())
+      .optional()
+      .describe("1-based changed line numbers for diff mode"),
+    context: z
+      .string()
+      .optional()
+      .describe("Optional context about business purpose or constraints"),
+    maxFindings: z
+      .number()
+      .optional()
+      .describe("Maximum number of translated top findings to return (default: 10)"),
+    maxTasks: z
+      .number()
+      .optional()
+      .describe("Maximum number of remediation tasks to return (default: 20)"),
+  },
+  async ({ code, language, files, changedLines, context, maxFindings, maxTasks }) => {
+    try {
+      const result = runAppBuilderWorkflow({
+        code,
+        language,
+        files,
+        changedLines,
+        context,
+        maxFindings,
+        maxTasks,
+      });
+
+      const releaseLabel =
+        result.releaseDecision === "do-not-ship"
+          ? "Do not ship"
+          : result.releaseDecision === "ship-with-caution"
+          ? "Ship with caution"
+          : "Ship now";
+
+      let md = `# App Builder Workflow Report\n\n`;
+      md += `**Mode:** ${result.mode}\n`;
+      md += `**Decision:** ${releaseLabel}\n`;
+      md += `**Verdict:** ${result.verdict.toUpperCase()} (${result.score}/100)\n`;
+      md += `**Findings:** Critical ${result.criticalCount} | High ${result.highCount} | Medium ${result.mediumCount}\n\n`;
+      md += `${result.summary}\n\n`;
+
+      md += `## Plain-Language Summary\n\n`;
+      if (result.plainLanguageFindings.length === 0) {
+        md += `No critical/high/medium findings were identified in this run.\n\n`;
+      } else {
+        for (const finding of result.plainLanguageFindings) {
+          md += `### [${finding.severity.toUpperCase()}] ${finding.ruleId}: ${finding.title}\n`;
+          md += `- **What is wrong:** ${finding.whatIsWrong}\n`;
+          md += `- **Why it matters:** ${finding.whyItMatters}\n`;
+          md += `- **Next action:** ${finding.nextAction}\n\n`;
+        }
+      }
+
+      md += `## Prioritized Task List\n\n`;
+      if (result.tasks.length === 0) {
+        md += `No remediation tasks generated.\n\n`;
+      } else {
+        for (const task of result.tasks) {
+          md += `- **${task.priority}** | Owner: ${task.owner.toUpperCase()} | Effort: ${task.effort} | ${task.ruleId}\n`;
+          md += `  - Task: ${task.task}\n`;
+          md += `  - Done when: ${task.doneWhen}\n`;
+        }
+        md += `\n`;
+      }
+
+      md += `## AI-Fixable Now (P0/P1)\n\n`;
+      if (result.aiFixableNow.length === 0) {
+        md += `No AI-fixable P0/P1 items detected in this run.\n`;
+      } else {
+        for (const task of result.aiFixableNow) {
+          md += `- **${task.priority} ${task.ruleId}** ${task.task}\n`;
+        }
+      }
+
+      return {
+        content: [{ type: "text" as const, text: md }],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              error instanceof Error
+                ? `Error: ${error.message}`
+                : "Error: Failed to run app builder workflow",
+          },
+        ],
+        isError: true,
+      };
+    }
   }
 );
 

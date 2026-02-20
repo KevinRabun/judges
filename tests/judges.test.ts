@@ -21,6 +21,7 @@ import {
   evaluateProject,
   evaluateDiff,
   analyzeDependencies,
+  runAppBuilderWorkflow,
   formatVerdictAsMarkdown,
   formatEvaluationAsMarkdown,
 } from "../src/evaluators/index.js";
@@ -781,6 +782,85 @@ require (
       assert.ok(result);
       assert.ok(result.findings.length > 0, "Should report parse error");
     });
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: App Builder Workflow (review → translate → task plan)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("App Builder Workflow", () => {
+  it("should produce do-not-ship for heavily flawed code", () => {
+    const result = runAppBuilderWorkflow({
+      code: sampleCode,
+      language: "typescript",
+    });
+
+    assert.equal(result.mode, "code");
+    assert.equal(result.releaseDecision, "do-not-ship");
+    assert.ok(result.criticalCount > 0, "Expected critical findings");
+    assert.ok(result.plainLanguageFindings.length > 0, "Expected translated findings");
+    assert.ok(result.tasks.length > 0, "Expected remediation tasks");
+  });
+
+  it("should support project mode and produce prioritized tasks", () => {
+    const result = runAppBuilderWorkflow({
+      files: [
+        {
+          path: "src/a.ts",
+          language: "typescript",
+          content: `export function bad(input: string) { return eval(input); }`,
+        },
+        {
+          path: "src/b.ts",
+          language: "typescript",
+          content: `export const pwd = "admin123";`,
+        },
+      ],
+      maxTasks: 5,
+    });
+
+    assert.equal(result.mode, "project");
+    assert.ok(result.tasks.length > 0, "Expected tasks in project mode");
+    assert.ok(
+      result.tasks.every((task) => ["P0", "P1", "P2"].includes(task.priority)),
+      "Tasks should have valid priority"
+    );
+  });
+
+  it("should support diff mode and return AI-fixable P0/P1 subset", () => {
+    const code = `
+app.get("/data", (req, res) => {
+  const q = "SELECT * FROM t WHERE id=" + req.query.id;
+  eval(req.body.code);
+  res.json({ ok: true });
+});`;
+
+    const result = runAppBuilderWorkflow({
+      code,
+      language: "typescript",
+      changedLines: [2, 3, 4],
+    });
+
+    assert.equal(result.mode, "diff");
+    assert.ok(Array.isArray(result.aiFixableNow));
+    assert.ok(
+      result.aiFixableNow.every(
+        (task) => task.aiFixable && (task.priority === "P0" || task.priority === "P1")
+      ),
+      "AI-fixable-now list should only contain P0/P1 AI-fixable tasks"
+    );
+  });
+
+  it("should throw for invalid mode input", () => {
+    assert.throws(
+      () =>
+        runAppBuilderWorkflow({
+          changedLines: [1, 2],
+          language: "typescript",
+        }),
+      /requires both code and language inputs/
+    );
   });
 });
 

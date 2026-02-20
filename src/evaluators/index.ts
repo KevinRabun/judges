@@ -12,6 +12,10 @@ import {
   DependencyEntry,
   Finding,
   Verdict,
+  Severity,
+  AppBuilderWorkflowResult,
+  PlainLanguageFinding,
+  WorkflowTask,
 } from "../types.js";
 import { JUDGES } from "../judges/index.js";
 
@@ -629,6 +633,206 @@ export function analyzeDependencies(
     score,
     verdict,
     summary: `Dependency analysis: ${dependencies.length} dependencies, ${findings.length} findings, score ${score}/100 — ${verdict.toUpperCase()}`,
+  };
+}
+
+// ─── App Builder Flow (Review → Translate → Task Plan) ─────────────────────
+
+function severityRank(severity: Severity): number {
+  switch (severity) {
+    case "critical":
+      return 5;
+    case "high":
+      return 4;
+    case "medium":
+      return 3;
+    case "low":
+      return 2;
+    case "info":
+      return 1;
+  }
+}
+
+function dedupeFindings(findings: Finding[]): Finding[] {
+  const seen = new Set<string>();
+  const result: Finding[] = [];
+
+  for (const finding of findings) {
+    const key = `${finding.ruleId}|${finding.title}|${finding.severity}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(finding);
+  }
+
+  return result;
+}
+
+function decideRelease(
+  criticalCount: number,
+  highCount: number,
+  score: number
+): AppBuilderWorkflowResult["releaseDecision"] {
+  if (criticalCount > 0 || score < 60) return "do-not-ship";
+  if (highCount > 0 || score < 80) return "ship-with-caution";
+  return "ship-now";
+}
+
+function toPlainLanguageFinding(finding: Finding): PlainLanguageFinding {
+  const severityImpact: Record<Severity, string> = {
+    critical:
+      "This can directly cause security incidents, outages, or serious compliance exposure.",
+    high: "This is likely to impact users or operations if left unresolved.",
+    medium: "This can create reliability, maintainability, or quality issues over time.",
+    low: "This is a quality improvement that reduces friction and future rework.",
+    info: "This is guidance to strengthen consistency and engineering hygiene.",
+  };
+
+  return {
+    ruleId: finding.ruleId,
+    severity: finding.severity,
+    title: finding.title,
+    whatIsWrong: `${finding.title}: ${finding.description}`,
+    whyItMatters: severityImpact[finding.severity],
+    nextAction: finding.recommendation,
+  };
+}
+
+function pickOwner(finding: Finding): WorkflowTask["owner"] {
+  if (/^(UX|A11Y|I18N|ETHICS|COMPAT)-/.test(finding.ruleId)) return "product";
+  if (/^(DOC|TEST|MAINT|ERR|CFG)-/.test(finding.ruleId)) return "ai";
+  return "developer";
+}
+
+function pickPriority(severity: Severity): WorkflowTask["priority"] {
+  if (severity === "critical") return "P0";
+  if (severity === "high") return "P1";
+  return "P2";
+}
+
+function pickEffort(finding: Finding): WorkflowTask["effort"] {
+  if (finding.severity === "critical") return "L";
+  if (finding.severity === "high") return "M";
+  return finding.lineNumbers && finding.lineNumbers.length > 3 ? "M" : "S";
+}
+
+function toWorkflowTask(finding: Finding): WorkflowTask {
+  const owner = pickOwner(finding);
+  const priority = pickPriority(finding.severity);
+  const effort = pickEffort(finding);
+  const aiFixable = owner !== "product";
+
+  return {
+    priority,
+    owner,
+    effort,
+    ruleId: finding.ruleId,
+    task: `${finding.title} — ${finding.recommendation}`,
+    doneWhen: `A follow-up review no longer reports ${finding.ruleId} and related tests/checks pass.`,
+    aiFixable,
+  };
+}
+
+export function runAppBuilderWorkflow(params: {
+  code?: string;
+  language?: string;
+  files?: Array<{ path: string; content: string; language: string }>;
+  changedLines?: number[];
+  context?: string;
+  maxFindings?: number;
+  maxTasks?: number;
+}): AppBuilderWorkflowResult {
+  const maxFindings = Math.max(1, params.maxFindings ?? 10);
+  const maxTasks = Math.max(1, params.maxTasks ?? 20);
+
+  let mode: AppBuilderWorkflowResult["mode"];
+  let verdict: Verdict;
+  let score: number;
+  let findings: Finding[];
+
+  if (params.files && params.files.length > 0) {
+    mode = "project";
+    const result = evaluateProject(params.files, params.context);
+    verdict = result.overallVerdict;
+    score = result.overallScore;
+    findings = [
+      ...result.fileResults.flatMap((fr) => fr.findings),
+      ...result.architecturalFindings,
+    ];
+  } else if (params.changedLines && params.changedLines.length > 0) {
+    if (!params.code || !params.language) {
+      throw new Error(
+        "changedLines mode requires both code and language inputs"
+      );
+    }
+
+    mode = "diff";
+    const result = evaluateDiff(
+      params.code,
+      params.language,
+      params.changedLines,
+      params.context
+    );
+    verdict = result.verdict;
+    score = result.score;
+    findings = result.findings;
+  } else {
+    if (!params.code || !params.language) {
+      throw new Error(
+        "code mode requires both code and language, or provide files for project mode"
+      );
+    }
+
+    mode = "code";
+    const result = evaluateWithTribunal(params.code, params.language, params.context);
+    verdict = result.overallVerdict;
+    score = result.overallScore;
+    findings = result.evaluations.flatMap((evaluation) => evaluation.findings);
+  }
+
+  const dedupedFindings = dedupeFindings(findings).sort(
+    (a, b) => severityRank(b.severity) - severityRank(a.severity)
+  );
+
+  const criticalCount = dedupedFindings.filter(
+    (finding) => finding.severity === "critical"
+  ).length;
+  const highCount = dedupedFindings.filter(
+    (finding) => finding.severity === "high"
+  ).length;
+  const mediumCount = dedupedFindings.filter(
+    (finding) => finding.severity === "medium"
+  ).length;
+
+  const releaseDecision = decideRelease(criticalCount, highCount, score);
+  const topFindings = dedupedFindings
+    .filter((finding) => ["critical", "high", "medium"].includes(finding.severity))
+    .slice(0, maxFindings);
+
+  const plainLanguageFindings = topFindings.map(toPlainLanguageFinding);
+  const tasks = dedupedFindings.slice(0, maxTasks).map(toWorkflowTask);
+  const aiFixableNow = tasks.filter(
+    (task) => task.aiFixable && (task.priority === "P0" || task.priority === "P1")
+  );
+
+  const summary =
+    releaseDecision === "do-not-ship"
+      ? "Do not ship yet. Resolve critical risks before release."
+      : releaseDecision === "ship-with-caution"
+      ? "Ship with caution. Address high-priority gaps and monitor closely."
+      : "Ship now. No blocking risks were detected in this review pass.";
+
+  return {
+    mode,
+    verdict,
+    score,
+    criticalCount,
+    highCount,
+    mediumCount,
+    releaseDecision,
+    summary,
+    plainLanguageFindings,
+    tasks,
+    aiFixableNow,
   };
 }
 
