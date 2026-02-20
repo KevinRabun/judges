@@ -92,5 +92,83 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
     });
   }
 
+  // Auth endpoints without stricter rate limits
+  const authRoutePattern = /(?:post|put)\s*\(\s*['"]\/(?:auth|login|signin|register|signup|password|reset|forgot|token|oauth)/gi;
+  const authRouteLines = getLineNumbers(code, authRoutePattern);
+  const hasRateLimiter = /rateLimit|rateLimiter|rate_limit|throttle/gi.test(code);
+  if (authRouteLines.length > 0 && !hasRateLimiter) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Authentication endpoints without rate limiting",
+      description: `Found ${authRouteLines.length} authentication endpoint(s) without visible rate limiting. Auth endpoints are prime targets for brute-force and credential-stuffing attacks.`,
+      lineNumbers: authRouteLines,
+      recommendation: "Apply strict rate limits to auth endpoints (e.g., 5-10 requests/minute per IP). Use progressive delays or CAPTCHA after failed attempts. Consider using 'express-rate-limit' or 'rate-limiter-flexible'.",
+      reference: "OWASP: Brute Force Protection / NIST 800-63B",
+    });
+  }
+
+  // File upload without size limit
+  const uploadPattern = /multer\s*\(|upload\s*\.\s*(?:single|array|fields)|formidable|busboy|multipart/gi;
+  const uploadLines = getLineNumbers(code, uploadPattern);
+  const hasUploadLimit = /limits\s*:\s*\{|maxFileSize|fileSizeLimit|maxFiles/gi.test(code);
+  if (uploadLines.length > 0 && !hasUploadLimit) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "File upload without size or count limits",
+      description: `Found ${uploadLines.length} file upload handler(s) without visible size limits. Unbounded uploads can exhaust disk space and memory, causing denial of service.`,
+      lineNumbers: uploadLines,
+      recommendation: "Set explicit file size limits (e.g., multer({ limits: { fileSize: 5 * 1024 * 1024 } })). Limit the number of files per request. Validate file types.",
+      reference: "OWASP: Unrestricted File Upload / Multer Limits",
+    });
+  }
+
+  // Missing 429 status code responses
+  const has429 = /429|Too Many Requests|too_many_requests|RATE_LIMIT|rateLimited/gi.test(code);
+  const hasApiEndpoints = /app\.\s*(?:get|post|put|delete|patch)\s*\(|router\.\s*(?:get|post|put|delete|patch)\s*\(/gi.test(code);
+  if (hasApiEndpoints && !has429 && !hasRateLimiter) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "API endpoints with no 429 (Too Many Requests) handling",
+      description: "API endpoints found but no 429 status code or rate limiting middleware detected. Without rate limiting responses, clients have no feedback mechanism to back off.",
+      recommendation: "Return 429 status with Retry-After header when rate limits are exceeded. Include rate limit headers (X-RateLimit-Remaining, X-RateLimit-Reset) in all responses.",
+      reference: "RFC 6585: 429 Too Many Requests / IETF Rate Limiting Headers",
+    });
+  }
+
+  // WebSocket connections without limits
+  const wsPattern = /new\s+WebSocket(?:Server)?|wss?\.\s*on\s*\(\s*['"]connection/gi;
+  const wsLines = getLineNumbers(code, wsPattern);
+  const hasWsLimit = /maxPayload|maxConnections|maxClientsCount|perMessageDeflate.*threshold/gi.test(code);
+  if (wsLines.length > 0 && !hasWsLimit) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "WebSocket server without connection or message limits",
+      description: `Found ${wsLines.length} WebSocket server setup(s) without visible connection or payload limits. Unbounded WebSocket connections can exhaust server resources.`,
+      lineNumbers: wsLines,
+      recommendation: "Set maxPayload to limit message sizes. Limit concurrent connections per client. Implement message rate limiting per connection. Set idle timeouts.",
+      reference: "ws Package: Connection Limits / WebSocket Security",
+    });
+  }
+
+  // Recursive/infinite retry without backoff
+  const retryPattern = /retry|retryCount|maxRetries|attempts?\s*[<>]/gi;
+  const retryLines = getLineNumbers(code, retryPattern);
+  const hasBackoffStrategy = /backoff|exponential|delay\s*\*|Math\.pow|jitter/gi.test(code);
+  if (retryLines.length > 0 && !hasBackoffStrategy) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Retry logic without exponential backoff",
+      description: `Found ${retryLines.length} retry reference(s) without backoff or delay escalation. Retrying at a fixed rate can overwhelm downstream services and cause cascading failures.`,
+      lineNumbers: retryLines,
+      recommendation: "Use exponential backoff with jitter: delay = baseDelay * Math.pow(2, attempt) + randomJitter. Set a maximum retry count. Use libraries like 'p-retry' or 'axios-retry'.",
+      reference: "AWS Architecture Blog: Exponential Backoff and Jitter",
+    });
+  }
+
   return findings;
 }

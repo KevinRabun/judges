@@ -67,14 +67,19 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   }
 
   // Single-threaded heavy computation
+  // Detect nested loops, known CPU-intensive operations, and blocking patterns
   const heavyCompPattern = /(?:for|while)\s*\(.*(?:length|size|count).*\)[\s\S]{0,200}(?:for|while)\s*\(/gi;
-  if (heavyCompPattern.test(code)) {
+  const cpuIntensiveOps = /crypto\.pbkdf2Sync|crypto\.scryptSync|bcrypt\.hashSync|JSON\.parse\s*\(\s*JSON\.stringify|structuredClone|zlib\.[^a-z]*Sync|(?:sort|reduce|map|filter)\s*\([^)]*(?:sort|reduce|map|filter)\s*\(/gi;
+  const hasNestedLoops = heavyCompPattern.test(code);
+  const cpuOpsLines = getLineNumbers(code, cpuIntensiveOps);
+  if (hasNestedLoops || cpuOpsLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "CPU-intensive computation may block scaling",
-      description: "Heavy computation on the main thread can starve other requests. In Node.js, this blocks the event loop; in other runtimes, it consumes thread pool capacity.",
-      recommendation: "Offload CPU-intensive work to worker threads, a job queue (Bull, Celery), or a dedicated compute service. Consider WebAssembly for hot-path computation.",
+      description: `Detected ${hasNestedLoops ? "nested loops" : ""}${hasNestedLoops && cpuOpsLines.length > 0 ? " and " : ""}${cpuOpsLines.length > 0 ? `${cpuOpsLines.length} synchronous/heavy operation(s)` : ""}. Heavy computation on the main thread blocks the event loop (Node.js) or consumes thread pool capacity.`,
+      lineNumbers: cpuOpsLines.length > 0 ? cpuOpsLines : undefined,
+      recommendation: "Offload CPU-intensive work to worker threads, a job queue (Bull, Celery), or a dedicated compute service. Use async variants of crypto operations (pbkdf2, scrypt). Consider WebAssembly for hot-path computation.",
       reference: "Node.js Worker Threads / Job Queue Patterns",
     });
   }

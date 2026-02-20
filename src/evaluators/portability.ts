@@ -112,5 +112,82 @@ export function analyzePortability(code: string, language: string): Finding[] {
     });
   }
 
+  // OS-specific environment variables
+  const osEnvPattern = /process\.env\.(?:APPDATA|LOCALAPPDATA|USERPROFILE|PROGRAMFILES|HOMEPATH|WINDIR|SystemRoot|COMSPEC|HOME|XDG_\w+)/g;
+  const osEnvLines = getLineNumbers(code, osEnvPattern);
+  if (osEnvLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "OS-specific environment variables used directly",
+      description: `Found ${osEnvLines.length} reference(s) to platform-specific environment variables (e.g., APPDATA, USERPROFILE, XDG_*). These variables only exist on specific operating systems.`,
+      lineNumbers: osEnvLines,
+      recommendation: "Use cross-platform helpers like os.homedir(), os.tmpdir(), or libraries like 'env-paths' to resolve platform-appropriate directories.",
+      reference: "Node.js os Module / Cross-Platform File Paths",
+    });
+  }
+
+  // Browser-specific APIs in server/universal code
+  const browserApiPattern = /\b(?:document\.|window\.|navigator\.|localStorage\.|sessionStorage\.|alert\s*\(|confirm\s*\(|prompt\s*\()/g;
+  const browserApiLines = getLineNumbers(code, browserApiPattern);
+  const isLikelyServer = /require\s*\(\s*['"](?:express|http|fs|net|child_process|cluster)/gi.test(code) || /import\s+.*from\s+['"](?:express|http|fs|net|child_process|cluster)/gi.test(code);
+  if (browserApiLines.length > 0 && isLikelyServer) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Browser-specific APIs used in server-side code",
+      description: `Found ${browserApiLines.length} browser-only API call(s) (document, window, localStorage, etc.) in what appears to be server-side code. These will throw ReferenceError at runtime.`,
+      lineNumbers: browserApiLines,
+      recommendation: "Guard browser API usage with typeof checks (e.g., typeof window !== 'undefined'). Use isomorphic libraries for code shared between client and server.",
+      reference: "Universal JavaScript / SSR Best Practices",
+    });
+  }
+
+  // __dirname / __filename in ESM
+  const dirnamePattern = /\b__dirname\b|\b__filename\b/g;
+  const dirnameLines = getLineNumbers(code, dirnamePattern);
+  const isESM = /import\s+.*from\s+['"]|export\s+(?:default|const|function|class)\b/g.test(code);
+  if (dirnameLines.length > 0 && isESM) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "__dirname/__filename used in ESM module",
+      description: `Found ${dirnameLines.length} use(s) of __dirname or __filename, which are not available in ES modules. This will fail at runtime when using ESM.`,
+      lineNumbers: dirnameLines,
+      recommendation: "Use import.meta.url with fileURLToPath() and path.dirname() for ESM-compatible directory resolution: const __dirname = path.dirname(fileURLToPath(import.meta.url))",
+      reference: "Node.js ESM: import.meta.url",
+    });
+  }
+
+  // Architecture-specific assumptions (32/64 bit)
+  const archPattern = /(?:Int32Array|Float32Array|Uint32Array|Buffer\.alloc(?:Unsafe)?\s*\(\s*\d{8,})|(?:MAX_SAFE_INTEGER|Number\.MAX_SAFE_INTEGER)/g;
+  const archLines = getLineNumbers(code, archPattern);
+  if (archLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Potential architecture-specific assumptions",
+      description: `Found ${archLines.length} instance(s) of typed arrays, large buffer allocations, or integer limit references that may behave differently across architectures.`,
+      lineNumbers: archLines,
+      recommendation: "Use BigInt for values exceeding Number.MAX_SAFE_INTEGER. Be mindful of buffer sizes on memory-constrained platforms. Test on both 32-bit and 64-bit environments.",
+      reference: "MDN: BigInt / Node.js Buffer Best Practices",
+    });
+  }
+
+  // Platform-specific process signals
+  const signalPattern = /process\.on\s*\(\s*['"](?:SIGUSR1|SIGUSR2|SIGWINCH|SIGHUP|SIGPIPE)['"]/g;
+  const signalLines = getLineNumbers(code, signalPattern);
+  if (signalLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Platform-specific process signals used",
+      description: `Found ${signalLines.length} Unix-specific signal handler(s) (SIGUSR1, SIGHUP, etc.). These signals are not available on Windows and will cause errors.`,
+      lineNumbers: signalLines,
+      recommendation: "Guard signal handlers with platform checks (process.platform !== 'win32'). Use cross-platform shutdown mechanisms. Consider using 'death' or 'signal-exit' packages.",
+      reference: "Node.js Process Signals / Cross-Platform Considerations",
+    });
+  }
+
   return findings;
 }

@@ -146,5 +146,110 @@ export function analyzeMaintainability(code: string, language: string): Finding[
     });
   }
 
+  // Inconsistent naming conventions
+  const camelCaseVars = (code.match(/(?:const|let|var)\s+[a-z][a-zA-Z0-9]*\s*[:=]/g) || []).length;
+  const snakeCaseVars = (code.match(/(?:const|let|var)\s+[a-z][a-z0-9]*_[a-z][a-z0-9_]*\s*[:=]/g) || []).length;
+  if (camelCaseVars > 3 && snakeCaseVars > 3) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Inconsistent naming conventions (mixed camelCase and snake_case)",
+      description: `Found both camelCase (${camelCaseVars}) and snake_case (${snakeCaseVars}) variable names. Inconsistent naming makes the codebase harder to navigate.`,
+      recommendation: "Adopt a single naming convention for the project. In JavaScript/TypeScript, use camelCase for variables and functions, PascalCase for classes and types.",
+      reference: "Clean Code: Meaningful Names (Chapter 2)",
+    });
+  }
+
+  // Functions with excessive parameters (>5)
+  const manyParamsPattern = /function\s+\w+\s*\(\s*(?:\w+\s*[,:]\s*){5,}/g;
+  const arrowManyParams = /(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?\(\s*(?:\w+\s*[,:]\s*){5,}/g;
+  const manyParamLines = [
+    ...getLineNumbers(code, manyParamsPattern),
+    ...getLineNumbers(code, arrowManyParams),
+  ];
+  if (manyParamLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Functions with too many parameters",
+      description: `Found ${manyParamLines.length} function(s) with more than 5 parameters. Long parameter lists are hard to remember, easy to misorder, and indicate the function does too much.`,
+      lineNumbers: manyParamLines,
+      recommendation: "Use an options object parameter: func({ name, age, ...opts }). This is self-documenting, order-independent, and extensible.",
+      reference: "Clean Code: Functions (Chapter 3) / Code Complete",
+    });
+  }
+
+  // Single-letter variable names (outside loops)
+  const singleLetterVarPattern = /(?:const|let|var)\s+([a-zA-Z])\s*[:=]/g;
+  const singleLetterLines: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/\b(?:for|while)\s*\(/.test(line)) continue; // skip loop counters
+    if (/(?:const|let|var)\s+[a-zA-Z]\s*[:=]/.test(line) && !/(?:const|let|var)\s+[a-zA-Z]\s*[:=].*(?:=>|\bfunction\b)/.test(line)) {
+      singleLetterLines.push(i + 1);
+    }
+  }
+  if (singleLetterLines.length > 2) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Single-letter variable names reduce readability",
+      description: `Found ${singleLetterLines.length} single-letter variable declaration(s) outside of loop counters. Cryptic names force readers to track variable meaning mentally.`,
+      lineNumbers: singleLetterLines.slice(0, 5),
+      recommendation: "Use descriptive variable names that reveal intent: 'user' instead of 'u', 'index' instead of 'i' (outside loops). Good names are self-documenting.",
+      reference: "Clean Code: Meaningful Names (Chapter 2)",
+    });
+  }
+
+  // Unused imports heuristic
+  const importPattern = /import\s+(?:\{([^}]+)\}|(\w+))\s+from/g;
+  let importMatch;
+  const unusedImportLines: number[] = [];
+  while ((importMatch = importPattern.exec(code)) !== null) {
+    const importedNames = (importMatch[1] || importMatch[2] || "").split(",").map(s => s.trim().split(/\s+as\s+/).pop()?.trim()).filter(Boolean);
+    for (const name of importedNames) {
+      if (!name || name.length === 0) continue;
+      // Count occurrences beyond the import line itself
+      const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const usageCount = (code.match(new RegExp(`\\b${escapedName}\\b`, 'g')) || []).length;
+      if (usageCount <= 1) {
+        const importLine = code.substring(0, importMatch.index).split("\n").length;
+        unusedImportLines.push(importLine);
+        break; // one finding per import line is enough
+      }
+    }
+  }
+  if (unusedImportLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "info",
+      title: "Potentially unused imports detected",
+      description: `Found ${unusedImportLines.length} import statement(s) where imported names appear only once (in the import itself). Unused imports increase bundle size and add noise.`,
+      lineNumbers: unusedImportLines.slice(0, 5),
+      recommendation: "Remove unused imports. Enable ESLint no-unused-vars and TypeScript noUnusedLocals. Most editors can auto-remove unused imports on save.",
+      reference: "ESLint no-unused-vars / TypeScript Best Practices",
+    });
+  }
+
+  // Duplicate string literals
+  const stringLiterals: Record<string, number> = {};
+  const stringLiteralPattern = /["'`]([^"'`]{10,})["'`]/g;
+  let strMatch;
+  while ((strMatch = stringLiteralPattern.exec(code)) !== null) {
+    const val = strMatch[1];
+    stringLiterals[val] = (stringLiterals[val] || 0) + 1;
+  }
+  const duplicateStrings = Object.entries(stringLiterals).filter(([, count]) => count >= 3);
+  if (duplicateStrings.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Duplicate string literals — extract to constants",
+      description: `Found ${duplicateStrings.length} string value(s) repeated 3+ times. Duplicate strings are easy to typo and hard to update consistently.`,
+      recommendation: "Extract repeated strings into named constants. This makes updates a single-point change and prevents typos.",
+      reference: "DRY Principle / Clean Code",
+    });
+  }
+
   return findings;
 }

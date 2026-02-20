@@ -81,5 +81,78 @@ export function analyzeCaching(code: string, language: string): Finding[] {
     });
   }
 
+  // Cache key collision risk — simple string concatenation keys
+  const cacheKeyPattern = /cache\.(?:set|get|has)\s*\(\s*(?:["'`][^"'`]{1,10}["'`]|`\$\{)/gi;
+  const cacheKeyLines = getLineNumbers(code, cacheKeyPattern);
+  if (cacheKeyLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Simple cache keys risk collisions",
+      description: `Found ${cacheKeyLines.length} cache operation(s) with short or interpolated keys. Without namespace prefixes or hashing, keys from different features can collide.`,
+      lineNumbers: cacheKeyLines,
+      recommendation: "Use namespaced, structured cache keys: 'users:byId:${id}'. Include version or tenant info for multi-tenant apps. Consider hashing complex keys.",
+      reference: "Cache Key Design Best Practices",
+    });
+  }
+
+  // Thundering herd / cache stampede — multiple concurrent fetches on miss
+  const cacheGetPattern = /cache\.get\s*\(/gi;
+  const cacheGetLines = getLineNumbers(code, cacheGetPattern);
+  const hasStampedeProtection = /lock|mutex|singleflight|coalesce|dedupe|p-memoize/gi.test(code);
+  if (cacheGetLines.length > 0 && !hasStampedeProtection) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "No thundering herd protection on cache misses",
+      description: "Cache reads without stampede protection. When a popular cache entry expires, many concurrent requests will all miss and hit the backend simultaneously.",
+      recommendation: "Implement request coalescing (singleflight pattern) so only one request fetches on a miss. Use stale-while-revalidate or lock-based refresh.",
+      reference: "Cache Stampede / Thundering Herd Problem",
+    });
+  }
+
+  // Caching secrets or tokens
+  const cacheSecretPattern = /cache\.(?:set|put)\s*\([^)]*(?:token|secret|password|credential|apikey|api_key)/gi;
+  const cacheSecretLines = getLineNumbers(code, cacheSecretPattern);
+  if (cacheSecretLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Secrets or tokens stored in cache",
+      description: "Sensitive values (tokens, secrets, passwords) are cached. Cached secrets may persist beyond their intended lifetime and can be exposed via cache inspection.",
+      lineNumbers: cacheSecretLines,
+      recommendation: "Never cache secrets or authentication tokens. Use a dedicated secrets manager with built-in rotation. If token caching is necessary, encrypt values and set strict TTLs.",
+      reference: "OWASP Secrets Management / Cache Security",
+    });
+  }
+
+  // Stale data served without revalidation
+  const hasCacheRead = /cache\.get|cache\.fetch|getFromCache|getCached/gi.test(code);
+  const hasRevalidation = /revalidate|stale-while-revalidate|refresh|ETag|If-None-Match|If-Modified-Since|304/gi.test(code);
+  if (hasCacheRead && !hasRevalidation && cacheSetLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Cached data served without revalidation mechanism",
+      description: "Data is cached and served without any revalidation strategy. Clients may receive stale data indefinitely until the TTL expires.",
+      recommendation: "Implement stale-while-revalidate: serve stale data immediately while refreshing in the background. Use ETags or Last-Modified for conditional fetches.",
+      reference: "HTTP Stale-While-Revalidate / RFC 5861",
+    });
+  }
+
+  // No cache warming strategy
+  const hasStartup = /listen\s*\(|bootstrap|main\s*\(|init\s*\(/gi.test(code);
+  const hasCacheWarm = /warm|preheat|preload|seed.*cache|cache.*seed|cache.*warm/gi.test(code);
+  if (hasStartup && hasCacheRead && !hasCacheWarm && code.split("\n").length > 50) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "info",
+      title: "No cache warming strategy for cold starts",
+      description: "Application uses caching but has no visible cache warming on startup. After deployments or restarts, all requests will miss the cache and hit backends simultaneously.",
+      recommendation: "Implement cache warming on startup for critical data. Pre-populate frequently accessed keys during deployment. Consider gradual traffic ramp-up after deploys.",
+      reference: "Cache Warming / Blue-Green Deployment Best Practices",
+    });
+  }
+
   return findings;
 }

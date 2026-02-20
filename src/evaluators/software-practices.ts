@@ -37,8 +37,14 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   }
 
   // Magic numbers
+  const codeLines = code.split("\n");
   const magicNumberPattern = /(?:===?|!==?|<=?|>=?|&&|\|\|)\s*\d{2,}|(?:timeout|delay|limit|max|min|size|count|length|port|interval)\s*[:=]\s*\d{3,}/gi;
-  const magicLines = getLineNumbers(code, magicNumberPattern);
+  // Filter out common well-known numbers (HTTP status codes, ports, permissions, etc.)
+  const wellKnownNumbers = /\b(?:200|201|204|301|302|304|400|401|403|404|405|409|422|429|500|502|503|504|80|443|8080|3000|8443|3001|5432|27017|6379|0o?[0-7]{3,4}|0x[0-9a-f]+|1000|1024|255|256|65535|1e[3-9])\b/gi;
+  const magicLines = getLineNumbers(code, magicNumberPattern).filter(lineNum => {
+    const line = codeLines[lineNum - 1] || "";
+    return !wellKnownNumbers.test(line);
+  });
   if (magicLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -52,7 +58,6 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   }
 
   // Very long functions (>50 lines)
-  const codeLines = code.split("\n");
   let funcStart = -1;
   let braceDepth = 0;
   const longFunctions: number[] = [];
@@ -206,7 +211,13 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   }
 
   // Type coercion risks (JavaScript ==)
-  const looseEqualLines = getLineNumbers(code, /[^!=]={2}[^=]/g);
+  // More precise pattern: match == but exclude ===, !==, ==>, arrow functions, and template literals
+  const looseEqualPattern = /(?<![!=<>])\s==\s(?!=)/g;
+  const looseEqualLines = getLineNumbers(code, looseEqualPattern).filter(lineNum => {
+    const line = codeLines[lineNum - 1] || "";
+    // Exclude lines that are comments, strings with CSS selectors, or template literals
+    return !(/^\s*(?:\/\/|\*|\/\*)/.test(line)) && !(/['"].*==.*['"]/.test(line));
+  });
   if (looseEqualLines.length > 0 && (language === "javascript" || language === "typescript" || language === "jsx" || language === "tsx")) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

@@ -130,5 +130,63 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
     });
   }
 
+  // DROP TABLE / TRUNCATE without safeguards
+  const destructiveDbPattern = /(?:DROP\s+TABLE|TRUNCATE\s+TABLE|DROP\s+DATABASE|DROP\s+SCHEMA)/gi;
+  const destructiveDbLines = getLineNumbers(code, destructiveDbPattern);
+  if (destructiveDbLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "critical",
+      title: "Destructive DDL statements in application code",
+      description: `Found ${destructiveDbLines.length} DROP/TRUNCATE statement(s). These permanently delete data or schema. If executed accidentally (e.g., via injection), data loss is irreversible.`,
+      lineNumbers: destructiveDbLines,
+      recommendation: "Never run destructive DDL from application code. Use migration tools (Prisma, Flyway, Alembic) with review and rollback support. Require elevated permissions for DDL.",
+      reference: "Database Migration Best Practices / Least Privilege",
+    });
+  }
+
+  // No migration tooling
+  const hasMigrations = /migration|migrate|knex\.schema|Schema\.create|CreateTable|createTable|sequelize\.define|prisma\s+migrate|alembic|flyway|liquibase|db-migrate|umzug/gi.test(code);
+  const hasSchemaChanges = /CREATE\s+TABLE|ALTER\s+TABLE|ADD\s+COLUMN|DROP\s+COLUMN/gi.test(code);
+  if (hasSchemaChanges && !hasMigrations) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Schema changes without migration tooling",
+      description: "DDL statements (CREATE TABLE, ALTER TABLE) found without migration tooling. Manual schema changes are unreproducible and error-prone across environments.",
+      recommendation: "Use a database migration tool (Prisma, Knex, Flyway, Alembic) to version schema changes. Migrations should be idempotent and reversible.",
+      reference: "Database Migration Best Practices / Evolutionary Database Design",
+    });
+  }
+
+  // Missing database indexes heuristic
+  const hasWhereClause = /WHERE\s+\w+\s*(?:=|IN\s*\(|LIKE|>|<|BETWEEN)/gi.test(code);
+  const hasIndexHint = /CREATE\s+INDEX|ADD\s+INDEX|ensureIndex|createIndex|\.index\s*\(/gi.test(code);
+  if (hasWhereClause && !hasIndexHint && rawSqlLines.length > 2) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Queries with WHERE clauses but no index definitions",
+      description: "SQL queries filter on columns but no index creation is visible. Without indexes, queries perform full table scans which degrade exponentially with data volume.",
+      recommendation: "Create indexes on columns used in WHERE, JOIN, and ORDER BY clauses. Monitor slow query logs. Use EXPLAIN to verify query plans.",
+      reference: "SQL Indexing Best Practices / Use The Index, Luke!",
+    });
+  }
+
+  // Database credentials in connection string
+  const credInConnPattern = /(?:postgres|mysql|mongodb|mssql):\/\/\w+:\w+@/gi;
+  const credInConnLines = getLineNumbers(code, credInConnPattern);
+  if (credInConnLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Database credentials embedded in connection string",
+      description: "Connection string contains inline username and password. These credentials are visible in source code, logs, and process listings.",
+      lineNumbers: credInConnLines,
+      recommendation: "Use separate credential parameters or environment variables. Consider IAM/managed identity for passwordless database connections in cloud environments.",
+      reference: "OWASP: Credential Management / Azure Managed Identity",
+    });
+  }
+
   return findings;
 }

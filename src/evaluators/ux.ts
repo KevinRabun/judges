@@ -111,5 +111,79 @@ export function analyzeUx(code: string, language: string): Finding[] {
     });
   }
 
+  // No empty state handling
+  const hasEmptyCheck = /(?:\.length\s*===?\s*0|isEmpty|no\s*(?:results|data|items)|empty.?state|emptyState|NoData|NoResults)/gi.test(code);
+  const hasListRendering = /\.map\s*\(|\.forEach\s*\(|v-for|ngFor|\*ngFor|\.render\s*\(/gi.test(code);
+  if (hasListRendering && !hasEmptyCheck && code.split("\n").length > 30) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "List rendering without empty state handling",
+      description: "Code renders lists/collections without checking for empty state. Users see a blank screen with no feedback when no data exists.",
+      recommendation: "Always handle the empty state: show a helpful message, illustration, or call-to-action. Check array.length before rendering lists.",
+      reference: "UX Design: Empty State Patterns",
+    });
+  }
+
+  // Missing success feedback
+  const hasMutation = /\.post\s*\(|\.put\s*\(|\.delete\s*\(|\.patch\s*\(|fetch\s*\([^)]*(?:POST|PUT|DELETE|PATCH)/gi.test(code);
+  const hasSuccessFeedback = /toast|snackbar|notification|alert\s*\(\s*['"].*(?:success|saved|created|updated|deleted)|showMessage|showSuccess|feedback/gi.test(code);
+  if (hasMutation && !hasSuccessFeedback && code.split("\n").length > 30) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Mutations without success feedback",
+      description: "POST/PUT/DELETE operations found without visible success feedback. Users don't know if their action worked, leading to repeated submissions.",
+      recommendation: "Show success notifications (toasts, alerts) after mutations. Provide clear visual feedback. Consider optimistic UI updates with rollback on failure.",
+      reference: "Nielsen's Heuristic #1: Visibility of System Status",
+    });
+  }
+
+  // No progress indicator for long operations
+  const hasAsyncOp = /async\s+function|await\s+fetch|\.then\s*\(|Promise\./gi.test(code);
+  const hasProgress = /progress|spinner|loading|isLoading|setLoading|skeleton|placeholder/gi.test(code);
+  const hasFileProcessing = /readFile|writeFile|stream|pipe\s*\(|transform/gi.test(code);
+  if (hasFileProcessing && hasAsyncOp && !hasProgress) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "File/stream operations without progress indicators",
+      description: "File processing or streaming operations found without progress feedback. Users waiting on long operations without feedback may assume the app is frozen.",
+      recommendation: "Show progress bars for file operations. Use streaming progress events. Provide estimated time remaining for large operations.",
+      reference: "UX: Progress Indicator Patterns / Nielsen's Heuristic #1",
+    });
+  }
+
+  // Hardcoded UI strings (i18n issue from UX perspective)
+  const hardcodedStringPattern = /(?:innerHTML|textContent|innerText|placeholder|title|label)\s*=\s*['"][A-Z][a-z]+(?:\s+[a-z]+){2,}['"]/g;
+  const hardcodedStringLines = getLineNumbers(code, hardcodedStringPattern);
+  if (hardcodedStringLines.length > 3) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "info",
+      title: "Multiple hardcoded UI strings detected",
+      description: `Found ${hardcodedStringLines.length} hardcoded UI string(s) directly assigned to DOM properties. This makes copy changes difficult and blocks localization.`,
+      lineNumbers: hardcodedStringLines,
+      recommendation: "Extract UI strings to a constants file or i18n library. Use translation keys instead of hardcoded strings. This enables copy editing without code changes.",
+      reference: "i18n Best Practices / Content Management",
+    });
+  }
+
+  // Form submission without validation
+  const formPattern = /onSubmit|handleSubmit|form\.submit|\.submit\s*\(/gi;
+  const formLines = getLineNumbers(code, formPattern);
+  const hasValidation = /validate|validator|yup|zod|joi|schema|required|minLength|maxLength|pattern\s*=/gi.test(code);
+  if (formLines.length > 0 && !hasValidation) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Form submission without client-side validation",
+      description: `Found ${formLines.length} form submission handler(s) without visible validation. Submitting invalid data wastes round trips and frustrates users with server-side error messages.`,
+      lineNumbers: formLines,
+      recommendation: "Add client-side validation before submission. Use schema validation libraries (Zod, Yup, Joi). Show inline validation feedback. Keep server-side validation as well.",
+      reference: "UX: Form Validation Patterns / Nielsen's Heuristic #9: Error Recovery",
+    });
+  }
+
   return findings;
 }

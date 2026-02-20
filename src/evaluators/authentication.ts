@@ -108,5 +108,77 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
     });
   }
 
+  // No session expiration / no token expiry
+  const hasSession = /session|express-session|cookie-session|SessionMiddleware/gi.test(code);
+  const hasExpiry = /maxAge|expires|expiresIn|exp:|ttl|timeout.*session|cookie.*max/gi.test(code);
+  if (hasSession && !hasExpiry) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Sessions without expiration configured",
+      description: "Session middleware is used without visible expiration settings. Sessions that never expire allow stolen session tokens to be used indefinitely.",
+      recommendation: "Set session maxAge (e.g., 30 minutes for sensitive apps). Implement idle timeout. Invalidate sessions on password change or logout.",
+      reference: "OWASP Session Management Cheat Sheet",
+    });
+  }
+
+  // Weak password policy — no complexity enforcement
+  const hasUserRegistration = /register|signup|sign.?up|createUser|create.*user|new.*user/gi.test(code);
+  const hasPasswordPolicy = /minLength|minimum.*length|password.*length|complexity|strongPassword|zxcvbn|password.*policy|password.*require/gi.test(code);
+  if (hasUserRegistration && !hasPasswordPolicy) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "No password complexity enforcement",
+      description: "User registration logic without visible password policy. Users can set weak passwords like '123456' or 'password', which are trivially guessable.",
+      recommendation: "Enforce minimum password length (12+ chars), check against known breached passwords (HaveIBeenPwned API), and use a strength estimator like zxcvbn.",
+      reference: "NIST 800-63b / OWASP Password Guidelines",
+    });
+  }
+
+  // No account lockout after failed attempts
+  const hasLogin = /login|signin|sign.?in|authenticate|verifyPassword|checkPassword/gi.test(code);
+  const hasLockout = /lockout|lock.*out|attempt|maxAttempt|failedAttempt|rateLimitLogin|brute.?force|account.*lock/gi.test(code);
+  if (hasLogin && !hasLockout) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "No account lockout after failed login attempts",
+      description: "Login logic without account lockout or rate limiting. Attackers can brute-force passwords by trying unlimited login attempts.",
+      recommendation: "Implement progressive delays or temporary lockout after 5-10 failed attempts. Use rate limiting on login endpoints. Consider CAPTCHA for repeated failures.",
+      reference: "OWASP Brute Force Prevention / CWE-307",
+    });
+  }
+
+  // Cookie without Secure and HttpOnly flags
+  const cookiePattern = /(?:cookie|Cookie|set-cookie|setCookie|res\.cookie)\s*\(/gi;
+  const cookieLines = getLineNumbers(code, cookiePattern);
+  const hasSecureFlags = /secure\s*:\s*true|httpOnly\s*:\s*true|HttpOnly|Secure/g.test(code);
+  if (cookieLines.length > 0 && !hasSecureFlags) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Cookies set without Secure/HttpOnly flags",
+      description: "Cookies are set without Secure (HTTPS-only) or HttpOnly (no JS access) flags. This exposes cookies to interception and XSS-based theft.",
+      lineNumbers: cookieLines,
+      recommendation: "Set cookies with { secure: true, httpOnly: true, sameSite: 'strict' }. Use Secure for all auth cookies. HttpOnly prevents JavaScript access.",
+      reference: "OWASP Secure Cookie Best Practices / CWE-614",
+    });
+  }
+
+  // No CSRF protection
+  const hasFormPost = /app\.post\s*\(|method\s*=\s*["']POST/gi.test(code);
+  const hasCsrf = /csrf|csurf|xsrf|_token|csrfToken|antiForgery|X-CSRF|X-XSRF/gi.test(code);
+  if (hasFormPost && !hasCsrf && hasSession) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "No CSRF protection on form submissions",
+      description: "POST endpoints with session-based auth but no CSRF tokens. Attackers can craft pages that submit forms on behalf of authenticated users.",
+      recommendation: "Use CSRF tokens (csurf middleware, Django CSRF, Rails authenticity_token). Set SameSite=Strict on cookies. Use custom headers for API calls.",
+      reference: "OWASP CSRF Prevention Cheat Sheet / CWE-352",
+    });
+  }
+
   return findings;
 }

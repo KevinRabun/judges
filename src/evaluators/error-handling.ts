@@ -129,5 +129,66 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
     });
   }
 
+  // Catch-and-rethrow without added context
+  const catchRethrowPattern = /catch\s*\(\s*(\w+)\s*\)\s*\{[^}]*throw\s+\1\s*;?\s*\}/g;
+  const catchRethrowLines = getLineNumbers(code, catchRethrowPattern);
+  if (catchRethrowLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Catch-and-rethrow without added context",
+      description: `Found ${catchRethrowLines.length} catch block(s) that rethrow the same error without adding context. These blocks add no value — they clutter the code and obscure the original stack trace.`,
+      lineNumbers: catchRethrowLines,
+      recommendation: "Either add context when rethrowing (new Error('context', { cause: err })) or remove the try/catch entirely and let the error propagate naturally.",
+      reference: "Error Handling Best Practices / Error Wrapping",
+    });
+  }
+
+  // Error swallowed with only console.log
+  const swallowedErrorPattern = /catch\s*\(\s*\w+\s*\)\s*\{\s*console\.(?:log|warn|info)\s*\([^)]*\)\s*;?\s*\}/g;
+  const swallowedLines = getLineNumbers(code, swallowedErrorPattern);
+  if (swallowedLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Error caught and only logged — not propagated",
+      description: `Found ${swallowedLines.length} catch block(s) that only console.log the error without rethrowing or returning an error response. The caller has no idea the operation failed.`,
+      lineNumbers: swallowedLines,
+      recommendation: "After logging, rethrow the error, return an error response, or propagate the failure to the caller. Silent failures are as dangerous as empty catch blocks.",
+      reference: "Error Handling Patterns / Don't Swallow Errors",
+    });
+  }
+
+  // Missing error codes in error responses
+  const errorResponsePattern = /res\.status\s*\(\s*(?:4|5)\d{2}\s*\)\s*\.json\s*\(/g;
+  const errorRespLines = getLineNumbers(code, errorResponsePattern);
+  const hasErrorCodes = /errorCode|error_code|code\s*:\s*["'`]ERR|code\s*:\s*["'`][A-Z_]+/gi.test(code);
+  if (errorRespLines.length > 0 && !hasErrorCodes) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Error responses without error codes",
+      description: "HTTP error responses don't include machine-readable error codes. Clients must parse human-readable messages to determine the error type.",
+      lineNumbers: errorRespLines.slice(0, 5),
+      recommendation: "Include a machine-readable error code in responses: { code: 'VALIDATION_ERROR', message: '...' }. Use RFC 7807 Problem Details format.",
+      reference: "RFC 7807: Problem Details for HTTP APIs",
+    });
+  }
+
+  // console.error as sole error strategy
+  const consoleErrorPattern = /console\.error\s*\(/g;
+  const consoleErrorLines = getLineNumbers(code, consoleErrorPattern);
+  const hasErrorReporting = /sentry|bugsnag|rollbar|newrelic|datadog|errorReporter|reportError|alerting|pagerduty/gi.test(code);
+  if (consoleErrorLines.length > 3 && !hasErrorReporting) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "console.error as sole error reporting strategy",
+      description: `Found ${consoleErrorLines.length} console.error call(s) with no error reporting service. Console output is transient — errors won't be tracked, aggregated, or alerted on.`,
+      recommendation: "Integrate an error reporting service (Sentry, Bugsnag, Application Insights). These provide aggregation, alerting, and stack trace analysis.",
+      reference: "Error Monitoring Best Practices",
+    });
+  }
+
   return findings;
 }

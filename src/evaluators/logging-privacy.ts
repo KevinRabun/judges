@@ -110,5 +110,50 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
     });
   }
 
+  // Logging IP addresses
+  const logIpPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:ip|ipAddress|remoteAddress|x-forwarded-for|req\.ip|req\.connection\.remoteAddress)/gi;
+  const logIpLines = getLineNumbers(code, logIpPattern);
+  if (logIpLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "IP addresses logged without anonymization",
+      description: `Found ${logIpLines.length} instance(s) where IP addresses are logged. Under GDPR, IP addresses are personal data and must be handled accordingly.`,
+      lineNumbers: logIpLines,
+      recommendation: "Anonymize IP addresses in logs (truncate last octet for IPv4, mask prefix for IPv6). If full IP is needed for security, ensure log retention complies with privacy policy.",
+      reference: "GDPR Recital 30: IP Addresses as Personal Data",
+    });
+  }
+
+  // Logging database queries with parameters
+  const logQueryPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:query|sql|SELECT|INSERT|UPDATE|DELETE)/gi;
+  const logQueryLines = getLineNumbers(code, logQueryPattern);
+  if (logQueryLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Database queries logged — may contain sensitive parameters",
+      description: `Found ${logQueryLines.length} instance(s) where SQL queries are logged. Query parameters often contain user data (emails, names, IDs) that shouldn't appear in logs.`,
+      lineNumbers: logQueryLines,
+      recommendation: "Log query templates without parameter values. Use parameterized query logging that replaces bind values with placeholders. Redact sensitive column values.",
+      reference: "Database Logging Privacy / OWASP Logging Cheat Sheet",
+    });
+  }
+
+  // Stack traces exposed to external consumers
+  const stackExposedPattern = /res\.(?:json|send|status)\s*\([^)]*(?:stack|stackTrace|err\.stack|error\.stack)/gi;
+  const stackExposedLines = getLineNumbers(code, stackExposedPattern);
+  if (stackExposedLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Stack traces exposed in API responses",
+      description: "Error stack traces are included in HTTP responses. Stack traces reveal internal file paths, dependency versions, and code structure to potential attackers.",
+      lineNumbers: stackExposedLines,
+      recommendation: "Never send stack traces in production API responses. Log them server-side for debugging. Return a generic error ID that correlates to internal logs.",
+      reference: "OWASP: Improper Error Handling / CWE-209",
+    });
+  }
+
   return findings;
 }

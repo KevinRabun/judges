@@ -79,5 +79,80 @@ export function analyzeConfigurationManagement(code: string, language: string): 
     });
   }
 
+  // Missing defaults on process.env reads
+  const envNoDefaultPattern = /process\.env\.\w+(?!\s*\|\||[^;\n]*?(?:\?\?|default|fallback))/g;
+  const envNoDefaultLines = getLineNumbers(code, envNoDefaultPattern);
+  const envWithDefaultPattern = /process\.env\.\w+\s*(?:\|\||&&|\?\?)/g;
+  const envWithDefaults = (code.match(envWithDefaultPattern) || []).length;
+  const envTotal = envNoDefaultLines.length;
+  if (envTotal > 0 && envWithDefaults === 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Environment variable reads without defaults",
+      description: `Found ${envTotal} process.env reads without fallback defaults. Missing env vars will silently be undefined at runtime, causing hard-to-debug issues.`,
+      lineNumbers: envNoDefaultLines.slice(0, 5),
+      recommendation: "Provide defaults: process.env.PORT || 3000, or validate at startup that required variables are present. Use a config library that enforces defaults.",
+      reference: "Node.js Configuration Best Practices",
+    });
+  }
+
+  // Hardcoded feature flags
+  const featureFlagPattern = /(?:const|let|var)\s+(?:ENABLE|DISABLE|FEATURE|FLAG|TOGGLE|ALLOW|USE)_\w+\s*=\s*(?:true|false)/gi;
+  const featureFlagLines = getLineNumbers(code, featureFlagPattern);
+  if (featureFlagLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Feature flags hardcoded as constants",
+      description: `Found ${featureFlagLines.length} hardcoded feature flag(s). Hardcoded flags require code changes and redeployment to toggle features.`,
+      lineNumbers: featureFlagLines,
+      recommendation: "Use a feature flag service (LaunchDarkly, Unleash, AWS AppConfig) or environment variables. This allows toggling features without deploying.",
+      reference: "Feature Flag Best Practices / Martin Fowler: Feature Toggles",
+    });
+  }
+
+  // No secret rotation mechanism
+  const hasSecrets = /(?:password|secret|api_?key|token|private_?key)\s*[:=]/gi.test(code);
+  const hasRotation = /rotate|rotation|expir|renew|refresh.*token|refresh.*secret/gi.test(code);
+  if (hasSecrets && !hasRotation && code.split("\n").length > 30) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "No secret rotation mechanism detected",
+      description: "Secrets are used but no rotation logic is visible. Secrets that cannot be rotated become a liability — a single leak requires emergency credential replacement.",
+      recommendation: "Design for secret rotation: use short-lived tokens, implement token refresh flows, and use secrets managers with automatic rotation (Azure Key Vault, AWS Secrets Manager).",
+      reference: "NIST 800-53: Secret Rotation / Zero Trust Principles",
+    });
+  }
+
+  // Missing config schema / documentation
+  const hasConfigSchema = /schema|convict|joi\.object|zod\.object|yup\.object|ajv|configSchema|configSpec/gi.test(code);
+  if (hasEnvVars && !hasConfigSchema && code.split("\n").length > 40) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "info",
+      title: "No configuration schema or documentation",
+      description: "Environment variables are read but no config schema is defined. New developers won't know which variables are required, what types they should be, or what values are valid.",
+      recommendation: "Define a config schema using convict, Zod, or Joi. Document every env var in a .env.example file with comments explaining purpose, type, and valid values.",
+      reference: "Configuration Schema Validation / 12-Factor App",
+    });
+  }
+
+  // Environment-specific code
+  const envSpecificPattern = /(?:if|switch|case)\s*.*(?:NODE_ENV|ENVIRONMENT|ENV)\s*(?:===?|!==?|==)\s*["'`](?:production|staging|development|test)/gi;
+  const envSpecificLines = getLineNumbers(code, envSpecificPattern);
+  if (envSpecificLines.length > 2) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Excessive environment-specific branching in code",
+      description: `Found ${envSpecificLines.length} environment-specific conditional(s). Too many if(NODE_ENV) checks scatter config logic across the codebase instead of centralizing it.`,
+      lineNumbers: envSpecificLines.slice(0, 5),
+      recommendation: "Centralize environment-specific config in a config module. Use dependency injection or config objects rather than environment checks throughout the codebase.",
+      reference: "12-Factor App: Config / Clean Architecture",
+    });
+  }
+
   return findings;
 }

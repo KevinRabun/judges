@@ -79,5 +79,80 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
     });
   }
 
+  // Renamed or removed exports
+  const commentedExportPattern = /\/\/\s*export\s+(?:function|class|const|let|type|interface)\s+\w+/g;
+  const commentedExportLines = getLineNumbers(code, commentedExportPattern);
+  if (commentedExportLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Commented-out exports may indicate removed API surface",
+      description: `Found ${commentedExportLines.length} commented-out export(s). If these were previously published, removing them is a breaking change for consumers.`,
+      lineNumbers: commentedExportLines,
+      recommendation: "Re-export removed symbols as deprecated wrappers. Mark them @deprecated with a migration guide. Remove only in the next major version.",
+      reference: "Semantic Versioning / API Deprecation Lifecycle",
+    });
+  }
+
+  // Changed function signatures — optional to required parameter
+  const requiredAfterOptionalPattern = /\w+\?:\s*\w+[^)]*,\s*\w+\s*:\s*\w+/g;
+  const sigChangeLines = getLineNumbers(code, requiredAfterOptionalPattern);
+  if (sigChangeLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Function signature with required params after optional — potential breaking change",
+      description: "Required parameters placed after optional parameters can break callers who relied on positional arguments.",
+      lineNumbers: sigChangeLines,
+      recommendation: "Keep required parameters before optional ones. Use options objects for functions with many parameters to allow adding fields without breaking callers.",
+      reference: "API Design: Function Signature Evolution",
+    });
+  }
+
+  // Enum/union type removals
+  const enumPattern = /enum\s+\w+\s*\{[^}]*\}/g;
+  const enumMatches = code.match(enumPattern) || [];
+  const hasDeprecatedEnumComment = /\/\/.*deprecated.*enum|\/\/.*removed.*value/gi.test(code);
+  if (enumMatches.length > 0 && hasDeprecatedEnumComment) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Enum value changes may break consumers",
+      description: "Enums with deprecated or removed values detected. Removing enum values is a breaking change for anything serializing or deserializing these values.",
+      recommendation: "Never remove enum values in minor releases. Mark values as deprecated. If numeric, keep the slot allocated. Provide migration mapping for removed values.",
+      reference: "Breaking Changes in Enums / Protocol Buffers Reserved Fields",
+    });
+  }
+
+  // Changing HTTP methods on endpoints (POST mapping doing DELETE work, etc.)
+  const deleteViaPostPattern = /app\.post\s*\([^)]*(?:delete|remove|destroy)/gi;
+  const deleteViaPostLines = getLineNumbers(code, deleteViaPostPattern);
+  if (deleteViaPostLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "HTTP method mismatch — destructive action via POST",
+      description: "Destructive operations (delete, remove) are exposed via POST instead of DELETE. If these were originally DELETE endpoints, the method change breaks REST clients.",
+      lineNumbers: deleteViaPostLines,
+      recommendation: "Use appropriate HTTP methods: DELETE for removal, PUT/PATCH for updates. If migrating methods, keep the old method working during a deprecation period.",
+      reference: "RESTful API Design / HTTP Method Semantics",
+    });
+  }
+
+  // Breaking serialization changes (renaming JSON fields)
+  const fieldRenamePattern = /\/\/\s*(?:renamed|was|previously|old name|formerly)\s*[:=]?\s*\w+/gi;
+  const fieldRenameLines = getLineNumbers(code, fieldRenamePattern);
+  if (fieldRenameLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Possible field rename — breaking serialization change",
+      description: `Found ${fieldRenameLines.length} comment(s) suggesting renamed fields. Renaming JSON response fields breaks API clients that depend on the old names.`,
+      lineNumbers: fieldRenameLines,
+      recommendation: "Include both old and new field names during a transition period. Mark the old field as deprecated. Remove only in the next major version.",
+      reference: "API Versioning / Backwards-Compatible JSON Evolution",
+    });
+  }
+
   return findings;
 }

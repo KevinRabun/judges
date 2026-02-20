@@ -196,5 +196,86 @@ app.listen(PORT, () => {
 // ── RATE-LIMITING: no rate limit, unbounded queries, no backoff ──────────────
 // ── CI/CD: @ts-nocheck, no lint config, process.exit ─────────────────────────
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Additional triggers for expanded evaluator rules
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── AUTH: Session without expiration, cookies without Secure flag ─────────────
+app.post("/login", async (req, res) => {
+  const session = { userId: req.body.id, created: Date.now() };
+  res.cookie("session", JSON.stringify(session));
+  res.json({ token: "abc123" });
+});
+
+// ── ERROR-HANDLING: Catch and rethrow, swallowed with console.log ────────────
+async function fetchData() {
+  try {
+    const data = await fetch("https://api.example.com/data");
+    return data;
+  } catch (err) {
+    console.log(err);
+  }
+}
+
+// ── DATABASE: DROP TABLE, credentials in connection URI ──────────────────────
+async function cleanupOldData() {
+  db.execute("DROP TABLE temp_data");
+  const connStr = "mongodb://root:password123@dbserver:27017/mydb";
+}
+
+// ── LOGGING-PRIVACY: IP address logged, stack trace in API response ──────────
+app.use((req, res, next) => {
+  console.log("Client IP: " + req.ip + " " + req.connection.remoteAddress);
+  next();
+});
+app.use((err, req, res, next) => {
+  res.status(500).json({ error: err.message, stack: err.stack });
+});
+
+// ── CACHING: Simple cache key, secrets in cache ─────────────────────────────
+function getCachedUser(id: any) {
+  const key = id;
+  if (userCache[key]) return userCache[key];
+  const user = db.findOne({ id });
+  userCache[key] = user;
+  userCache["token_" + id] = user.apiToken;
+  return user;
+}
+
+// ── CONFIGURATION: Feature flags, env without defaults ──────────────────────
+const featureEnabled = true;
+const debugMode = false;
+const dbHost = process.env.DB_HOST;
+const redisUrl = process.env.REDIS_URL;
+
+// ── RATE-LIMITING: File upload without size limit ────────────────────────────
+import multer from "multer";
+const upload = multer({ dest: "uploads/" });
+app.post("/upload", upload.single("file"), (req, res) => {
+  res.json({ file: req.file });
+});
+
+// ── PORTABILITY: OS-specific env vars, browser API in server code ────────────
+const appDataDir = process.env.APPDATA || process.env.HOME;
+document.getElementById("app").innerHTML = "<div>Hello</div>";
+
+// ── UX: Form submit without validation ──────────────────────────────────────
+function handleSubmit(formData: any) {
+  fetch("/api/createUser", { method: "POST", body: JSON.stringify(formData) });
+}
+
+// ── CI/CD: Dockerfile patterns ──────────────────────────────────────────────
+// FROM node:latest
+// COPY . .
+// RUN npm install
+
+// ── MAINTAINABILITY: Too many parameters, duplicate strings ─────────────────
+function processOrder(userId: any, itemId: any, quantity: any, price: any, discount: any, taxRate: any) {
+  console.log("Processing order for user");
+  console.log("Processing order for user");
+  console.log("Processing order for user");
+  return userId;
+}
+
 // TODO fix security issues before launch
 // FIXME this entire file needs refactoring

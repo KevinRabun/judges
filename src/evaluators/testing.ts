@@ -180,14 +180,18 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     }
   } else {
     // No test structure detected - check if this is production code without tests
+    // Exclude config files, type definitions, constants, and utility barrel files
     const hasFunctions = /function\s+\w+|=>\s*\{|def\s+\w+|public\s+\w+\s+\w+\s*\(/i.test(code);
     const isLargeFile = lines.length > 50;
-    if (hasFunctions && isLargeFile) {
+    const isConfigOrUtility = /(?:config|configuration|settings|constants|types|interfaces|models|schema|migration|seed|fixture|mock|stub|setup|index|barrel)\b/gi.test(code);
+    const isTypeDefinitionFile = /^(?:export\s+)?(?:type|interface|enum|declare)\s+/gim.test(code) && !(/(function|class)\s+\w+.*\{[\s\S]{10,}\}/gi.test(code));
+    const hasMinimalLogic = (code.match(/(?:if|for|while|switch)\s*\(/g) || []).length >= 3;
+    if (hasFunctions && isLargeFile && hasMinimalLogic && !isConfigOrUtility && !isTypeDefinitionFile) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "medium",
         title: "No tests detected for production code",
-        description: "This file contains significant logic but no accompanying tests were detected.",
+        description: "This file contains significant logic (multiple branches/loops) but no accompanying tests were detected.",
         recommendation: "Write unit tests covering the main functions, edge cases, and error paths. Aim for meaningful coverage of critical paths.",
         reference: "Test-Driven Development / Testing Pyramid",
       });

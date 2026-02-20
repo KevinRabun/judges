@@ -93,5 +93,76 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
     });
   }
 
+  // Dockerfile without .dockerignore
+  const hasDockerfile = /^FROM\s+/gim.test(code);
+  const hasDockerignore = /\.dockerignore/gi.test(code);
+  const copiesEverything = /COPY\s+\.\s+\.|ADD\s+\.\s+\./gi.test(code);
+  if (hasDockerfile && copiesEverything && !hasDockerignore) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Dockerfile copies everything without .dockerignore",
+      description: "COPY . . or ADD . . copies the entire build context including node_modules, .git, .env, and other unnecessary files. This bloats images and may expose secrets.",
+      recommendation: "Create a .dockerignore file excluding node_modules, .git, .env, test files, and build artifacts. Only copy files needed for production.",
+      reference: "Docker Best Practices: .dockerignore / Multi-Stage Builds",
+    });
+  }
+
+  // Dockerfile without HEALTHCHECK
+  if (hasDockerfile && !/HEALTHCHECK/gi.test(code)) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Dockerfile without HEALTHCHECK instruction",
+      description: "Docker container has no HEALTHCHECK defined. Without health checks, orchestrators (Docker Compose, Kubernetes) cannot detect unhealthy containers for restart.",
+      recommendation: "Add a HEALTHCHECK instruction: HEALTHCHECK --interval=30s CMD curl -f http://localhost:3000/health || exit 1. Or define health checks in docker-compose/k8s.",
+      reference: "Docker HEALTHCHECK / Container Health Best Practices",
+    });
+  }
+
+  // No test coverage configuration
+  const hasTests = /test|jest|mocha|vitest|ava|tape|jasmine|karma/gi.test(code);
+  const hasCoverage = /coverage|istanbul|nyc|c8|--coverage|coverageThreshold|coverageDirectory|lcov/gi.test(code);
+  if (hasTests && !hasCoverage) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "info",
+      title: "Test configuration without coverage tracking",
+      description: "Test tooling is referenced but no code coverage configuration is visible. Without coverage tracking, gaps in test coverage go undetected.",
+      recommendation: "Configure coverage reporting (jest --coverage, c8, nyc). Set minimum coverage thresholds. Integrate coverage reports into CI/CD pipeline.",
+      reference: "Jest Coverage / Istanbul.js",
+    });
+  }
+
+  // npm install instead of npm ci in CI
+  const npmInstallPattern = /npm\s+install(?!\s+--save|\s+-[gDEOS]|\s+\w)/gi;
+  const npmInstallLines = getLineNumbers(code, npmInstallPattern);
+  const isCIConfig = /\.github\/workflows|\.gitlab-ci|jenkinsfile|\.circleci|pipeline|ci\s*:/gi.test(code);
+  if (npmInstallLines.length > 0 && isCIConfig) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Using 'npm install' instead of 'npm ci' in CI",
+      description: "CI configuration uses 'npm install' which may modify package-lock.json and install different versions than intended. This makes builds non-deterministic.",
+      lineNumbers: npmInstallLines,
+      recommendation: "Use 'npm ci' in CI/CD pipelines for clean, reproducible installs from the lockfile. Only use 'npm install' during local development.",
+      reference: "npm ci Documentation / Reproducible Builds",
+    });
+  }
+
+  // Running as root in Docker
+  const hasRootUser = /^USER\s+root/gim.test(code);
+  const hasNonRootUser = /^USER\s+(?!root)\w+/gim.test(code);
+  if (hasDockerfile && !hasNonRootUser) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Docker container runs as root user",
+      description: "No non-root USER instruction found in Dockerfile. Running as root inside containers increases the blast radius of container escape vulnerabilities.",
+      recommendation: "Add a non-root user: RUN addgroup -S app && adduser -S app -G app, then USER app. Use the --chown flag with COPY.",
+      reference: "Docker Security: Run as Non-Root / CIS Docker Benchmark",
+    });
+  }
+
   return findings;
 }
