@@ -40,6 +40,18 @@ import { analyzeInternationalization } from "./internationalization.js";
 import { analyzeDependencyHealth } from "./dependency-health.js";
 import { analyzeConcurrency } from "./concurrency.js";
 import { analyzeEthicsBias } from "./ethics-bias.js";
+import { analyzeMaintainability } from "./maintainability.js";
+import { analyzeErrorHandling } from "./error-handling.js";
+import { analyzeAuthentication } from "./authentication.js";
+import { analyzeDatabase } from "./database.js";
+import { analyzeCaching } from "./caching.js";
+import { analyzeConfigurationManagement } from "./configuration-management.js";
+import { analyzeBackwardsCompatibility } from "./backwards-compatibility.js";
+import { analyzePortability } from "./portability.js";
+import { analyzeUx } from "./ux.js";
+import { analyzeLoggingPrivacy } from "./logging-privacy.js";
+import { analyzeRateLimiting } from "./rate-limiting.js";
+import { analyzeCiCd } from "./ci-cd.js";
 
 // ─── Evaluation Engine ──────────────────────────────────────────────────────
 
@@ -108,6 +120,42 @@ export function evaluateWithJudge(
       break;
     case "ethics-bias":
       findings.push(...analyzeEthicsBias(code, language));
+      break;
+    case "maintainability":
+      findings.push(...analyzeMaintainability(code, language));
+      break;
+    case "error-handling":
+      findings.push(...analyzeErrorHandling(code, language));
+      break;
+    case "authentication":
+      findings.push(...analyzeAuthentication(code, language));
+      break;
+    case "database":
+      findings.push(...analyzeDatabase(code, language));
+      break;
+    case "caching":
+      findings.push(...analyzeCaching(code, language));
+      break;
+    case "configuration-management":
+      findings.push(...analyzeConfigurationManagement(code, language));
+      break;
+    case "backwards-compatibility":
+      findings.push(...analyzeBackwardsCompatibility(code, language));
+      break;
+    case "portability":
+      findings.push(...analyzePortability(code, language));
+      break;
+    case "ux":
+      findings.push(...analyzeUx(code, language));
+      break;
+    case "logging-privacy":
+      findings.push(...analyzeLoggingPrivacy(code, language));
+      break;
+    case "rate-limiting":
+      findings.push(...analyzeRateLimiting(code, language));
+      break;
+    case "ci-cd":
+      findings.push(...analyzeCiCd(code, language));
       break;
   }
 

@@ -18,6 +18,18 @@ import { internationalizationJudge } from "./internationalization.js";
 import { dependencyHealthJudge } from "./dependency-health.js";
 import { concurrencyJudge } from "./concurrency.js";
 import { ethicsBiasJudge } from "./ethics-bias.js";
+import { maintainabilityJudge } from "./maintainability.js";
+import { errorHandlingJudge } from "./error-handling.js";
+import { authenticationJudge } from "./authentication.js";
+import { databaseJudge } from "./database.js";
+import { cachingJudge } from "./caching.js";
+import { configurationManagementJudge } from "./configuration-management.js";
+import { backwardsCompatibilityJudge } from "./backwards-compatibility.js";
+import { portabilityJudge } from "./portability.js";
+import { uxJudge } from "./ux.js";
+import { loggingPrivacyJudge } from "./logging-privacy.js";
+import { rateLimitingJudge } from "./rate-limiting.js";
+import { ciCdJudge } from "./ci-cd.js";
 
 /**
  * The panel of judges that comprise the Judges Panel.
@@ -45,6 +57,18 @@ export const JUDGES: JudgeDefinition[] = [
   dependencyHealthJudge,
   concurrencyJudge,
   ethicsBiasJudge,
+  maintainabilityJudge,
+  errorHandlingJudge,
+  authenticationJudge,
+  databaseJudge,
+  cachingJudge,
+  configurationManagementJudge,
+  backwardsCompatibilityJudge,
+  portabilityJudge,
+  uxJudge,
+  loggingPrivacyJudge,
+  rateLimitingJudge,
+  ciCdJudge,
 ];
 
 /**

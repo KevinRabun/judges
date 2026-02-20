@@ -62,8 +62,8 @@ function findingsAreWellFormed(findings: Finding[]): void {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Judge Registry", () => {
-  it("should have exactly 18 judges registered", () => {
-    assert.equal(JUDGES.length, 18);
+  it("should have exactly 30 judges registered", () => {
+    assert.equal(JUDGES.length, 30);
   });
 
   it("should allow lookup of every judge by ID", () => {
@@ -125,8 +125,8 @@ describe("Full Tribunal Evaluation", () => {
     );
   });
 
-  it("should produce evaluations from all 18 judges", () => {
-    assert.equal(verdict.evaluations.length, 18);
+  it("should produce evaluations from all 30 judges", () => {
+    assert.equal(verdict.evaluations.length, 30);
   });
 
   it("should include a timestamp", () => {
@@ -170,6 +170,18 @@ const JUDGE_EXPECTATIONS: Record<
   "dependency-health":   { prefix: "DEPS",   minFindings: 1 },
   "concurrency":         { prefix: "CONC",   minFindings: 1 },
   "ethics-bias":         { prefix: "ETHICS", minFindings: 2 },
+  "maintainability":     { prefix: "MAINT",  minFindings: 1 },
+  "error-handling":      { prefix: "ERR",    minFindings: 1 },
+  "authentication":      { prefix: "AUTH",   minFindings: 1 },
+  "database":            { prefix: "DB",     minFindings: 1 },
+  "caching":             { prefix: "CACHE",  minFindings: 1 },
+  "configuration-management": { prefix: "CFG", minFindings: 1 },
+  "backwards-compatibility":  { prefix: "COMPAT", minFindings: 1 },
+  "portability":         { prefix: "PORTA",  minFindings: 1 },
+  "ux":                  { prefix: "UX",     minFindings: 1 },
+  "logging-privacy":     { prefix: "LOGPRIV", minFindings: 1 },
+  "rate-limiting":       { prefix: "RATE",   minFindings: 1 },
+  "ci-cd":               { prefix: "CICD",   minFindings: 1 },
 };
 
 describe("Individual Judge Evaluations", () => {
@@ -324,13 +336,13 @@ describe("Edge Cases", () => {
   it("should handle empty code gracefully", () => {
     const verdict = evaluateWithTribunal("", "typescript");
     assert.ok(verdict);
-    assert.equal(verdict.evaluations.length, 18);
+    assert.equal(verdict.evaluations.length, 30);
   });
 
   it("should handle unknown language gracefully", () => {
     const verdict = evaluateWithTribunal(sampleCode, "brainfuck");
     assert.ok(verdict);
-    assert.equal(verdict.evaluations.length, 18);
+    assert.equal(verdict.evaluations.length, 30);
   });
 
   it("should handle very short code gracefully", () => {
@@ -342,6 +354,6 @@ describe("Edge Cases", () => {
   it("should handle code with only comments", () => {
     const verdict = evaluateWithTribunal("// This is a comment\n// Another comment", "typescript");
     assert.ok(verdict);
-    assert.equal(verdict.evaluations.length, 18);
+    assert.equal(verdict.evaluations.length, 30);
   });
 });

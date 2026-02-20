@@ -1,6 +1,6 @@
 # Judges Panel
 
-An MCP (Model Context Protocol) server that provides a panel of **18 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed.
+An MCP (Model Context Protocol) server that provides a panel of **30 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed.
 
 [![CI](https://github.com/KevinRabun/judges/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinRabun/judges/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
@@ -21,7 +21,7 @@ npm run build
 
 ### 2. Try the Demo
 
-Run the included demo to see all 18 judges evaluate a purposely flawed API server:
+Run the included demo to see all 30 judges evaluate a purposely flawed API server:
 
 ```bash
 npm run demo
@@ -41,7 +41,7 @@ This evaluates [`examples/sample-vulnerable-api.ts`](examples/sample-vulnerable-
   Critical Issues : 15
   High Issues     : 17
   Total Findings  : 83
-  Judges Run      : 18
+  Judges Run      : 30
 
   Per-Judge Breakdown:
   ────────────────────────────────────────────────────────────────
@@ -63,6 +63,18 @@ This evaluates [`examples/sample-vulnerable-api.ts`](examples/sample-vulnerable-
   ⚠️  Judge Dependency Health        90/100    1 finding(s)
   ❌ Judge Concurrency               44/100    4 finding(s)
   ❌ Judge Ethics & Bias             65/100    2 finding(s)
+  ❌ Judge Maintainability           52/100    4 finding(s)
+  ❌ Judge Error Handling            27/100    3 finding(s)
+  ❌ Judge Authentication             0/100    4 finding(s)
+  ❌ Judge Database                   0/100    5 finding(s)
+  ❌ Judge Caching                   62/100    3 finding(s)
+  ❌ Judge Configuration Mgmt         0/100    3 finding(s)
+  ⚠️  Judge Backwards Compat         80/100    2 finding(s)
+  ⚠️  Judge Portability              72/100    2 finding(s)
+  ❌ Judge UX                        52/100    4 finding(s)
+  ❌ Judge Logging Privacy            0/100    4 finding(s)
+  ❌ Judge Rate Limiting             27/100    4 finding(s)
+  ⚠️  Judge CI/CD                    80/100    2 finding(s)
 ```
 
 ### 3. Run the Tests
@@ -71,7 +83,7 @@ This evaluates [`examples/sample-vulnerable-api.ts`](examples/sample-vulnerable-
 npm test
 ```
 
-Runs 184 automated tests covering all 18 judges, markdown formatters, and edge cases.
+Runs automated tests covering all 30 judges, markdown formatters, and edge cases.
 
 ### 4. Connect to Your Editor
 
@@ -135,6 +147,18 @@ Then use `judges` as the command in your MCP config (no `args` needed).
 | **Dependency Health** | Dependency Management | `DEPS-` | Version pinning, deprecated packages, supply chain |
 | **Concurrency** | Concurrency & Async Safety | `CONC-` | Race conditions, unbounded parallelism, missing await |
 | **Ethics & Bias** | Ethics & Bias | `ETHICS-` | Demographic logic, dark patterns, inclusive language |
+| **Maintainability** | Code Maintainability & Technical Debt | `MAINT-` | Any types, magic numbers, deep nesting, dead code, file length |
+| **Error Handling** | Error Handling & Fault Tolerance | `ERR-` | Empty catch blocks, missing error handlers, swallowed errors |
+| **Authentication** | Authentication & Authorization | `AUTH-` | Hardcoded creds, missing auth middleware, token in query params |
+| **Database** | Database Design & Query Efficiency | `DB-` | SQL injection, N+1 queries, connection pooling, transactions |
+| **Caching** | Caching Strategy & Data Freshness | `CACHE-` | Unbounded caches, missing TTL, no HTTP cache headers |
+| **Configuration Mgmt** | Configuration & Secrets Management | `CFG-` | Hardcoded secrets, missing env vars, config validation |
+| **Backwards Compat** | Backwards Compatibility & Versioning | `COMPAT-` | API versioning, breaking changes, response consistency |
+| **Portability** | Platform Portability & Vendor Independence | `PORTA-` | OS-specific paths, vendor lock-in, hardcoded hosts |
+| **UX** | User Experience & Interface Quality | `UX-` | Loading states, error messages, pagination, destructive actions |
+| **Logging Privacy** | Logging Privacy & Data Redaction | `LOGPRIV-` | PII in logs, token logging, structured logging, redaction |
+| **Rate Limiting** | Rate Limiting & Throttling | `RATE-` | Missing rate limits, unbounded queries, backoff strategy |
+| **CI/CD** | CI/CD Pipeline & Deployment Safety | `CICD-` | Test infrastructure, lint config, Docker tags, build scripts |
 
 ---
 
@@ -173,7 +197,7 @@ When your AI coding assistant connects to multiple MCP servers, each one contrib
 
 | Layer | What It Does | Example Servers |
 |-------|-------------|-----------------|
-| **Judges Panel** | 18-judge quality gate — security patterns, cost, scalability, a11y, compliance, ethics | This server |
+| **Judges Panel** | 30-judge quality gate — security patterns, cost, scalability, a11y, compliance, ethics | This server |
 | **AST Analysis** | Deep structural analysis — data flow, complexity metrics, dead code, type tracking | Tree-sitter, Semgrep, SonarQube MCP servers |
 | **CVE / SBOM** | Vulnerability scanning against live databases — known CVEs, license risks, supply chain | OSV, Snyk, Trivy, Grype MCP servers |
 | **Linting** | Language-specific style and correctness rules | ESLint, Ruff, Clippy MCP servers |
@@ -209,7 +233,7 @@ Each server returns structured findings. The AI synthesizes everything into a si
 List all available judges with their domains and descriptions.
 
 ### `evaluate_code`
-Submit code to the **full judges panel**. All 18 judges evaluate independently and return a combined verdict.
+Submit code to the **full judges panel**. All 30 judges evaluate independently and return a combined verdict.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -229,7 +253,7 @@ Submit code to a **specific judge** for targeted review.
 
 #### Judge IDs
 
-`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias`
+`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd`
 
 ---
 
@@ -257,7 +281,19 @@ Each judge has a corresponding prompt for LLM-powered deep analysis:
 | `judge-dependency-health` | Deep dependency health review |
 | `judge-concurrency` | Deep concurrency & async safety review |
 | `judge-ethics-bias` | Deep ethics & bias review |
-| `full-tribunal` | All 18 judges in a single prompt |
+| `judge-maintainability` | Deep maintainability & tech debt review |
+| `judge-error-handling` | Deep error handling review |
+| `judge-authentication` | Deep authentication & authorization review |
+| `judge-database` | Deep database design & query review |
+| `judge-caching` | Deep caching strategy review |
+| `judge-configuration-management` | Deep configuration & secrets review |
+| `judge-backwards-compatibility` | Deep backwards compatibility review |
+| `judge-portability` | Deep platform portability review |
+| `judge-ux` | Deep user experience review |
+| `judge-logging-privacy` | Deep logging privacy review |
+| `judge-rate-limiting` | Deep rate limiting review |
+| `judge-ci-cd` | Deep CI/CD pipeline review |
+| `full-tribunal` | All 30 judges in a single prompt |
 
 ---
 
@@ -278,7 +314,7 @@ Each judge scores the code from **0 to 100**:
 - **WARNING** — Any high finding, any medium finding, or score < 80
 - **PASS** — Score ≥ 80 with no critical, high, or medium findings
 
-The **overall tribunal score** is the average of all 18 judges. The overall verdict fails if **any** judge fails.
+The **overall tribunal score** is the average of all 30 judges. The overall verdict fails if **any** judge fails.
 
 ---
 
@@ -292,12 +328,12 @@ judges/
 │   ├── evaluators/           # Pattern-based analysis engine for each judge
 │   │   ├── index.ts          # evaluateWithJudge(), evaluateWithTribunal()
 │   │   ├── shared.ts         # Scoring, verdict logic, markdown formatters
-│   │   └── *.ts              # One analyzer per judge (18 files)
+│   │   └── *.ts              # One analyzer per judge (30 files)
 │   └── judges/               # Judge definitions (id, name, domain, system prompt)
 │       ├── index.ts          # JUDGES array, getJudge(), getJudgeSummaries()
-│       └── *.ts              # One definition per judge (18 files)
+│       └── *.ts              # One definition per judge (30 files)
 ├── examples/
-│   ├── sample-vulnerable-api.ts  # Intentionally flawed code (triggers all 18 judges)
+│   ├── sample-vulnerable-api.ts  # Intentionally flawed code (triggers all 30 judges)
 │   └── demo.ts                   # Run: npm run demo
 ├── tests/
 │   └── judges.test.ts            # Run: npm test (184 tests)
@@ -315,7 +351,7 @@ judges/
 |---------|-------------|
 | `npm run build` | Compile TypeScript to `dist/` |
 | `npm run dev` | Watch mode — recompile on save |
-| `npm test` | Run the full test suite (184 tests) |
+| `npm test` | Run the full test suite |
 | `npm run demo` | Run the sample tribunal demo |
 | `npm start` | Start the MCP server |
 | `npm run clean` | Remove `dist/` |

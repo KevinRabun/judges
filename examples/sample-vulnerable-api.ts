@@ -170,6 +170,10 @@ setInterval(() => {
 
 // ── CLOUD-READINESS: Hardcoded host/port, no health check, no graceful shutdown
 const PORT = 3000;
+
+// ── PORTABILITY: OS-specific path ────────────────────────────────────────────
+const backupPath = "/var/backups/myapp/data.json";
+
 app.listen(PORT, () => {
   console.log("Server running on localhost:" + PORT);
 });
@@ -179,6 +183,18 @@ app.listen(PORT, () => {
 // ── OBSERVABILITY: No structured logging, no metrics, no tracing ─────────────
 // ── COMPLIANCE: No data deletion mechanism, no consent check ─────────────────
 // ── DOCUMENTATION: No JSDoc on exported functions ────────────────────────────
+// ── MAINTAINABILITY: any types, magic numbers, var keyword, TODO/FIXME ───────
+// ── ERROR-HANDLING: empty catch, no global error handler, process.exit ────────
+// ── AUTHENTICATION: hardcoded creds, no auth middleware, token in query ───────
+// ── DATABASE: SQL injection, N+1 queries, SELECT *, hardcoded connection ─────
+// ── CACHING: unbounded global cache, no HTTP cache headers ───────────────────
+// ── CONFIGURATION: hardcoded PORT, DATABASE_URL, secrets in code ─────────────
+// ── BACKWARDS-COMPAT: API routes without version prefix ──────────────────────
+// ── PORTABILITY: OS-specific path, hardcoded relative paths ──────────────────
+// ── UX: inline event handler, no loading states, generic errors ──────────────
+// ── LOGGING-PRIVACY: auth token logged, password logged, PII in logs ─────────
+// ── RATE-LIMITING: no rate limit, unbounded queries, no backoff ──────────────
+// ── CI/CD: @ts-nocheck, no lint config, process.exit ─────────────────────────
 
 // TODO fix security issues before launch
 // FIXME this entire file needs refactoring

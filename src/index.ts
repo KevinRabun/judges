@@ -9,7 +9,7 @@
  * to perform thorough contextual analysis beyond what static patterns catch.
  *
  * Tools exposed:
- *   - evaluate_code:              Full panel review (all 18 judges)
+ *   - evaluate_code:              Full panel review (all 30 judges)
  *   - evaluate_code_single_judge: Review by a specific judge
  *   - get_judges:                 List all available judges
  */
@@ -64,7 +64,7 @@ server.tool(
 
 server.tool(
   "evaluate_code",
-  `Submit code to the full Judges Panel for evaluation. All 18 judges will independently review the code using both automated pattern detection and deep contextual analysis criteria. Returns a combined verdict with scores, findings, and expert review guidance for thorough evaluation.`,
+  `Submit code to the full Judges Panel for evaluation. All 30 judges will independently review the code using both automated pattern detection and deep contextual analysis criteria. Returns a combined verdict with scores, findings, and expert review guidance for thorough evaluation.`,
   {
     code: z
       .string()
@@ -275,7 +275,7 @@ for (const judge of JUDGES) {
 // Full tribunal prompt
 server.prompt(
   "full-tribunal",
-  "Convene the full Judges Panel — all 18 judges evaluate the code in their respective domains and produce a combined verdict.",
+  "Convene the full Judges Panel — all 30 judges evaluate the code in their respective domains and produce a combined verdict.",
   {
     code: z
       .string()
