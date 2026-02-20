@@ -1,77 +1,100 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeSoftwarePractices(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "SWDEV";
+  const lang = getLangFamily(language);
 
-  // TypeScript 'any' type usage
-  const anyTypePattern = /:\s*any\b|as\s+any\b|<any>/gi;
-  const anyLines = getLineNumbers(code, anyTypePattern);
+  // Weak / dynamic type usage (multi-language)
+  const anyLines = getLangLineNumbers(code, language, LP.WEAK_TYPE);
   if (anyLines.length > 0) {
+    const titles: Record<string, string> = {
+      javascript: "'any' type usage",
+      typescript: "'any' type usage",
+      python: "'Any' type annotation",
+      rust: "Unsafe block or raw pointer cast",
+      csharp: "'dynamic' or 'object' type usage",
+      java: "Raw type or 'Object' type usage",
+      go: "Empty interface (any/interface{}) usage",
+    };
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
-      title: "TypeScript 'any' type usage",
-      description: "'any' type defeats the purpose of TypeScript's type system, hiding potential runtime errors and making refactoring unsafe.",
+      title: titles[lang] || "Weak/dynamic type usage",
+      description: "Using weak or dynamic types defeats the type system, hiding potential runtime errors and making refactoring unsafe.",
       lineNumbers: anyLines,
-      recommendation: "Replace 'any' with specific types, generics, or 'unknown' (which requires type narrowing before use). Enable 'noImplicitAny' in tsconfig.json.",
-      reference: "TypeScript Best Practices / Clean Code",
+      recommendation: "Replace with specific types, generics, or constrained types. In TS enable 'noImplicitAny'. In Go use concrete types or type constraints.",
+      reference: "Type Safety Best Practices / Clean Code",
+      suggestedFix: LP.isJsTs(lang) ? "Replace 'any' with a specific type or 'unknown'." : undefined,
     });
   }
 
-  // @ts-ignore usage
-  const tsIgnorePattern = /@ts-ignore|@ts-nocheck/gi;
-  const tsIgnoreLines = getLineNumbers(code, tsIgnorePattern);
-  if (tsIgnoreLines.length > 0) {
+  // Linter / type-checker suppression (multi-language)
+  const suppressLines = getLangLineNumbers(code, language, LP.LINTER_DISABLE);
+  if (suppressLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
-      title: "TypeScript error suppression",
-      description: "@ts-ignore and @ts-nocheck suppress compiler errors that may indicate real bugs. This weakens type safety.",
-      lineNumbers: tsIgnoreLines,
-      recommendation: "Fix the underlying type error instead of suppressing it. If suppression is truly necessary, use @ts-expect-error with a comment explaining why.",
-      reference: "TypeScript Strict Mode Best Practices",
+      title: "Type-checker / linter error suppression",
+      description: "Directives that suppress compiler or linter errors may mask real bugs and weaken safety guarantees.",
+      lineNumbers: suppressLines,
+      recommendation: "Fix the underlying issue instead of suppressing it. If suppression is truly necessary, add a comment explaining why.",
+      reference: "Strict Mode Best Practices",
     });
   }
 
-  // Magic numbers
+  // Magic numbers (multi-language)
   const codeLines = code.split("\n");
-  const magicNumberPattern = /(?:===?|!==?|<=?|>=?|&&|\|\|)\s*\d{2,}|(?:timeout|delay|limit|max|min|size|count|length|port|interval)\s*[:=]\s*\d{3,}/gi;
-  // Filter out common well-known numbers (HTTP status codes, ports, permissions, etc.)
+  const magicLines = getLangLineNumbers(code, language, LP.MAGIC_NUMBER);
   const wellKnownNumbers = /\b(?:200|201|204|301|302|304|400|401|403|404|405|409|422|429|500|502|503|504|80|443|8080|3000|8443|3001|5432|27017|6379|0o?[0-7]{3,4}|0x[0-9a-f]+|1000|1024|255|256|65535|1e[3-9])\b/gi;
-  const magicLines = getLineNumbers(code, magicNumberPattern).filter(lineNum => {
+  const filteredMagicLines = magicLines.filter(lineNum => {
     const line = codeLines[lineNum - 1] || "";
     return !wellKnownNumbers.test(line);
   });
-  if (magicLines.length > 0) {
+  if (filteredMagicLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Magic numbers detected",
       description: "Numeric literals used directly in code without named constants are harder to understand, maintain, and change consistently.",
-      lineNumbers: magicLines,
-      recommendation: "Extract magic numbers into named constants (e.g., const MAX_RETRIES = 3, const TIMEOUT_MS = 5000) for clarity and maintainability.",
+      lineNumbers: filteredMagicLines,
+      recommendation: "Extract magic numbers into named constants (e.g., const MAX_RETRIES = 3, TIMEOUT_MS = 5000) for clarity and maintainability.",
       reference: "Clean Code (Robert C. Martin) — Chapter 17",
     });
   }
 
-  // Very long functions (>50 lines)
-  let funcStart = -1;
-  let braceDepth = 0;
+  // Very long functions (>50 lines) — multi-language
+  const funcDefLines = getLangLineNumbers(code, language, LP.FUNCTION_DEF);
   const longFunctions: number[] = [];
-  for (let i = 0; i < codeLines.length; i++) {
-    if (/(?:function\s+\w+|(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?(?:function|\([^)]*\)\s*=>|\w+\s*=>))/.test(codeLines[i])) {
-      if (braceDepth === 0) funcStart = i;
-    }
-    braceDepth += (codeLines[i].match(/\{/g) || []).length;
-    braceDepth -= (codeLines[i].match(/\}/g) || []).length;
-    if (braceDepth === 0 && funcStart >= 0) {
-      if (i - funcStart > 50) {
-        longFunctions.push(funcStart + 1);
+  if (LP.isBraceLang(lang)) {
+    let funcStart = -1;
+    let braceDepth = 0;
+    for (let i = 0; i < codeLines.length; i++) {
+      if (funcDefLines.includes(i + 1) && braceDepth === 0) {
+        funcStart = i;
       }
-      funcStart = -1;
+      braceDepth += (codeLines[i].match(/\{/g) || []).length;
+      braceDepth -= (codeLines[i].match(/\}/g) || []).length;
+      if (braceDepth === 0 && funcStart >= 0) {
+        if (i - funcStart > 50) longFunctions.push(funcStart + 1);
+        funcStart = -1;
+      }
+    }
+  } else if (lang === "python") {
+    // Indent-based: find def lines, measure until next def or dedent
+    for (const defLine of funcDefLines) {
+      const idx = defLine - 1;
+      const indent = codeLines[idx].search(/\S/);
+      let end = idx + 1;
+      while (end < codeLines.length) {
+        const l = codeLines[end];
+        if (l.trim() !== "" && l.search(/\S/) <= indent && !/^\s*#/.test(l)) break;
+        end++;
+      }
+      if (end - idx > 50) longFunctions.push(defLine);
     }
   }
   if (longFunctions.length > 0) {
@@ -86,9 +109,8 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
     });
   }
 
-  // TODO/FIXME/HACK comments
-  const todoPattern = /\/\/\s*(?:TODO|FIXME|HACK|XXX|TEMP|WORKAROUND)\b/gi;
-  const todoLines = getLineNumbers(code, todoPattern);
+  // TODO/FIXME/HACK comments (multi-language)
+  const todoLines = getLangLineNumbers(code, language, LP.TODO_FIXME);
   if (todoLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -101,9 +123,8 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
     });
   }
 
-  // Empty catch blocks
-  const emptyCatchPattern = /catch\s*\([^)]*\)\s*\{\s*\}/gi;
-  const emptyCatchLines = getLineNumbers(code, emptyCatchPattern);
+  // Empty catch blocks (multi-language)
+  const emptyCatchLines = getLangLineNumbers(code, language, LP.EMPTY_CATCH);
   if (emptyCatchLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -116,28 +137,29 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
     });
   }
 
-  // No input validation
-  const hasValidation = /validate|validator|joi|yup|zod|class-validator|ajv|schema|sanitize|\.check\(|\.isValid\(/gi.test(code);
-  const hasUserInput = /req\.body|req\.params|req\.query|request\.body|input|formData|event\.body/gi.test(code);
-  if (hasUserInput && !hasValidation) {
+  // No input validation (multi-language)
+  const hasValidation = /validate|validator|joi|yup|zod|class-validator|ajv|schema|sanitize|\.check\(|\.isValid\(|pydantic|marshmallow|serde|DataAnnotations|@Valid|@NotNull/gi.test(code);
+  const inputLines = getLangLineNumbers(code, language, LP.INPUT_VALIDATION);
+  if (inputLines.length > 0 && !hasValidation) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "No input validation detected",
-      description: "User input is consumed (req.body, req.params, etc.) but no validation library or pattern is detected. Unvalidated input is the root cause of most security vulnerabilities.",
-      recommendation: "Use a validation library (Zod, Joi, Yup, class-validator) to validate and sanitize all external input at the boundary. Define schemas for all API request bodies.",
+      description: "User input is consumed but no validation library or pattern is detected. Unvalidated input is the root cause of most security vulnerabilities.",
+      lineNumbers: inputLines,
+      recommendation: "Use a validation library (Zod/Joi for JS, Pydantic for Python, DataAnnotations for C#, @Valid for Java) to validate and sanitize all external input.",
       reference: "OWASP Input Validation — Defense in Depth",
     });
   }
 
-  // Console.log for debugging left in code
-  const debugLogPattern = /console\.log\s*\(\s*['"](?:debug|test|here|xxx|tmp|temp|asdf|TODO)/gi;
-  const debugLines = getLineNumbers(code, debugLogPattern);
+  // Debug log statements left in code (multi-language)
+  const debugWords = /(?:console\.log|print|println|fmt\.Print|System\.out\.print|puts|echo|dbg!)\s*\(\s*['"](?:debug|test|here|xxx|tmp|temp|asdf|TODO)/gi;
+  const debugLines = getLineNumbers(code, debugWords);
   if (debugLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
-      title: "Debug console.log statements left in code",
+      title: "Debug log statements left in code",
       description: "Debug log statements (e.g., 'debug', 'test', 'here') appear to be leftover from development and should not be in production code.",
       lineNumbers: debugLines,
       recommendation: "Remove debug log statements before committing. Use a proper logging library with log levels to control verbosity.",
@@ -166,18 +188,21 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   }
 
   // var usage in JavaScript/TypeScript
-  const varPattern = /^\s*var\s+\w/gm;
-  const varLines = getLineNumbers(code, varPattern);
-  if (varLines.length > 0 && (language === "javascript" || language === "typescript" || language === "jsx" || language === "tsx")) {
-    findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
-      severity: "medium",
-      title: "'var' keyword used instead of let/const",
-      description: "'var' has function scope and is hoisted, leading to subtle bugs. Modern JavaScript should use 'let' for mutable and 'const' for immutable bindings.",
-      lineNumbers: varLines,
-      recommendation: "Replace 'var' with 'const' (preferred) or 'let'. Enable ESLint's no-var rule.",
-      reference: "ES6+ Best Practices",
-    });
+  if (LP.isJsTs(lang)) {
+    const varPattern = /^\s*var\s+\w/gm;
+    const varLines = getLineNumbers(code, varPattern);
+    if (varLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "medium",
+        title: "'var' keyword used instead of let/const",
+        description: "'var' has function scope and is hoisted, leading to subtle bugs. Modern JavaScript should use 'let' for mutable and 'const' for immutable bindings.",
+        lineNumbers: varLines,
+        recommendation: "Replace 'var' with 'const' (preferred) or 'let'. Enable ESLint's no-var rule.",
+        reference: "ES6+ Best Practices",
+        suggestedFix: "Replace 'var' with 'const' (or 'let' if the variable is reassigned).",
+      });
+    }
   }
 
   // Mutable default arguments (Python)
@@ -195,9 +220,8 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
     });
   }
 
-  // Bare except / catch-all without logging
-  const bareExceptPattern = /except\s*:|catch\s*\{|catch\s*\(\s*\)/gi;
-  const bareExceptLines = getLineNumbers(code, bareExceptPattern);
+  // Bare except / catch-all without logging (multi-language)
+  const bareExceptLines = getLangLineNumbers(code, language, LP.GENERIC_CATCH);
   if (bareExceptLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -205,40 +229,40 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       title: "Bare except / untyped catch block",
       description: "Catching all exceptions without specifying the type can mask unexpected errors (OutOfMemoryError, StackOverflow, KeyboardInterrupt).",
       lineNumbers: bareExceptLines,
-      recommendation: "Catch specific exception types. In Python, use 'except Exception' at minimum (not bare 'except:'). In Java, catch specific exception classes.",
+      recommendation: "Catch specific exception types. In Python, use 'except ValueError' (not bare 'except:'). In Java/C#, catch specific exception classes.",
       reference: "Exception Handling Best Practices",
     });
   }
 
   // Type coercion risks (JavaScript ==)
-  // More precise pattern: match == but exclude ===, !==, ==>, arrow functions, and template literals
-  const looseEqualPattern = /(?<![!=<>])\s==\s(?!=)/g;
-  const looseEqualLines = getLineNumbers(code, looseEqualPattern).filter(lineNum => {
-    const line = codeLines[lineNum - 1] || "";
-    // Exclude lines that are comments, strings with CSS selectors, or template literals
-    return !(/^\s*(?:\/\/|\*|\/\*)/.test(line)) && !(/['"].*==.*['"]/.test(line));
-  });
-  if (looseEqualLines.length > 0 && (language === "javascript" || language === "typescript" || language === "jsx" || language === "tsx")) {
-    findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
-      severity: "medium",
-      title: "Loose equality (==) instead of strict (===)",
-      description: "JavaScript's == operator performs type coercion, leading to unexpected results (e.g., '' == 0 is true). Always use === for predictable comparisons.",
-      lineNumbers: looseEqualLines.slice(0, 5),
-      recommendation: "Replace == with === and != with !==. Enable ESLint's eqeqeq rule.",
-      reference: "JavaScript Equality Comparison",
+  if (LP.isJsTs(lang)) {
+    const looseEqualPattern = /(?<![!=<>])\s==\s(?!=)/g;
+    const looseEqualLines = getLineNumbers(code, looseEqualPattern).filter(lineNum => {
+      const line = codeLines[lineNum - 1] || "";
+      return !(/^\s*(?:\/\/|\*|\/\*)/.test(line)) && !(/['"].*==.*['"]/.test(line));
     });
+    if (looseEqualLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Loose equality (==) instead of strict (===)",
+        description: "JavaScript's == operator performs type coercion, leading to unexpected results (e.g., '' == 0 is true). Always use === for predictable comparisons.",
+        lineNumbers: looseEqualLines.slice(0, 5),
+        recommendation: "Replace == with === and != with !==. Enable ESLint's eqeqeq rule.",
+        reference: "JavaScript Equality Comparison",
+        suggestedFix: "Replace '==' with '===' and '!=' with '!=='.",
+      });
+    }
   }
 
-  // God class / file with too many responsibilities
-  const classCount = (code.match(/\bclass\s+\w+/g) || []).length;
-  const functionCount = (code.match(/(?:function\s+\w+|=>\s*\{)/g) || []).length;
-  if (codeLines.length > 500 && functionCount > 20) {
+  // God class / file with too many responsibilities (multi-language)
+  const functionLines = getLangLineNumbers(code, language, LP.FUNCTION_DEF);
+  if (codeLines.length > 500 && functionLines.length > 20) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
-      title: "Large file with many functions — possible God class/module",
-      description: `File has ${codeLines.length} lines and ${functionCount} functions. This suggests the module has too many responsibilities.`,
+      title: "Large file with many functions \u2014 possible God class/module",
+      description: `File has ${codeLines.length} lines and ${functionLines.length} functions. This suggests the module has too many responsibilities.`,
       recommendation: "Split into smaller, focused modules. Apply Single Responsibility Principle. Group related functions into their own files.",
       reference: "SOLID Principles — Single Responsibility",
     });

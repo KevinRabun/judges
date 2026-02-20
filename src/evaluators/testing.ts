@@ -1,26 +1,23 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeTesting(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "TEST";
   let ruleNum = 1;
+  const lang = getLangFamily(language);
 
-  // Detect test files with no assertions
-  const hasTestStructure = /describe\s*\(|it\s*\(|test\s*\(|def\s+test_|@Test/i.test(code);
+  // Detect test files with no assertions (multi-language)
+  const hasTestStructure = /describe\s*\(|it\s*\(|test\s*\(|def\s+test_|@Test|#\[test\]|#\[cfg\(test\)\]|func\s+Test[A-Z]|\[Fact\]|\[Theory\]|@pytest/i.test(code);
   if (hasTestStructure) {
-    // Check for assertions
-    const assertionLines: number[] = [];
-    lines.forEach((line, i) => {
-      if (/expect\s*\(|assert|should\.|\.to\.|\.toBe|\.toEqual|\.toThrow|assertEqual|assertTrue|verify/i.test(line)) {
-        assertionLines.push(i + 1);
-      }
-    });
+    // Check for assertions (multi-language)
+    const assertionLines = getLangLineNumbers(code, language, LP.ASSERTION);
 
     const testBlockLines: number[] = [];
     lines.forEach((line, i) => {
-      if (/\b(?:it|test)\s*\(\s*["'`]/i.test(line)) {
+      if (/\b(?:it|test)\s*\(\s*["'`]/i.test(line) || /def\s+test_/i.test(line) || /@Test/i.test(line) || /func\s+Test[A-Z]/i.test(line) || /#\[test\]/i.test(line) || /\[Fact\]/i.test(line)) {
         testBlockLines.push(i + 1);
       }
     });
@@ -75,10 +72,10 @@ export function analyzeTesting(code: string, language: string): Finding[] {
       });
     }
 
-    // Detect tests with external dependencies
+    // Detect tests with external dependencies (multi-language)
     const externalDepLines: number[] = [];
     lines.forEach((line, i) => {
-      if (/fetch\s*\(|axios\.|https?:\/\/|database|redis|mongodb/i.test(line) && !/mock|stub|fake|spy|nock|msw/i.test(line)) {
+      if (/fetch\s*\(|axios\.|https?:\/\/|database|redis|mongodb|requests\.|reqwest::|HttpClient|http\.Get/i.test(line) && !/mock|stub|fake|spy|nock|msw|Mock|patch|@patch|mockito|Moq/i.test(line)) {
         externalDepLines.push(i + 1);
       }
     });
@@ -89,7 +86,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         title: "Tests with real external dependencies",
         description: "Tests that call real external services or databases are slow, flaky, and may fail due to network issues or service unavailability.",
         lineNumbers: externalDepLines,
-        recommendation: "Mock external dependencies using test doubles (jest.mock, sinon, nock, msw). Use in-memory databases for integration tests.",
+        recommendation: "Mock external dependencies using test doubles (jest.mock, sinon, nock, msw, unittest.mock, mockito, Moq, httptest). Use in-memory databases for integration tests.",
         reference: "Test Doubles: Mocks, Stubs, and Fakes",
       });
     }
@@ -129,10 +126,10 @@ export function analyzeTesting(code: string, language: string): Finding[] {
       });
     }
 
-    // Detect sleep/wait in tests
+    // Detect sleep/wait in tests (multi-language)
     const sleepLines: number[] = [];
     lines.forEach((line, i) => {
-      if (/(?:sleep|setTimeout|Thread\.sleep|time\.sleep|delay)\s*\(\s*\d/i.test(line)) {
+      if (/(?:sleep|setTimeout|Thread\.sleep|time\.sleep|delay|tokio::time::sleep|std::thread::sleep|Task\.Delay)\s*\(\s*\d/i.test(line)) {
         sleepLines.push(i + 1);
       }
     });
@@ -181,11 +178,11 @@ export function analyzeTesting(code: string, language: string): Finding[] {
   } else {
     // No test structure detected - check if this is production code without tests
     // Exclude config files, type definitions, constants, and utility barrel files
-    const hasFunctions = /function\s+\w+|=>\s*\{|def\s+\w+|public\s+\w+\s+\w+\s*\(/i.test(code);
+    const hasFunctions = getLangLineNumbers(code, language, LP.FUNCTION_DEF).length > 0;
     const isLargeFile = lines.length > 50;
     const isConfigOrUtility = /(?:config|configuration|settings|constants|types|interfaces|models|schema|migration|seed|fixture|mock|stub|setup|index|barrel)\b/gi.test(code);
     const isTypeDefinitionFile = /^(?:export\s+)?(?:type|interface|enum|declare)\s+/gim.test(code) && !(/(function|class)\s+\w+.*\{[\s\S]{10,}\}/gi.test(code));
-    const hasMinimalLogic = (code.match(/(?:if|for|while|switch)\s*\(/g) || []).length >= 3;
+    const hasMinimalLogic = (code.match(/(?:if|for|while|switch|match)\s*[\s(]/g) || []).length >= 3;
     if (hasFunctions && isLargeFile && hasMinimalLogic && !isConfigOrUtility && !isTypeDefinitionFile) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

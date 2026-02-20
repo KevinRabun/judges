@@ -1,10 +1,12 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeDatabase(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "DB";
+  const lang = getLangFamily(language);
 
   // SQL injection via string concatenation
   const sqlInjectionPattern = /(?:execute|query|raw|prepare)\s*\(\s*(?:`[^`]*\$\{|['"][^'"]*['"]\s*\+|['"][^'"]*['"]\s*\.\s*concat)/gi;

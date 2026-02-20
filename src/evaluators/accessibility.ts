@@ -1,11 +1,13 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeAccessibility(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "A11Y";
   let ruleNum = 1;
+  const lang = getLangFamily(language);
 
   // Detect images without alt attributes
   const imgNoAltLines: number[] = [];

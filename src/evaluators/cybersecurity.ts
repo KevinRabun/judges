@@ -1,14 +1,15 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeCybersecurity(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "CYBER";
+  const lang = getLangFamily(language);
 
   // eval() / exec() usage (multi-language)
-  const evalPattern = /\beval\s*\(|exec\s*\(.*(?:req\.|request\.|input|user)|Function\s*\(\s*["'`]|compile\s*\(\s*(?:req|input|user)/gi;
-  const evalLines = getLineNumbers(code, evalPattern);
+  const evalLines = getLangLineNumbers(code, language, LP.EVAL_USAGE);
   if (evalLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -16,8 +17,9 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       title: "Dangerous eval()/exec() usage",
       description: "eval(), exec(), or dynamic code compilation executes arbitrary code and is a primary vector for code injection attacks.",
       lineNumbers: evalLines,
-      recommendation: "Remove eval() entirely. Use JSON.parse() for data parsing, or a proper expression parser if dynamic evaluation is truly needed.",
+      recommendation: "Remove eval() entirely. Use JSON.parse() for data parsing (JS/TS), ast.literal_eval (Python), or a proper expression parser.",
       reference: "OWASP Code Injection — CWE-94",
+      suggestedFix: LP.isJsTs(lang) ? "Replace eval(expr) with JSON.parse(expr) or a safe parser." : undefined,
     });
   }
 
@@ -37,8 +39,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
   }
 
   // Command injection risk (multi-language)
-  const cmdPattern = /(?:exec|spawn|execSync|spawnSync|execFile|child_process|subprocess|os\.system|os\.popen|Runtime\.exec|ProcessBuilder|Process\.Start|system\s*\(|popen\s*\(|shell_exec|passthru|proc_open)\s*\(.*(?:\+|`|\$\{|%s|\.format)/gi;
-  const cmdLines = getLineNumbers(code, cmdPattern);
+  const cmdLines = getLangLineNumbers(code, language, LP.COMMAND_INJECTION);
   if (cmdLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -51,9 +52,8 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     });
   }
 
-  // Disabled TLS / certificate validation
-  const tlsRejectPattern = /NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['"]?0|rejectUnauthorized\s*:\s*false|verify\s*=\s*False|InsecureSkipVerify\s*:\s*true|ssl_verify\s*=\s*false|ServerCertificateValidationCallback\s*=.*true|CURLOPT_SSL_VERIFYPEER.*false|verify_ssl\s*=\s*false/gi;
-  const tlsLines = getLineNumbers(code, tlsRejectPattern);
+  // Disabled TLS / certificate validation (multi-language)
+  const tlsLines = getLangLineNumbers(code, language, LP.TLS_DISABLED);
   if (tlsLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -66,9 +66,8 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     });
   }
 
-  // Insecure CORS
-  const corsPattern = /(?:Access-Control-Allow-Origin|cors)\s*[:({]\s*['"]\*/gi;
-  const corsLines = getLineNumbers(code, corsPattern);
+  // Insecure CORS (multi-language)
+  const corsLines = getLangLineNumbers(code, language, LP.CORS_WILDCARD);
   if (corsLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -96,9 +95,8 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     });
   }
 
-  // Disabled linter/type-checker rules
-  const disablePattern = /(?:eslint-disable|tslint:disable|@ts-ignore|@ts-nocheck|nosec|noinspection|noqa|type:\s*ignore|#\s*pragma\s+no\s+cover)/gi;
-  const disableLines = getLineNumbers(code, disablePattern);
+  // Disabled linter/type-checker rules (multi-language)
+  const disableLines = getLangLineNumbers(code, language, LP.LINTER_DISABLE);
   if (disableLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -129,8 +127,8 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     }
   }
 
-  // LDAP injection
-  const ldapPatterns = /ldap\.search|ldap_search|DirectorySearcher|LdapTemplate|ldap\.bind/gi;
+  // LDAP injection (multi-language)
+  const ldapPatterns = /ldap\.search|ldap_search|DirectorySearcher|LdapTemplate|ldap\.bind|python-ldap|go-ldap|novell\.directory/gi;
   const ldapLines = getLineNumbers(code, ldapPatterns);
   if (ldapLines.length > 0) {
     const hasLdapSanitation = /escape|sanitize|ldap_escape|filter_format/gi.test(code);
@@ -147,8 +145,8 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     }
   }
 
-  // Server-Side Request Forgery (SSRF)
-  const ssrfPatterns = /(?:fetch|axios|http\.get|requests\.get|urllib|HttpClient|WebClient|curl)\s*\(.*(?:req\.|request\.|params\.|query\.|body\.|input|url\s*=)/gi;
+  // Server-Side Request Forgery (SSRF) (multi-language)
+  const ssrfPatterns = /(?:fetch|axios|http\.get|requests\.get|urllib|HttpClient|WebClient|curl|reqwest|http\.NewRequest|httpx|aiohttp)\s*\(.*(?:req\.|request\.|params\.|query\.|body\.|input|url\s*=)/gi;
   const ssrfLines = getLineNumbers(code, ssrfPatterns);
   if (ssrfLines.length > 0) {
     findings.push({
@@ -162,8 +160,8 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     });
   }
 
-  // Open redirect
-  const redirectPatterns = /(?:res\.redirect|Response\.Redirect|redirect|HttpResponseRedirect|header\s*\(\s*["']Location)\s*\(.*(?:req\.|request\.|params\.|query\.|body\.|input|url\s*=)/gi;
+  // Open redirect (multi-language)
+  const redirectPatterns = /(?:res\.redirect|Response\.Redirect|redirect|HttpResponseRedirect|header\s*\(\s*["']Location|http\.Redirect|c\.Redirect)\s*\(.*(?:req\.|request\.|params\.|query\.|body\.|input|url\s*=)/gi;
   const redirectLines = getLineNumbers(code, redirectPatterns);
   if (redirectLines.length > 0) {
     findings.push({
@@ -177,8 +175,8 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     });
   }
 
-  // ReDoS (Regular Expression Denial of Service)
-  const regexPatterns = /new\s+RegExp\s*\(.*(?:req\.|request\.|params\.|query\.|body\.|input|user)/gi;
+  // ReDoS (Regular Expression Denial of Service) (multi-language)
+  const regexPatterns = /(?:new\s+RegExp|re\.compile|Regex\.new|Pattern\.compile|regexp\.Compile|Regex\()\s*\(.*(?:req\.|request\.|params\.|query\.|body\.|input|user)/gi;
   const regexLines = getLineNumbers(code, regexPatterns);
   if (regexLines.length > 0) {
     findings.push({
@@ -222,9 +220,9 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     });
   }
 
-  // Missing security headers
-  const hasHelmet = /helmet|X-Content-Type-Options|Content-Security-Policy|X-Frame-Options|Strict-Transport-Security|X-XSS-Protection/gi.test(code);
-  const hasServer = /app\.(listen|use)|createServer|express\(\)|Flask\(|Django|WebApplication|Startup/gi.test(code);
+  // Missing security headers (multi-language)
+  const hasHelmet = /helmet|X-Content-Type-Options|Content-Security-Policy|X-Frame-Options|Strict-Transport-Security|X-XSS-Protection|SecurityHeaders|secure_headers/gi.test(code);
+  const hasServer = /app\.(listen|use)|createServer|express\(\)|Flask\(|Django|WebApplication|Startup|actix.web|gin\.Default|SpringBoot|@RestController|http\.ListenAndServe/gi.test(code);
   if (hasServer && !hasHelmet) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -236,8 +234,8 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     });
   }
 
-  // Insecure session configuration
-  const sessionPatterns = /session\s*\(\s*\{|express-session|SessionMiddleware|session_config/gi;
+  // Insecure session configuration (multi-language)
+  const sessionPatterns = /session\s*\(\s*\{|express-session|SessionMiddleware|session_config|SessionOptions|gorilla\/sessions|actix.session|HttpSession/gi;
   const sessionLines = getLineNumbers(code, sessionPatterns);
   if (sessionLines.length > 0) {
     const hasSecureSession = /secure\s*:\s*true|HttpOnly|sameSite/gi.test(code);

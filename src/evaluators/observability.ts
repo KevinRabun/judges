@@ -1,19 +1,16 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeObservability(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "OBS";
   let ruleNum = 1;
+  const lang = getLangFamily(language);
 
-  // Detect console.log used instead of structured logging
-  const consoleLogLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (/console\.(log|warn|error|info)\s*\(/i.test(line) && !/\/\/.*console/i.test(line)) {
-      consoleLogLines.push(i + 1);
-    }
-  });
+  // Detect console.log used instead of structured logging (multi-language)
+  const consoleLogLines = getLangLineNumbers(code, language, LP.CONSOLE_LOG);
   if (consoleLogLines.length > 3) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -21,7 +18,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       title: "Console logging instead of structured logger",
       description: "Using console.log for application logging produces unstructured output that is difficult to search, filter, and alert on in production.",
       lineNumbers: consoleLogLines.slice(0, 5),
-      recommendation: "Use a structured logging library (winston, pino, bunyan, log4j, serilog) with log levels, timestamps, and correlation IDs.",
+      recommendation: "Use a structured logging library (winston/pino for JS, logging for Python, slog for Go, serilog for C#, log4j for Java, tracing for Rust) with log levels, timestamps, and correlation IDs.",
       reference: "Observability Best Practices: Structured Logging",
     });
   }
@@ -49,8 +46,8 @@ export function analyzeObservability(code: string, language: string): Finding[] 
     });
   }
 
-  // Detect missing health check endpoints
-  const hasRoutes = /app\.(get|post|use)|router\.(get|post)/i.test(code);
+  // Detect missing health check endpoints (multi-language)
+  const hasRoutes = /app\.(get|post|use)|router\.(get|post)|@app\.route|@GetMapping|@PostMapping|http\.HandleFunc|actix_web|rocket::get/i.test(code);
   const hasHealthCheck = /health|readiness|liveness|\/ready|\/live|\/healthz/i.test(code);
   if (hasRoutes && !hasHealthCheck) {
     findings.push({
@@ -96,10 +93,10 @@ export function analyzeObservability(code: string, language: string): Finding[] 
     });
   }
 
-  // Sensitive data in logs
+  // Sensitive data in logs (multi-language)
   const sensitiveLogLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/(?:console|logger|log)\.\w+\s*\(/i.test(line) && /(?:password|secret|token|apiKey|api_key|ssn|creditCard|credit_card|authorization)/i.test(line)) {
+    if (/(?:console|logger|log|logging|println|print|eprintln|fmt\.Print|Debug\.Log)\s*[.(]/i.test(line) && /(?:password|secret|token|apiKey|api_key|ssn|creditCard|credit_card|authorization)/i.test(line)) {
       sensitiveLogLines.push(i + 1);
     }
   });
@@ -115,8 +112,8 @@ export function analyzeObservability(code: string, language: string): Finding[] 
     });
   }
 
-  // Missing metrics/instrumentation
-  const hasMetrics = /metrics|prometheus|statsd|datadog|newrelic|appInsights|applicationInsights|opentelemetry|otlp/i.test(code);
+  // Missing metrics/instrumentation (multi-language)
+  const hasMetrics = /metrics|prometheus|statsd|datadog|newrelic|appInsights|applicationInsights|opentelemetry|otlp|micrometer|System\.Diagnostics\.Metrics/i.test(code);
   if (hasRoutes && !hasMetrics && lines.length > 100) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -128,8 +125,8 @@ export function analyzeObservability(code: string, language: string): Finding[] 
     });
   }
 
-  // Missing distributed tracing
-  const hasTracing = /opentelemetry|jaeger|zipkin|trace|span|@opentelemetry|dd-trace|newrelic/i.test(code);
+  // Missing distributed tracing (multi-language)
+  const hasTracing = /opentelemetry|jaeger|zipkin|trace|span|@opentelemetry|dd-trace|newrelic|tracing::|Activity\.Start|opentracing/i.test(code);
   if (hasRoutes && !hasTracing && lines.length > 100) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

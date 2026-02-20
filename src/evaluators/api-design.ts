@@ -1,11 +1,13 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeApiDesign(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "API";
   let ruleNum = 1;
+  const lang = getLangFamily(language);
 
   // Detect inconsistent HTTP methods
   const verbInUrlLines: number[] = [];
@@ -90,14 +92,16 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect missing API versioning
+  // Detect missing API versioning (multi-language)
   const routeRegLines: number[] = [];
   let hasVersioning = false;
   lines.forEach((line, i) => {
     if (/\/v\d+\//i.test(line) || /api-version|x-api-version/i.test(line)) {
       hasVersioning = true;
     }
-    if (/app\.(get|post|put|patch|delete)\s*\(\s*["'`]\//i.test(line) || /router\.(get|post|put|patch|delete)/i.test(line)) {
+    if (/app\.(get|post|put|patch|delete)\s*\(\s*["'`]\//i.test(line) || /router\.(get|post|put|patch|delete)/i.test(line)
+      || /@(Get|Post|Put|Delete|Patch)Mapping/i.test(line) || /@app\.(get|post|put|delete)\s*\(/i.test(line)
+      || /http\.HandleFunc/i.test(line) || /#\[(?:get|post|put|delete)\s*\(/i.test(line)) {
       routeRegLines.push(i + 1);
     }
   });
@@ -181,9 +185,9 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
     });
   }
 
-  // Missing rate limiting
-  const hasRoutes2 = /app\.(get|post|put|delete)|router\.(get|post|put|delete)/i.test(code);
-  const hasRateLimit = /rate.?limit|throttle|express-rate-limit|rateLimit|slowDown/i.test(code);
+  // Missing rate limiting (multi-language)
+  const hasRoutes2 = /app\.(get|post|put|delete)|router\.(get|post|put|delete)|@GetMapping|@PostMapping|@app\.route|http\.HandleFunc|#\[get|#\[post/i.test(code);
+  const hasRateLimit = /rate.?limit|throttle|express-rate-limit|rateLimit|slowDown|@RateLimiter|Bucket4j|x-ratelimit|golang\.org\/x\/time\/rate/i.test(code);
   if (hasRoutes2 && !hasRateLimit && routeRegLines.length > 3) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

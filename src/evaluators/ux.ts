@@ -1,10 +1,12 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeUx(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "UX";
+  const lang = getLangFamily(language);
 
   // Inline event handlers (onClick, onSubmit in HTML)
   const inlineHandlerPattern = /\bon[A-Z]\w+\s*=\s*["'`]/gi;

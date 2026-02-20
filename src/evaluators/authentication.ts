@@ -1,10 +1,12 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeAuthentication(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "AUTH";
+  const lang = getLangFamily(language);
 
   // Hardcoded credentials
   const credentialPattern = /(?:password|passwd|pwd|secret|api_?key|apikey|token|auth_?token)\s*[:=]\s*["'`][^"'`]{3,}/gi;

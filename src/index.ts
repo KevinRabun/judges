@@ -22,6 +22,9 @@ import { JUDGES, getJudge, getJudgeSummaries } from "./judges/index.js";
 import {
   evaluateWithJudge,
   evaluateWithTribunal,
+  evaluateProject,
+  evaluateDiff,
+  analyzeDependencies,
   formatVerdictAsMarkdown,
   formatEvaluationAsMarkdown,
 } from "./evaluators/index.js";
@@ -31,7 +34,7 @@ import { JudgeDefinition } from "./types.js";
 
 const server = new McpServer({
   name: "judges",
-  version: "1.2.0",
+  version: "1.5.0",
 });
 
 // ─── Tool: get_judges ────────────────────────────────────────────────────────
@@ -154,6 +157,161 @@ server.tool(
           text: patternResults + deepReview,
         },
       ],
+    };
+  }
+);
+
+// ─── Tool: evaluate_project ──────────────────────────────────────────────────
+
+server.tool(
+  "evaluate_project",
+  "Submit multiple files for project-level analysis. All 30 judges evaluate each file, plus cross-file architectural analysis detects issues like code duplication, inconsistent error handling, and dependency cycles.",
+  {
+    files: z.array(
+      z.object({
+        path: z.string().describe("Relative file path"),
+        content: z.string().describe("File content"),
+        language: z.string().describe("Programming language"),
+      })
+    ).describe("Array of project files to analyze"),
+    context: z
+      .string()
+      .optional()
+      .describe("Optional context about the project"),
+  },
+  async ({ files, context }) => {
+    const result = evaluateProject(files, context);
+
+    let md = `# Project Analysis\n\n`;
+    md += `**Overall:** ${result.overallVerdict.toUpperCase()} (${result.overallScore}/100)\n`;
+    md += `**Files:** ${result.fileResults.length} | **Critical:** ${result.criticalCount} | **High:** ${result.highCount}\n\n`;
+
+    for (const fr of result.fileResults) {
+      md += `## ${fr.path} (${fr.language}) — ${fr.score}/100\n`;
+      if (fr.findings.length === 0) {
+        md += `No findings.\n\n`;
+      } else {
+        for (const f of fr.findings.slice(0, 10)) {
+          md += `- **[${f.severity.toUpperCase()}]** ${f.ruleId}: ${f.title}\n`;
+        }
+        if (fr.findings.length > 10) {
+          md += `- ... and ${fr.findings.length - 10} more\n`;
+        }
+        md += `\n`;
+      }
+    }
+
+    if (result.architecturalFindings.length > 0) {
+      md += `## Architectural Findings\n\n`;
+      for (const f of result.architecturalFindings) {
+        md += `- **[${f.severity.toUpperCase()}]** ${f.ruleId}: ${f.title}\n  ${f.description}\n`;
+      }
+    }
+
+    return {
+      content: [{ type: "text" as const, text: md }],
+    };
+  }
+);
+
+// ─── Tool: evaluate_diff ─────────────────────────────────────────────────────
+
+server.tool(
+  "evaluate_diff",
+  "Evaluate only the changed lines in a code diff. Runs all 30 judges on the full file but filters findings to only those affecting the specified changed lines. Ideal for PR reviews and incremental analysis.",
+  {
+    code: z
+      .string()
+      .describe("The full file content (post-change)"),
+    language: z
+      .string()
+      .describe("The programming language"),
+    changedLines: z
+      .array(z.number())
+      .describe(
+        "Array of 1-based line numbers that were changed (added or modified)"
+      ),
+    context: z
+      .string()
+      .optional()
+      .describe("Optional context about the change"),
+  },
+  async ({ code, language, changedLines, context }) => {
+    const result = evaluateDiff(code, language, changedLines, context);
+
+    let md = `# Diff Analysis\n\n`;
+    md += `**Verdict:** ${result.verdict.toUpperCase()} (${result.score}/100)\n`;
+    md += `**Changed lines analyzed:** ${result.linesAnalyzed}\n`;
+    md += `**Findings in changed code:** ${result.findings.length}\n\n`;
+
+    if (result.findings.length === 0) {
+      md += `No issues found in the changed lines.\n`;
+    } else {
+      for (const f of result.findings) {
+        md += `### ${f.ruleId}: ${f.title}\n`;
+        md += `**Severity:** ${f.severity} | **Lines:** ${f.lineNumbers?.join(", ") ?? "N/A"}\n\n`;
+        md += `${f.description}\n\n`;
+        md += `**Recommendation:** ${f.recommendation}\n\n`;
+      }
+    }
+
+    return {
+      content: [{ type: "text" as const, text: md }],
+    };
+  }
+);
+
+// ─── Tool: analyze_dependencies ──────────────────────────────────────────────
+
+server.tool(
+  "analyze_dependencies",
+  "Analyze a dependency manifest file for supply-chain risks, version pinning issues, typosquatting indicators, and dependency hygiene. Supports package.json, requirements.txt, Cargo.toml, go.mod, pom.xml, and .csproj files.",
+  {
+    manifest: z
+      .string()
+      .describe("The full content of the manifest file"),
+    manifestType: z
+      .enum([
+        "package.json",
+        "requirements.txt",
+        "Cargo.toml",
+        "go.mod",
+        "pom.xml",
+        "csproj",
+      ])
+      .describe("The type of manifest file"),
+  },
+  async ({ manifest, manifestType }) => {
+    const result = analyzeDependencies(manifest, manifestType);
+
+    let md = `# Dependency Analysis (${manifestType})\n\n`;
+    md += `**Verdict:** ${result.verdict.toUpperCase()} (${result.score}/100)\n`;
+    md += `**Total dependencies:** ${result.totalDependencies}\n`;
+    md += `**Findings:** ${result.findings.length}\n\n`;
+
+    if (result.findings.length > 0) {
+      for (const f of result.findings) {
+        md += `### ${f.ruleId}: ${f.title}\n`;
+        md += `**Severity:** ${f.severity}\n\n`;
+        md += `${f.description}\n\n`;
+        md += `**Recommendation:** ${f.recommendation}\n\n`;
+      }
+    }
+
+    if (result.dependencies.length > 0) {
+      md += `## Dependencies (${result.dependencies.length})\n\n`;
+      const prod = result.dependencies.filter((d) => !d.isDev);
+      const dev = result.dependencies.filter((d) => d.isDev);
+      if (prod.length > 0) {
+        md += `**Production (${prod.length}):** ${prod.map((d) => `${d.name}@${d.version}`).join(", ")}\n\n`;
+      }
+      if (dev.length > 0) {
+        md += `**Development (${dev.length}):** ${dev.map((d) => `${d.name}@${d.version}`).join(", ")}\n\n`;
+      }
+    }
+
+    return {
+      content: [{ type: "text" as const, text: md }],
     };
   }
 );

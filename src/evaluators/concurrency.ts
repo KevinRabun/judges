@@ -1,11 +1,13 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeConcurrency(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "CONC";
   let ruleNum = 1;
+  const lang = getLangFamily(language);
 
   // Detect unbounded Promise.all
   const promiseAllLines: number[] = [];
@@ -29,17 +31,15 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect shared mutable state
+  // Detect shared mutable state (multi-language)
   const globalMutableLines: number[] = [];
-  const globalVarPattern = /^(?:let|var)\s+\w+\s*=\s*(?:\[|\{|0|""|\d)/i;
-  lines.forEach((line, i) => {
-    if (globalVarPattern.test(line.trim())) {
-      // Check if used in async context
-      const restOfFile = lines.slice(i + 1).join("\n");
-      const varName = line.trim().match(/(?:let|var)\s+(\w+)/)?.[1];
-      if (varName && /async\s|\.then\s*\(/i.test(restOfFile) && new RegExp(`\\b${varName}\\b`).test(restOfFile)) {
-        globalMutableLines.push(i + 1);
-      }
+  const sharedMutableLines = getLangLineNumbers(code, language, LP.SHARED_MUTABLE);
+  sharedMutableLines.forEach((ln) => {
+    const idx = ln - 1;
+    const restOfFile = lines.slice(idx + 1).join("\n");
+    const varName = lines[idx].trim().match(/(?:let|var|static\s+mut|static\s+(?:Lazy|Once))\s+(\w+)/)?.[1];
+    if (varName && /async\s|\.then\s*\(|await|tokio|Task\.|Thread|goroutine|go\s+func/i.test(restOfFile) && new RegExp(`\\b${varName}\\b`).test(restOfFile)) {
+      globalMutableLines.push(ln);
     }
   });
   if (globalMutableLines.length > 0) {
@@ -143,14 +143,14 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect worker/thread creation without pool
+  // Detect worker/thread creation without pool (multi-language)
   const workerLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/new\s+Worker\s*\(|new\s+Thread\s*\(|threading\.Thread\s*\(|Thread\.start/i.test(line)) {
+    if (/new\s+Worker\s*\(|new\s+Thread\s*\(|threading\.Thread\s*\(|Thread\.start|std::thread::spawn|thread::spawn|go\s+func|Task\.Run|Task\.Factory/i.test(line)) {
       workerLines.push(i + 1);
     }
   });
-  const hasPool = /pool|WorkerPool|ThreadPool|threadpool|ExecutorService/i.test(code);
+  const hasPool = /pool|WorkerPool|ThreadPool|threadpool|ExecutorService|rayon|tokio::spawn|goroutine.*pool|semaphore/i.test(code);
   if (workerLines.length > 0 && !hasPool) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -185,12 +185,12 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect mutex/lock-free concurrent data access
+  // Detect mutex/lock-free concurrent data access (multi-language)
   const concurrentDataLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/(?:Map|Set|Array|Object)\s*\(\s*\)/i.test(line) && /shared|global|cache|store|registry/i.test(line)) {
+    if (/(?:Map|Set|Array|Object|HashMap|Vec|Dictionary|List)\s*(?:\(|<|::new)/i.test(line) && /shared|global|cache|store|registry|static/i.test(line)) {
       const restOfFile = lines.slice(i + 1).join("\n");
-      if (/async\s|Promise|\.then\s*\(/i.test(restOfFile) && !/mutex|lock|semaphore|synchronized|atomic/i.test(restOfFile)) {
+      if (/async\s|Promise|\.then\s*\(|Thread|goroutine|go\s+func|tokio|Task\./i.test(restOfFile) && !/mutex|Mutex|lock|Lock|semaphore|Semaphore|synchronized|atomic|Atomic|RwLock|sync\.Map|ConcurrentDictionary|ConcurrentHashMap/i.test(restOfFile)) {
         concurrentDataLines.push(i + 1);
       }
     }
@@ -202,7 +202,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       title: "Shared data structure without synchronization",
       description: "Data structures labeled as shared/global/cache are used in async contexts without any synchronization mechanism.",
       lineNumbers: concurrentDataLines,
-      recommendation: "Use ConcurrentHashMap (Java), Mutex/RWLock (Go/Rust), or atomic operations. In Node.js, consider request-scoped state.",
+      recommendation: "Use ConcurrentHashMap (Java), sync.Map or Mutex (Go), Mutex/RwLock (Rust), ConcurrentDictionary (C#), or atomic operations. In Node.js, consider request-scoped state.",
       reference: "Concurrent Data Access Patterns",
     });
   }

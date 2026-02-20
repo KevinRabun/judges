@@ -1,10 +1,12 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeDataSecurity(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "DATA";
+  const lang = getLangFamily(language);
 
   // Hardcoded secrets (multi-language)
   const secretPatterns = [
@@ -56,8 +58,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   }
 
   // Weak hashing (multi-language)
-  const weakHashPatterns = /(?:md5|sha1|MD5|SHA1)\s*\(|MessageDigest\.getInstance\s*\(\s*["'](?:MD5|SHA-?1)["']\)|hashlib\.(?:md5|sha1)|Digest::(?:MD5|SHA1)|crypto\.createHash\s*\(\s*["'](?:md5|sha1)["']\)|MD5\.Create|SHA1\.Create/gi;
-  const weakHashLines = getLineNumbers(code, weakHashPatterns);
+  const weakHashLines = getLangLineNumbers(code, language, LP.WEAK_HASH);
   if (weakHashLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -71,8 +72,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   }
 
   // SQL injection risk (multi-language)
-  const sqlInjectionPatterns = /(?:query|execute|exec|cursor\.execute|raw|rawQuery|createQuery)\s*\(\s*[`"'].*\$\{|(?:query|execute|exec|cursor\.execute)\s*\(\s*.*\+\s*(?:req\.|request\.|params\.|query\.|body\.|args\.|kwargs)|(?:query|execute|exec)\s*\(\s*f["']|\.format\s*\(.*(?:req\.|request\.|input)|String\.format\s*\(\s*["'](?:SELECT|INSERT|UPDATE|DELETE)/gi;
-  const sqlLines = getLineNumbers(code, sqlInjectionPatterns);
+  const sqlLines = getLangLineNumbers(code, language, LP.SQL_INJECTION);
   if (sqlLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -101,8 +101,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   }
 
   // Unsafe deserialization (multi-language)
-  const deserializationPatterns = /pickle\.loads?|yaml\.load\s*\([^)]*(?!\s*Loader)|Marshal\.load|JSON\.parse\s*\(\s*(?:req|request|body|input)|ObjectInputStream|readObject\s*\(|BinaryFormatter\.Deserialize|unserialize\s*\(/gi;
-  const deserLines = getLineNumbers(code, deserializationPatterns);
+  const deserLines = getLangLineNumbers(code, language, LP.UNSAFE_DESERIALIZATION);
   if (deserLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

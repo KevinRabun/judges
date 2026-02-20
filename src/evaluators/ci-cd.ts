@@ -1,10 +1,12 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeCiCd(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "CICD";
+  const lang = getLangFamily(language);
 
   // No test script
   const hasTestScript = /["']test["']\s*:\s*["'][^"']+["']/gi.test(code) ||

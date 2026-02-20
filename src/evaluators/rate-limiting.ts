@@ -1,10 +1,12 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeRateLimiting(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "RATE";
+  const lang = getLangFamily(language);
 
   // No rate limiting middleware
   const hasRateLimit = /rate.?limit|throttle|express-rate-limit|koa-ratelimit|bottleneck|p-limit|limiter|quota/gi.test(code);

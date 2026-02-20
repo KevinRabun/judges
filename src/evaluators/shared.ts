@@ -5,7 +5,13 @@ import {
   Finding,
   Severity,
   Verdict,
+  JudgesConfig,
+  LangFamily,
 } from "../types.js";
+import { normalizeLanguage, langPattern } from "../language-patterns.js";
+
+// ─── Re-export language utilities for convenience ────────────────────────────
+export { normalizeLanguage, langPattern };
 
 // ─── Shared Utilities ────────────────────────────────────────────────────────
 // Helper functions used by all analyzer modules and the evaluation engine.
@@ -23,6 +29,97 @@ export function getLineNumbers(code: string, pattern: RegExp): number[] {
     }
   }
   return matches;
+}
+
+/**
+ * Find line numbers using a language-aware pattern map.
+ * Takes the raw language string, normalises it, and builds the right regex.
+ * Returns empty array if no pattern exists for the language.
+ */
+export function getLangLineNumbers(
+  code: string,
+  language: string,
+  patterns: Partial<Record<LangFamily | "jsts" | "all", string>>
+): number[] {
+  const lang = normalizeLanguage(language);
+  const re = langPattern(lang, patterns);
+  if (!re) return [];
+  return getLineNumbers(code, re);
+}
+
+/**
+ * Returns the normalised LangFamily for the given language string.
+ */
+export function getLangFamily(language: string): LangFamily {
+  return normalizeLanguage(language);
+}
+
+// ─── Configuration ───────────────────────────────────────────────────────────
+
+/**
+ * Apply configuration to a set of findings — suppress disabled rules,
+ * override severities, and filter by minimum severity.
+ */
+export function applyConfig(
+  findings: Finding[],
+  config?: JudgesConfig
+): Finding[] {
+  if (!config) return findings;
+
+  const severityOrder: Record<Severity, number> = {
+    info: 0,
+    low: 1,
+    medium: 2,
+    high: 3,
+    critical: 4,
+  };
+
+  let result = findings;
+
+  // Remove disabled rules
+  if (config.disabledRules && config.disabledRules.length > 0) {
+    const disabled = new Set(config.disabledRules);
+    result = result.filter((f) => {
+      if (disabled.has(f.ruleId)) return false;
+      // Check prefix wildcards like "SEC-*"
+      for (const rule of disabled) {
+        if (rule.endsWith("*") && f.ruleId.startsWith(rule.slice(0, -1))) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
+  // Apply per-rule overrides
+  if (config.ruleOverrides) {
+    result = result
+      .map((f) => {
+        const override =
+          config.ruleOverrides![f.ruleId] ??
+          // Check prefix overrides like "SEC-*"
+          Object.entries(config.ruleOverrides!).find(
+            ([key]) =>
+              key.endsWith("*") && f.ruleId.startsWith(key.slice(0, -1))
+          )?.[1];
+
+        if (!override) return f;
+        if (override.disabled) return null;
+        if (override.severity) return { ...f, severity: override.severity };
+        return f;
+      })
+      .filter((f): f is Finding => f !== null);
+  }
+
+  // Filter by minimum severity
+  if (config.minSeverity) {
+    const minOrder = severityOrder[config.minSeverity];
+    result = result.filter(
+      (f) => severityOrder[f.severity] >= minOrder
+    );
+  }
+
+  return result;
 }
 
 // ─── Scoring ─────────────────────────────────────────────────────────────────

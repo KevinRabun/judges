@@ -1,22 +1,24 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzePerformance(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "PERF";
   let ruleNum = 1;
+  const lang = getLangFamily(language);
 
-  // Detect N+1 query patterns
+  // Detect N+1 query patterns (multi-language)
   const nPlusOneLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (/for\s*\(|\.forEach\s*\(|\.map\s*\(/i.test(line)) {
-      const loopBody = lines.slice(i + 1, Math.min(lines.length, i + 10)).join("\n");
-      if (/\.find\s*\(|\.findOne\s*\(|\.query\s*\(|SELECT\s|await\s+.*\.get\s*\(/i.test(loopBody)) {
-        nPlusOneLines.push(i + 1);
-      }
+  const loopLines = getLangLineNumbers(code, language, LP.FOR_LOOP);
+  for (const loopLine of loopLines) {
+    const idx = loopLine - 1;
+    const loopBody = lines.slice(idx + 1, Math.min(lines.length, idx + 10)).join("\n");
+    if (/\.find\s*\(|\.findOne\s*\(|\.query\s*\(|SELECT\s|cursor\.execute|\.executeQuery|db\.Query|\.get\s*\(/i.test(loopBody)) {
+      nPlusOneLines.push(loopLine);
     }
-  });
+  }
   if (nPlusOneLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -29,10 +31,16 @@ export function analyzePerformance(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect synchronous file I/O
+  // Detect synchronous file I/O (multi-language)
   const syncIOLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/readFileSync|writeFileSync|appendFileSync|existsSync|mkdirSync|readdirSync|statSync/i.test(line)) {
+    // JS/TS sync I/O, Python blocking I/O, Rust std::fs blocking, C# synchronous I/O, Java blocking I/O, Go blocking I/O
+    if (/readFileSync|writeFileSync|appendFileSync|existsSync|mkdirSync|readdirSync|statSync/i.test(line) ||
+        (lang === "python" && /open\s*\([^)]*\)(?!.*async)|time\.sleep\s*\(/i.test(line)) ||
+        (lang === "rust" && /std::fs::(?:read|write|copy|remove)|std::thread::sleep/i.test(line)) ||
+        (lang === "csharp" && /File\.(?:ReadAll|WriteAll|Copy|Move|Exists)(?!Async)|Thread\.Sleep/i.test(line)) ||
+        (lang === "java" && /FileInputStream|FileOutputStream|BufferedReader|Thread\.sleep/i.test(line)) ||
+        (lang === "go" && /ioutil\.ReadFile|os\.ReadFile|time\.Sleep/i.test(line))) {
       syncIOLines.push(i + 1);
     }
   });
@@ -40,11 +48,11 @@ export function analyzePerformance(code: string, language: string): Finding[] {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
-      title: "Synchronous file I/O detected",
-      description: "Synchronous file operations block the event loop (Node.js) or thread, degrading throughput under concurrent load.",
+      title: "Synchronous / blocking I/O detected",
+      description: "Synchronous file or blocking operations can block the event loop (Node.js), thread, or async runtime, degrading throughput under concurrent load.",
       lineNumbers: syncIOLines,
-      recommendation: "Use async/await versions (readFile, writeFile) or streaming for large files. Sync I/O is only acceptable at startup.",
-      reference: "Node.js Performance Best Practices",
+      recommendation: "Use async/await versions, non-blocking APIs, or spawn blocking work on a separate thread/runtime. Sync I/O is only acceptable at startup.",
+      reference: "Performance Best Practices",
     });
   }
 
@@ -112,16 +120,15 @@ export function analyzePerformance(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect regex in hot paths
+  // Detect regex in hot paths (multi-language)
   const regexInLoopLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (/for\s*\(|\.forEach|\.map|\.filter|while\s*\(/.test(line)) {
-      const body = lines.slice(i + 1, Math.min(lines.length, i + 8)).join("\n");
-      if (/new\s+RegExp\s*\(/.test(body)) {
-        regexInLoopLines.push(i + 1);
-      }
+  for (const loopLine of loopLines) {
+    const idx = loopLine - 1;
+    const body = lines.slice(idx + 1, Math.min(lines.length, idx + 8)).join("\n");
+    if (/new\s+RegExp\s*\(|re\.compile\s*\(|Regex::new|Pattern\.compile|regexp\.(?:Compile|MustCompile)/i.test(body)) {
+      regexInLoopLines.push(loopLine);
     }
-  });
+  }
   if (regexInLoopLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -253,16 +260,15 @@ export function analyzePerformance(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect inefficient string building in loops
+  // Detect inefficient string building in loops (multi-language)
   const stringConcatLoopLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (/for\s*\(|\.forEach|while\s*\(/.test(line)) {
-      const body = lines.slice(i + 1, Math.min(lines.length, i + 8)).join("\n");
-      if (/\+\s*=\s*["'`]|\.concat\s*\(/i.test(body)) {
-        stringConcatLoopLines.push(i + 1);
-      }
+  for (const loopLine of loopLines) {
+    const idx = loopLine - 1;
+    const body = lines.slice(idx + 1, Math.min(lines.length, idx + 8)).join("\n");
+    if (/\+\s*=\s*["'`]|\.concat\s*\(|\+=\s*str|\+=\s*\w+\.to_string|StringBuilder|String\.Concat/i.test(body)) {
+      stringConcatLoopLines.push(loopLine);
     }
-  });
+  }
   if (stringConcatLoopLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -275,12 +281,12 @@ export function analyzePerformance(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect missing pagination for large data
+  // Detect missing pagination for large data (multi-language)
   const bulkFetchLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/\.find\s*\(\s*\{\s*\}\s*\)|\.find\s*\(\s*\)|findAll\s*\(\s*\)|SELECT\s+\*\s+FROM/i.test(line)) {
+    if (/\.find\s*\(\s*\{\s*\}\s*\)|\.find\s*\(\s*\)|findAll\s*\(\s*\)|SELECT\s+\*\s+FROM|\.all\s*\(\s*\)|objects\.all\s*\(|cursor\.execute\s*\(.*SELECT\s+\*/i.test(line)) {
       const context = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 3)).join("\n");
-      if (!/limit|skip|offset|page|cursor|take|first|top\s+\d/i.test(context)) {
+      if (!/limit|skip|offset|page|cursor|take|first|top\s+\d|LIMIT|paginate|Pageable|setMaxResults|setFirstResult/i.test(context)) {
         bulkFetchLines.push(i + 1);
       }
     }

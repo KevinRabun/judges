@@ -1,20 +1,22 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeDocumentation(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "DOC";
   let ruleNum = 1;
+  const lang = getLangFamily(language);
 
-  // Detect public functions without documentation
+  // Detect public functions without documentation (multi-language)
   const undocFnLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (/^(?:export\s+)?(?:async\s+)?function\s+\w+/i.test(line.trim()) || /^(?:export\s+)?(?:public\s+)(?:async\s+)?\w+\s*\(/i.test(line.trim())) {
-      const prevLines = lines.slice(Math.max(0, i - 3), i).join("\n");
-      if (!/\/\*\*|\/\/\/|#\s+|"""|'''|:param|@param|@returns|@description/i.test(prevLines)) {
-        undocFnLines.push(i + 1);
-      }
+  const fnLines = getLangLineNumbers(code, language, LP.FUNCTION_DEF);
+  fnLines.forEach((ln) => {
+    const idx = ln - 1;
+    const prevLines = lines.slice(Math.max(0, idx - 3), idx).join("\n");
+    if (!/\/\*\*|\/\/\/|#\s+|^\s*"""|'''|:param|@param|@returns|@description|@doc|doc\s*=/i.test(prevLines)) {
+      undocFnLines.push(ln);
     }
   });
   if (undocFnLines.length > 0) {
@@ -24,7 +26,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       title: "Exported functions without documentation",
       description: "Public/exported functions lack documentation comments. Consumers cannot understand parameters, return values, or behavior without reading the implementation.",
       lineNumbers: undocFnLines,
-      recommendation: "Add JSDoc/TSDoc/docstring comments for all exported functions, describing purpose, parameters, return values, and thrown errors.",
+      recommendation: "Add documentation comments (JSDoc/TSDoc, docstrings, /// doc comments, Javadoc, GoDoc) for all exported functions, describing purpose, parameters, return values, and thrown errors.",
       reference: "TSDoc / JSDoc / Docstring Standards",
     });
   }
@@ -68,23 +70,36 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
     });
   }
 
-  // Detect complex functions without explanatory comments
+  // Detect complex functions without explanatory comments (multi-language)
   const complexFnLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (/function\s+\w+|=>\s*\{/.test(line)) {
+  const allFnLines = getLangLineNumbers(code, language, LP.FUNCTION_DEF);
+  allFnLines.forEach((ln) => {
+    const idx = ln - 1;
+    if (LP.isJsTs(lang) || lang === "rust" || lang === "csharp" || lang === "java" || lang === "go") {
       let braceCount = 0;
       let fnLength = 0;
-      for (let j = i; j < Math.min(lines.length, i + 100); j++) {
+      for (let j = idx; j < Math.min(lines.length, idx + 100); j++) {
         braceCount += (lines[j].match(/\{/g) || []).length - (lines[j].match(/\}/g) || []).length;
         fnLength++;
         if (braceCount === 0 && fnLength > 1) break;
       }
       if (fnLength > 40) {
-        const fnBody = lines.slice(i, i + fnLength).join("\n");
-        const commentCount = (fnBody.match(/\/\/|\/\*|\*\//g) || []).length;
-        if (commentCount < 2) {
-          complexFnLines.push(i + 1);
-        }
+        const fnBody = lines.slice(idx, idx + fnLength).join("\n");
+        const commentCount = (fnBody.match(/\/\/|\/\*|\*\/|#\s|"""|\/\/\//g) || []).length;
+        if (commentCount < 2) complexFnLines.push(ln);
+      }
+    } else if (lang === "python") {
+      const indent = (lines[idx].match(/^(\s*)/)?.[1] || "").length;
+      let fnLength = 0;
+      for (let j = idx + 1; j < Math.min(lines.length, idx + 100); j++) {
+        const lineIndent = (lines[j].match(/^(\s*)/)?.[1] || "").length;
+        if (lines[j].trim().length > 0 && lineIndent <= indent) break;
+        fnLength++;
+      }
+      if (fnLength > 40) {
+        const fnBody = lines.slice(idx, idx + fnLength).join("\n");
+        const commentCount = (fnBody.match(/#\s|"""|\'\'\'|^\s*#/gm) || []).length;
+        if (commentCount < 2) complexFnLines.push(ln);
       }
     }
   });
@@ -103,7 +118,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   // Detect missing README or module-level documentation
   if (lines.length > 100) {
     const firstLines = lines.slice(0, 10).join("\n");
-    if (!/\/\*\*|\/\/!|#!.*\n#|"""|module|@module|@fileoverview|@file/i.test(firstLines)) {
+    if (!/\/\*\*|\/\/!|#!.*\n#|"""|'''|\bmodule|@module|@fileoverview|@file|^\/\/\/|^package\s|^\s*\/\/\s+Package/im.test(firstLines)) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "low",
@@ -115,14 +130,14 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
     }
   }
 
-  // Detect missing API endpoint documentation
+  // Detect missing API endpoint documentation (multi-language)
   const routeLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (/(?:app|router)\.(get|post|put|patch|delete)\s*\(\s*["'`]/i.test(line)) {
-      const prevLines = lines.slice(Math.max(0, i - 5), i).join("\n");
-      if (!/\/\*\*|@swagger|@api|@route|@openapi|@summary|@description/i.test(prevLines)) {
-        routeLines.push(i + 1);
-      }
+  const httpRouteLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
+  httpRouteLines.forEach((ln) => {
+    const idx = ln - 1;
+    const prevLines = lines.slice(Math.max(0, idx - 5), idx).join("\n");
+    if (!/\/\*\*|@swagger|@api|@route|@openapi|@summary|@description|""".*@|#\s+@|@ApiOperation|@Operation|godoc/i.test(prevLines)) {
+      routeLines.push(ln);
     }
   });
   if (routeLines.length > 0) {
@@ -161,12 +176,16 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
     });
   }
 
-  // Detect missing error message documentation
+  // Detect missing error message documentation (multi-language)
   const throwLines: number[] = [];
   lines.forEach((line, i) => {
     if (/throw\s+new\s+\w*Error\s*\(\s*["'`]?$/i.test(line.trim()) || /throw\s+new\s+\w*Error\s*\(\s*\)/i.test(line.trim())) {
       throwLines.push(i + 1);
     }
+    if (/raise\s+\w*Error\s*\(\s*\)$/i.test(line.trim())) throwLines.push(i + 1);
+    if (/panic!\s*\(\s*\)\s*;?$/i.test(line.trim())) throwLines.push(i + 1);
+    if (/throw\s+new\s+\w*Exception\s*\(\s*\)\s*;?$/i.test(line.trim())) throwLines.push(i + 1);
+    if (/return\s+fmt\.Errorf\s*\(\s*""\s*\)/i.test(line.trim())) throwLines.push(i + 1);
   });
   if (throwLines.length > 0) {
     findings.push({

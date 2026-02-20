@@ -1,13 +1,15 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeScalability(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "SCALE";
+  const lang = getLangFamily(language);
 
-  // Global mutable state
-  const globalStateLines = getLineNumbers(code, /^(?:let|var)\s+\w+\s*=\s*(?:\[|\{|new\s)/);
+  // Global mutable state (multi-language)
+  const globalStateLines = getLangLineNumbers(code, language, LP.SHARED_MUTABLE);
   if (globalStateLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -15,7 +17,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       title: "Global mutable state detected",
       description: "Top-level mutable variables (let/var with object/array initialization) create shared state that prevents safe horizontal scaling across multiple instances.",
       lineNumbers: globalStateLines,
-      recommendation: "Externalize state to a database, cache (Redis), or message queue. Use const for configuration and immutable data. Each instance should be stateless.",
+      recommendation: "Externalize state to a database, cache (Redis), or message queue. Use const/final/immutable for configuration. Each instance should be stateless.",
       reference: "12-Factor App: Processes (Factor VI)",
     });
   }
@@ -36,7 +38,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   }
 
   // Synchronous blocking in hot paths (multi-language)
-  const blockingPattern = /Sync\s*\(|\.sleep\s*\(|Thread\.sleep|time\.sleep|threading\.Event\(\)\.wait|Task\.Delay.*\.Wait\(\)|\.Result\b/gi;
+  const blockingPattern = /Sync\s*\(|\.sleep\s*\(|Thread\.sleep|time\.sleep|threading\.Event\(\)\.wait|Task\.Delay.*\.Wait\(\)|\.Result\b|std::thread::sleep|tokio::task::block_in_place/gi;
   const blockingLines = getLineNumbers(code, blockingPattern);
   if (blockingLines.length > 0) {
     findings.push({
@@ -50,10 +52,9 @@ export function analyzeScalability(code: string, language: string): Finding[] {
     });
   }
 
-  // No timeout on external calls
-  const fetchPattern = /fetch\s*\(|axios\s*\.|http\s*\.\s*(?:get|post|put|delete|request)|\.request\s*\(|requests\.(get|post)|HttpClient|WebClient/gi;
-  const hasTimeout = /timeout|Timeout|deadline|AbortController/gi.test(code);
-  const fetchLines = getLineNumbers(code, fetchPattern);
+  // No timeout on external calls (multi-language)
+  const fetchLines = getLangLineNumbers(code, language, LP.HTTP_CLIENT);
+  const hasTimeout = /timeout|Timeout|deadline|AbortController|Duration|TimeSpan|time\.After/gi.test(code);
   if (fetchLines.length > 0 && !hasTimeout) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

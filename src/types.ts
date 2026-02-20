@@ -26,6 +26,130 @@ export interface Finding {
   recommendation: string;
   /** Reference link or standard (e.g. OWASP, CIS, etc.) */
   reference?: string;
+  /** Suggested code fix — a corrected code snippet the developer can apply directly */
+  suggestedFix?: string;
+}
+
+// ─── Configuration ───────────────────────────────────────────────────────────
+
+/**
+ * Supported language families for multi-language analysis.
+ */
+export type LangFamily =
+  | "javascript"
+  | "typescript"
+  | "python"
+  | "rust"
+  | "csharp"
+  | "java"
+  | "go"
+  | "unknown";
+
+/**
+ * Per-rule configuration override.
+ */
+export interface RuleOverride {
+  /** Disable this rule entirely */
+  disabled?: boolean;
+  /** Override the default severity */
+  severity?: Severity;
+}
+
+/**
+ * Project-level configuration (loaded from .judgesrc or .judgesrc.json).
+ */
+export interface JudgesConfig {
+  /** Rules to suppress entirely */
+  disabledRules?: string[];
+  /** Per-rule overrides keyed by rule ID or prefix (e.g. "SEC-*" or "SEC-003") */
+  ruleOverrides?: Record<string, RuleOverride>;
+  /** Judges to skip entirely (by ID) */
+  disabledJudges?: string[];
+  /** Minimum severity to report — anything below is filtered out */
+  minSeverity?: Severity;
+  /** Languages to restrict analysis to (empty = all) */
+  languages?: string[];
+}
+
+// ─── Project / Multi-file Types ──────────────────────────────────────────────
+
+/**
+ * A single file in a project submission.
+ */
+export interface ProjectFile {
+  /** Relative file path */
+  path: string;
+  /** File content */
+  content: string;
+  /** Programming language */
+  language: string;
+}
+
+/**
+ * Result of analyzing a project (multiple files).
+ */
+export interface ProjectVerdict extends TribunalVerdict {
+  /** Per-file breakdown */
+  fileResults: Array<{
+    path: string;
+    language: string;
+    findings: Finding[];
+    score: number;
+  }>;
+  /** Cross-file/architectural findings */
+  architecturalFindings: Finding[];
+}
+
+// ─── Diff Analysis Types ─────────────────────────────────────────────────────
+
+/**
+ * Result of evaluating only changed lines in a diff.
+ */
+export interface DiffVerdict {
+  /** Number of changed lines analyzed */
+  linesAnalyzed: number;
+  /** Findings that match changed lines */
+  findings: Finding[];
+  /** Score based only on diff-scoped findings */
+  score: number;
+  /** Verdict based only on diff-scoped findings */
+  verdict: Verdict;
+  /** Summary */
+  summary: string;
+}
+
+// ─── Dependency Analysis Types ───────────────────────────────────────────────
+
+/**
+ * A dependency entry parsed from a manifest file.
+ */
+export interface DependencyEntry {
+  /** Package name */
+  name: string;
+  /** Version or version range */
+  version: string;
+  /** Whether it's a dev dependency */
+  isDev: boolean;
+  /** Source manifest file */
+  source: string;
+}
+
+/**
+ * Result of dependency/supply-chain analysis.
+ */
+export interface DependencyVerdict {
+  /** Total dependencies found */
+  totalDependencies: number;
+  /** Findings about dependency issues */
+  findings: Finding[];
+  /** Parsed dependency list */
+  dependencies: DependencyEntry[];
+  /** Score */
+  score: number;
+  /** Verdict */
+  verdict: Verdict;
+  /** Summary */
+  summary: string;
 }
 
 /**

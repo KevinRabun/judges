@@ -1,10 +1,12 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeLoggingPrivacy(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "LOGPRIV";
+  const lang = getLangFamily(language);
 
   // Logging authorization/token headers
   const logAuthPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:authorization|bearer|token|auth)/gi;

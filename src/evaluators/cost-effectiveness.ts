@@ -1,17 +1,22 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeCostEffectiveness(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "COST";
+  const lang = getLangFamily(language);
 
-  // Nested loops (potential O(n²))
+  // Nested loops (potential O(n²)) (multi-language)
   const lines = code.split("\n");
   let loopDepth = 0;
   const nestedLoopLines: number[] = [];
+  const loopPattern = lang === "python"
+    ? /\b(?:for|while)\s/
+    : /\b(?:for|while|loop)\s*[\s(]/;
   for (let i = 0; i < lines.length; i++) {
-    if (/\b(?:for|while)\s*\(/.test(lines[i])) {
+    if (loopPattern.test(lines[i])) {
       loopDepth++;
       if (loopDepth >= 2) {
         nestedLoopLines.push(i + 1);
@@ -111,8 +116,8 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
     });
   }
 
-  // Over-logging in production paths
-  const logLines = getLineNumbers(code, /console\.(log|info|debug|warn|trace)\s*\(|logger\.(log|info|debug|trace)\s*\(|print\s*\(|fmt\.Print/gi);
+  // Over-logging in production paths (multi-language)
+  const logLines = getLangLineNumbers(code, language, LP.CONSOLE_LOG);
   if (logLines.length > 15) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -153,9 +158,9 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
     });
   }
 
-  // Uncompressed responses
+  // Uncompressed responses (multi-language)
   const hasCompression = /compression|gzip|deflate|brotli|Content-Encoding|Accept-Encoding|UseResponseCompression/gi.test(code);
-  const hasServer = /app\.(listen|use)|createServer|express\(\)|Flask|Django|WebApplication/gi.test(code);
+  const hasServer = /app\.(listen|use)|createServer|express\(\)|Flask|Django|WebApplication|actix_web|rocket::|gin\.|http\.ListenAndServe|SpringBoot/gi.test(code);
   if (hasServer && !hasCompression) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

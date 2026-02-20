@@ -1,22 +1,16 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeReliability(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "REL";
   let ruleNum = 1;
+  const lang = getLangFamily(language);
 
-  // Detect empty catch blocks
-  const emptyCatchLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (/catch\s*\(/.test(line)) {
-      const nextLines = lines.slice(i + 1, Math.min(lines.length, i + 3)).join("\n").trim();
-      if (/^\s*\}\s*$/.test(nextLines) || nextLines === "}") {
-        emptyCatchLines.push(i + 1);
-      }
-    }
-  });
+  // Detect empty catch blocks (multi-language)
+  const emptyCatchLines = getLangLineNumbers(code, language, LP.EMPTY_CATCH);
   if (emptyCatchLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -29,14 +23,14 @@ export function analyzeReliability(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect missing timeout on network calls
+  // Detect missing timeout on network calls (multi-language)
   const noTimeoutLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (/fetch\s*\(|axios\.|http\.request|\.get\s*\(\s*["'`]https?:/i.test(line)) {
-      const context = lines.slice(i, Math.min(lines.length, i + 5)).join("\n");
-      if (!/timeout|AbortController|signal|deadline/i.test(context)) {
-        noTimeoutLines.push(i + 1);
-      }
+  const httpClientLines = getLangLineNumbers(code, language, LP.HTTP_CLIENT);
+  httpClientLines.forEach((ln) => {
+    const idx = ln - 1;
+    const context = lines.slice(idx, Math.min(lines.length, idx + 5)).join("\n");
+    if (!/timeout|AbortController|signal|deadline|Duration|TimeSpan|time\.After/i.test(context)) {
+      noTimeoutLines.push(ln);
     }
   });
   if (noTimeoutLines.length > 0) {
@@ -51,14 +45,11 @@ export function analyzeReliability(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect missing retry logic for transient failures
-  const externalCallLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (/fetch\s*\(|axios\.|\.query\s*\(|\.execute\s*\(/i.test(line)) {
-      externalCallLines.push(i + 1);
-    }
-  });
-  const hasRetry = /retry|retries|backoff|exponential/i.test(code);
+  // Detect missing retry logic for transient failures (multi-language)
+  const externalCallLines = getLangLineNumbers(code, language, LP.HTTP_CLIENT).concat(
+    getLangLineNumbers(code, language, LP.DB_QUERY)
+  );
+  const hasRetry = /retry|retries|backoff|exponential|tenacity|Polly|resilience4j|backoff::/i.test(code);
   if (externalCallLines.length > 2 && !hasRetry) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -66,7 +57,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       title: "No retry logic for external calls",
       description: "Multiple external calls detected without retry logic. Transient failures (network blips, rate limits) will cause unnecessary errors.",
       lineNumbers: externalCallLines.slice(0, 5),
-      recommendation: "Implement retry with exponential backoff for transient failures. Use libraries like p-retry, tenacity, or Polly.",
+      recommendation: "Implement retry with exponential backoff for transient failures. Use libraries like p-retry, tenacity, Polly, Resilience4j, or backoff crate.",
       reference: "Resilience Patterns: Retry with Backoff",
     });
   }
@@ -109,22 +100,17 @@ export function analyzeReliability(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect process.exit in library code
-  const processExitLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (/process\.exit\s*\(/i.test(line)) {
-      processExitLines.push(i + 1);
-    }
-  });
+  // Detect process.exit / panic / System.exit (multi-language)
+  const processExitLines = getLangLineNumbers(code, language, LP.PANIC_UNWRAP);
   if (processExitLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
-      title: "process.exit() call detected",
-      description: "Calling process.exit() prevents graceful shutdown, skips cleanup handlers, and can cause data loss.",
+      title: "Abrupt process termination detected",
+      description: "Calling process.exit(), panic!(), System.exit(), or os.Exit() prevents graceful shutdown, skips cleanup handlers, and can cause data loss.",
       lineNumbers: processExitLines,
-      recommendation: "Throw errors or use graceful shutdown patterns instead. Let the process exit naturally after cleanup.",
-      reference: "Node.js Graceful Shutdown",
+      recommendation: "Throw errors or use graceful shutdown patterns instead. Let the process exit naturally after cleanup. Reserve panics for truly unrecoverable situations.",
+      reference: "Graceful Shutdown Patterns",
     });
   }
 
@@ -184,24 +170,9 @@ export function analyzeReliability(code: string, language: string): Finding[] {
     });
   }
 
-  // Panic/fatal in Go or System.exit in Java
-  const panicExitLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (/\bpanic\s*\(|log\.Fatal|System\.exit\s*\(|os\.Exit\s*\(/i.test(line)) {
-      panicExitLines.push(i + 1);
-    }
-  });
-  if (panicExitLines.length > 0) {
-    findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
-      severity: "medium",
-      title: "Abrupt process termination (panic/Fatal/System.exit)",
-      description: "Abruptly terminating the process prevents graceful shutdown, resource cleanup, and proper error propagation.",
-      lineNumbers: panicExitLines,
-      recommendation: "Return errors instead of panicking. Reserve Fatal/panic/System.exit for truly unrecoverable situations during startup only.",
-      reference: "Go Error Handling / Java Shutdown Best Practices",
-    });
-  }
+  // Panic/fatal in Go or System.exit in Java (already covered above, remove duplicate)
+  // Skipping REL-010 equivalent since merged into process exit rule above
+  ruleNum++; // keep numbering consistent
 
   // Unhandled promise rejection
   const unhandledPromiseLines: number[] = [];

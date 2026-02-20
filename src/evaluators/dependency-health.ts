@@ -1,11 +1,13 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeDependencyHealth(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "DEPS";
   let ruleNum = 1;
+  const lang = getLangFamily(language);
 
   // Detect wildcard version ranges
   const wildcardLines: number[] = [];

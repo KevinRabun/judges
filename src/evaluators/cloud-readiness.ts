@@ -1,10 +1,12 @@
 import { Finding } from "../types.js";
-import { getLineNumbers } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import * as LP from "../language-patterns.js";
 
 export function analyzeCloudReadiness(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "CLOUD";
+  const lang = getLangFamily(language);
 
   // Hardcoded hosts/ports
   const hardcodedHostPattern = /(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d{4,5}(?!.*(?:test|spec|mock|example))/gi;
@@ -49,22 +51,23 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
     });
   }
 
-  // No structured logging
-  const hasStructuredLog = /winston|pino|bunyan|structuredLog|log\.info\(.*\{|logger\.|logging\.getLogger|serilog|log4j|NLog|zap\./gi.test(code);
-  const hasConsoleLog = /console\.(log|info|warn|error|debug)\s*\(/gi.test(code);
+  // No structured logging (multi-language)
+  const hasStructuredLog = /winston|pino|bunyan|structuredLog|log\.info\(.*\{|logger\.|logging\.getLogger|serilog|log4j|NLog|zap\.|slog\.|tracing::/gi.test(code);
+  const consoleLogLines = getLangLineNumbers(code, language, LP.CONSOLE_LOG);
+  const hasConsoleLog = consoleLogLines.length > 0;
   if (hasConsoleLog && !hasStructuredLog) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Console.log instead of structured logging",
       description: "Console.log output is unstructured and difficult to parse in cloud log aggregation systems (CloudWatch, Azure Monitor, GCP Logging, ELK).",
-      recommendation: "Use a structured logging library (pino, winston, bunyan) that outputs JSON. Include correlation IDs, timestamps, and log levels.",
+      recommendation: "Use a structured logging library (pino/winston for JS, logging with dictConfig for Python, slog for Go, serilog for C#, log4j/slf4j for Java, tracing for Rust) that outputs JSON. Include correlation IDs, timestamps, and log levels.",
       reference: "Cloud-Native Logging Best Practices",
     });
   }
 
-  // No graceful shutdown
-  const hasGracefulShutdown = /SIGTERM|SIGINT|graceful.*shutdown|process\.on\s*\(\s*['"](?:SIGTERM|SIGINT)['"]/gi.test(code);
+  // No graceful shutdown (multi-language)
+  const hasGracefulShutdown = /SIGTERM|SIGINT|graceful.*shutdown|process\.on\s*\(\s*['"](?:SIGTERM|SIGINT)['"]|signal\.Notify|tokio::signal|ctrlc::|CancellationToken|Runtime\.getRuntime\(\)\.addShutdownHook/gi.test(code);
   if (!hasGracefulShutdown && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -76,8 +79,8 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
     });
   }
 
-  // .env file usage in production context
-  const dotenvPattern = /require\s*\(\s*['"]dotenv['"]\)|dotenv\.config|from\s+['"]dotenv['"]/gi;
+  // .env file usage in production context (multi-language)
+  const dotenvPattern = /require\s*\(\s*['"]dotenv['"]\)|dotenv\.config|from\s+['"]dotenv['"]|dotenv\.load|python-dotenv|godotenv|DotNetEnv/gi;
   const dotenvLines = getLineNumbers(code, dotenvPattern);
   if (dotenvLines.length > 0) {
     findings.push({
@@ -92,8 +95,8 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   }
 
   // Missing Dockerfile / container support indicators
-  const hasContainerSupport = /Dockerfile|docker|containerPort|EXPOSE|FROM\s+node|FROM\s+python|FROM\s+mcr/gi.test(code);
-  const hasServerCode = /app\.(listen|use)|createServer|express\(\)|Flask\(|Django|WebApplication/gi.test(code);
+  const hasContainerSupport = /Dockerfile|docker|containerPort|EXPOSE|FROM\s+node|FROM\s+python|FROM\s+mcr|FROM\s+golang|FROM\s+rust|FROM\s+openjdk/gi.test(code);
+  const hasServerCode = /app\.(listen|use)|createServer|express\(\)|Flask\(|Django|WebApplication|actix_web|rocket::|gin\.|fiber\.|http\.ListenAndServe|SpringBoot/gi.test(code);
   if (hasServerCode && !hasContainerSupport && code.split("\n").length > 50) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -149,10 +152,10 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
     });
   }
 
-  // Missing retry/resilience for cloud services
-  const cloudSdkPattern = /aws-sdk|@aws-sdk|@azure|googleapis|firebase|@google-cloud/gi;
+  // Missing retry/resilience for cloud services (multi-language)
+  const cloudSdkPattern = /aws-sdk|@aws-sdk|@azure|googleapis|firebase|@google-cloud|boto3|azure\.identity|google\.cloud|Azure\.|Amazon\.|cloud\.google\.com/gi;
   const cloudSdkLines = getLineNumbers(code, cloudSdkPattern);
-  const hasRetry = /retry|retries|backoff|exponential|resilience|polly|cockatiel/gi.test(code);
+  const hasRetry = /retry|retries|backoff|exponential|resilience|polly|cockatiel|tenacity|resilience4j|backoff::|go-retryablehttp/gi.test(code);
   if (cloudSdkLines.length > 0 && !hasRetry) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -165,9 +168,9 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
     });
   }
 
-  // Missing resource cleanup / dispose pattern
-  const hasResources = /createReadStream|openSync|createConnection|new\s+Client|open\s*\(|DatabaseConnection|SqlConnection/gi.test(code);
-  const hasCleanup = /\.close\s*\(|\.end\s*\(|\.destroy\s*\(|\.dispose\s*\(|finally\s*\{|using\s*\(|with\s+.*as\s/gi.test(code);
+  // Missing resource cleanup / dispose pattern (multi-language)
+  const hasResources = /createReadStream|openSync|createConnection|new\s+Client|open\s*\(|DatabaseConnection|SqlConnection|DriverManager|sql\.Open|File\.open|BufReader::new/gi.test(code);
+  const hasCleanup = /\.close\s*\(|\.end\s*\(|\.destroy\s*\(|\.dispose\s*\(|finally\s*\{|using\s*\(|with\s+.*as\s|defer\s|Drop\s+for|IDisposable|AutoCloseable/gi.test(code);
   if (hasResources && !hasCleanup) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

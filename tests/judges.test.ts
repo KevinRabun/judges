@@ -18,6 +18,9 @@ import { fileURLToPath } from "url";
 import {
   evaluateWithJudge,
   evaluateWithTribunal,
+  evaluateProject,
+  evaluateDiff,
+  analyzeDependencies,
   formatVerdictAsMarkdown,
   formatEvaluationAsMarkdown,
 } from "../src/evaluators/index.js";
@@ -25,6 +28,9 @@ import { JUDGES, getJudge } from "../src/judges/index.js";
 import type {
   JudgeEvaluation,
   TribunalVerdict,
+  ProjectVerdict,
+  DiffVerdict,
+  DependencyVerdict,
   Finding,
   Verdict,
 } from "../src/types.js";
@@ -355,5 +361,440 @@ describe("Edge Cases", () => {
     const verdict = evaluateWithTribunal("// This is a comment\n// Another comment", "typescript");
     assert.ok(verdict);
     assert.equal(verdict.evaluations.length, 30);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Multi-Language Support
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Multi-Language Support", () => {
+  const pythonCode = `
+import os, pickle, hashlib
+
+def handle_request(user_input):
+    # eval usage
+    result = eval(user_input)
+    # SQL injection
+    query = "SELECT * FROM users WHERE id = " + user_input
+    # weak hash
+    h = hashlib.md5(user_input.encode()).hexdigest()
+    # hardcoded password
+    password = "admin123"
+    data = pickle.loads(user_input)
+    os.system("rm -rf " + user_input)
+    return result
+`;
+
+  const rustCode = `
+use std::sync::Mutex;
+use std::collections::HashMap;
+
+static GLOBAL_STATE: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
+
+fn process(input: &str) -> String {
+    let result = GLOBAL_STATE.lock().unwrap();
+    let query = format!("SELECT * FROM users WHERE id = {}", input);
+    let password = "secret123";
+    println!("Processing: {}", input);
+    result.get(input).unwrap().clone()
+}
+`;
+
+  const goCode = `
+package main
+
+import (
+    "database/sql"
+    "fmt"
+    "os/exec"
+    "net/http"
+    "crypto/md5"
+)
+
+var globalCache = make(map[string]string)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    input := r.URL.Query().Get("input")
+    cmd := exec.Command("bash", "-c", input)
+    cmd.Run()
+    query := fmt.Sprintf("SELECT * FROM users WHERE id = %s", input)
+    db, _ := sql.Open("mysql", "root:password@/db")
+    db.Query(query)
+    h := md5.Sum([]byte(input))
+    fmt.Println("Processed:", input)
+}
+`;
+
+  const javaCode = `
+import java.sql.*;
+import java.security.MessageDigest;
+
+public class Handler {
+    private static String password = "hunter2";
+
+    public void handle(String input) throws Exception {
+        Runtime.getRuntime().exec(input);
+        Connection conn = DriverManager.getConnection("jdbc:mysql://localhost/db");
+        Statement stmt = conn.createStatement();
+        stmt.executeQuery("SELECT * FROM users WHERE id = " + input);
+        MessageDigest md = MessageDigest.getInstance("MD5");
+        System.out.println("Processed: " + input);
+    }
+}
+`;
+
+  const csharpCode = `
+using System;
+using System.Data.SqlClient;
+using System.Diagnostics;
+using System.Security.Cryptography;
+
+public class Handler {
+    private string password = "letmein";
+
+    public void Handle(string input) {
+        Process.Start(input);
+        var conn = new SqlConnection("Server=.;Database=db;User=sa;Password=pass;");
+        var cmd = new SqlCommand("SELECT * FROM users WHERE id = " + input, conn);
+        var md5 = MD5.Create();
+        Console.WriteLine("Processed: " + input);
+    }
+}
+`;
+
+  const samples: Array<{ lang: string; code: string; label: string }> = [
+    { lang: "python", code: pythonCode, label: "Python" },
+    { lang: "rust", code: rustCode, label: "Rust" },
+    { lang: "go", code: goCode, label: "Go" },
+    { lang: "java", code: javaCode, label: "Java" },
+    { lang: "csharp", code: csharpCode, label: "C#" },
+  ];
+
+  for (const { lang, code, label } of samples) {
+    describe(`${label} code analysis`, () => {
+      let verdict: TribunalVerdict;
+
+      it(`should evaluate ${label} code without throwing`, () => {
+        verdict = evaluateWithTribunal(code, lang);
+        assert.ok(verdict);
+      });
+
+      it(`should produce evaluations from all 30 judges for ${label}`, () => {
+        assert.equal(verdict.evaluations.length, 30);
+      });
+
+      it(`should detect at least some findings in flawed ${label} code`, () => {
+        const total = verdict.evaluations.reduce((s, e) => s + e.findings.length, 0);
+        assert.ok(total > 0, `Expected findings in flawed ${label} code, got ${total}`);
+      });
+
+      it(`should detect security issues in ${label} code`, () => {
+        const secFindings = verdict.evaluations
+          .filter((e) => e.judgeId === "cybersecurity" || e.judgeId === "data-security")
+          .flatMap((e) => e.findings);
+        assert.ok(
+          secFindings.length > 0,
+          `Expected security findings in ${label} code`
+        );
+      });
+
+      it(`should produce a score below 100 for flawed ${label} code`, () => {
+        assert.ok(
+          verdict.overallScore < 100,
+          `Expected score < 100 for flawed ${label} code, got ${verdict.overallScore}`
+        );
+      });
+    });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Project Evaluation (multi-file)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Project Evaluation", () => {
+  const projectFiles = [
+    {
+      path: "src/server.ts",
+      language: "typescript",
+      content: `
+import express from "express";
+const app = express();
+app.get("/api/data", (req, res) => {
+  const q = "SELECT * FROM t WHERE id=" + req.query.id;
+  res.json({ data: q });
+});
+app.listen(3000);
+`,
+    },
+    {
+      path: "src/utils.ts",
+      language: "typescript",
+      content: `
+export function helper(input: string) {
+  return eval(input);
+}
+export function formatDate(d: Date): string {
+  return d.toISOString();
+}
+`,
+    },
+    {
+      path: "src/handler.py",
+      language: "python",
+      content: `
+import os
+def helper(input):
+    return eval(input)
+def process(data):
+    os.system("ls " + data)
+`,
+    },
+  ];
+
+  let result: ProjectVerdict;
+
+  it("should evaluate a project without throwing", () => {
+    result = evaluateProject(projectFiles);
+    assert.ok(result);
+  });
+
+  it("should produce per-file results", () => {
+    assert.equal(result.fileResults.length, 3);
+    for (const fr of result.fileResults) {
+      assert.ok(fr.path.length > 0);
+      assert.ok(fr.score >= 0 && fr.score <= 100);
+    }
+  });
+
+  it("should produce architectural findings for duplicated helper()", () => {
+    assert.ok(
+      result.architecturalFindings.length > 0,
+      `Expected architectural findings for duplicate functions across files`
+    );
+  });
+
+  it("should produce a summary", () => {
+    assert.ok(result.summary.length > 0);
+  });
+
+  it("should produce an overall score", () => {
+    assert.ok(result.overallScore >= 0 && result.overallScore <= 100);
+  });
+
+  it("should produce a valid overall verdict", () => {
+    assert.ok(["pass", "fail", "warning"].includes(result.overallVerdict));
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Diff Evaluation
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Diff Evaluation", () => {
+  const diffCode = `
+import express from "express";
+const app = express();
+
+// safe line
+const port = 3000;
+
+// dangerous line at ~line 8
+app.get("/data", (req, res) => {
+  const q = "SELECT * FROM t WHERE id=" + req.query.id;
+  eval(req.body.code);
+  res.json({});
+});
+
+app.listen(port);
+`;
+
+  let result: DiffVerdict;
+
+  it("should evaluate a diff without throwing", () => {
+    result = evaluateDiff(diffCode, "typescript", [8, 9, 10, 11]);
+    assert.ok(result);
+  });
+
+  it("should report the number of changed lines", () => {
+    assert.equal(result.linesAnalyzed, 4);
+  });
+
+  it("should filter findings to only changed lines", () => {
+    for (const f of result.findings) {
+      assert.ok(
+        f.lineNumbers && f.lineNumbers.some((ln) => [8, 9, 10, 11].includes(ln)),
+        `Finding ${f.ruleId} should reference changed lines`
+      );
+    }
+  });
+
+  it("should produce a score", () => {
+    assert.ok(result.score >= 0 && result.score <= 100);
+  });
+
+  it("should produce a valid verdict", () => {
+    assert.ok(["pass", "fail", "warning"].includes(result.verdict));
+  });
+
+  it("should have fewer findings than full analysis", () => {
+    const fullVerdict = evaluateWithTribunal(diffCode, "typescript");
+    const fullFindings = fullVerdict.evaluations.flatMap((e) => e.findings);
+    assert.ok(
+      result.findings.length <= fullFindings.length,
+      `Diff findings (${result.findings.length}) should be <= full findings (${fullFindings.length})`
+    );
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Dependency / Supply-chain Analysis
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Dependency Analysis", () => {
+  describe("package.json analysis", () => {
+    const manifest = JSON.stringify({
+      dependencies: {
+        express: "*",
+        lodash: "^4.17.21",
+        "event-stream": "3.3.6",
+      },
+      devDependencies: {
+        jest: "^29.0.0",
+        typescript: "~5.0.0",
+      },
+    });
+
+    let result: DependencyVerdict;
+
+    it("should analyze package.json without throwing", () => {
+      result = analyzeDependencies(manifest, "package.json");
+      assert.ok(result);
+    });
+
+    it("should parse all dependencies", () => {
+      assert.equal(result.totalDependencies, 5);
+      assert.equal(result.dependencies.length, 5);
+    });
+
+    it("should detect unpinned version (*)", () => {
+      const unpinned = result.findings.filter((f) => f.title.toLowerCase().includes("unpinned") || f.description.includes("*"));
+      assert.ok(unpinned.length > 0, "Should flag unpinned version *");
+    });
+
+    it("should produce a score", () => {
+      assert.ok(result.score >= 0 && result.score <= 100);
+    });
+
+    it("should produce a valid verdict", () => {
+      assert.ok(["pass", "fail", "warning"].includes(result.verdict));
+    });
+
+    it("should produce a summary", () => {
+      assert.ok(result.summary.length > 0);
+    });
+  });
+
+  describe("requirements.txt analysis", () => {
+    const manifest = `
+flask
+requests==2.28.0
+django>=3.2
+numpy
+`;
+
+    let result: DependencyVerdict;
+
+    it("should analyze requirements.txt without throwing", () => {
+      result = analyzeDependencies(manifest, "requirements.txt");
+      assert.ok(result);
+    });
+
+    it("should parse dependencies", () => {
+      assert.ok(result.totalDependencies >= 3, `Expected >=3 deps, got ${result.totalDependencies}`);
+    });
+
+    it("should detect unpinned dependencies", () => {
+      const unpinned = result.findings.filter((f) => f.title.toLowerCase().includes("unpinned") || f.description.toLowerCase().includes("unpin"));
+      assert.ok(unpinned.length > 0, "Should flag unpinned Python deps");
+    });
+  });
+
+  describe("Cargo.toml analysis", () => {
+    const manifest = `
+[package]
+name = "myapp"
+version = "0.1.0"
+
+[dependencies]
+serde = "*"
+tokio = { version = "1", features = ["full"] }
+actix-web = "4.0"
+`;
+
+    let result: DependencyVerdict;
+
+    it("should analyze Cargo.toml without throwing", () => {
+      result = analyzeDependencies(manifest, "Cargo.toml");
+      assert.ok(result);
+    });
+
+    it("should parse dependencies", () => {
+      assert.ok(result.totalDependencies >= 3, `Expected >=3 deps, got ${result.totalDependencies}`);
+    });
+
+    it("should detect wildcard version", () => {
+      const wildcard = result.findings.filter((f) => f.description.includes("*") || f.title.toLowerCase().includes("unpinned"));
+      assert.ok(wildcard.length > 0, "Should flag wildcard * version in Cargo.toml");
+    });
+  });
+
+  describe("go.mod analysis", () => {
+    const manifest = `
+module example.com/myapp
+
+go 1.21
+
+require (
+    github.com/gin-gonic/gin v1.9.1
+    github.com/go-sql-driver/mysql v1.7.0
+)
+`;
+
+    let result: DependencyVerdict;
+
+    it("should analyze go.mod without throwing", () => {
+      result = analyzeDependencies(manifest, "go.mod");
+      assert.ok(result);
+    });
+
+    it("should parse dependencies", () => {
+      assert.ok(result.totalDependencies >= 2, `Expected >=2 deps, got ${result.totalDependencies}`);
+    });
+  });
+
+  describe("invalid manifest", () => {
+    it("should handle malformed JSON gracefully", () => {
+      const result = analyzeDependencies("{invalid json", "package.json");
+      assert.ok(result);
+      assert.ok(result.findings.length > 0, "Should report parse error");
+    });
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: suggestedFix Field
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("suggestedFix Support", () => {
+  it("should include suggestedFix on some findings for flawed code", () => {
+    const verdict = evaluateWithTribunal(sampleCode, "typescript");
+    const allFindings = verdict.evaluations.flatMap((e) => e.findings);
+    const withFix = allFindings.filter((f) => f.suggestedFix && f.suggestedFix.length > 0);
+    assert.ok(
+      withFix.length > 0,
+      `Expected at least one finding with suggestedFix, found ${withFix.length}`
+    );
   });
 });
