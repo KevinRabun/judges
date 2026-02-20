@@ -42,6 +42,7 @@ import { analyzeReliability } from "./reliability.js";
 import { analyzeObservability } from "./observability.js";
 import { analyzePerformance } from "./performance.js";
 import { analyzeCompliance } from "./compliance.js";
+import { analyzeDataSovereignty } from "./data-sovereignty.js";
 import { analyzeTesting } from "./testing.js";
 import { analyzeDocumentation } from "./documentation.js";
 import { analyzeInternationalization } from "./internationalization.js";
@@ -111,6 +112,9 @@ export function evaluateWithJudge(
       break;
     case "compliance":
       findings.push(...analyzeCompliance(code, language));
+      break;
+    case "data-sovereignty":
+      findings.push(...analyzeDataSovereignty(code, language));
       break;
     case "testing":
       findings.push(...analyzeTesting(code, language));

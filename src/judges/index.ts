@@ -12,6 +12,7 @@ import { reliabilityJudge } from "./reliability.js";
 import { observabilityJudge } from "./observability.js";
 import { performanceJudge } from "./performance.js";
 import { complianceJudge } from "./compliance.js";
+import { dataSovereigntyJudge } from "./data-sovereignty.js";
 import { testingJudge } from "./testing.js";
 import { documentationJudge } from "./documentation.js";
 import { internationalizationJudge } from "./internationalization.js";
@@ -52,6 +53,7 @@ export const JUDGES: JudgeDefinition[] = [
   observabilityJudge,
   performanceJudge,
   complianceJudge,
+  dataSovereigntyJudge,
   testingJudge,
   documentationJudge,
   internationalizationJudge,

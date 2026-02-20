@@ -69,8 +69,8 @@ function findingsAreWellFormed(findings: Finding[]): void {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Judge Registry", () => {
-  it("should have exactly 31 judges registered", () => {
-    assert.equal(JUDGES.length, 31);
+  it("should have exactly 32 judges registered", () => {
+    assert.equal(JUDGES.length, 32);
   });
 
   it("should allow lookup of every judge by ID", () => {
@@ -132,8 +132,8 @@ describe("Full Tribunal Evaluation", () => {
     );
   });
 
-  it("should produce evaluations from all 31 judges", () => {
-    assert.equal(verdict.evaluations.length, 31);
+  it("should produce evaluations from all judges", () => {
+    assert.equal(verdict.evaluations.length, JUDGES.length);
   });
 
   it("should include a timestamp", () => {
@@ -171,6 +171,7 @@ const JUDGE_EXPECTATIONS: Record<
   "observability":       { prefix: "OBS",    minFindings: 2 },
   "performance":         { prefix: "PERF",   minFindings: 2 },
   "compliance":          { prefix: "COMP",   minFindings: 2 },
+  "data-sovereignty":    { prefix: "SOV",    minFindings: 1 },
   "testing":             { prefix: "TEST",   minFindings: 1 },
   "documentation":       { prefix: "DOC",    minFindings: 1 },
   "internationalization": { prefix: "I18N",  minFindings: 1 },
@@ -254,6 +255,69 @@ describe("Individual Judge Evaluations", () => {
       });
     });
   }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Data Sovereignty Judge
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Data Sovereignty Judge", () => {
+  const riskyCode = `
+const defaultRegion = "global";
+async function syncCustomerData(payload) {
+  await fetch("https://thirdparty.example.com/export", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+function configureStorage() {
+  return { replication: "geo-redundant", backup: "cross-region" };
+}
+`;
+
+  const guardedCode = `
+const approvedRegions = ["eu-west-1", "eu-central-1"];
+
+function assertResidency(region: string) {
+  if (!approvedRegions.includes(region)) {
+    throw new Error("residencyViolation");
+  }
+}
+
+async function exportAggregated(region: string, payload: unknown) {
+  assertResidency(region);
+  return fetch("https://eu-api.example.com/report", {
+    method: "POST",
+    body: JSON.stringify({ region, payload }),
+  });
+}
+`;
+
+  it("should trigger SOV findings for risky cross-border patterns", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const evaluation = evaluateWithJudge(judge!, riskyCode, "typescript");
+    assert.ok(
+      hasRulePrefix(evaluation.findings, "SOV"),
+      "Expected at least one SOV-* finding"
+    );
+    assert.ok(evaluation.findings.length > 0, "Expected sovereignty findings");
+  });
+
+  it("should score guarded code higher than risky code", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const risky = evaluateWithJudge(judge!, riskyCode, "typescript");
+    const guarded = evaluateWithJudge(judge!, guardedCode, "typescript");
+
+    assert.ok(
+      guarded.score >= risky.score,
+      `Expected guarded score (${guarded.score}) >= risky score (${risky.score})`
+    );
+  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -344,13 +408,13 @@ describe("Edge Cases", () => {
   it("should handle empty code gracefully", () => {
     const verdict = evaluateWithTribunal("", "typescript");
     assert.ok(verdict);
-    assert.equal(verdict.evaluations.length, 31);
+    assert.equal(verdict.evaluations.length, JUDGES.length);
   });
 
   it("should handle unknown language gracefully", () => {
     const verdict = evaluateWithTribunal(sampleCode, "brainfuck");
     assert.ok(verdict);
-    assert.equal(verdict.evaluations.length, 31);
+    assert.equal(verdict.evaluations.length, JUDGES.length);
   });
 
   it("should handle very short code gracefully", () => {
@@ -362,7 +426,7 @@ describe("Edge Cases", () => {
   it("should handle code with only comments", () => {
     const verdict = evaluateWithTribunal("// This is a comment\n// Another comment", "typescript");
     assert.ok(verdict);
-    assert.equal(verdict.evaluations.length, 31);
+    assert.equal(verdict.evaluations.length, JUDGES.length);
   });
 });
 
@@ -482,8 +546,8 @@ public class Handler {
         assert.ok(verdict);
       });
 
-      it(`should produce evaluations from all 31 judges for ${label}`, () => {
-        assert.equal(verdict.evaluations.length, 31);
+      it(`should produce evaluations from all judges for ${label}`, () => {
+        assert.equal(verdict.evaluations.length, JUDGES.length);
       });
 
       it(`should detect at least some findings in flawed ${label} code`, () => {
