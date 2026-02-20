@@ -30,6 +30,7 @@ import { uxJudge } from "./ux.js";
 import { loggingPrivacyJudge } from "./logging-privacy.js";
 import { rateLimitingJudge } from "./rate-limiting.js";
 import { ciCdJudge } from "./ci-cd.js";
+import { codeStructureJudge } from "./code-structure.js";
 
 /**
  * The panel of judges that comprise the Judges Panel.
@@ -69,6 +70,7 @@ export const JUDGES: JudgeDefinition[] = [
   loggingPrivacyJudge,
   rateLimitingJudge,
   ciCdJudge,
+  codeStructureJudge,
 ];
 
 /**

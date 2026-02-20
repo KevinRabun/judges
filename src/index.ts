@@ -9,7 +9,7 @@
  * to perform thorough contextual analysis beyond what static patterns catch.
  *
  * Tools exposed:
- *   - evaluate_code:              Full panel review (all 30 judges)
+ *   - evaluate_code:              Full panel review (all 31 judges)
  *   - evaluate_code_single_judge: Review by a specific judge
  *   - get_judges:                 List all available judges
  */
@@ -34,7 +34,7 @@ import { JudgeDefinition } from "./types.js";
 
 const server = new McpServer({
   name: "judges",
-  version: "1.5.0",
+  version: "1.6.0",
 });
 
 // ─── Tool: get_judges ────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ server.tool(
 
 server.tool(
   "evaluate_code",
-  `Submit code to the full Judges Panel for evaluation. All 30 judges will independently review the code using both automated pattern detection and deep contextual analysis criteria. Returns a combined verdict with scores, findings, and expert review guidance for thorough evaluation.`,
+  `Submit code to the full Judges Panel for evaluation. All 31 judges will independently review the code using both automated pattern detection and deep contextual analysis criteria. Returns a combined verdict with scores, findings, and expert review guidance for thorough evaluation.`,
   {
     code: z
       .string()
@@ -165,7 +165,7 @@ server.tool(
 
 server.tool(
   "evaluate_project",
-  "Submit multiple files for project-level analysis. All 30 judges evaluate each file, plus cross-file architectural analysis detects issues like code duplication, inconsistent error handling, and dependency cycles.",
+  "Submit multiple files for project-level analysis. All 31 judges evaluate each file, plus cross-file architectural analysis detects issues like code duplication, inconsistent error handling, and dependency cycles.",
   {
     files: z.array(
       z.object({
@@ -218,7 +218,7 @@ server.tool(
 
 server.tool(
   "evaluate_diff",
-  "Evaluate only the changed lines in a code diff. Runs all 30 judges on the full file but filters findings to only those affecting the specified changed lines. Ideal for PR reviews and incremental analysis.",
+  "Evaluate only the changed lines in a code diff. Runs all 31 judges on the full file but filters findings to only those affecting the specified changed lines. Ideal for PR reviews and incremental analysis.",
   {
     code: z
       .string()
@@ -433,7 +433,7 @@ for (const judge of JUDGES) {
 // Full tribunal prompt
 server.prompt(
   "full-tribunal",
-  "Convene the full Judges Panel — all 30 judges evaluate the code in their respective domains and produce a combined verdict.",
+  "Convene the full Judges Panel — all 31 judges evaluate the code in their respective domains and produce a combined verdict.",
   {
     code: z
       .string()

@@ -68,8 +68,8 @@ function findingsAreWellFormed(findings: Finding[]): void {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Judge Registry", () => {
-  it("should have exactly 30 judges registered", () => {
-    assert.equal(JUDGES.length, 30);
+  it("should have exactly 31 judges registered", () => {
+    assert.equal(JUDGES.length, 31);
   });
 
   it("should allow lookup of every judge by ID", () => {
@@ -131,8 +131,8 @@ describe("Full Tribunal Evaluation", () => {
     );
   });
 
-  it("should produce evaluations from all 30 judges", () => {
-    assert.equal(verdict.evaluations.length, 30);
+  it("should produce evaluations from all 31 judges", () => {
+    assert.equal(verdict.evaluations.length, 31);
   });
 
   it("should include a timestamp", () => {
@@ -188,6 +188,7 @@ const JUDGE_EXPECTATIONS: Record<
   "logging-privacy":     { prefix: "LOGPRIV", minFindings: 3, expectVerdict: "fail" },
   "rate-limiting":       { prefix: "RATE",   minFindings: 3, expectVerdict: "fail" },
   "ci-cd":               { prefix: "CICD",   minFindings: 3 },
+  "code-structure":       { prefix: "STRUCT", minFindings: 1 },
 };
 
 describe("Individual Judge Evaluations", () => {
@@ -342,13 +343,13 @@ describe("Edge Cases", () => {
   it("should handle empty code gracefully", () => {
     const verdict = evaluateWithTribunal("", "typescript");
     assert.ok(verdict);
-    assert.equal(verdict.evaluations.length, 30);
+    assert.equal(verdict.evaluations.length, 31);
   });
 
   it("should handle unknown language gracefully", () => {
     const verdict = evaluateWithTribunal(sampleCode, "brainfuck");
     assert.ok(verdict);
-    assert.equal(verdict.evaluations.length, 30);
+    assert.equal(verdict.evaluations.length, 31);
   });
 
   it("should handle very short code gracefully", () => {
@@ -360,7 +361,7 @@ describe("Edge Cases", () => {
   it("should handle code with only comments", () => {
     const verdict = evaluateWithTribunal("// This is a comment\n// Another comment", "typescript");
     assert.ok(verdict);
-    assert.equal(verdict.evaluations.length, 30);
+    assert.equal(verdict.evaluations.length, 31);
   });
 });
 
@@ -480,8 +481,8 @@ public class Handler {
         assert.ok(verdict);
       });
 
-      it(`should produce evaluations from all 30 judges for ${label}`, () => {
-        assert.equal(verdict.evaluations.length, 30);
+      it(`should produce evaluations from all 31 judges for ${label}`, () => {
+        assert.equal(verdict.evaluations.length, 31);
       });
 
       it(`should detect at least some findings in flawed ${label} code`, () => {
@@ -796,5 +797,337 @@ describe("suggestedFix Support", () => {
       withFix.length > 0,
       `Expected at least one finding with suggestedFix, found ${withFix.length}`
     );
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AST / Structural Analysis
+// ═════════════════════════════════════════════════════════════════════════════
+
+import { analyzeStructure } from "../src/ast/index.js";
+import { analyzeCodeStructure } from "../src/evaluators/code-structure.js";
+
+describe("AST Analysis — TypeScript", () => {
+  const tsCode = `
+function simple(a: number, b: number): number {
+  return a + b;
+}
+
+function complex(x: number): string {
+  if (x > 0) {
+    if (x > 10) {
+      if (x > 100) {
+        if (x > 1000) {
+          if (x > 10000) {
+            return "huge";
+          }
+          return "very large";
+        }
+        return "large";
+      }
+      return "medium";
+    }
+    return "small";
+  }
+  return "zero or negative";
+}
+
+function tooManyParams(a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any): void {
+  console.log(a);
+}
+`;
+
+  it("should parse TypeScript code into a CodeStructure", () => {
+    const structure = analyzeStructure(tsCode, "typescript");
+    assert.ok(structure);
+    assert.equal(structure.language, "typescript");
+    assert.ok(structure.functions.length >= 3, `Expected >=3 functions, got ${structure.functions.length}`);
+  });
+
+  it("should compute cyclomatic complexity", () => {
+    const structure = analyzeStructure(tsCode, "typescript");
+    const complexFn = structure.functions.find((f) => f.name === "complex");
+    assert.ok(complexFn, "Should find the 'complex' function");
+    assert.ok(complexFn!.cyclomaticComplexity >= 5, `Expected CC >= 5, got ${complexFn!.cyclomaticComplexity}`);
+  });
+
+  it("should compute nesting depth", () => {
+    const structure = analyzeStructure(tsCode, "typescript");
+    const complexFn = structure.functions.find((f) => f.name === "complex");
+    assert.ok(complexFn, "Should find the 'complex' function");
+    assert.ok(complexFn!.maxNestingDepth >= 4, `Expected nesting >= 4, got ${complexFn!.maxNestingDepth}`);
+  });
+
+  it("should count parameters", () => {
+    const structure = analyzeStructure(tsCode, "typescript");
+    const manyParams = structure.functions.find((f) => f.name === "tooManyParams");
+    assert.ok(manyParams, "Should find the 'tooManyParams' function");
+    assert.equal(manyParams!.parameterCount, 9);
+  });
+
+  it("should detect any type usage", () => {
+    const structure = analyzeStructure(tsCode, "typescript");
+    assert.ok(structure.typeAnyLines.length > 0, "Should detect 'any' type annotations");
+  });
+
+  it("should detect deeply nested code via evaluator", () => {
+    const findings = analyzeCodeStructure(tsCode, "typescript");
+    const deepNest = findings.filter((f) => f.ruleId === "STRUCT-002");
+    assert.ok(deepNest.length > 0, "Should flag deeply nested code");
+  });
+
+  it("should detect too many parameters via evaluator", () => {
+    const findings = analyzeCodeStructure(tsCode, "typescript");
+    const params = findings.filter((f) => f.ruleId === "STRUCT-004" || f.ruleId === "STRUCT-009");
+    assert.ok(params.length > 0, "Should flag excessive parameters");
+  });
+
+  it("should detect any types via evaluator", () => {
+    const findings = analyzeCodeStructure(tsCode, "typescript");
+    const anyTypes = findings.filter((f) => f.ruleId === "STRUCT-006");
+    assert.ok(anyTypes.length > 0, "Should flag any type usage");
+  });
+});
+
+describe("AST Analysis — Dead Code Detection", () => {
+  const deadCode = `
+function hasDeadCode(): string {
+  return "early";
+  console.log("this is dead");
+  const x = 42;
+}
+`;
+
+  it("should detect unreachable code after return", () => {
+    const structure = analyzeStructure(deadCode, "typescript");
+    assert.ok(structure.deadCodeLines.length > 0, "Should detect dead code lines");
+  });
+
+  it("should produce STRUCT-005 findings", () => {
+    const findings = analyzeCodeStructure(deadCode, "typescript");
+    const dead = findings.filter((f) => f.ruleId === "STRUCT-005");
+    assert.ok(dead.length > 0, "Should flag dead code");
+  });
+});
+
+describe("AST Analysis — Long Functions", () => {
+  // Generate a function with 60 lines
+  const longLines = Array.from({ length: 55 }, (_, i) => `  const v${i} = ${i};`).join("\n");
+  const longFnCode = `function longFunction() {\n${longLines}\n  return 0;\n}`;
+
+  it("should detect long functions (>50 lines)", () => {
+    const findings = analyzeCodeStructure(longFnCode, "typescript");
+    const longFn = findings.filter((f) => f.ruleId === "STRUCT-003");
+    assert.ok(longFn.length > 0, "Should flag long function");
+  });
+});
+
+describe("AST Analysis — Python", () => {
+  const pythonCode = `
+def simple(a, b):
+    return a + b
+
+def complex_function(x):
+    if x > 0:
+        if x > 10:
+            if x > 100:
+                if x > 1000:
+                    if x > 10000:
+                        return "huge"
+                    return "very large"
+                return "large"
+            return "medium"
+        return "small"
+    return "zero"
+
+def too_many(a, b, c, d, e, f, g, h, i):
+    pass
+`;
+
+  it("should parse Python code into a CodeStructure", () => {
+    const structure = analyzeStructure(pythonCode, "python");
+    assert.ok(structure);
+    assert.equal(structure.language, "python");
+    assert.ok(structure.functions.length >= 3, `Expected >=3 functions, got ${structure.functions.length}`);
+  });
+
+  it("should count parameters in Python", () => {
+    const structure = analyzeStructure(pythonCode, "python");
+    const manyParams = structure.functions.find((f) => f.name === "too_many");
+    assert.ok(manyParams, "Should find too_many function");
+    assert.equal(manyParams!.parameterCount, 9);
+  });
+
+  it("should detect complexity in Python", () => {
+    const findings = analyzeCodeStructure(pythonCode, "python");
+    assert.ok(findings.length > 0, "Should produce at least one finding for complex Python code");
+  });
+});
+
+describe("AST Analysis — Go", () => {
+  const goCode = `
+package main
+
+func simple(a int, b int) int {
+    return a + b
+}
+
+func complex(x int) string {
+    if x > 0 {
+        if x > 10 {
+            if x > 100 {
+                if x > 1000 {
+                    if x > 10000 {
+                        return "huge"
+                    }
+                    return "very large"
+                }
+                return "large"
+            }
+            return "medium"
+        }
+        return "small"
+    }
+    return "zero"
+}
+`;
+
+  it("should parse Go code into a CodeStructure", () => {
+    const structure = analyzeStructure(goCode, "go");
+    assert.ok(structure);
+    assert.equal(structure.language, "go");
+    assert.ok(structure.functions.length >= 2, `Expected >=2 functions, got ${structure.functions.length}`);
+  });
+
+  it("should detect deep nesting in Go", () => {
+    const structure = analyzeStructure(goCode, "go");
+    assert.ok(structure.maxNestingDepth >= 4, `Expected nesting >= 4, got ${structure.maxNestingDepth}`);
+  });
+});
+
+describe("AST Analysis — Rust", () => {
+  const rustCode = `
+fn simple(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+fn complex(x: i32) -> &'static str {
+    if x > 0 {
+        if x > 10 {
+            if x > 100 {
+                if x > 1000 {
+                    return "huge";
+                }
+                return "large";
+            }
+            return "medium";
+        }
+        return "small";
+    }
+    "zero"
+}
+
+unsafe fn dangerous() {
+    let ptr: *const i32 = std::ptr::null();
+}
+`;
+
+  it("should parse Rust code into a CodeStructure", () => {
+    const structure = analyzeStructure(rustCode, "rust");
+    assert.ok(structure);
+    assert.equal(structure.language, "rust");
+    assert.ok(structure.functions.length >= 2, `Expected >=2 functions, got ${structure.functions.length}`);
+  });
+
+  it("should detect unsafe in Rust as weak type usage", () => {
+    const structure = analyzeStructure(rustCode, "rust");
+    assert.ok(structure.typeAnyLines.length > 0, "Should detect unsafe usage");
+  });
+});
+
+describe("AST Analysis — Java", () => {
+  const javaCode = `
+public class Example {
+    public int simple(int a, int b) {
+        return a + b;
+    }
+
+    public String complex(int x) {
+        if (x > 0) {
+            if (x > 10) {
+                if (x > 100) {
+                    if (x > 1000) {
+                        return "huge";
+                    }
+                    return "large";
+                }
+                return "medium";
+            }
+            return "small";
+        }
+        return "zero";
+    }
+
+    public void tooMany(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        System.out.println(a);
+    }
+}
+`;
+
+  it("should parse Java code into a CodeStructure", () => {
+    const structure = analyzeStructure(javaCode, "java");
+    assert.ok(structure);
+    assert.equal(structure.language, "java");
+    assert.ok(structure.functions.length >= 2, `Expected >=2 functions, got ${structure.functions.length}`);
+  });
+});
+
+describe("AST Analysis — C#", () => {
+  const csharpCode = `
+public class Example {
+    public int Simple(int a, int b) {
+        return a + b;
+    }
+
+    public string Complex(int x) {
+        if (x > 0) {
+            if (x > 10) {
+                if (x > 100) {
+                    if (x > 1000) {
+                        return "huge";
+                    }
+                    return "large";
+                }
+                return "medium";
+            }
+            return "small";
+        }
+        return "zero";
+    }
+
+    public void TooMany(dynamic a, dynamic b, dynamic c, dynamic d, dynamic e, dynamic f, dynamic g, dynamic h, dynamic i) {
+        Console.WriteLine(a);
+    }
+}
+`;
+
+  it("should parse C# code into a CodeStructure", () => {
+    const structure = analyzeStructure(csharpCode, "csharp");
+    assert.ok(structure);
+    assert.equal(structure.language, "csharp");
+    assert.ok(structure.functions.length >= 2, `Expected >=2 functions, got ${structure.functions.length}`);
+  });
+
+  it("should detect dynamic type usage in C#", () => {
+    const structure = analyzeStructure(csharpCode, "csharp");
+    assert.ok(structure.typeAnyLines.length > 0, "Should detect dynamic type usage");
+  });
+});
+
+describe("AST Analysis — Unknown Language", () => {
+  it("should return a minimal structure for unknown languages", () => {
+    const structure = analyzeStructure("some code", "brainfuck");
+    assert.ok(structure);
+    assert.equal(structure.functions.length, 0);
   });
 });
