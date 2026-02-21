@@ -1101,7 +1101,22 @@ async function exportData(payload) {
       policyProfile: "public-sector",
     });
 
-    assert.ok(result.findings.length >= 0);
+    assert.ok(Array.isArray(result.findings));
+    if (result.findings.length > 0) {
+      const finding = result.findings[0];
+      assert.ok(
+        typeof finding.specialtyArea === "string",
+        "finding should have specialtyArea"
+      );
+      assert.ok(
+        typeof finding.confidence === "number",
+        "finding should have confidence"
+      );
+      assert.ok(
+        Array.isArray(finding.evidenceBasis),
+        "finding should have evidenceBasis array"
+      );
+    }
     assert.ok(result.timestamp.length > 0);
     assert.equal(
       result.timestamp,
