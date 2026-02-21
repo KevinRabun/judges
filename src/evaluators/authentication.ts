@@ -2,6 +2,146 @@ import { Finding } from "../types.js";
 import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
+function isLikelyPlaceholderCredentialValue(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+
+  const exactPlaceholders = new Set([
+    "test",
+    "testing",
+    "mock",
+    "dummy",
+    "example",
+    "sample",
+    "fake",
+    "na",
+    "n/a",
+    "none",
+    "null",
+    "undefined",
+    "changeme",
+    "change_me",
+    "replace_me",
+    "replace-me",
+    "your_token_here",
+    "your_api_key",
+    "unused",
+    "not_used",
+    "placeholder",
+  ]);
+
+  if (exactPlaceholders.has(normalized)) {
+    return true;
+  }
+
+  if (/^(?:test|mock|dummy|sample|example|fake|placeholder|na|n\/a|unused|changeme|replace)[-_a-z0-9]*$/i.test(normalized)) {
+    return true;
+  }
+
+  return false;
+}
+
+function isStrictCredentialDetectionEnabled(): boolean {
+  return process.env.JUDGES_CREDENTIAL_MODE?.toLowerCase() === "strict";
+}
+
+function looksLikeRealCredentialValue(value: string): boolean {
+  if (isLikelyPlaceholderCredentialValue(value)) {
+    return false;
+  }
+
+  if (!isStrictCredentialDetectionEnabled()) {
+    return true;
+  }
+
+  const normalized = value.trim();
+  if (normalized.length < 12) {
+    return false;
+  }
+
+  if (/(?:test|mock|dummy|sample|example|fake|placeholder|changeme|replace[_-]?me|unused|not[_-]?used|password|secret)/i.test(normalized)) {
+    return false;
+  }
+
+  const hasLower = /[a-z]/.test(normalized);
+  const hasUpper = /[A-Z]/.test(normalized);
+  const hasDigit = /\d/.test(normalized);
+  const hasSymbol = /[^A-Za-z0-9]/.test(normalized);
+  const classCount = [hasLower, hasUpper, hasDigit, hasSymbol].filter(Boolean).length;
+
+  if (normalized.length >= 20 && classCount >= 2) {
+    return true;
+  }
+
+  if (normalized.length >= 16 && classCount >= 3) {
+    return true;
+  }
+
+  return false;
+}
+
+function getHardcodedCredentialLinesWithoutPlaceholders(code: string): number[] {
+  const lines = code.split("\n");
+  const flaggedLines: number[] = [];
+  const assignmentPattern = /\b(password|passwd|pwd|secret|api_?key|apikey|token|auth_?token)\b\s*[:=]\s*["'`]([^"'`]{3,})["'`]/gi;
+
+  const nonProductionContextPattern = /\b(?:test|tests|mock|mocks|fixture|fixtures|harness|e2e|example|sample|dummy)\b/i;
+  const productionContextPattern = /\b(?:prod|production|release|deploy|deployment)\b/i;
+  const isLikelyTestModule = /\b(?:describe|it|test)\s*\(/i.test(code);
+
+  if (isLikelyTestModule && !productionContextPattern.test(code)) {
+    return [];
+  }
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const matches = [...line.matchAll(assignmentPattern)];
+    if (matches.length === 0) continue;
+
+    const contextStart = Math.max(0, index - 2);
+    const contextEnd = Math.min(lines.length, index + 3);
+    const context = lines.slice(contextStart, contextEnd).join("\n");
+
+    const isLikelyNonProductionContext =
+      nonProductionContextPattern.test(context) &&
+      !productionContextPattern.test(context);
+
+    const hasRealCredential = matches.some((match) => {
+      const value = match[2] ?? "";
+      return looksLikeRealCredentialValue(value);
+    });
+
+    if (hasRealCredential && !isLikelyNonProductionContext) {
+      flaggedLines.push(index + 1);
+    }
+  }
+
+  return flaggedLines;
+}
+
+function getWeakCredentialHashLines(code: string): number[] {
+  const lines = code.split("\n");
+  const weakHashPattern = /createHash\s*\(\s*["'`](?:md5|sha1|sha256)["'`]\)|(?:\bmd5\b|\bsha1\b)\s*\(/gi;
+  const authContextPattern = /password|passwd|pwd|credential|login|signin|signup|auth|token|session|user/i;
+
+  const flagged: number[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    weakHashPattern.lastIndex = 0;
+    if (!weakHashPattern.test(lines[index])) {
+      continue;
+    }
+
+    const start = Math.max(0, index - 4);
+    const end = Math.min(lines.length - 1, index + 4);
+    const context = lines.slice(start, end + 1).join("\n");
+
+    if (authContextPattern.test(context)) {
+      flagged.push(index + 1);
+    }
+  }
+
+  return flagged;
+}
+
 export function analyzeAuthentication(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
@@ -9,8 +149,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   const lang = getLangFamily(language);
 
   // Hardcoded credentials
-  const credentialPattern = /(?:password|passwd|pwd|secret|api_?key|apikey|token|auth_?token)\s*[:=]\s*["'`][^"'`]{3,}/gi;
-  const credentialLines = getLineNumbers(code, credentialPattern);
+  const credentialLines = getHardcodedCredentialLinesWithoutPlaceholders(code);
   if (credentialLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -53,8 +192,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   }
 
   // Weak password hashing
-  const weakHashPattern = /createHash\s*\(\s*["'`](?:md5|sha1|sha256)["'`]\)|(?:md5|sha1)\s*\(/gi;
-  const weakHashLines = getLineNumbers(code, weakHashPattern);
+  const weakHashLines = getWeakCredentialHashLines(code);
   if (weakHashLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

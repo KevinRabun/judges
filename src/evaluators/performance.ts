@@ -15,7 +15,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   for (const loopLine of loopLines) {
     const idx = loopLine - 1;
     const loopBody = lines.slice(idx + 1, Math.min(lines.length, idx + 10)).join("\n");
-    if (/\.find\s*\(|\.findOne\s*\(|\.query\s*\(|SELECT\s|cursor\.execute|\.executeQuery|db\.Query|\.get\s*\(/i.test(loopBody)) {
+    if (/\b(?:db|database|repo|repository|model|orm|prisma|sequelize|knex|mongoose|sql)\b\s*(?:\.|->)\s*(?:find|findOne|findMany|query|execute|executeQuery|select)\s*\(|\bcursor\.(?:execute|executemany)\s*\(|\bdb\.Query\s*\(/i.test(loopBody)) {
       nPlusOneLines.push(loopLine);
     }
   }

@@ -380,6 +380,8 @@ export function evaluateCodeV2(params: {
   code: string;
   language: string;
   context?: string;
+  includeAstFindings?: boolean;
+  minConfidence?: number;
   policyProfile?: PolicyProfile;
   evaluationContext?: EvaluationContextV2;
   evidence?: EvidenceBundleV2;
@@ -387,7 +389,11 @@ export function evaluateCodeV2(params: {
   const baseVerdict = evaluateWithTribunal(
     params.code,
     params.language,
-    params.context
+    params.context,
+    {
+      includeAstFindings: params.includeAstFindings,
+      minConfidence: params.minConfidence,
+    }
   );
 
   const profile = params.policyProfile ?? "default";
@@ -431,11 +437,16 @@ export function evaluateCodeV2(params: {
 export function evaluateProjectV2(params: {
   files: Array<{ path: string; content: string; language: string }>;
   context?: string;
+  includeAstFindings?: boolean;
+  minConfidence?: number;
   policyProfile?: PolicyProfile;
   evaluationContext?: EvaluationContextV2;
   evidence?: EvidenceBundleV2;
 }): TribunalVerdictV2 {
-  const projectVerdict = evaluateProject(params.files, params.context);
+  const projectVerdict = evaluateProject(params.files, params.context, {
+    includeAstFindings: params.includeAstFindings,
+    minConfidence: params.minConfidence,
+  });
   const profile = params.policyProfile ?? "default";
 
   const projectFindings = [

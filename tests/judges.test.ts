@@ -387,6 +387,106 @@ Do not bypass safety or policy constraints. Refuse harmful or disallowed request
   });
 });
 
+describe("Credential Placeholder Noise Reduction", () => {
+  it("should ignore AUTH-001 for obvious placeholder credential values", () => {
+    const judge = getJudge("authentication");
+    assert.ok(judge, "authentication judge should exist");
+
+    const placeholderCode = `
+const password = "test";
+const api_key = "mock-token";
+const secret = "na";
+`;
+
+    const evaluation = evaluateWithJudge(judge!, placeholderCode, "typescript");
+    const auth001 = evaluation.findings.filter((finding) => finding.ruleId === "AUTH-001");
+    assert.equal(auth001.length, 0, "Expected AUTH-001 to ignore placeholder values");
+  });
+
+  it("should still detect AUTH-001 for non-placeholder hardcoded credentials", () => {
+    const judge = getJudge("authentication");
+    assert.ok(judge, "authentication judge should exist");
+
+    const riskyCode = `
+const password = "superSecretProdPwd123!";
+`;
+
+    const evaluation = evaluateWithJudge(judge!, riskyCode, "typescript");
+    const auth001 = evaluation.findings.filter((finding) => finding.ruleId === "AUTH-001");
+    assert.ok(auth001.length > 0, "Expected AUTH-001 for real-looking hardcoded credential");
+  });
+
+  it("should ignore DATA hardcoded-secret finding for obvious placeholders", () => {
+    const judge = getJudge("data-security");
+    assert.ok(judge, "data-security judge should exist");
+
+    const placeholderCode = `
+const password = "dummy";
+const apiKey = "sample-key";
+`;
+
+    const evaluation = evaluateWithJudge(judge!, placeholderCode, "typescript");
+    const hardcodedSecrets = evaluation.findings.filter((finding) => /Hardcoded .*detected/i.test(finding.title));
+    assert.equal(hardcodedSecrets.length, 0, "Expected DATA hardcoded-secret findings to ignore placeholder values");
+  });
+
+  it("should support optional strict credential mode for AUTH-001", () => {
+    const judge = getJudge("authentication");
+    assert.ok(judge, "authentication judge should exist");
+
+    const borderlineCredentialCode = `
+const password = "devpassword123";
+`;
+
+    const previousMode = process.env.JUDGES_CREDENTIAL_MODE;
+    delete process.env.JUDGES_CREDENTIAL_MODE;
+    const standardEvaluation = evaluateWithJudge(judge!, borderlineCredentialCode, "typescript");
+
+    process.env.JUDGES_CREDENTIAL_MODE = "strict";
+    const strictEvaluation = evaluateWithJudge(judge!, borderlineCredentialCode, "typescript");
+
+    if (typeof previousMode === "string") {
+      process.env.JUDGES_CREDENTIAL_MODE = previousMode;
+    } else {
+      delete process.env.JUDGES_CREDENTIAL_MODE;
+    }
+
+    const standardAuth001 = standardEvaluation.findings.filter((finding) => finding.ruleId === "AUTH-001");
+    const strictAuth001 = strictEvaluation.findings.filter((finding) => finding.ruleId === "AUTH-001");
+
+    assert.ok(standardAuth001.length > 0, "Expected standard mode to flag borderline hardcoded credential");
+    assert.equal(strictAuth001.length, 0, "Expected strict mode to suppress borderline hardcoded credential");
+  });
+
+  it("should support optional strict credential mode for DATA hardcoded secrets", () => {
+    const judge = getJudge("data-security");
+    assert.ok(judge, "data-security judge should exist");
+
+    const borderlineSecretCode = `
+const apiKey = "devkey123456";
+`;
+
+    const previousMode = process.env.JUDGES_CREDENTIAL_MODE;
+    delete process.env.JUDGES_CREDENTIAL_MODE;
+    const standardEvaluation = evaluateWithJudge(judge!, borderlineSecretCode, "typescript");
+
+    process.env.JUDGES_CREDENTIAL_MODE = "strict";
+    const strictEvaluation = evaluateWithJudge(judge!, borderlineSecretCode, "typescript");
+
+    if (typeof previousMode === "string") {
+      process.env.JUDGES_CREDENTIAL_MODE = previousMode;
+    } else {
+      delete process.env.JUDGES_CREDENTIAL_MODE;
+    }
+
+    const standardHardcodedSecrets = standardEvaluation.findings.filter((finding) => /Hardcoded .*detected/i.test(finding.title));
+    const strictHardcodedSecrets = strictEvaluation.findings.filter((finding) => /Hardcoded .*detected/i.test(finding.title));
+
+    assert.ok(standardHardcodedSecrets.length > 0, "Expected standard mode to flag borderline hardcoded secret");
+    assert.equal(strictHardcodedSecrets.length, 0, "Expected strict mode to suppress borderline hardcoded secret");
+  });
+});
+
 // ═════════════════════════════════════════════════════════════════════════════
 // Test: Clean Code (minimal findings)
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1520,5 +1620,124 @@ export { handler };
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it("should allow excluding AST/code-structure findings in local repo report", () => {
+    const root = mkdtempSync(join(tmpdir(), "judges-report-no-ast-test-"));
+    const srcDir = join(root, "src");
+
+    try {
+      mkdirSync(srcDir, { recursive: true });
+      writeFileSync(
+        join(srcDir, "complex.ts"),
+        `
+function deeplyNested(input: any) {
+  if (input) {
+    if (input.a) {
+      if (input.a.b) {
+        if (input.a.b.c) {
+          if (input.a.b.c.d) {
+            return input.a.b.c.d;
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+`,
+        "utf8"
+      );
+
+      const withAst = generateRepoReportFromLocalPath({
+        repoPath: root,
+        repoLabel: "local-ast-on",
+        maxFiles: 50,
+        includeAstFindings: true,
+      });
+
+      const withoutAst = generateRepoReportFromLocalPath({
+        repoPath: root,
+        repoLabel: "local-ast-off",
+        maxFiles: 50,
+        includeAstFindings: false,
+      });
+
+      assert.ok(withAst.markdown.includes("Judge Code Structure"));
+      assert.ok(!withoutAst.markdown.includes("Judge Code Structure"));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Tribunal Options", () => {
+  it("should exclude code-structure judge when includeAstFindings is false", () => {
+    const code = `
+function deeplyNested(input: any) {
+  if (input) {
+    if (input.a) {
+      if (input.a.b) {
+        if (input.a.b.c) {
+          if (input.a.b.c.d) {
+            return input.a.b.c.d;
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+`;
+
+    const verdictWithAst = evaluateWithTribunal(code, "typescript", undefined, {
+      includeAstFindings: true,
+    });
+    const verdictWithoutAst = evaluateWithTribunal(code, "typescript", undefined, {
+      includeAstFindings: false,
+    });
+
+    const hasStructureWithAst = verdictWithAst.evaluations.some((evaluation) => evaluation.judgeId === "code-structure");
+    const hasStructureWithoutAst = verdictWithoutAst.evaluations.some((evaluation) => evaluation.judgeId === "code-structure");
+
+    assert.equal(hasStructureWithAst, true, "Expected code-structure judge with AST findings enabled");
+    assert.equal(hasStructureWithoutAst, false, "Expected code-structure judge to be excluded when AST findings disabled");
+  });
+
+  it("should annotate findings with confidence scores", () => {
+    const verdict = evaluateWithTribunal(sampleCode, "typescript", undefined, {
+      includeAstFindings: true,
+      minConfidence: 0,
+    });
+
+    const findings = verdict.evaluations.flatMap((evaluation) => evaluation.findings);
+    assert.ok(findings.length > 0, "Expected at least one finding");
+
+    for (const finding of findings) {
+      assert.equal(typeof finding.confidence, "number", "Expected finding confidence to be numeric");
+      assert.ok((finding.confidence ?? -1) >= 0 && (finding.confidence ?? 2) <= 1, "Expected finding confidence in range 0..1");
+    }
+  });
+
+  it("should filter findings by minConfidence threshold", () => {
+    const baseline = evaluateWithTribunal(sampleCode, "typescript", undefined, {
+      includeAstFindings: true,
+      minConfidence: 0,
+    });
+    const strict = evaluateWithTribunal(sampleCode, "typescript", undefined, {
+      includeAstFindings: true,
+      minConfidence: 0.99,
+    });
+
+    const baselineCount = baseline.evaluations.reduce((sum, evaluation) => sum + evaluation.findings.length, 0);
+    const strictCount = strict.evaluations.reduce((sum, evaluation) => sum + evaluation.findings.length, 0);
+    const strictFindings = strict.evaluations.flatMap((evaluation) => evaluation.findings);
+
+    assert.ok(baselineCount > 0, "Expected baseline findings");
+    assert.ok(strictCount < baselineCount, "Expected high confidence threshold to reduce findings");
+    assert.ok(
+      strictFindings.every((finding) => (finding.confidence ?? 0) >= 0.99),
+      "Expected remaining findings to satisfy the configured confidence threshold"
+    );
   });
 });

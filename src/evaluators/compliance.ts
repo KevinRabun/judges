@@ -9,11 +9,27 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   let ruleNum = 1;
   const lang = getLangFamily(language);
 
+  const isCommentLikeLine = (line: string): boolean => {
+    const trimmed = line.trim();
+    return (
+      trimmed.startsWith("//") ||
+      trimmed.startsWith("/*") ||
+      trimmed.startsWith("*") ||
+      trimmed.startsWith("#") ||
+      trimmed.startsWith("--")
+    );
+  };
+
   // Detect PII handling without encryption
   const piiFieldLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLikeLine(line)) return;
+
     if (/(?:ssn|social_security|tax_id|passport|national_id|driver_license)/i.test(line) && !/encrypt|hash|mask|redact/i.test(line)) {
-      piiFieldLines.push(i + 1);
+      const context = lines.slice(Math.max(0, i - 4), Math.min(lines.length, i + 5)).join("\n");
+      if (/(?:save|store|insert|persist|write|log|send|post|request|payload|body|db\.)/i.test(context)) {
+        piiFieldLines.push(i + 1);
+      }
     }
   });
   if (piiFieldLines.length > 0) {
@@ -114,10 +130,16 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   // Detect credit card number patterns (PCI DSS)
   const cardNumberLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b/.test(line)) {
+    if (isCommentLikeLine(line)) return;
+
+    const context = lines.slice(Math.max(0, i - 4), Math.min(lines.length, i + 5)).join("\n");
+    const hasPaymentContext = /(?:payment|billing|checkout|charge|\bcard(?:Number)?\b|\bpan\b|stripe|braintree|authorize|capture|transaction)/i.test(context);
+    const hasOperationalFlow = /(?:store|save|log|send|post|request|payload|body|db\.)/i.test(context);
+
+    if (/\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b/.test(line) && hasPaymentContext && hasOperationalFlow) {
       cardNumberLines.push(i + 1);
     }
-    if (/credit.?card|card.?number|ccn|pan\b|cardNumber/i.test(line) && !/mask|redact|encrypt|hash|tokenize|\*{4}/i.test(line)) {
+    if (/credit.?card|card.?number|ccn|pan\b|cardNumber/i.test(line) && !/mask|redact|encrypt|hash|tokenize|\*{4}/i.test(line) && hasPaymentContext && hasOperationalFlow) {
       cardNumberLines.push(i + 1);
     }
   });

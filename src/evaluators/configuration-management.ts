@@ -10,7 +10,34 @@ export function analyzeConfigurationManagement(code: string, language: string): 
 
   // Hardcoded secrets / credentials
   const secretPattern = /(?:password|passwd|secret|api_?key|token|private_?key)\s*[:=]\s*["'`][^"'`]{3,}/gi;
-  const secretLines = getLineNumbers(code, secretPattern);
+  const nonProductionContextPattern = /\b(?:test|tests|mock|mocks|fixture|fixtures|harness|e2e|example|sample|dummy)\b/i;
+  const productionContextPattern = /\b(?:prod|production|release|deploy|deployment)\b/i;
+  const secretLines: number[] = [];
+
+  if (/\b(?:describe|it|test)\s*\(/i.test(code) && !productionContextPattern.test(code)) {
+    // Skip hardcoded secret findings in explicit test modules.
+  } else {
+
+    const lines = code.split("\n");
+    for (let index = 0; index < lines.length; index += 1) {
+      secretPattern.lastIndex = 0;
+      if (!secretPattern.test(lines[index])) {
+        continue;
+      }
+
+      const contextStart = Math.max(0, index - 2);
+      const contextEnd = Math.min(lines.length, index + 3);
+      const context = lines.slice(contextStart, contextEnd).join("\n");
+      const isLikelyNonProductionContext =
+        nonProductionContextPattern.test(context) &&
+        !productionContextPattern.test(context);
+
+      if (!isLikelyNonProductionContext) {
+        secretLines.push(index + 1);
+      }
+    }
+  }
+
   if (secretLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

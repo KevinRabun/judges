@@ -28,6 +28,8 @@ export interface Finding {
   reference?: string;
   /** Suggested code fix — a corrected code snippet the developer can apply directly */
   suggestedFix?: string;
+  /** Optional confidence score in range 0-1 indicating analyzer certainty */
+  confidence?: number;
 }
 
 // ─── Configuration ───────────────────────────────────────────────────────────

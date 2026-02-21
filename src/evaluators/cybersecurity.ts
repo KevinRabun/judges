@@ -40,13 +40,28 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
 
   // Command injection risk (multi-language)
   const cmdLines = getLangLineNumbers(code, language, LP.COMMAND_INJECTION);
-  if (cmdLines.length > 0) {
+  const filteredCmdLines = cmdLines.filter((lineNumber) => {
+    const index = lineNumber - 1;
+    const context = code
+      .split("\n")
+      .slice(Math.max(0, index - 3), index + 4)
+      .join("\n");
+
+    const dangerousSink = /\b(?:exec|execSync|spawn|spawnSync|system|popen|Runtime\.getRuntime\(\)\.exec|subprocess\.(?:Popen|run|call)|os\.system)\s*\(/i;
+    const safeSink = /\bexecFile\s*\(/i;
+    const untrustedInput = /(?:req\.|request\.|params\.|query\.|body\.|argv|input|user|prompt|command)/i;
+    const unsafeConstruction = /(?:\+\s*\w|\$\{[^}]+\}|\.concat\s*\(|\.join\s*\(|shell\s*:\s*true)/i;
+
+    return dangerousSink.test(context) && !safeSink.test(context) && untrustedInput.test(context) && unsafeConstruction.test(context);
+  });
+
+  if (filteredCmdLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "Potential command injection",
       description: "Shell commands are constructed with string concatenation/interpolation, allowing an attacker to inject arbitrary OS commands if user input is included.",
-      lineNumbers: cmdLines,
+      lineNumbers: filteredCmdLines,
       recommendation: "Use execFile() with an argument array instead of exec(). Never concatenate user input into shell commands. Validate and sanitize all inputs.",
       reference: "OWASP Command Injection — CWE-78",
     });
@@ -191,15 +206,28 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
   }
 
   // Template injection (SSTI)
-  const templatePatterns = /render_template_string|Template\(.*(?:req|request|input|user)|Jinja2|nunjucks\.renderString|Handlebars\.compile\s*\(.*(?:req|input)|ERB\.new\s*\(.*(?:params|request)/gi;
+  const templatePatterns = /render_template_string|nunjucks\.renderString|Handlebars\.compile\s*\(|ERB\.new\s*\(/gi;
   const templateLines = getLineNumbers(code, templatePatterns);
-  if (templateLines.length > 0) {
+  const filteredTemplateLines = templateLines.filter((lineNumber) => {
+    const index = lineNumber - 1;
+    const context = code
+      .split("\n")
+      .slice(Math.max(0, index - 3), index + 4)
+      .join("\n");
+
+    const templateSink = /(?:render_template_string|nunjucks\.renderString|Handlebars\.compile\s*\(|ERB\.new\s*\()/i;
+    const untrustedInput = /(?:req\.|request\.|params\.|query\.|body\.|input|user)/i;
+
+    return templateSink.test(context) && untrustedInput.test(context);
+  });
+
+  if (filteredTemplateLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "Potential Server-Side Template Injection (SSTI)",
       description: "User input appears to be passed directly to template rendering, allowing attackers to execute arbitrary code via template syntax.",
-      lineNumbers: templateLines,
+      lineNumbers: filteredTemplateLines,
       recommendation: "Never pass user input as template source. Use templates only from trusted files with parameterized data. Enable sandboxing if available.",
       reference: "OWASP SSTI — CWE-1336",
     });

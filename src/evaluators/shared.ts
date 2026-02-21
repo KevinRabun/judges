@@ -242,6 +242,9 @@ export function formatVerdictAsMarkdown(verdict: TribunalVerdict): string {
       if (finding.lineNumbers && finding.lineNumbers.length > 0) {
         md += `**Lines affected:** ${finding.lineNumbers.join(", ")}\n\n`;
       }
+      if (typeof finding.confidence === "number") {
+        md += `**Confidence:** ${Math.round(finding.confidence * 100)}%\n\n`;
+      }
       md += `**Recommendation:** ${finding.recommendation}\n\n`;
       if (finding.reference) {
         md += `**Reference:** ${finding.reference}\n\n`;
@@ -277,6 +280,9 @@ export function formatEvaluationAsMarkdown(evaluation: JudgeEvaluation): string 
     md += `${finding.description}\n\n`;
     if (finding.lineNumbers && finding.lineNumbers.length > 0) {
       md += `**Lines affected:** ${finding.lineNumbers.join(", ")}\n\n`;
+    }
+    if (typeof finding.confidence === "number") {
+      md += `**Confidence:** ${Math.round(finding.confidence * 100)}%\n\n`;
     }
     md += `**Recommendation:** ${finding.recommendation}\n\n`;
     if (finding.reference) {

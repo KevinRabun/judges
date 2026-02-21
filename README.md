@@ -375,6 +375,8 @@ Supports:
 | `language` | string | conditional | Programming language for single-file mode |
 | `files` | array | conditional | `{ path, content, language }[]` for project mode |
 | `context` | string | no | High-level review context |
+| `includeAstFindings` | boolean | no | Include AST/code-structure findings (default: true) |
+| `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
 | `policyProfile` | enum | no | `default`, `startup`, `regulated`, `healthcare`, `fintech`, `public-sector` |
 | `evaluationContext` | object | no | Structured architecture/constraint context |
 | `evidence` | object | no | Runtime/operational evidence for confidence calibration |
@@ -400,6 +402,8 @@ Supports:
 | `context` | string | no | Optional business/technical context |
 | `maxFindings` | number | no | Max translated top findings (default: 10) |
 | `maxTasks` | number | no | Max generated tasks (default: 20) |
+| `includeAstFindings` | boolean | no | Include AST/code-structure findings (default: true) |
+| `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
 
 ### `evaluate_public_repo_report`
 Clone a **public repository URL**, run the full judges panel across eligible source files, and generate a consolidated markdown report.
@@ -412,6 +416,9 @@ Clone a **public repository URL**, run the full judges panel across eligible sou
 | `maxFiles` | number | no | Max files analyzed (default: 600) |
 | `maxFileBytes` | number | no | Max file size in bytes (default: 300000) |
 | `maxFindingsInReport` | number | no | Max detailed findings in output (default: 150) |
+| `credentialMode` | string | no | Credential detection mode: `standard` (default) or `strict` |
+| `includeAstFindings` | boolean | no | Include AST/code-structure findings (default: true) |
+| `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
 | `keepClone` | boolean | no | Keep cloned repo on disk for inspection |
 
 **Quick examples**
@@ -420,6 +427,15 @@ Generate a report from CLI:
 
 ```bash
 npm run report:public-repo -- --repoUrl https://github.com/microsoft/vscode --output reports/vscode-judges-report.md
+
+# stricter credential-signal mode (optional)
+npm run report:public-repo -- --repoUrl https://github.com/openclaw/openclaw --credentialMode strict --output reports/openclaw-judges-report-strict.md
+
+# judge findings only (exclude AST/code-structure findings)
+npm run report:public-repo -- --repoUrl https://github.com/openclaw/openclaw --includeAstFindings false --output reports/openclaw-judges-report-no-ast.md
+
+# show only findings at 80%+ confidence
+npm run report:public-repo -- --repoUrl https://github.com/openclaw/openclaw --minConfidence 0.8 --output reports/openclaw-judges-report-high-confidence.md
 ```
 
 Call from MCP client:
@@ -432,6 +448,9 @@ Call from MCP client:
     "branch": "main",
     "maxFiles": 400,
     "maxFindingsInReport": 120,
+    "credentialMode": "strict",
+    "includeAstFindings": false,
+    "minConfidence": 0.8,
     "outputPath": "reports/vscode-judges-report.md"
   }
 }
@@ -467,6 +486,8 @@ Submit code to the **full judges panel**. All 33 judges evaluate independently a
 | `code` | string | yes | The source code to evaluate |
 | `language` | string | yes | Programming language (e.g., `typescript`, `python`) |
 | `context` | string | no | Additional context about the code |
+| `includeAstFindings` | boolean | no | Include AST/code-structure findings (default: true) |
+| `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
 
 ### `evaluate_code_single_judge`
 Submit code to a **specific judge** for targeted review.
@@ -477,6 +498,7 @@ Submit code to a **specific judge** for targeted review.
 | `language` | string | yes | Programming language |
 | `judgeId` | string | yes | See [judge IDs](#judge-ids) below |
 | `context` | string | no | Additional context |
+| `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
 
 ### `evaluate_project`
 Submit multiple files for **project-level analysis**. All 33 judges evaluate each file, plus cross-file architectural analysis detects code duplication, inconsistent error handling, and dependency cycles.
@@ -485,6 +507,8 @@ Submit multiple files for **project-level analysis**. All 33 judges evaluate eac
 |-----------|------|----------|-------------|
 | `files` | array | yes | Array of `{ path, content, language }` objects |
 | `context` | string | no | Optional project context |
+| `includeAstFindings` | boolean | no | Include AST/code-structure findings (default: true) |
+| `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
 
 ### `evaluate_diff`
 Evaluate only the **changed lines** in a code diff. Runs all 33 judges on the full file but filters findings to lines you specify. Ideal for PR reviews and incremental analysis.
@@ -495,6 +519,8 @@ Evaluate only the **changed lines** in a code diff. Runs all 33 judges on the fu
 | `language` | string | yes | Programming language |
 | `changedLines` | number[] | yes | 1-based line numbers that were changed |
 | `context` | string | no | Optional context about the change |
+| `includeAstFindings` | boolean | no | Include AST/code-structure findings (default: true) |
+| `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
 
 ### `analyze_dependencies`
 Analyze a dependency manifest file for supply-chain risks, version pinning issues, typosquatting indicators, and dependency hygiene. Supports `package.json`, `requirements.txt`, `Cargo.toml`, `go.mod`, `pom.xml`, and `.csproj` files.

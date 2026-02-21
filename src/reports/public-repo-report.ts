@@ -22,12 +22,18 @@ type FileEvaluation = {
   findings: Finding[];
 };
 
+type CredentialMode = "standard" | "strict";
+
 export interface PublicRepoReportOptions {
   repoUrl: string;
   branch?: string;
   maxFiles?: number;
   maxFileBytes?: number;
   maxFindingsInReport?: number;
+  excludePathRegexes?: string[];
+  credentialMode?: CredentialMode;
+  includeAstFindings?: boolean;
+  minConfidence?: number;
   outputPath?: string;
   keepClone?: boolean;
 }
@@ -49,12 +55,17 @@ export interface LocalRepoReportOptions {
   maxFiles?: number;
   maxFileBytes?: number;
   maxFindingsInReport?: number;
+  excludePathRegexes?: string[];
+  credentialMode?: CredentialMode;
+  includeAstFindings?: boolean;
+  minConfidence?: number;
   outputPath?: string;
 }
 
 const DEFAULT_MAX_FILE_BYTES = 300_000;
 const DEFAULT_MAX_FILES = 600;
 const DEFAULT_MAX_FINDINGS_IN_REPORT = 150;
+const DEFAULT_CREDENTIAL_MODE: CredentialMode = "standard";
 
 const INCLUDE_EXTENSIONS = new Set([
   ".ts",
@@ -162,7 +173,100 @@ function countBySeverity(findings: Finding[]): Record<Severity, number> {
   return counts;
 }
 
-function walkSourceFiles(repoPath: string, maxFileBytes: number, maxFiles: number): SourceFile[] {
+function compileExcludeRegexes(patterns?: string[]): RegExp[] {
+  if (!patterns || patterns.length === 0) return [];
+  return patterns.map((pattern) => new RegExp(pattern, "i"));
+}
+
+function isLikelyNonProductionPath(path: string): boolean {
+  return /(^|\/)(test|tests|__tests__|spec|specs|e2e)(\/|\.|$)|\.(?:test|tests|spec|specs|e2e)\.[^/]+$|mock|fixture|fixtures|(^|\/)docs(-|\/)i18n(\/|$)|(^|\/)docs(\/|$)/i.test(path);
+}
+
+function shouldSuppressFindingForPath(path: string, finding: Finding): boolean {
+  if (!isLikelyNonProductionPath(path)) {
+    return false;
+  }
+
+  const nonProdSuppressPrefixes = [
+    "A11Y-",
+    "API-",
+    "AUTH-",
+    "CACHE-",
+    "CFG-",
+    "CICD-",
+    "CLOUD-",
+    "COMP-",
+    "COMPAT-",
+    "CONC-",
+    "COST-",
+    "CYBER-",
+    "DATA-",
+    "DEPS-",
+    "DB-",
+    "DOC-",
+    "ERR-",
+    "ETHICS-",
+    "I18N-",
+    "LOGPRIV-",
+    "MAINT-",
+    "OBS-",
+    "PERF-",
+    "PORTA-",
+    "RATE-",
+    "REL-",
+    "SCALE-",
+    "SOV-",
+    "STRUCT-",
+    "SWDEV-",
+    "TEST-",
+    "UX-",
+  ];
+
+  if (nonProdSuppressPrefixes.some((prefix) => finding.ruleId.startsWith(prefix))) {
+    return true;
+  }
+
+  if (/^AUTH-/.test(finding.ruleId) && /hardcoded credentials/i.test(finding.title)) {
+    return true;
+  }
+
+  if (/^DATA-/.test(finding.ruleId) && /hardcoded/i.test(finding.title)) {
+    return true;
+  }
+
+  if (finding.ruleId === "STRUCT-008") {
+    return true;
+  }
+
+  return false;
+}
+
+function withCredentialMode<T>(mode: CredentialMode, action: () => T): T {
+  const previous = process.env.JUDGES_CREDENTIAL_MODE;
+
+  if (mode === "strict") {
+    process.env.JUDGES_CREDENTIAL_MODE = "strict";
+  } else {
+    delete process.env.JUDGES_CREDENTIAL_MODE;
+  }
+
+  try {
+    return action();
+  } finally {
+    if (typeof previous === "string") {
+      process.env.JUDGES_CREDENTIAL_MODE = previous;
+    } else {
+      delete process.env.JUDGES_CREDENTIAL_MODE;
+    }
+  }
+}
+
+function walkSourceFiles(
+  repoPath: string,
+  maxFileBytes: number,
+  maxFiles: number,
+  excludePathRegexes: RegExp[] = []
+): SourceFile[] {
   const files: SourceFile[] = [];
 
   const visit = (currentPath: string, relativePrefix = "") => {
@@ -174,6 +278,10 @@ function walkSourceFiles(repoPath: string, maxFileBytes: number, maxFiles: numbe
 
       const absolutePath = join(currentPath, entry.name);
       const relativePath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
+
+      if (excludePathRegexes.some((regex) => regex.test(relativePath))) {
+        continue;
+      }
 
       if (entry.isDirectory()) {
         if (EXCLUDED_DIRS.has(entry.name)) continue;
@@ -364,25 +472,41 @@ export function generateRepoReportFromLocalPath(
   const maxFileBytes = options.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES;
   const maxFiles = options.maxFiles ?? DEFAULT_MAX_FILES;
   const maxFindingsInReport = options.maxFindingsInReport ?? DEFAULT_MAX_FINDINGS_IN_REPORT;
+  const credentialMode = options.credentialMode ?? DEFAULT_CREDENTIAL_MODE;
+  const includeAstFindings = options.includeAstFindings ?? true;
+  const minConfidence = options.minConfidence;
   const repoPath = resolve(options.repoPath);
+  const excludePathRegexes = compileExcludeRegexes(options.excludePathRegexes);
 
-  const files = walkSourceFiles(repoPath, maxFileBytes, maxFiles);
+  const files = walkSourceFiles(repoPath, maxFileBytes, maxFiles, excludePathRegexes);
   if (files.length === 0) {
     throw new Error("No eligible source files found in the repository path.");
   }
 
-  const evaluations: FileEvaluation[] = files.map((file) => {
-    const verdict = evaluateWithTribunal(file.content, file.language);
-    const findings = verdict.evaluations.flatMap((evaluation) => evaluation.findings);
-    return {
-      path: file.relativePath,
-      language: file.language,
-      score: verdict.overallScore,
-      verdict: verdict.overallVerdict,
-      judgeEvaluations: verdict.evaluations,
-      findings,
-    };
-  });
+  const evaluations: FileEvaluation[] = withCredentialMode(credentialMode, () =>
+    files.map((file) => {
+      const verdict = evaluateWithTribunal(file.content, file.language, undefined, {
+        includeAstFindings,
+        minConfidence,
+      });
+      const judgeEvaluations = verdict.evaluations.map((evaluation) => ({
+        ...evaluation,
+        findings: evaluation.findings.filter(
+          (finding) => !shouldSuppressFindingForPath(file.relativePath, finding)
+        ),
+      }));
+
+      const findings = judgeEvaluations.flatMap((evaluation) => evaluation.findings);
+      return {
+        path: file.relativePath,
+        language: file.language,
+        score: verdict.overallScore,
+        verdict: verdict.overallVerdict,
+        judgeEvaluations,
+        findings,
+      };
+    })
+  );
 
   const commitSha = getCommitSha(repoPath);
   const report = buildMarkdownReport({
@@ -426,6 +550,10 @@ export function generatePublicRepoReport(options: PublicRepoReportOptions): Publ
       maxFiles: options.maxFiles,
       maxFileBytes: options.maxFileBytes,
       maxFindingsInReport: options.maxFindingsInReport,
+      excludePathRegexes: options.excludePathRegexes,
+      credentialMode: options.credentialMode,
+      includeAstFindings: options.includeAstFindings,
+      minConfidence: options.minConfidence,
       outputPath: options.outputPath,
     });
 

@@ -108,6 +108,20 @@ server.tool(
       .positive()
       .optional()
       .describe("Maximum number of detailed findings in report (default: 150)"),
+    credentialMode: z
+      .enum(["standard", "strict"])
+      .optional()
+      .describe("Credential detection mode: standard (default) or strict"),
+    includeAstFindings: z
+      .boolean()
+      .optional()
+      .describe("Include AST/code-structure findings (default: true)"),
+    minConfidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Minimum finding confidence to include (0-1, default: 0)"),
     keepClone: z
       .boolean()
       .optional()
@@ -120,6 +134,9 @@ server.tool(
     maxFiles,
     maxFileBytes,
     maxFindingsInReport,
+    credentialMode,
+    includeAstFindings,
+    minConfidence,
     keepClone,
   }) => {
     try {
@@ -130,6 +147,9 @@ server.tool(
         maxFiles,
         maxFileBytes,
         maxFindingsInReport,
+        credentialMode,
+        includeAstFindings,
+        minConfidence,
         keepClone,
       });
 
@@ -139,6 +159,9 @@ server.tool(
       summary += `- Average score: ${report.averageScore}/100\n`;
       summary += `- Files analyzed: ${report.analyzedFileCount}\n`;
       summary += `- Total findings: ${report.totalFindings}\n`;
+      summary += `- Credential mode: ${(credentialMode ?? "standard").toUpperCase()}\n`;
+      summary += `- AST findings: ${(includeAstFindings ?? true) ? "INCLUDED" : "EXCLUDED"}\n`;
+      summary += `- Min confidence: ${minConfidence ?? 0}\n`;
       if (report.outputPath) {
         summary += `- Report path: ${report.outputPath}\n`;
       }
@@ -199,6 +222,16 @@ server.tool(
       .string()
       .optional()
       .describe("Optional high-level context"),
+    includeAstFindings: z
+      .boolean()
+      .optional()
+      .describe("Include AST/code-structure findings (default: true)"),
+    minConfidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Minimum finding confidence to include (0-1, default: 0)"),
     policyProfile: z
       .enum([
         "default",
@@ -232,7 +265,7 @@ server.tool(
       .optional()
       .describe("Runtime/operational evidence used for confidence calibration"),
   },
-  async ({ code, language, files, context, policyProfile, evaluationContext, evidence }) => {
+  async ({ code, language, files, context, includeAstFindings, minConfidence, policyProfile, evaluationContext, evidence }) => {
     try {
       if (!code && (!files || files.length === 0)) {
         return {
@@ -275,6 +308,8 @@ server.tool(
         ? evaluateProjectV2({
             files,
             context,
+            includeAstFindings,
+            minConfidence,
             policyProfile,
             evaluationContext,
             evidence,
@@ -283,6 +318,8 @@ server.tool(
             code: code!,
             language: language!,
             context,
+            includeAstFindings,
+            minConfidence,
             policyProfile,
             evaluationContext,
             evidence,
@@ -389,6 +426,16 @@ server.tool(
       .string()
       .optional()
       .describe("Optional context about business purpose or constraints"),
+    includeAstFindings: z
+      .boolean()
+      .optional()
+      .describe("Include AST/code-structure findings (default: true)"),
+    minConfidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Minimum finding confidence to include (0-1, default: 0)"),
     maxFindings: z
       .number()
       .optional()
@@ -398,7 +445,7 @@ server.tool(
       .optional()
       .describe("Maximum number of remediation tasks to return (default: 20)"),
   },
-  async ({ code, language, files, changedLines, context, maxFindings, maxTasks }) => {
+  async ({ code, language, files, changedLines, context, includeAstFindings, minConfidence, maxFindings, maxTasks }) => {
     try {
       const result = runAppBuilderWorkflow({
         code,
@@ -406,6 +453,8 @@ server.tool(
         files,
         changedLines,
         context,
+        includeAstFindings,
+        minConfidence,
         maxFindings,
         maxTasks,
       });
@@ -499,9 +548,22 @@ server.tool(
       .describe(
         "Optional additional context about the code — e.g., what the code does, which framework it uses, or the deployment target."
       ),
+    includeAstFindings: z
+      .boolean()
+      .optional()
+      .describe("Include AST/code-structure findings (default: true)"),
+    minConfidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Minimum finding confidence to include (0-1, default: 0)"),
   },
-  async ({ code, language, context }) => {
-    const verdict = evaluateWithTribunal(code, language, context);
+  async ({ code, language, context, includeAstFindings, minConfidence }) => {
+    const verdict = evaluateWithTribunal(code, language, context, {
+      includeAstFindings,
+      minConfidence,
+    });
     const patternResults = formatVerdictAsMarkdown(verdict);
     const deepReview = buildTribunalDeepReviewSection(JUDGES, language, context);
 
@@ -545,8 +607,14 @@ server.tool(
       .describe(
         "Optional additional context about the code — e.g., what the code does, which framework it uses, or the deployment target."
       ),
+    minConfidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Minimum finding confidence to include (0-1, default: 0)"),
   },
-  async ({ code, language, judgeId, context }) => {
+  async ({ code, language, judgeId, context, minConfidence }) => {
     const judge = getJudge(judgeId);
     if (!judge) {
       return {
@@ -560,7 +628,9 @@ server.tool(
       };
     }
 
-    const evaluation = evaluateWithJudge(judge, code, language, context);
+    const evaluation = evaluateWithJudge(judge, code, language, context, {
+      minConfidence,
+    });
     const patternResults = formatEvaluationAsMarkdown(evaluation);
     const deepReview = buildSingleJudgeDeepReviewSection(judge, language, context);
 
@@ -592,9 +662,22 @@ server.tool(
       .string()
       .optional()
       .describe("Optional context about the project"),
+    includeAstFindings: z
+      .boolean()
+      .optional()
+      .describe("Include AST/code-structure findings (default: true)"),
+    minConfidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Minimum finding confidence to include (0-1, default: 0)"),
   },
-  async ({ files, context }) => {
-    const result = evaluateProject(files, context);
+  async ({ files, context, includeAstFindings, minConfidence }) => {
+    const result = evaluateProject(files, context, {
+      includeAstFindings,
+      minConfidence,
+    });
 
     let md = `# Project Analysis\n\n`;
     md += `**Overall:** ${result.overallVerdict.toUpperCase()} (${result.overallScore}/100)\n`;
@@ -649,9 +732,22 @@ server.tool(
       .string()
       .optional()
       .describe("Optional context about the change"),
+    includeAstFindings: z
+      .boolean()
+      .optional()
+      .describe("Include AST/code-structure findings (default: true)"),
+    minConfidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Minimum finding confidence to include (0-1, default: 0)"),
   },
-  async ({ code, language, changedLines, context }) => {
-    const result = evaluateDiff(code, language, changedLines, context);
+  async ({ code, language, changedLines, context, includeAstFindings, minConfidence }) => {
+    const result = evaluateDiff(code, language, changedLines, context, {
+      includeAstFindings,
+      minConfidence,
+    });
 
     let md = `# Diff Analysis\n\n`;
     md += `**Verdict:** ${result.verdict.toUpperCase()} (${result.score}/100)\n`;

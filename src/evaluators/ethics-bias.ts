@@ -9,10 +9,26 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
   let ruleNum = 1;
   const lang = getLangFamily(language);
 
+  const isCommentLikeLine = (line: string): boolean => {
+    const trimmed = line.trim();
+    return (
+      trimmed.startsWith("//") ||
+      trimmed.startsWith("/*") ||
+      trimmed.startsWith("*") ||
+      trimmed.startsWith("#") ||
+      trimmed.startsWith("--")
+    );
+  };
+
+  const stripStringLiterals = (line: string): string =>
+    line.replace(/(["'`])(?:\\.|(?!\1).)*\1/g, "");
+
   // Detect demographic-based filtering or scoring
   const demographicLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/(?:gender|sex|race|ethnicity|religion|nationality|age|disability)\s*(?:===|==|!==|!=|\?\s|&&|\|\|)/i.test(line)) {
+    if (isCommentLikeLine(line)) return;
+    const executableLine = stripStringLiterals(line);
+    if (/\b(?:gender|sex|race|ethnicity|religion|nationality|age|disability)\b\s*(?:===|==|!==|!=|\?\s|&&|\|\|)/i.test(executableLine)) {
       demographicLines.push(i + 1);
     }
   });

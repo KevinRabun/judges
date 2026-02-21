@@ -278,10 +278,10 @@ export const WEAK_HASH = {
 export const EVAL_USAGE = {
   jsts: String.raw`\beval\s*\(|new\s+Function\s*\(`,
   python: String.raw`\beval\s*\(|\bexec\s*\(|compile\s*\(`,
-  rust: String.raw`(?:)`,  // Rust has no eval equivalent
+  rust: String.raw`(?!)`,  // Rust has no eval equivalent
   csharp: String.raw`CSharpScript\.EvaluateAsync|Roslyn\.Scripting`,
   java: String.raw`ScriptEngine\.eval\s*\(|Nashorn|Groovy`,
-  go: String.raw`(?:)`,  // Go has no eval equivalent
+  go: String.raw`(?!)`,  // Go has no eval equivalent
 };
 
 // ── Security: TLS / Certificate ──────────────────────────────────────────────

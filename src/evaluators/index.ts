@@ -66,6 +66,102 @@ import { analyzeAgentInstructions } from "./agent-instructions.js";
 
 // ─── Evaluation Engine ──────────────────────────────────────────────────────
 
+export interface EvaluationOptions {
+  includeAstFindings?: boolean;
+  minConfidence?: number;
+}
+
+function clampConfidence(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+}
+
+function estimateFindingConfidence(finding: Finding): number {
+  const existing = typeof finding.confidence === "number" ? finding.confidence : undefined;
+  if (typeof existing === "number" && Number.isFinite(existing)) {
+    return clampConfidence(existing);
+  }
+
+  let score = 0.4;
+
+  const lineCount = finding.lineNumbers?.length ?? 0;
+  if (lineCount === 0) {
+    score -= 0.12;
+  } else if (lineCount <= 3) {
+    score += 0.22;
+  } else if (lineCount <= 8) {
+    score += 0.14;
+  } else {
+    score += 0.06;
+  }
+
+  const hasReference = Boolean(finding.reference);
+  const hasSuggestedFix = Boolean(finding.suggestedFix);
+  const hasRichDescription = finding.description.length >= 120;
+  const hasRichRecommendation = finding.recommendation.length >= 90;
+
+  if (hasReference) score += 0.1;
+  if (hasSuggestedFix) score += 0.12;
+  if (hasRichDescription) score += 0.05;
+  if (hasRichRecommendation) score += 0.05;
+
+  const richEvidenceCount = [
+    hasReference,
+    hasSuggestedFix,
+    hasRichDescription,
+    hasRichRecommendation,
+  ].filter(Boolean).length;
+
+  if (lineCount > 0 && richEvidenceCount >= 3) {
+    score += 0.08;
+  }
+  if (lineCount > 0 && richEvidenceCount === 4) {
+    score += 0.05;
+  }
+
+  const noisyPrefixes = [
+    "API-",
+    "COMP-",
+    "CONC-",
+    "CYBER-",
+    "DB-",
+    "DEPS-",
+    "ETHICS-",
+    "LOGPRIV-",
+    "OBS-",
+    "PERF-",
+  ];
+
+  if (noisyPrefixes.some((prefix) => finding.ruleId.startsWith(prefix)) && richEvidenceCount < 4) {
+    score = Math.min(score, 0.89);
+  }
+
+  return Number(clampConfidence(score).toFixed(2));
+}
+
+function applyConfidenceThreshold(findings: Finding[], options?: EvaluationOptions): Finding[] {
+  const minConfidence = clampConfidence(options?.minConfidence ?? 0);
+
+  const normalized = findings.map((finding) => ({
+    ...finding,
+    confidence: estimateFindingConfidence(finding),
+  }));
+
+  if (minConfidence <= 0) {
+    return normalized;
+  }
+
+  return normalized.filter((finding) => (finding.confidence ?? 0) >= minConfidence);
+}
+
+function resolveJudgeSet(options?: EvaluationOptions): JudgeDefinition[] {
+  const includeAstFindings = options?.includeAstFindings ?? true;
+  if (includeAstFindings) {
+    return JUDGES;
+  }
+  return JUDGES.filter((judge) => judge.id !== "code-structure");
+}
+
 /**
  * Run a single judge against the provided code.
  */
@@ -73,7 +169,8 @@ export function evaluateWithJudge(
   judge: JudgeDefinition,
   code: string,
   language: string,
-  context?: string
+  context?: string,
+  options?: EvaluationOptions
 ): JudgeEvaluation {
   const findings: Finding[] = [];
 
@@ -179,9 +276,10 @@ export function evaluateWithJudge(
       break;
   }
 
-  const score = calculateScore(findings);
-  const verdict = deriveVerdict(findings, score);
-  const summary = buildSummary(judge, findings, score, verdict);
+  const filteredFindings = applyConfidenceThreshold(findings, options);
+  const score = calculateScore(filteredFindings);
+  const verdict = deriveVerdict(filteredFindings, score);
+  const summary = buildSummary(judge, filteredFindings, score, verdict);
 
   return {
     judgeId: judge.id,
@@ -189,7 +287,7 @@ export function evaluateWithJudge(
     verdict,
     score,
     summary,
-    findings,
+    findings: filteredFindings,
   };
 }
 
@@ -199,10 +297,12 @@ export function evaluateWithJudge(
 export function evaluateWithTribunal(
   code: string,
   language: string,
-  context?: string
+  context?: string,
+  options?: EvaluationOptions
 ): TribunalVerdict {
-  const evaluations = JUDGES.map((judge) =>
-    evaluateWithJudge(judge, code, language, context)
+  const judges = resolveJudgeSet(options);
+  const evaluations = judges.map((judge) =>
+    evaluateWithJudge(judge, code, language, context, options)
   );
 
   const overallScore = Math.round(
@@ -248,11 +348,12 @@ export function evaluateWithTribunal(
  */
 export function evaluateProject(
   files: Array<{ path: string; content: string; language: string }>,
-  context?: string
+  context?: string,
+  options?: EvaluationOptions
 ): ProjectVerdict {
   // Per-file evaluations
   const fileResults = files.map((f) => {
-    const verdict = evaluateWithTribunal(f.content, f.language, context);
+    const verdict = evaluateWithTribunal(f.content, f.language, context, options);
     return {
       path: f.path,
       language: f.language,
@@ -315,6 +416,11 @@ export function evaluateProject(
     });
   }
 
+  const filteredArchitecturalFindings = applyConfidenceThreshold(
+    architecturalFindings,
+    options
+  );
+
   // Check for circular-looking dependency indicators
   const importMap = new Map<string, string[]>();
   for (const f of files) {
@@ -330,7 +436,7 @@ export function evaluateProject(
 
   // Overall scores
   const allFindings = fileResults.flatMap((f) => f.findings);
-  const crossFindings = [...allFindings, ...architecturalFindings];
+  const crossFindings = [...allFindings, ...filteredArchitecturalFindings];
   const overallScore =
     fileResults.length > 0
       ? Math.round(
@@ -362,7 +468,7 @@ export function evaluateProject(
     highCount,
     timestamp: new Date().toISOString(),
     fileResults,
-    architecturalFindings,
+    architecturalFindings: filteredArchitecturalFindings,
   };
 }
 
@@ -376,9 +482,10 @@ export function evaluateDiff(
   code: string,
   language: string,
   changedLines: number[],
-  context?: string
+  context?: string,
+  options?: EvaluationOptions
 ): DiffVerdict {
-  const verdict = evaluateWithTribunal(code, language, context);
+  const verdict = evaluateWithTribunal(code, language, context, options);
   const allFindings = verdict.evaluations.flatMap((e) => e.findings);
 
   // Filter findings to only those touching changed lines
@@ -746,6 +853,8 @@ export function runAppBuilderWorkflow(params: {
   files?: Array<{ path: string; content: string; language: string }>;
   changedLines?: number[];
   context?: string;
+  includeAstFindings?: boolean;
+  minConfidence?: number;
   maxFindings?: number;
   maxTasks?: number;
 }): AppBuilderWorkflowResult {
@@ -759,7 +868,10 @@ export function runAppBuilderWorkflow(params: {
 
   if (params.files && params.files.length > 0) {
     mode = "project";
-    const result = evaluateProject(params.files, params.context);
+    const result = evaluateProject(params.files, params.context, {
+      includeAstFindings: params.includeAstFindings,
+      minConfidence: params.minConfidence,
+    });
     verdict = result.overallVerdict;
     score = result.overallScore;
     findings = [
@@ -778,7 +890,11 @@ export function runAppBuilderWorkflow(params: {
       params.code,
       params.language,
       params.changedLines,
-      params.context
+      params.context,
+      {
+        includeAstFindings: params.includeAstFindings,
+        minConfidence: params.minConfidence,
+      }
     );
     verdict = result.verdict;
     score = result.score;
@@ -791,7 +907,10 @@ export function runAppBuilderWorkflow(params: {
     }
 
     mode = "code";
-    const result = evaluateWithTribunal(params.code, params.language, params.context);
+    const result = evaluateWithTribunal(params.code, params.language, params.context, {
+      includeAstFindings: params.includeAstFindings,
+      minConfidence: params.minConfidence,
+    });
     verdict = result.overallVerdict;
     score = result.overallScore;
     findings = result.evaluations.flatMap((evaluation) => evaluation.findings);

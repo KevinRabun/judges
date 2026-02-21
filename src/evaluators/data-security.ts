@@ -2,6 +2,125 @@ import { Finding } from "../types.js";
 import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
+function isLikelyPlaceholderCredentialValue(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+
+  const exactPlaceholders = new Set([
+    "test",
+    "testing",
+    "mock",
+    "dummy",
+    "example",
+    "sample",
+    "fake",
+    "na",
+    "n/a",
+    "none",
+    "null",
+    "undefined",
+    "changeme",
+    "change_me",
+    "replace_me",
+    "replace-me",
+    "your_token_here",
+    "your_api_key",
+    "unused",
+    "not_used",
+    "placeholder",
+  ]);
+
+  if (exactPlaceholders.has(normalized)) {
+    return true;
+  }
+
+  if (/^(?:test|mock|dummy|sample|example|fake|placeholder|na|n\/a|unused|changeme|replace)[-_a-z0-9]*$/i.test(normalized)) {
+    return true;
+  }
+
+  return false;
+}
+
+function isStrictCredentialDetectionEnabled(): boolean {
+  return process.env.JUDGES_CREDENTIAL_MODE?.toLowerCase() === "strict";
+}
+
+function looksLikeRealCredentialValue(value: string): boolean {
+  if (isLikelyPlaceholderCredentialValue(value)) {
+    return false;
+  }
+
+  if (!isStrictCredentialDetectionEnabled()) {
+    return true;
+  }
+
+  const normalized = value.trim();
+  if (normalized.length < 12) {
+    return false;
+  }
+
+  if (/(?:test|mock|dummy|sample|example|fake|placeholder|changeme|replace[_-]?me|unused|not[_-]?used|password|secret)/i.test(normalized)) {
+    return false;
+  }
+
+  const hasLower = /[a-z]/.test(normalized);
+  const hasUpper = /[A-Z]/.test(normalized);
+  const hasDigit = /\d/.test(normalized);
+  const hasSymbol = /[^A-Za-z0-9]/.test(normalized);
+  const classCount = [hasLower, hasUpper, hasDigit, hasSymbol].filter(Boolean).length;
+
+  if (normalized.length >= 20 && classCount >= 2) {
+    return true;
+  }
+
+  if (normalized.length >= 16 && classCount >= 3) {
+    return true;
+  }
+
+  return false;
+}
+
+function lineContainsRealQuotedSecret(line: string, pattern: RegExp): boolean {
+  const matches = [...line.matchAll(pattern)];
+  if (matches.length === 0) return false;
+
+  return matches.some((match) => {
+    const full = match[0] ?? "";
+    const quotedValueMatch = full.match(/["']([^"']+)["']/);
+    if (!quotedValueMatch) return true;
+    const value = quotedValueMatch[1] ?? "";
+    return looksLikeRealCredentialValue(value);
+  });
+}
+
+function isLikelyNonProductionContext(lines: string[], index: number): boolean {
+  const contextStart = Math.max(0, index - 2);
+  const contextEnd = Math.min(lines.length, index + 3);
+  const context = lines.slice(contextStart, contextEnd).join("\n");
+
+  const nonProductionSignals = /\b(?:describe|it|test)\s*\(|\b(?:tests?|mock|mocks|fixture|fixtures|harness|e2e|example|sample|dummy)\b/i;
+  const productionSignals = /\b(?:prod|production|release|deploy|deployment)\b/i;
+
+  return nonProductionSignals.test(context) && !productionSignals.test(context);
+}
+
+function filterNonProductionLineNumbers(code: string, lineNumbers: number[]): number[] {
+  const lines = code.split("\n");
+  return lineNumbers.filter((lineNumber) => !isLikelyNonProductionContext(lines, lineNumber - 1));
+}
+
+function getFilteredHardcodedSecretLines(code: string, pattern: RegExp): number[] {
+  const lines = code.split("\n");
+  const flaggedLines: number[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lineContainsRealQuotedSecret(lines[index], pattern) && !isLikelyNonProductionContext(lines, index)) {
+      flaggedLines.push(index + 1);
+    }
+  }
+
+  return flaggedLines;
+}
+
 export function analyzeDataSecurity(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
@@ -27,8 +146,23 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
     { pattern: /(?:DATABASE_URL|MONGO_URI|REDIS_URL)\s*[:=]\s*["'][^"']+["']/gi, name: "database connection URL" },
   ];
 
+  const filteredQuotedSecretNames = new Set([
+    "password",
+    "API key",
+    "secret/token",
+    "connection string",
+    "private key",
+    "AWS credential",
+    "hardcoded auth token",
+    "Azure credential",
+    "database connection URL",
+  ]);
+
   for (const sp of secretPatterns) {
-    const lines = getLineNumbers(code, sp.pattern);
+    const baseLines = filteredQuotedSecretNames.has(sp.name)
+      ? getFilteredHardcodedSecretLines(code, sp.pattern)
+      : getLineNumbers(code, sp.pattern);
+    const lines = filterNonProductionLineNumbers(code, baseLines);
     if (lines.length > 0) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -230,7 +364,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
 
   // Hardcoded encryption keys / IVs
   const encKeyPatterns = /(?:encryption[_-]?key|aes[_-]?key|iv|initialization[_-]?vector|nonce)\s*[:=]\s*["'][^"']+["']|(?:Buffer\.from|new\s+Uint8Array)\s*\(.*(?:key|iv)/gi;
-  const encKeyLines = getLineNumbers(code, encKeyPatterns);
+  const encKeyLines = filterNonProductionLineNumbers(code, getLineNumbers(code, encKeyPatterns));
   if (encKeyLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

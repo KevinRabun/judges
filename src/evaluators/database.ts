@@ -9,7 +9,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   const lang = getLangFamily(language);
 
   // SQL injection via string concatenation
-  const sqlInjectionPattern = /(?:execute|query|raw|prepare)\s*\(\s*(?:`[^`]*\$\{|['"][^'"]*['"]\s*\+|['"][^'"]*['"]\s*\.\s*concat)/gi;
+  const sqlInjectionPattern = /(?:execute|query|raw|prepare)\s*\(\s*(?:`[^`]*(?:\$\{[^}]*\b(?:req|request|params|query|body|input|user|id|name|email)\b|\$\{[^}]*\+)|['"][^'"]*['"]\s*\+\s*(?:req\.|request\.|params\.|query\.|body\.|input|user|id|name|email)|['"][^'"]*['"]\s*\.\s*concat\s*\()/gi;
   const sqlInjectionLines = getLineNumbers(code, sqlInjectionPattern);
   if (sqlInjectionLines.length > 0) {
     findings.push({

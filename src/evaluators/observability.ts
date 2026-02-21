@@ -96,7 +96,8 @@ export function analyzeObservability(code: string, language: string): Finding[] 
   // Sensitive data in logs (multi-language)
   const sensitiveLogLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/(?:console|logger|log|logging|println|print|eprintln|fmt\.Print|Debug\.Log)\s*[.(]/i.test(line) && /(?:password|secret|token|apiKey|api_key|ssn|creditCard|credit_card|authorization)/i.test(line)) {
+    const executableLine = line.replace(/(["'`])(?:\\.|(?!\1).)*\1/g, "");
+    if (/(?:console|logger|log|logging|println|print|eprintln|fmt\.Print|Debug\.Log)\s*[.(]/i.test(executableLine) && /\b(?:password|secret|token|apiKey|api_key|ssn|creditCard|credit_card|authorization)\b/i.test(executableLine)) {
       sensitiveLogLines.push(i + 1);
     }
   });
