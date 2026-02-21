@@ -258,6 +258,18 @@ server.tool(
         };
       }
 
+      if (code && files && files.length > 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: provide either code+language OR files[], not both.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
       const supportedProfiles = getSupportedPolicyProfiles();
       const result = files && files.length > 0
         ? evaluateProjectV2({

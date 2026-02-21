@@ -23,7 +23,7 @@ type PolicyEscalationRule = {
 const POLICY_ESCALATIONS: Record<PolicyProfile, PolicyEscalationRule[]> = {
   default: [],
   startup: [
-    { prefixes: ["PERF", "REL", "OBS"], minimumSeverity: "medium" },
+    { prefixes: ["PERF", "REL"], minimumSeverity: "medium" },
   ],
   regulated: [
     { prefixes: ["COMP", "DATA", "CYBER", "SOV", "LOGPRIV"], minimumSeverity: "high" },
@@ -132,6 +132,8 @@ function mapJudgeIdFromRule(ruleId: string): string | undefined {
     CICD: "ci-cd",
     STRUCT: "code-structure",
     AGENT: "agent-instructions",
+    ARCH: "software-practices",
+    SUPPLY: "dependency-health",
   };
 
   return map[prefix];
@@ -158,7 +160,7 @@ function confidenceForFinding(
   context?: EvaluationContextV2,
   evidence?: EvidenceBundleV2
 ): { confidence: number; evidenceBasis: string[] } {
-  let confidence = 0.45;
+  let confidence = 0.4;
   const evidenceBasis: string[] = [];
 
   if (finding.lineNumbers && finding.lineNumbers.length > 0) {
@@ -192,7 +194,7 @@ function confidenceForFinding(
   }
 
   if (finding.severity === "critical" || finding.severity === "high") {
-    confidence += 0.05;
+    confidence += 0.03;
     evidenceBasis.push("high-severity pattern");
   }
 
@@ -315,22 +317,37 @@ function aggregateSpecialtyFeedback(findings: SpecializedFindingV2[]): Specialty
     });
   }
 
-  if (feedback.length === 0) {
-    for (const [specialty, specialtyFindings] of groupedBySpecialty.entries()) {
-      const avgConfidence =
-        specialtyFindings.reduce((sum, finding) => sum + finding.confidence, 0) /
-        specialtyFindings.length;
-      feedback.push({
-        judgeId: "specialty",
-        judgeName: `Specialty ${specialty}`,
-        domain: specialty,
-        findings: specialtyFindings,
-        confidence: Number(avgConfidence.toFixed(2)),
-      });
-    }
+  return feedback.sort((a, b) => b.findings.length - a.findings.length);
+}
+
+function confidenceForNoFindings(
+  context?: EvaluationContextV2,
+  evidence?: EvidenceBundleV2,
+  uncertainty?: UncertaintyReportV2
+): number {
+  let confidence = 0.55;
+
+  if (context?.architectureNotes || context?.constraints?.length || context?.standards?.length) {
+    confidence += 0.1;
   }
 
-  return feedback.sort((a, b) => b.findings.length - a.findings.length);
+  if (
+    evidence?.testSummary ||
+    evidence?.coveragePercent !== undefined ||
+    evidence?.p95LatencyMs !== undefined ||
+    evidence?.dependencyVulnerabilityCount !== undefined
+  ) {
+    confidence += 0.1;
+  }
+
+  const missingCount = uncertainty?.missingEvidence.length ?? 0;
+  if (missingCount >= 3) {
+    confidence -= 0.1;
+  } else if (missingCount === 0) {
+    confidence += 0.1;
+  }
+
+  return Math.max(0.35, Math.min(0.9, Number(confidence.toFixed(2))));
 }
 
 function enrichFindings(
@@ -379,18 +396,17 @@ export function evaluateCodeV2(params: {
   const findings = enrichFindings(policyFindings, params.evaluationContext, params.evidence);
   const specialtyFeedback = aggregateSpecialtyFeedback(findings);
   const calibrated = calibrateScoreAndVerdict(findings);
+  const uncertainty = buildUncertainty(params.evaluationContext, params.evidence);
 
   const confidence =
     findings.length === 0
-      ? 0.5
+      ? confidenceForNoFindings(params.evaluationContext, params.evidence, uncertainty)
       : Number(
           (
             findings.reduce((sum, finding) => sum + finding.confidence, 0) /
             findings.length
           ).toFixed(2)
         );
-
-  const uncertainty = buildUncertainty(params.evaluationContext, params.evidence);
 
   return {
     policyProfile: profile,
@@ -431,18 +447,17 @@ export function evaluateProjectV2(params: {
   const findings = enrichFindings(policyFindings, params.evaluationContext, params.evidence);
   const specialtyFeedback = aggregateSpecialtyFeedback(findings);
   const calibrated = calibrateScoreAndVerdict(findings);
+  const uncertainty = buildUncertainty(params.evaluationContext, params.evidence);
 
   const confidence =
     findings.length === 0
-      ? 0.5
+      ? confidenceForNoFindings(params.evaluationContext, params.evidence, uncertainty)
       : Number(
           (
             findings.reduce((sum, finding) => sum + finding.confidence, 0) /
             findings.length
           ).toFixed(2)
         );
-
-  const uncertainty = buildUncertainty(params.evaluationContext, params.evidence);
 
   const baseTribunal: TribunalVerdict = {
     overallVerdict: projectVerdict.overallVerdict,
@@ -470,7 +485,7 @@ export function evaluateProjectV2(params: {
       confidence,
       profile
     ),
-    timestamp: new Date().toISOString(),
+    timestamp: projectVerdict.timestamp,
   };
 }
 

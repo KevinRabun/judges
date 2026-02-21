@@ -1032,6 +1032,56 @@ async function exportData(payload) {
     assert.ok(Array.isArray(result.specialtyFeedback));
     assert.ok(Array.isArray(result.uncertainty.assumptions));
     assert.ok(Array.isArray(result.uncertainty.missingEvidence));
+
+    const profileFromResult = result.policyProfile;
+    assert.equal(profileFromResult, "regulated");
+  });
+
+  it("should not improve score when using stricter regulated profile", () => {
+    const base = evaluateCodeV2({
+      code: v2Code,
+      language: "typescript",
+      policyProfile: "default",
+    });
+
+    const regulated = evaluateCodeV2({
+      code: v2Code,
+      language: "typescript",
+      policyProfile: "regulated",
+    });
+
+    assert.ok(
+      regulated.calibratedScore <= base.calibratedScore,
+      `Expected regulated score (${regulated.calibratedScore}) <= default score (${base.calibratedScore})`
+    );
+  });
+
+  it("should increase confidence when context and evidence are provided", () => {
+    const noEvidence = evaluateCodeV2({
+      code: v2Code,
+      language: "typescript",
+      policyProfile: "regulated",
+    });
+
+    const withEvidence = evaluateCodeV2({
+      code: v2Code,
+      language: "typescript",
+      policyProfile: "regulated",
+      evaluationContext: {
+        architectureNotes: "Regulated workload with explicit residency constraints.",
+        constraints: ["No cross-border transfer without legal basis"],
+      },
+      evidence: {
+        testSummary: "unit and integration tests passed",
+        coveragePercent: 82,
+        dependencyVulnerabilityCount: 0,
+      },
+    });
+
+    assert.ok(
+      withEvidence.confidence >= noEvidence.confidence,
+      `Expected confidence with evidence (${withEvidence.confidence}) >= without evidence (${noEvidence.confidence})`
+    );
   });
 
   it("should support project mode for V2", () => {
@@ -1053,6 +1103,11 @@ async function exportData(payload) {
 
     assert.ok(result.findings.length >= 0);
     assert.ok(result.timestamp.length > 0);
+    assert.equal(
+      result.timestamp,
+      result.baseVerdict.timestamp,
+      "Expected V2 project timestamp to match base verdict timestamp"
+    );
   });
 
   it("should expose supported policy profiles", () => {
