@@ -11,8 +11,9 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "fs";
-import { resolve, dirname } from "path";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { resolve, dirname, join } from "path";
+import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 
 import {
@@ -25,6 +26,12 @@ import {
   formatVerdictAsMarkdown,
   formatEvaluationAsMarkdown,
 } from "../src/evaluators/index.js";
+import {
+  evaluateCodeV2,
+  evaluateProjectV2,
+  getSupportedPolicyProfiles,
+} from "../src/evaluators/v2.js";
+import { generateRepoReportFromLocalPath } from "../src/reports/public-repo-report.js";
 import { JUDGES, getJudge } from "../src/judges/index.js";
 import type {
   JudgeEvaluation,
@@ -989,6 +996,144 @@ app.get("/data", (req, res) => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+// Test: V2 Context/Evidence-Aware Evaluation
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("V2 Evaluation", () => {
+  const v2Code = `
+const defaultRegion = "global";
+async function exportData(payload) {
+  return fetch("https://thirdparty.example.com/export", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+`;
+
+  it("should return calibrated verdict with confidence and uncertainty", () => {
+    const result = evaluateCodeV2({
+      code: v2Code,
+      language: "typescript",
+      policyProfile: "regulated",
+      evaluationContext: {
+        architectureNotes: "Multi-region SaaS with strict EU residency for regulated tenants.",
+        constraints: ["No cross-border transfer without legal basis"],
+      },
+      evidence: {
+        testSummary: "unit tests pass",
+        coveragePercent: 78,
+      },
+    });
+
+    assert.ok(result);
+    assert.ok(["pass", "warning", "fail"].includes(result.calibratedVerdict));
+    assert.ok(result.calibratedScore >= 0 && result.calibratedScore <= 100);
+    assert.ok(result.confidence >= 0 && result.confidence <= 1);
+    assert.ok(Array.isArray(result.specialtyFeedback));
+    assert.ok(Array.isArray(result.uncertainty.assumptions));
+    assert.ok(Array.isArray(result.uncertainty.missingEvidence));
+
+    const profileFromResult = result.policyProfile;
+    assert.equal(profileFromResult, "regulated");
+  });
+
+  it("should not improve score when using stricter regulated profile", () => {
+    const base = evaluateCodeV2({
+      code: v2Code,
+      language: "typescript",
+      policyProfile: "default",
+    });
+
+    const regulated = evaluateCodeV2({
+      code: v2Code,
+      language: "typescript",
+      policyProfile: "regulated",
+    });
+
+    assert.ok(
+      regulated.calibratedScore <= base.calibratedScore,
+      `Expected regulated score (${regulated.calibratedScore}) <= default score (${base.calibratedScore})`
+    );
+  });
+
+  it("should increase confidence when context and evidence are provided", () => {
+    const noEvidence = evaluateCodeV2({
+      code: v2Code,
+      language: "typescript",
+      policyProfile: "regulated",
+    });
+
+    const withEvidence = evaluateCodeV2({
+      code: v2Code,
+      language: "typescript",
+      policyProfile: "regulated",
+      evaluationContext: {
+        architectureNotes: "Regulated workload with explicit residency constraints.",
+        constraints: ["No cross-border transfer without legal basis"],
+      },
+      evidence: {
+        testSummary: "unit and integration tests passed",
+        coveragePercent: 82,
+        dependencyVulnerabilityCount: 0,
+      },
+    });
+
+    assert.ok(
+      withEvidence.confidence >= noEvidence.confidence,
+      `Expected confidence with evidence (${withEvidence.confidence}) >= without evidence (${noEvidence.confidence})`
+    );
+  });
+
+  it("should support project mode for V2", () => {
+    const result = evaluateProjectV2({
+      files: [
+        {
+          path: "src/a.ts",
+          language: "typescript",
+          content: `export async function send(x: unknown){ return fetch("https://api.example.com", { method: "POST", body: JSON.stringify(x) }); }`,
+        },
+        {
+          path: "src/b.ts",
+          language: "typescript",
+          content: `export const region = "global";`,
+        },
+      ],
+      policyProfile: "public-sector",
+    });
+
+    assert.ok(Array.isArray(result.findings));
+    if (result.findings.length > 0) {
+      const finding = result.findings[0];
+      assert.ok(
+        typeof finding.specialtyArea === "string",
+        "finding should have specialtyArea"
+      );
+      assert.ok(
+        typeof finding.confidence === "number",
+        "finding should have confidence"
+      );
+      assert.ok(
+        Array.isArray(finding.evidenceBasis),
+        "finding should have evidenceBasis array"
+      );
+    }
+    assert.ok(result.timestamp.length > 0);
+    assert.equal(
+      result.timestamp,
+      result.baseVerdict.timestamp,
+      "Expected V2 project timestamp to match base verdict timestamp"
+    );
+  });
+
+  it("should expose supported policy profiles", () => {
+    const profiles = getSupportedPolicyProfiles();
+    assert.ok(profiles.includes("default"));
+    assert.ok(profiles.includes("regulated"));
+    assert.ok(profiles.includes("public-sector"));
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 // Test: suggestedFix Field
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -1333,5 +1478,47 @@ describe("AST Analysis — Unknown Language", () => {
     const structure = analyzeStructure("some code", "brainfuck");
     assert.ok(structure);
     assert.equal(structure.functions.length, 0);
+  });
+});
+
+describe("Public Repo Report", () => {
+  it("should generate a markdown report from a local repository path", () => {
+    const root = mkdtempSync(join(tmpdir(), "judges-report-test-"));
+    const srcDir = join(root, "src");
+    const outputPath = join(root, "reports", "summary.md");
+
+    try {
+      mkdirSync(srcDir, { recursive: true });
+      writeFileSync(
+        join(srcDir, "index.ts"),
+        `
+function handler(req: any) {
+  console.log(req.body.password);
+  return { ok: true };
+}
+
+export { handler };
+`,
+        "utf8"
+      );
+
+      const report = generateRepoReportFromLocalPath({
+        repoPath: root,
+        repoLabel: "local-test-repo",
+        outputPath,
+        maxFiles: 50,
+      });
+
+      assert.ok(report.markdown.includes("Public Repository Full Judges Report"));
+      assert.ok(report.markdown.includes("local-test-repo"));
+      assert.ok(report.markdown.includes("Executive Summary"));
+      assert.ok(report.analyzedFileCount >= 1);
+      assert.ok(report.totalFindings >= 0);
+
+      const written = readFileSync(outputPath, "utf8");
+      assert.ok(written.includes("Per-Judge Breakdown"));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

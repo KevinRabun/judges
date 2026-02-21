@@ -9,7 +9,9 @@
  * to perform thorough contextual analysis beyond what static patterns catch.
  *
  * Tools exposed:
+ *   - evaluate_v2:                Context/evidence-aware V2 evaluation
  *   - evaluate_app_builder_flow:  3-step workflow (review, translate, tasks)
+ *   - evaluate_public_repo_report: Clone public repo and generate full report
  *   - evaluate_code:              Full panel review (all judges)
  *   - evaluate_code_single_judge: Review by a specific judge
  *   - get_judges:                 List all available judges
@@ -30,6 +32,12 @@ import {
   formatVerdictAsMarkdown,
   formatEvaluationAsMarkdown,
 } from "./evaluators/index.js";
+import {
+  evaluateCodeV2,
+  evaluateProjectV2,
+  getSupportedPolicyProfiles,
+} from "./evaluators/v2.js";
+import { generatePublicRepoReport } from "./reports/public-repo-report.js";
 import { JudgeDefinition } from "./types.js";
 
 // ─── Create MCP Server ──────────────────────────────────────────────────────
@@ -62,6 +70,290 @@ server.tool(
         },
       ],
     };
+  }
+);
+
+// ─── Tool: evaluate_public_repo_report ──────────────────────────────────────
+
+server.tool(
+  "evaluate_public_repo_report",
+  "Clone a public repository URL, run the full judges panel across source files, and generate a consolidated markdown report.",
+  {
+    repoUrl: z
+      .string()
+      .describe("Public repository URL (HTTP/HTTPS)"),
+    branch: z
+      .string()
+      .optional()
+      .describe("Optional branch name (defaults to repository default branch)"),
+    outputPath: z
+      .string()
+      .optional()
+      .describe("Optional path to write the markdown report"),
+    maxFiles: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Maximum number of source files to analyze (default: 600)"),
+    maxFileBytes: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Maximum single file size in bytes (default: 300000)"),
+    maxFindingsInReport: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Maximum number of detailed findings in report (default: 150)"),
+    keepClone: z
+      .boolean()
+      .optional()
+      .describe("Keep cloned repository on disk for inspection"),
+  },
+  async ({
+    repoUrl,
+    branch,
+    outputPath,
+    maxFiles,
+    maxFileBytes,
+    maxFindingsInReport,
+    keepClone,
+  }) => {
+    try {
+      const report = generatePublicRepoReport({
+        repoUrl,
+        branch,
+        outputPath,
+        maxFiles,
+        maxFileBytes,
+        maxFindingsInReport,
+        keepClone,
+      });
+
+      let summary = `# Public Repo Report Generated\n\n`;
+      summary += `- Repository: ${repoUrl}\n`;
+      summary += `- Overall verdict: ${report.overallVerdict.toUpperCase()}\n`;
+      summary += `- Average score: ${report.averageScore}/100\n`;
+      summary += `- Files analyzed: ${report.analyzedFileCount}\n`;
+      summary += `- Total findings: ${report.totalFindings}\n`;
+      if (report.outputPath) {
+        summary += `- Report path: ${report.outputPath}\n`;
+      }
+      if (keepClone) {
+        summary += `- Clone path: ${report.clonePath}\n`;
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `${summary}\n---\n\n${report.markdown}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              error instanceof Error
+                ? `Error: ${error.message}`
+                : "Error: Failed to generate public repository report",
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+// ─── Tool: evaluate_code ─────────────────────────────────────────────────────
+
+server.tool(
+  "evaluate_v2",
+  "Run V2 context-aware tribunal evaluation with policy profiles, evidence calibration, specialty feedback, confidence scoring, and uncertainty reporting.",
+  {
+    code: z
+      .string()
+      .optional()
+      .describe("Source code for single-file mode"),
+    language: z
+      .string()
+      .optional()
+      .describe("Language for single-file mode"),
+    files: z
+      .array(
+        z.object({
+          path: z.string().describe("Relative file path"),
+          content: z.string().describe("File content"),
+          language: z.string().describe("Programming language"),
+        })
+      )
+      .optional()
+      .describe("Project files for multi-file mode"),
+    context: z
+      .string()
+      .optional()
+      .describe("Optional high-level context"),
+    policyProfile: z
+      .enum([
+        "default",
+        "startup",
+        "regulated",
+        "healthcare",
+        "fintech",
+        "public-sector",
+      ])
+      .optional()
+      .describe("Policy profile for domain-specific severity calibration"),
+    evaluationContext: z
+      .object({
+        architectureNotes: z.string().optional(),
+        constraints: z.array(z.string()).optional(),
+        standards: z.array(z.string()).optional(),
+        knownRisks: z.array(z.string()).optional(),
+        dataBoundaryModel: z.string().optional(),
+      })
+      .optional()
+      .describe("Structured context to improve semantic relevance"),
+    evidence: z
+      .object({
+        testSummary: z.string().optional(),
+        coveragePercent: z.number().optional(),
+        p95LatencyMs: z.number().optional(),
+        errorRatePercent: z.number().optional(),
+        dependencyVulnerabilityCount: z.number().optional(),
+        deploymentNotes: z.string().optional(),
+      })
+      .optional()
+      .describe("Runtime/operational evidence used for confidence calibration"),
+  },
+  async ({ code, language, files, context, policyProfile, evaluationContext, evidence }) => {
+    try {
+      if (!code && (!files || files.length === 0)) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: provide either code+language for single-file mode, or files[] for project mode.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (code && !language) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: language is required when code is provided.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (code && files && files.length > 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Error: provide either code+language OR files[], not both.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const supportedProfiles = getSupportedPolicyProfiles();
+      const result = files && files.length > 0
+        ? evaluateProjectV2({
+            files,
+            context,
+            policyProfile,
+            evaluationContext,
+            evidence,
+          })
+        : evaluateCodeV2({
+            code: code!,
+            language: language!,
+            context,
+            policyProfile,
+            evaluationContext,
+            evidence,
+          });
+
+      let md = `# V2 Tribunal Evaluation\n\n`;
+      md += `**Policy Profile:** ${result.policyProfile}\n`;
+      md += `**Calibrated Verdict:** ${result.calibratedVerdict.toUpperCase()} (${result.calibratedScore}/100)\n`;
+      md += `**Base Verdict:** ${result.baseVerdict.overallVerdict.toUpperCase()} (${result.baseVerdict.overallScore}/100)\n`;
+      md += `**Confidence:** ${Math.round(result.confidence * 100)}%\n`;
+      md += `**Findings:** ${result.findings.length}\n\n`;
+      md += `${result.summary}\n\n`;
+
+      md += `## Specialty Feedback\n\n`;
+      for (const block of result.specialtyFeedback.slice(0, 10)) {
+        md += `### ${block.judgeName} — ${block.domain}\n`;
+        md += `Confidence: ${Math.round(block.confidence * 100)}% | Findings: ${block.findings.length}\n\n`;
+        for (const finding of block.findings.slice(0, 3)) {
+          md += `- [${finding.severity.toUpperCase()}] ${finding.ruleId} ${finding.title} (confidence ${Math.round(finding.confidence * 100)}%)\n`;
+        }
+        md += `\n`;
+      }
+
+      md += `## Uncertainty Report\n\n`;
+      md += `**Assumptions**\n`;
+      if (result.uncertainty.assumptions.length === 0) {
+        md += `- None\n`;
+      } else {
+        for (const item of result.uncertainty.assumptions) {
+          md += `- ${item}\n`;
+        }
+      }
+      md += `\n**Missing Evidence**\n`;
+      if (result.uncertainty.missingEvidence.length === 0) {
+        md += `- None\n`;
+      } else {
+        for (const item of result.uncertainty.missingEvidence) {
+          md += `- ${item}\n`;
+        }
+      }
+
+      md += `\n**Escalation Recommendations**\n`;
+      if (result.uncertainty.escalationRecommendations.length === 0) {
+        md += `- None\n`;
+      } else {
+        for (const item of result.uncertainty.escalationRecommendations) {
+          md += `- ${item}\n`;
+        }
+      }
+
+      md += `\n## Supported Policy Profiles\n\n`;
+      md += supportedProfiles.map((profile) => `- ${profile}`).join("\n");
+      md += "\n";
+
+      return {
+        content: [{ type: "text" as const, text: md }],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              error instanceof Error
+                ? `Error: ${error.message}`
+                : "Error: Failed to run V2 evaluation",
+          },
+        ],
+        isError: true,
+      };
+    }
   }
 );
 

@@ -228,6 +228,119 @@ export interface AppBuilderWorkflowResult {
   aiFixableNow: WorkflowTask[];
 }
 
+// ─── V2 Evaluation Types ────────────────────────────────────────────────────
+
+/**
+ * Policy profile for domain-specific governance overlays.
+ */
+export type PolicyProfile =
+  | "default"
+  | "startup"
+  | "regulated"
+  | "healthcare"
+  | "fintech"
+  | "public-sector";
+
+/**
+ * Optional context used to improve semantic relevance of judge feedback.
+ */
+export interface EvaluationContextV2 {
+  /** Short architecture summary or ADR excerpt */
+  architectureNotes?: string;
+  /** Business-critical constraints (SLO, latency budget, regulatory scope) */
+  constraints?: string[];
+  /** Team standards or coding conventions */
+  standards?: string[];
+  /** Known risks/incidents relevant to this review */
+  knownRisks?: string[];
+  /** Optional tenancy or data-boundary model notes */
+  dataBoundaryModel?: string;
+}
+
+/**
+ * Runtime and operational evidence used to calibrate findings.
+ */
+export interface EvidenceBundleV2 {
+  /** Unit/integration/e2e summary (human-readable) */
+  testSummary?: string;
+  /** Line coverage percentage */
+  coveragePercent?: number;
+  /** p95 request latency in ms */
+  p95LatencyMs?: number;
+  /** Error rate over recent observation window */
+  errorRatePercent?: number;
+  /** Number of known dependency vulnerabilities */
+  dependencyVulnerabilityCount?: number;
+  /** Deployment target/runtime notes */
+  deploymentNotes?: string;
+}
+
+/**
+ * Enriched finding with confidence and specialization metadata.
+ */
+export interface SpecializedFindingV2 extends Finding {
+  /** Judge specialty area for this rule */
+  specialtyArea: string;
+  /** Confidence score from 0.0 to 1.0 */
+  confidence: number;
+  /** Primary evidence basis */
+  evidenceBasis: string[];
+}
+
+/**
+ * Aggregated specialty feedback block.
+ */
+export interface SpecialtyFeedbackV2 {
+  /** Judge ID */
+  judgeId: string;
+  /** Judge display name */
+  judgeName: string;
+  /** Specialty domain */
+  domain: string;
+  /** Findings for this specialty */
+  findings: SpecializedFindingV2[];
+  /** Specialty confidence score 0.0-1.0 */
+  confidence: number;
+}
+
+/**
+ * Uncertainty report for transparency and escalation.
+ */
+export interface UncertaintyReportV2 {
+  /** Assumptions made during evaluation */
+  assumptions: string[];
+  /** Missing artifacts that would improve confidence */
+  missingEvidence: string[];
+  /** Recommendations to reduce uncertainty */
+  escalationRecommendations: string[];
+}
+
+/**
+ * V2 tribunal output with context/evidence-aware calibration.
+ */
+export interface TribunalVerdictV2 {
+  /** Policy profile used for this run */
+  policyProfile: PolicyProfile;
+  /** Base tribunal verdict from pattern/AST engine */
+  baseVerdict: TribunalVerdict;
+  /** Final calibrated verdict */
+  calibratedVerdict: Verdict;
+  /** Final calibrated score */
+  calibratedScore: number;
+  /** Aggregated enriched findings */
+  findings: SpecializedFindingV2[];
+  /** Per-specialty feedback */
+  specialtyFeedback: SpecialtyFeedbackV2[];
+  /** Confidence summary score 0.0-1.0 */
+  confidence: number;
+  /** Uncertainty and missing evidence report */
+  uncertainty: UncertaintyReportV2;
+  /** Evaluation summary */
+  summary: string;
+  /** Timestamp */
+  timestamp: string;
+}
+
 /**
  * The complete evaluation result from a single judge.
  */
