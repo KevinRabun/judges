@@ -217,7 +217,7 @@ The tribunal operates in three layers:
 
 Judges Panel covers **heuristic pattern detection** and **AST structural analysis** in a single server — fast, offline, and self-contained. It does not try to be a CVE scanner or a linter. Those capabilities belong in dedicated MCP servers that an AI agent can orchestrate alongside Judges.
 
-### Built-in AST Analysis (v1.9.0)
+### Built-in AST Analysis (v2.0.0)
 
 Unlike earlier versions that recommended a separate AST MCP server, Judges Panel now includes **real AST-based structural analysis** out of the box:
 
