@@ -25,6 +25,11 @@ import {
   formatVerdictAsMarkdown,
   formatEvaluationAsMarkdown,
 } from "../src/evaluators/index.js";
+import {
+  evaluateCodeV2,
+  evaluateProjectV2,
+  getSupportedPolicyProfiles,
+} from "../src/evaluators/v2.js";
 import { JUDGES, getJudge } from "../src/judges/index.js";
 import type {
   JudgeEvaluation,
@@ -985,6 +990,74 @@ app.get("/data", (req, res) => {
         }),
       /requires both code and language inputs/
     );
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: V2 Context/Evidence-Aware Evaluation
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("V2 Evaluation", () => {
+  const v2Code = `
+const defaultRegion = "global";
+async function exportData(payload) {
+  return fetch("https://thirdparty.example.com/export", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+`;
+
+  it("should return calibrated verdict with confidence and uncertainty", () => {
+    const result = evaluateCodeV2({
+      code: v2Code,
+      language: "typescript",
+      policyProfile: "regulated",
+      evaluationContext: {
+        architectureNotes: "Multi-region SaaS with strict EU residency for regulated tenants.",
+        constraints: ["No cross-border transfer without legal basis"],
+      },
+      evidence: {
+        testSummary: "unit tests pass",
+        coveragePercent: 78,
+      },
+    });
+
+    assert.ok(result);
+    assert.ok(["pass", "warning", "fail"].includes(result.calibratedVerdict));
+    assert.ok(result.calibratedScore >= 0 && result.calibratedScore <= 100);
+    assert.ok(result.confidence >= 0 && result.confidence <= 1);
+    assert.ok(Array.isArray(result.specialtyFeedback));
+    assert.ok(Array.isArray(result.uncertainty.assumptions));
+    assert.ok(Array.isArray(result.uncertainty.missingEvidence));
+  });
+
+  it("should support project mode for V2", () => {
+    const result = evaluateProjectV2({
+      files: [
+        {
+          path: "src/a.ts",
+          language: "typescript",
+          content: `export async function send(x: unknown){ return fetch("https://api.example.com", { method: "POST", body: JSON.stringify(x) }); }`,
+        },
+        {
+          path: "src/b.ts",
+          language: "typescript",
+          content: `export const region = "global";`,
+        },
+      ],
+      policyProfile: "public-sector",
+    });
+
+    assert.ok(result.findings.length >= 0);
+    assert.ok(result.timestamp.length > 0);
+  });
+
+  it("should expose supported policy profiles", () => {
+    const profiles = getSupportedPolicyProfiles();
+    assert.ok(profiles.includes("default"));
+    assert.ok(profiles.includes("regulated"));
+    assert.ok(profiles.includes("public-sector"));
   });
 });
 

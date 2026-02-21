@@ -4,6 +4,7 @@ An MCP (Model Context Protocol) server that provides a panel of **33 specialized
 
 **Highlights:**
 - Includes an **App Builder Workflow (3-step)** demo for release decisions, plain-language risk summaries, and prioritized fixes — see [Try the Demo](#2-try-the-demo).
+- Includes **V2 context-aware evaluation** with policy profiles, evidence calibration, specialty feedback, confidence scoring, and uncertainty reporting.
 
 [![CI](https://github.com/KevinRabun/judges/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinRabun/judges/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
@@ -281,6 +282,29 @@ Each server returns structured findings. The AI synthesizes everything into a si
 ---
 
 ## MCP Tools
+
+### `evaluate_v2`
+Run a **V2 context-aware tribunal evaluation** designed to raise feedback quality toward lead engineer/architect-level review:
+
+- Policy profile calibration (`default`, `startup`, `regulated`, `healthcare`, `fintech`, `public-sector`)
+- Context ingestion (architecture notes, constraints, standards, known risks, data-boundary model)
+- Runtime evidence hooks (tests, coverage, latency, error rate, vulnerability counts)
+- Specialty feedback aggregation by judge/domain
+- Confidence scoring and explicit uncertainty reporting
+
+Supports:
+- **Code mode**: `code` + `language`
+- **Project mode**: `files[]`
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `code` | string | conditional | Source code for single-file mode |
+| `language` | string | conditional | Programming language for single-file mode |
+| `files` | array | conditional | `{ path, content, language }[]` for project mode |
+| `context` | string | no | High-level review context |
+| `policyProfile` | enum | no | `default`, `startup`, `regulated`, `healthcare`, `fintech`, `public-sector` |
+| `evaluationContext` | object | no | Structured architecture/constraint context |
+| `evidence` | object | no | Runtime/operational evidence for confidence calibration |
 
 ### `evaluate_app_builder_flow`
 Run a **3-step app-builder workflow** for technical and non-technical stakeholders:
