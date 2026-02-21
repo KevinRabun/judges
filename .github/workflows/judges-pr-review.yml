@@ -68,7 +68,10 @@ jobs:
         with:
           script: |
             const marker = '<!-- judges-pr-summary -->';
-            const body = `${marker}\n## Judges PR Summary\n\n- Verdict: **${process.env.JUDGES_VERDICT?.toUpperCase() ?? 'UNKNOWN'}**\n- Average score: **${process.env.JUDGES_SCORE ?? 'n/a'}/100**\n- Total findings: **${process.env.JUDGES_FINDINGS ?? 'n/a'}**\n- Files analyzed: **${process.env.JUDGES_FILES ?? 'n/a'}**\n\nFull details are available in the workflow artifact: \`judges-pr-report\`.`;
+            const verdictRaw = (process.env.JUDGES_VERDICT ?? 'unknown').toLowerCase();
+            const verdictLabel = verdictRaw.toUpperCase();
+            const verdictBadge = verdictRaw === 'pass' ? '✅' : verdictRaw === 'warning' ? '⚠️' : verdictRaw === 'fail' ? '❌' : '❔';
+            const body = `${marker}\n## Judges PR Summary\n\n- Verdict: ${verdictBadge} **${verdictLabel}**\n- Average score: **${process.env.JUDGES_SCORE ?? 'n/a'}/100**\n- Total findings: **${process.env.JUDGES_FINDINGS ?? 'n/a'}**\n- Files analyzed: **${process.env.JUDGES_FILES ?? 'n/a'}**\n\nFull details are available in the workflow artifact: \`judges-pr-report\`.`;
 
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
