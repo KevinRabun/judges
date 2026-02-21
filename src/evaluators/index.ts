@@ -62,6 +62,7 @@ import { analyzeLoggingPrivacy } from "./logging-privacy.js";
 import { analyzeRateLimiting } from "./rate-limiting.js";
 import { analyzeCiCd } from "./ci-cd.js";
 import { analyzeCodeStructure } from "./code-structure.js";
+import { analyzeAgentInstructions } from "./agent-instructions.js";
 
 // ─── Evaluation Engine ──────────────────────────────────────────────────────
 
@@ -172,6 +173,9 @@ export function evaluateWithJudge(
       break;
     case "code-structure":
       findings.push(...analyzeCodeStructure(code, language));
+      break;
+    case "agent-instructions":
+      findings.push(...analyzeAgentInstructions(code, language));
       break;
   }
 

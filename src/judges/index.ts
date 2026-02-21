@@ -32,6 +32,7 @@ import { loggingPrivacyJudge } from "./logging-privacy.js";
 import { rateLimitingJudge } from "./rate-limiting.js";
 import { ciCdJudge } from "./ci-cd.js";
 import { codeStructureJudge } from "./code-structure.js";
+import { agentInstructionsJudge } from "./agent-instructions.js";
 
 /**
  * The panel of judges that comprise the Judges Panel.
@@ -73,6 +74,7 @@ export const JUDGES: JudgeDefinition[] = [
   rateLimitingJudge,
   ciCdJudge,
   codeStructureJudge,
+  agentInstructionsJudge,
 ];
 
 /**

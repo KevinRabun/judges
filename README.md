@@ -1,6 +1,6 @@
 # Judges Panel
 
-An MCP (Model Context Protocol) server that provides a panel of **32 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Includes **built-in AST analysis** powered by the TypeScript Compiler API — no separate parser server needed.
+An MCP (Model Context Protocol) server that provides a panel of **33 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Includes **built-in AST analysis** powered by the TypeScript Compiler API — no separate parser server needed.
 
 **Highlights:**
 - Includes an **App Builder Workflow (3-step)** demo for release decisions, plain-language risk summaries, and prioritized fixes — see [Try the Demo](#2-try-the-demo).
@@ -24,7 +24,7 @@ npm run build
 
 ### 2. Try the Demo
 
-Run the included demo to see all 32 judges evaluate a purposely flawed API server:
+Run the included demo to see all 33 judges evaluate a purposely flawed API server:
 
 ```bash
 npm run demo
@@ -75,7 +75,7 @@ The demo now also includes an **App Builder Workflow (3-step)** section. In a si
   Critical Issues : 15
   High Issues     : 17
   Total Findings  : 83
-  Judges Run      : 32
+  Judges Run      : 33
 
   Per-Judge Breakdown:
   ────────────────────────────────────────────────────────────────
@@ -195,6 +195,7 @@ Then use `judges` as the command in your MCP config (no `args` needed).
 | **Rate Limiting** | Rate Limiting & Throttling | `RATE-` | Missing rate limits, unbounded queries, backoff strategy |
 | **CI/CD** | CI/CD Pipeline & Deployment Safety | `CICD-` | Test infrastructure, lint config, Docker tags, build scripts |
 | **Code Structure** | Structural Analysis (AST) | `STRUCT-` | Cyclomatic complexity, nesting depth, function length, dead code, type safety |
+| **Agent Instructions** | Agent Instruction Markdown Quality & Safety | `AGENT-` | Instruction hierarchy, conflict detection, unsafe overrides, scope, validation, policy guidance |
 
 ---
 
@@ -214,7 +215,7 @@ The tribunal operates in three layers:
 
 Judges Panel covers **heuristic pattern detection** and **AST structural analysis** in a single server — fast, offline, and self-contained. It does not try to be a CVE scanner or a linter. Those capabilities belong in dedicated MCP servers that an AI agent can orchestrate alongside Judges.
 
-### Built-in AST Analysis (v1.8.0)
+### Built-in AST Analysis (v1.9.0)
 
 Unlike earlier versions that recommended a separate AST MCP server, Judges Panel now includes **real AST-based structural analysis** out of the box:
 
@@ -251,7 +252,7 @@ When your AI coding assistant connects to multiple MCP servers, each one contrib
   │   Judges     │  │  CVE / │  │ Linter │
   │   Panel      │  │  SBOM  │  │ Server │
   │ ─────────────│  └────────┘  └────────┘
-  │ 31 Heuristic │   Vuln DB     Style &
+  │ 32 Heuristic │   Vuln DB     Style &
   │   judges     │   scanning    correctness
   │ + AST judge  │
   └──────────────┘
@@ -262,7 +263,7 @@ When your AI coding assistant connects to multiple MCP servers, each one contrib
 
 | Layer | What It Does | Example Servers |
 |-------|-------------|-----------------|
-| **Judges Panel** | 32-judge quality gate — security patterns, AST analysis, cost, scalability, a11y, compliance, sovereignty, ethics, dependency health | This server |
+| **Judges Panel** | 33-judge quality gate — security patterns, AST analysis, cost, scalability, a11y, compliance, sovereignty, ethics, dependency health, agent instruction governance | This server |
 | **CVE / SBOM** | Vulnerability scanning against live databases — known CVEs, license risks, supply chain | OSV, Snyk, Trivy, Grype MCP servers |
 | **Linting** | Language-specific style and correctness rules | ESLint, Ruff, Clippy MCP servers |
 | **Runtime Profiling** | Memory, CPU, latency measurement on running code | Custom profiling MCP servers |
@@ -307,7 +308,7 @@ Supports:
 List all available judges with their domains and descriptions.
 
 ### `evaluate_code`
-Submit code to the **full judges panel**. All 32 judges evaluate independently and return a combined verdict.
+Submit code to the **full judges panel**. All 33 judges evaluate independently and return a combined verdict.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -326,7 +327,7 @@ Submit code to a **specific judge** for targeted review.
 | `context` | string | no | Additional context |
 
 ### `evaluate_project`
-Submit multiple files for **project-level analysis**. All 32 judges evaluate each file, plus cross-file architectural analysis detects code duplication, inconsistent error handling, and dependency cycles.
+Submit multiple files for **project-level analysis**. All 33 judges evaluate each file, plus cross-file architectural analysis detects code duplication, inconsistent error handling, and dependency cycles.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -334,7 +335,7 @@ Submit multiple files for **project-level analysis**. All 32 judges evaluate eac
 | `context` | string | no | Optional project context |
 
 ### `evaluate_diff`
-Evaluate only the **changed lines** in a code diff. Runs all 32 judges on the full file but filters findings to lines you specify. Ideal for PR reviews and incremental analysis.
+Evaluate only the **changed lines** in a code diff. Runs all 33 judges on the full file but filters findings to lines you specify. Ideal for PR reviews and incremental analysis.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -354,7 +355,7 @@ Analyze a dependency manifest file for supply-chain risks, version pinning issue
 
 #### Judge IDs
 
-`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure`
+`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure` · `agent-instructions`
 
 ---
 
@@ -396,7 +397,8 @@ Each judge has a corresponding prompt for LLM-powered deep analysis:
 | `judge-rate-limiting` | Deep rate limiting review |
 | `judge-ci-cd` | Deep CI/CD pipeline review |
 | `judge-code-structure` | Deep AST-based structural analysis review |
-| `full-tribunal` | All 32 judges in a single prompt |
+| `judge-agent-instructions` | Deep review of agent instruction markdown quality and safety |
+| `full-tribunal` | All 33 judges in a single prompt |
 
 ---
 
@@ -417,7 +419,7 @@ Each judge scores the code from **0 to 100**:
 - **WARNING** — Any high finding, any medium finding, or score < 80
 - **PASS** — Score ≥ 80 with no critical, high, or medium findings
 
-The **overall tribunal score** is the average of all 32 judges. The overall verdict fails if **any** judge fails.
+The **overall tribunal score** is the average of all 33 judges. The overall verdict fails if **any** judge fails.
 
 ---
 
@@ -436,10 +438,10 @@ judges/
 │   ├── evaluators/           # Analysis engine for each judge
 │   │   ├── index.ts          # evaluateWithJudge(), evaluateWithTribunal(), evaluateProject(), etc.
 │   │   ├── shared.ts         # Scoring, verdict logic, markdown formatters
-│   │   └── *.ts              # One analyzer per judge (32 files)
+│   │   └── *.ts              # One analyzer per judge (33 files)
 │   └── judges/               # Judge definitions (id, name, domain, system prompt)
 │       ├── index.ts          # JUDGES array, getJudge(), getJudgeSummaries()
-│       └── *.ts              # One definition per judge (32 files)
+│       └── *.ts              # One definition per judge (33 files)
 ├── examples/
 │   ├── sample-vulnerable-api.ts  # Intentionally flawed code (triggers all judges)
 │   └── demo.ts                   # Run: npm run demo
