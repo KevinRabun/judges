@@ -1,0 +1,43 @@
+name: Judges PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  judges:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Judges report
+        run: |
+          npx tsx -e "import { generateRepoReportFromLocalPath } from './src/reports/public-repo-report.ts';
+          const result = generateRepoReportFromLocalPath({
+            repoPath: process.cwd(),
+            outputPath: 'judges-pr-report.md',
+            maxFiles: 600,
+            maxFindingsInReport: 150,
+          });
+          console.log('Overall verdict:', result.overallVerdict);
+          console.log('Average score:', result.averageScore);
+          console.log('Findings:', result.totalFindings);"
+
+      - name: Upload Judges report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: judges-pr-report
+          path: judges-pr-report.md
