@@ -1101,7 +1101,13 @@ async function exportData(payload) {
       policyProfile: "public-sector",
     });
 
-    assert.ok(result.findings.length >= 0);
+    assert.ok(Array.isArray(result.findings));
+    if (result.findings.length > 0) {
+      const f = result.findings[0];
+      assert.ok(typeof f.specialtyArea === "string", "finding should have specialtyArea");
+      assert.ok(typeof f.confidence === "number", "finding should have confidence");
+      assert.ok(Array.isArray(f.evidenceBasis), "finding should have evidenceBasis array");
+    }
     assert.ok(result.timestamp.length > 0);
     assert.equal(
       result.timestamp,
