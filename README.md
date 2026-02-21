@@ -159,6 +159,78 @@ npm install -g @kevinrabun/judges
 
 Then use `judges` as the command in your MCP config (no `args` needed).
 
+### 5. Use Judges in GitHub Copilot PR Reviews
+
+Yes — users can include Judges as part of GitHub-based review workflows, with one important caveat:
+
+- The hosted `copilot-pull-request-reviewer` on GitHub does not currently let you directly attach arbitrary local MCP servers the same way VS Code does.
+- The practical pattern is to run Judges in CI on each PR, publish a report/check, and have Copilot + human reviewers use that output during review.
+
+#### Option A (recommended): PR workflow check + report artifact
+
+Create `.github/workflows/judges-pr-review.yml`:
+
+```yaml
+name: Judges PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  judges:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate Judges report
+        run: |
+          npx tsx -e "import { generateRepoReportFromLocalPath } from './src/reports/public-repo-report.ts';
+          const result = generateRepoReportFromLocalPath({
+            repoPath: process.cwd(),
+            outputPath: 'judges-pr-report.md',
+            maxFiles: 600,
+            maxFindingsInReport: 150,
+          });
+          console.log('Overall:', result.overallVerdict, result.averageScore);"
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: judges-pr-report
+          path: judges-pr-report.md
+```
+
+This gives every PR a reproducible Judges output your team (and Copilot) can reference.
+
+#### Option B: Add Copilot custom instructions in-repo
+
+Add `.github/instructions/judges.instructions.md` with guidance such as:
+
+```markdown
+When reviewing pull requests:
+1. Read the latest Judges report artifact/check output first.
+2. Prioritize CRITICAL and HIGH findings in remediation guidance.
+3. If findings conflict, defer to security/compliance-related Judges.
+4. Include rule IDs (e.g., DATA-001, CYBER-004) in suggested fixes.
+```
+
+This helps keep Copilot feedback aligned with Judges findings.
+
 ---
 
 ## The Judge Panel
