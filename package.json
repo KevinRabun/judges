@@ -21,6 +21,7 @@
     "clean": "rimraf dist",
     "test": "npx tsx --test tests/judges.test.ts",
     "demo": "npx tsx examples/demo.ts",
+    "report:public-repo": "npx tsx scripts/generate-public-repo-report.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

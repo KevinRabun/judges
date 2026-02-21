@@ -5,6 +5,7 @@ An MCP (Model Context Protocol) server that provides a panel of **33 specialized
 **Highlights:**
 - Includes an **App Builder Workflow (3-step)** demo for release decisions, plain-language risk summaries, and prioritized fixes — see [Try the Demo](#2-try-the-demo).
 - Includes **V2 context-aware evaluation** with policy profiles, evidence calibration, specialty feedback, confidence scoring, and uncertainty reporting.
+- Includes **public repository URL reporting** to clone a repo, run the full tribunal, and output a consolidated markdown report.
 
 [![CI](https://github.com/KevinRabun/judges/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinRabun/judges/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
@@ -328,6 +329,61 @@ Supports:
 | `maxFindings` | number | no | Max translated top findings (default: 10) |
 | `maxTasks` | number | no | Max generated tasks (default: 20) |
 
+### `evaluate_public_repo_report`
+Clone a **public repository URL**, run the full judges panel across eligible source files, and generate a consolidated markdown report.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `repoUrl` | string | yes | Public repository URL (`https://...`) |
+| `branch` | string | no | Optional branch name |
+| `outputPath` | string | no | Optional path to write report markdown |
+| `maxFiles` | number | no | Max files analyzed (default: 600) |
+| `maxFileBytes` | number | no | Max file size in bytes (default: 300000) |
+| `maxFindingsInReport` | number | no | Max detailed findings in output (default: 150) |
+| `keepClone` | boolean | no | Keep cloned repo on disk for inspection |
+
+**Quick examples**
+
+Generate a report from CLI:
+
+```bash
+npm run report:public-repo -- --repoUrl https://github.com/microsoft/vscode --output reports/vscode-judges-report.md
+```
+
+Call from MCP client:
+
+```json
+{
+  "tool": "evaluate_public_repo_report",
+  "arguments": {
+    "repoUrl": "https://github.com/microsoft/vscode",
+    "branch": "main",
+    "maxFiles": 400,
+    "maxFindingsInReport": 120,
+    "outputPath": "reports/vscode-judges-report.md"
+  }
+}
+```
+
+Typical response summary includes:
+- overall verdict and average score
+- analyzed file count and total findings
+- per-judge score table
+- highest-risk findings and lowest-scoring files
+
+Sample report snippet:
+
+```text
+# Public Repository Full Judges Report
+
+Generated from https://github.com/microsoft/vscode on 2026-02-21T12:00:00.000Z.
+
+## Executive Summary
+- Overall verdict: WARNING
+- Average file score: 78/100
+- Total findings: 412 (critical 3, high 29, medium 114, low 185, info 81)
+```
+
 ### `get_judges`
 List all available judges with their domains and descriptions.
 
@@ -452,7 +508,7 @@ The **overall tribunal score** is the average of all 33 judges. The overall verd
 ```
 judges/
 ├── src/
-│   ├── index.ts              # MCP server entry point — 6 tools, prompts, transport
+│   ├── index.ts              # MCP server entry point — tools, prompts, transport
 │   ├── types.ts              # TypeScript interfaces (Finding, JudgeEvaluation, etc.)
 │   ├── ast/                  # AST analysis engine (built-in, no external deps)
 │   │   ├── index.ts          # analyzeStructure() — routes to correct parser
@@ -463,9 +519,13 @@ judges/
 │   │   ├── index.ts          # evaluateWithJudge(), evaluateWithTribunal(), evaluateProject(), etc.
 │   │   ├── shared.ts         # Scoring, verdict logic, markdown formatters
 │   │   └── *.ts              # One analyzer per judge (33 files)
+│   ├── reports/
+│   │   └── public-repo-report.ts   # Public repo clone + full tribunal report generation
 │   └── judges/               # Judge definitions (id, name, domain, system prompt)
 │       ├── index.ts          # JUDGES array, getJudge(), getJudgeSummaries()
 │       └── *.ts              # One definition per judge (33 files)
+├── scripts/
+│   └── generate-public-repo-report.ts  # Run: npm run report:public-repo -- --repoUrl <url>
 ├── examples/
 │   ├── sample-vulnerable-api.ts  # Intentionally flawed code (triggers all judges)
 │   └── demo.ts                   # Run: npm run demo
@@ -487,6 +547,7 @@ judges/
 | `npm run dev` | Watch mode — recompile on save |
 | `npm test` | Run the full test suite |
 | `npm run demo` | Run the sample tribunal demo |
+| `npm run report:public-repo -- --repoUrl <url>` | Generate a full tribunal report for a public repository URL |
 | `npm start` | Start the MCP server |
 | `npm run clean` | Remove `dist/` |
 

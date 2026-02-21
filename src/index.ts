@@ -11,6 +11,7 @@
  * Tools exposed:
  *   - evaluate_v2:                Context/evidence-aware V2 evaluation
  *   - evaluate_app_builder_flow:  3-step workflow (review, translate, tasks)
+ *   - evaluate_public_repo_report: Clone public repo and generate full report
  *   - evaluate_code:              Full panel review (all judges)
  *   - evaluate_code_single_judge: Review by a specific judge
  *   - get_judges:                 List all available judges
@@ -36,6 +37,7 @@ import {
   evaluateProjectV2,
   getSupportedPolicyProfiles,
 } from "./evaluators/v2.js";
+import { generatePublicRepoReport } from "./reports/public-repo-report.js";
 import { JudgeDefinition } from "./types.js";
 
 // ─── Create MCP Server ──────────────────────────────────────────────────────
@@ -68,6 +70,104 @@ server.tool(
         },
       ],
     };
+  }
+);
+
+// ─── Tool: evaluate_public_repo_report ──────────────────────────────────────
+
+server.tool(
+  "evaluate_public_repo_report",
+  "Clone a public repository URL, run the full judges panel across source files, and generate a consolidated markdown report.",
+  {
+    repoUrl: z
+      .string()
+      .describe("Public repository URL (HTTP/HTTPS)"),
+    branch: z
+      .string()
+      .optional()
+      .describe("Optional branch name (defaults to repository default branch)"),
+    outputPath: z
+      .string()
+      .optional()
+      .describe("Optional path to write the markdown report"),
+    maxFiles: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Maximum number of source files to analyze (default: 600)"),
+    maxFileBytes: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Maximum single file size in bytes (default: 300000)"),
+    maxFindingsInReport: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Maximum number of detailed findings in report (default: 150)"),
+    keepClone: z
+      .boolean()
+      .optional()
+      .describe("Keep cloned repository on disk for inspection"),
+  },
+  async ({
+    repoUrl,
+    branch,
+    outputPath,
+    maxFiles,
+    maxFileBytes,
+    maxFindingsInReport,
+    keepClone,
+  }) => {
+    try {
+      const report = generatePublicRepoReport({
+        repoUrl,
+        branch,
+        outputPath,
+        maxFiles,
+        maxFileBytes,
+        maxFindingsInReport,
+        keepClone,
+      });
+
+      let summary = `# Public Repo Report Generated\n\n`;
+      summary += `- Repository: ${repoUrl}\n`;
+      summary += `- Overall verdict: ${report.overallVerdict.toUpperCase()}\n`;
+      summary += `- Average score: ${report.averageScore}/100\n`;
+      summary += `- Files analyzed: ${report.analyzedFileCount}\n`;
+      summary += `- Total findings: ${report.totalFindings}\n`;
+      if (report.outputPath) {
+        summary += `- Report path: ${report.outputPath}\n`;
+      }
+      if (keepClone) {
+        summary += `- Clone path: ${report.clonePath}\n`;
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `${summary}\n---\n\n${report.markdown}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              error instanceof Error
+                ? `Error: ${error.message}`
+                : "Error: Failed to generate public repository report",
+          },
+        ],
+        isError: true,
+      };
+    }
   }
 );
 

@@ -11,8 +11,9 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "fs";
-import { resolve, dirname } from "path";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { resolve, dirname, join } from "path";
+import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 
 import {
@@ -30,6 +31,7 @@ import {
   evaluateProjectV2,
   getSupportedPolicyProfiles,
 } from "../src/evaluators/v2.js";
+import { generateRepoReportFromLocalPath } from "../src/reports/public-repo-report.js";
 import { JUDGES, getJudge } from "../src/judges/index.js";
 import type {
   JudgeEvaluation,
@@ -1406,5 +1408,47 @@ describe("AST Analysis — Unknown Language", () => {
     const structure = analyzeStructure("some code", "brainfuck");
     assert.ok(structure);
     assert.equal(structure.functions.length, 0);
+  });
+});
+
+describe("Public Repo Report", () => {
+  it("should generate a markdown report from a local repository path", () => {
+    const root = mkdtempSync(join(tmpdir(), "judges-report-test-"));
+    const srcDir = join(root, "src");
+    const outputPath = join(root, "reports", "summary.md");
+
+    try {
+      mkdirSync(srcDir, { recursive: true });
+      writeFileSync(
+        join(srcDir, "index.ts"),
+        `
+function handler(req: any) {
+  console.log(req.body.password);
+  return { ok: true };
+}
+
+export { handler };
+`,
+        "utf8"
+      );
+
+      const report = generateRepoReportFromLocalPath({
+        repoPath: root,
+        repoLabel: "local-test-repo",
+        outputPath,
+        maxFiles: 50,
+      });
+
+      assert.ok(report.markdown.includes("Public Repository Full Judges Report"));
+      assert.ok(report.markdown.includes("local-test-repo"));
+      assert.ok(report.markdown.includes("Executive Summary"));
+      assert.ok(report.analyzedFileCount >= 1);
+      assert.ok(report.totalFindings >= 0);
+
+      const written = readFileSync(outputPath, "utf8");
+      assert.ok(written.includes("Per-Judge Breakdown"));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
