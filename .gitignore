@@ -60,3 +60,4 @@ tmp/
 temp/
 .tmp/
 daily-autofix-summary.json
+reports/
