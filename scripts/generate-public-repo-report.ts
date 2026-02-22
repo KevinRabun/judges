@@ -11,6 +11,10 @@ function parseArg(name: string): string | undefined {
   return process.argv[index + 1];
 }
 
+function hasProvidedArg(name: string): boolean {
+  return process.argv.includes(`--${name}`);
+}
+
 function parseArgs(name: string): string[] {
   const key = `--${name}`;
   const values: string[] = [];
@@ -73,6 +77,7 @@ Options:
   --credentialMode <mode>    Credential detection mode: standard|strict (default: standard)
   --includeAstFindings <b>   Include AST/code-structure findings: true|false (default: true)
   --minConfidence <0-1>      Minimum finding confidence to include (default: 0)
+  --quickStart               Use opinionated defaults for fast, high-signal onboarding
   --keepClone                Keep cloned temp directory for inspection
 `);
 }
@@ -100,17 +105,64 @@ async function main() {
     throw new Error("Missing required --repoUrl argument.");
   }
 
+  const quickStart = hasFlag("quickStart");
+  const quickStartExcludeRegexes = [
+    "(^|/)test(s)?(/|$)",
+    "(^|/)__tests__(/|$)",
+    "(^|/)spec(s)?(/|$)",
+    "\\.(test|spec)\\.",
+    "(^|/)docs(/|$)",
+    "(^|/)examples?(/|$)",
+    "(^|/)fixtures?(/|$)",
+    "(^|/)mocks?(/|$)",
+  ];
+
+  const maxFiles = parseIntArg(
+    "maxFiles",
+    quickStart ? 300 : 600
+  );
+  const maxFileBytes = parseIntArg(
+    "maxFileBytes",
+    quickStart ? 220_000 : 300_000
+  );
+  const maxFindingsInReport = parseIntArg(
+    "maxFindings",
+    quickStart ? 100 : 150
+  );
+  const excludePathRegexes = hasProvidedArg("excludePathRegex")
+    ? parseArgs("excludePathRegex")
+    : quickStart
+      ? quickStartExcludeRegexes
+      : [];
+  const credentialMode = hasProvidedArg("credentialMode")
+    ? parseCredentialMode()
+    : quickStart
+      ? "strict"
+      : undefined;
+  const includeAstFindings = parseBooleanArg(
+    "includeAstFindings",
+    true
+  );
+  const minConfidence = parseFloatArg(
+    "minConfidence",
+    quickStart ? 0.9 : 0
+  );
+
+  if (quickStart) {
+    console.log("Quick start mode enabled with opinionated high-signal defaults.");
+  }
+
   const report = generatePublicRepoReport({
     repoUrl,
     branch: parseArg("branch"),
     outputPath: parseArg("output"),
-    maxFiles: parseIntArg("maxFiles", 600),
-    maxFileBytes: parseIntArg("maxFileBytes", 300_000),
-    maxFindingsInReport: parseIntArg("maxFindings", 150),
-    excludePathRegexes: parseArgs("excludePathRegex"),
-    credentialMode: parseCredentialMode(),
-    includeAstFindings: parseBooleanArg("includeAstFindings", true),
-    minConfidence: parseFloatArg("minConfidence", 0),
+    maxFiles,
+    maxFileBytes,
+    maxFindingsInReport,
+    excludePathRegexes,
+    credentialMode,
+    includeAstFindings,
+    minConfidence,
     keepClone: hasFlag("keepClone"),
   });
 

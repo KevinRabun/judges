@@ -58,3 +58,4 @@ mcp-publisher.tar.gz
 .cache/
 tmp/
 temp/
+.tmp/

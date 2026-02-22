@@ -1,0 +1,63 @@
+name: Judges Daily Full-Run Autofix PRs
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+    inputs:
+      targetRepoUrl:
+        description: "Optional explicit repository URL to analyze"
+        required: false
+        type: string
+      maxPrs:
+        description: "Maximum PRs to open for this run"
+        required: false
+        default: "5"
+        type: string
+      dryRun:
+        description: "Prepare fixes without creating PRs"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-and-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout judges repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run daily popular-repo autofix
+        env:
+          GH_TOKEN: ${{ secrets.JUDGES_AUTOFIX_GH_TOKEN }}
+          TARGET_REPO_URL: ${{ inputs.targetRepoUrl }}
+          MAX_PRS: ${{ inputs.maxPrs }}
+          MIN_CONFIDENCE: "0.9"
+          DRY_RUN: ${{ inputs.dryRun }}
+          SUMMARY_PATH: "daily-autofix-summary.json"
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "JUDGES_AUTOFIX_GH_TOKEN is not configured; exiting without failure."
+            echo '{"skipped":["Missing JUDGES_AUTOFIX_GH_TOKEN secret."]}' > daily-autofix-summary.json
+            exit 0
+          fi
+
+          echo "Running full Judges-based autofix flow (public repos only, no extra auth escalation)."
+          npx tsx scripts/daily-popular-repo-autofix.ts
+
+      - name: Upload automation summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-autofix-summary
+          path: daily-autofix-summary.json

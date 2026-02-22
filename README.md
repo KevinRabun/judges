@@ -419,6 +419,7 @@ Clone a **public repository URL**, run the full judges panel across eligible sou
 | `credentialMode` | string | no | Credential detection mode: `standard` (default) or `strict` |
 | `includeAstFindings` | boolean | no | Include AST/code-structure findings (default: true) |
 | `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
+| `quickStart` | flag | no | Opinionated high-signal defaults for onboarding (`minConfidence=0.9`, `credentialMode=strict`, path exclusions) |
 | `keepClone` | boolean | no | Keep cloned repo on disk for inspection |
 
 **Quick examples**
@@ -436,6 +437,9 @@ npm run report:public-repo -- --repoUrl https://github.com/openclaw/openclaw --i
 
 # show only findings at 80%+ confidence
 npm run report:public-repo -- --repoUrl https://github.com/openclaw/openclaw --minConfidence 0.8 --output reports/openclaw-judges-report-high-confidence.md
+
+# opinionated quick-start mode (recommended first run)
+npm run report:quickstart -- --repoUrl https://github.com/openclaw/openclaw --output reports/openclaw-quickstart.md
 ```
 
 Call from MCP client:
@@ -623,7 +627,8 @@ judges/
 │       ├── index.ts          # JUDGES array, getJudge(), getJudgeSummaries()
 │       └── *.ts              # One definition per judge (33 files)
 ├── scripts/
-│   └── generate-public-repo-report.ts  # Run: npm run report:public-repo -- --repoUrl <url>
+│   ├── generate-public-repo-report.ts  # Run: npm run report:public-repo -- --repoUrl <url>
+│   └── daily-popular-repo-autofix.ts   # Run: npm run automation:daily-popular
 ├── examples/
 │   ├── sample-vulnerable-api.ts  # Intentionally flawed code (triggers all judges)
 │   └── demo.ts                   # Run: npm run demo
@@ -646,8 +651,29 @@ judges/
 | `npm test` | Run the full test suite |
 | `npm run demo` | Run the sample tribunal demo |
 | `npm run report:public-repo -- --repoUrl <url>` | Generate a full tribunal report for a public repository URL |
+| `npm run report:quickstart -- --repoUrl <url>` | Run opinionated high-signal report defaults for fast adoption |
+| `npm run automation:daily-popular` | Analyze one rotating popular repo and open up to 5 remediation PRs |
 | `npm start` | Start the MCP server |
 | `npm run clean` | Remove `dist/` |
+
+---
+
+## Daily Popular Repo Automation
+
+This repo includes a scheduled workflow at `.github/workflows/daily-popular-repo-autofix.yml` that:
+- selects one popular repository per day (or a manually supplied target),
+- runs the full Judges evaluation across supported source languages,
+- applies only conservative, single-line remediations that reduce matching finding counts,
+- opens up to 5 PRs with attribution to both Judges and the target repository,
+- skips repositories unless they are public and PR creation is possible with existing GitHub auth (no additional auth flow).
+
+Required secret:
+- `JUDGES_AUTOFIX_GH_TOKEN` — GitHub token with permission to fork/push/create PRs for target repositories.
+
+Manual run:
+```bash
+gh workflow run "Judges Daily Popular Repo Autofix" -f targetRepoUrl=https://github.com/owner/repo -f maxPrs=5
+```
 
 ---
 

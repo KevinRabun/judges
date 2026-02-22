@@ -22,6 +22,8 @@
     "test": "npx tsx --test tests/judges.test.ts",
     "demo": "npx tsx examples/demo.ts",
     "report:public-repo": "npx tsx scripts/generate-public-repo-report.ts",
+    "report:quickstart": "npx tsx scripts/generate-public-repo-report.ts --quickStart",
+    "automation:daily-popular": "npx tsx scripts/daily-popular-repo-autofix.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
