@@ -242,6 +242,10 @@ function run(command: string, args: string[], cwd?: string): string {
 }
 
 function hasGitHubAuth(): boolean {
+  if (process.env.GH_TOKEN?.trim() || process.env.GITHUB_TOKEN?.trim()) {
+    return true;
+  }
+
   try {
     run("gh", ["auth", "status"]);
     return true;
