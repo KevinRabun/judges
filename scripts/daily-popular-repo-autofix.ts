@@ -24,7 +24,121 @@ const DEFAULT_POPULAR_REPOS = [
   "https://github.com/tensorflow/tensorflow",
   "https://github.com/astral-sh/uv",
   "https://github.com/denoland/deno",
+  "https://github.com/kubernetes/kubernetes",
+  "https://github.com/microsoft/TypeScript",
+  "https://github.com/nodejs/node",
+  "https://github.com/golang/go",
+  "https://github.com/rust-lang/rust",
+  "https://github.com/python/cpython",
+  "https://github.com/django/django",
+  "https://github.com/pallets/flask",
+  "https://github.com/tiangolo/fastapi",
+  "https://github.com/encode/starlette",
+  "https://github.com/encode/httpx",
+  "https://github.com/numpy/numpy",
+  "https://github.com/pandas-dev/pandas",
+  "https://github.com/scikit-learn/scikit-learn",
+  "https://github.com/pytorch/pytorch",
+  "https://github.com/microsoft/onnxruntime",
+  "https://github.com/apache/spark",
+  "https://github.com/apache/airflow",
+  "https://github.com/apache/kafka",
+  "https://github.com/apache/flink",
+  "https://github.com/apache/dubbo",
+  "https://github.com/apache/echarts",
+  "https://github.com/apache/mxnet",
+  "https://github.com/apache/incubator-answer",
+  "https://github.com/elastic/elasticsearch",
+  "https://github.com/redis/redis",
+  "https://github.com/postgres/postgres",
+  "https://github.com/mysql/mysql-server",
+  "https://github.com/mongodb/mongo",
+  "https://github.com/prisma/prisma",
+  "https://github.com/typeorm/typeorm",
+  "https://github.com/sequelize/sequelize",
+  "https://github.com/vercel/turbo",
+  "https://github.com/vitejs/vite",
+  "https://github.com/webpack/webpack",
+  "https://github.com/rollup/rollup",
+  "https://github.com/babel/babel",
+  "https://github.com/eslint/eslint",
+  "https://github.com/prettier/prettier",
+  "https://github.com/jestjs/jest",
+  "https://github.com/vitest-dev/vitest",
+  "https://github.com/cypress-io/cypress",
+  "https://github.com/microsoft/playwright",
+  "https://github.com/storybookjs/storybook",
+  "https://github.com/tailwindlabs/tailwindcss",
+  "https://github.com/chakra-ui/chakra-ui",
+  "https://github.com/mui/material-ui",
+  "https://github.com/remix-run/remix",
+  "https://github.com/sveltejs/svelte",
+  "https://github.com/sveltejs/kit",
+  "https://github.com/angular/angular",
+  "https://github.com/vuejs/core",
+  "https://github.com/nuxt/nuxt",
+  "https://github.com/facebook/react-native",
+  "https://github.com/expo/expo",
+  "https://github.com/electron/electron",
+  "https://github.com/tauri-apps/tauri",
+  "https://github.com/supabase/supabase",
+  "https://github.com/appwrite/appwrite",
+  "https://github.com/nestjs/nest",
+  "https://github.com/expressjs/express",
+  "https://github.com/koa/koa",
+  "https://github.com/honojs/hono",
+  "https://github.com/strapi/strapi",
+  "https://github.com/keystonejs/keystone",
+  "https://github.com/laravel/laravel",
+  "https://github.com/symfony/symfony",
+  "https://github.com/rails/rails",
+  "https://github.com/spring-projects/spring-boot",
+  "https://github.com/spring-projects/spring-framework",
+  "https://github.com/quarkusio/quarkus",
+  "https://github.com/micronaut-projects/micronaut-core",
+  "https://github.com/gofiber/fiber",
+  "https://github.com/gin-gonic/gin",
+  "https://github.com/labstack/echo",
+  "https://github.com/spf13/cobra",
+  "https://github.com/cli/cli",
+  "https://github.com/docker/cli",
+  "https://github.com/moby/moby",
+  "https://github.com/containerd/containerd",
+  "https://github.com/helm/helm",
+  "https://github.com/hashicorp/terraform",
+  "https://github.com/hashicorp/vault",
+  "https://github.com/hashicorp/consul",
+  "https://github.com/pulumi/pulumi",
+  "https://github.com/ansible/ansible",
+  "https://github.com/argoproj/argo-cd",
+  "https://github.com/prometheus/prometheus",
+  "https://github.com/grafana/grafana",
+  "https://github.com/open-telemetry/opentelemetry-collector",
+  "https://github.com/getsentry/sentry",
+  "https://github.com/istio/istio",
+  "https://github.com/linkerd/linkerd2",
+  "https://github.com/envoyproxy/envoy",
+  "https://github.com/nginx/nginx",
+  "https://github.com/traefik/traefik",
+  "https://github.com/cilium/cilium",
+  "https://github.com/calico/calico",
+  "https://github.com/open-policy-agent/opa",
+  "https://github.com/falco/falco",
+  "https://github.com/trufflesecurity/trufflehog",
+  "https://github.com/aquasecurity/trivy",
+  "https://github.com/dependabot/dependabot-core",
+  "https://github.com/renovatebot/renovate",
+  "https://github.com/actions/runner",
+  "https://github.com/neovim/neovim",
+  "https://github.com/git/git",
+  "https://github.com/starship/starship",
+  "https://github.com/alacritty/alacritty",
+  "https://github.com/wezterm/wezterm",
+  "https://github.com/obsidianmd/obsidian-releases",
+  "https://github.com/microsoft/terminal",
 ];
+
+const DEFAULT_MAX_REPOS_PER_DAY = 10;
 
 const SOURCE_EXTENSIONS = new Set([
   ".ts",
@@ -80,12 +194,9 @@ type CandidateFix = {
   reason: string;
 };
 
-type Summary = {
-  selectedRepo: string;
+type RepoRunSummary = {
+  repoUrl: string;
   defaultBranch: string;
-  generatedAt: string;
-  dryRun: boolean;
-  maxPrs: number;
   candidateConfidenceUsed: number;
   fallbackUsed: boolean;
   judgesFindingsScanned: number;
@@ -98,6 +209,16 @@ type Summary = {
     filePath: string;
     line: number;
   }>;
+  skipped: string[];
+};
+
+type Summary = {
+  selectedRepos: string[];
+  generatedAt: string;
+  dryRun: boolean;
+  maxPrsPerRepo: number;
+  maxReposPerDay: number;
+  repoRuns: RepoRunSummary[];
   skipped: string[];
 };
 
@@ -175,20 +296,25 @@ function dayOfYear(now: Date): number {
   return Math.floor(diff / 86_400_000);
 }
 
-function selectRepository(): string {
+function selectRepositories(maxReposPerDay: number): string[] {
   const fromEnv = process.env.POPULAR_REPOS
     ?.split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 
-  const repos = fromEnv && fromEnv.length > 0 ? fromEnv : DEFAULT_POPULAR_REPOS;
+  const repos = [...new Set(fromEnv && fromEnv.length > 0 ? fromEnv : DEFAULT_POPULAR_REPOS)];
   const forced = process.env.TARGET_REPO_URL?.trim();
   if (forced) {
-    return forced;
+    return [forced];
   }
 
-  const index = dayOfYear(new Date()) % repos.length;
-  return repos[index];
+  const reposToPick = Math.max(1, Math.min(maxReposPerDay, repos.length));
+  const startIndex = dayOfYear(new Date()) % repos.length;
+  const selected: string[] = [];
+  for (let offset = 0; offset < reposToPick; offset += 1) {
+    selected.push(repos[(startIndex + offset) % repos.length]);
+  }
+  return selected;
 }
 
 function detectDefaultBranch(clonePath: string): string {
@@ -629,36 +755,21 @@ function createPullRequest(
   );
 }
 
-function main() {
-  if (!hasGitHubAuth()) {
-    throw new Error("GitHub CLI is not authenticated. Set GH_TOKEN/GITHUB_TOKEN before running.");
-  }
-
-  const selectedRepo = selectRepository();
+function processRepository(
+  selectedRepo: string,
+  dryRun: boolean,
+  maxPrs: number,
+  minConfidence: number,
+  fallbackEnabled: boolean,
+  fallbackMinConfidence: number,
+  fallbackHighCriticalOnly: boolean
+): RepoRunSummary {
   const { owner, repo } = parseRepoFromUrl(selectedRepo);
-  const dryRun = (process.env.DRY_RUN ?? "false").toLowerCase() === "true";
-  const parsedMaxPrs = Number.parseInt(process.env.MAX_PRS ?? "5", 10);
-  const parsedMinConfidence = Number.parseFloat(process.env.MIN_CONFIDENCE ?? "0.9");
-  const fallbackEnabled = (process.env.ENABLE_FALLBACK ?? "true").toLowerCase() === "true";
-  const parsedFallbackMinConfidence = Number.parseFloat(process.env.FALLBACK_MIN_CONFIDENCE ?? "0.8");
-  const fallbackHighCriticalOnly = (process.env.FALLBACK_HIGH_CRITICAL_ONLY ?? "true").toLowerCase() !== "false";
-  const maxPrs = Number.isFinite(parsedMaxPrs) && parsedMaxPrs > 0 ? parsedMaxPrs : 5;
-  const minConfidence = Number.isFinite(parsedMinConfidence) ? parsedMinConfidence : 0.9;
-  const fallbackMinConfidence = Number.isFinite(parsedFallbackMinConfidence)
-    ? parsedFallbackMinConfidence
-    : 0.8;
-
-  let candidateConfidenceUsed = minConfidence;
-  let fallbackUsed = false;
-
-  const summary: Summary = {
-    selectedRepo,
+  const repoRun: RepoRunSummary = {
+    repoUrl: selectedRepo,
     defaultBranch: "",
-    generatedAt: new Date().toISOString(),
-    dryRun,
-    maxPrs,
-    candidateConfidenceUsed,
-    fallbackUsed,
+    candidateConfidenceUsed: minConfidence,
+    fallbackUsed: false,
     judgesFindingsScanned: 0,
     candidatesInspected: 0,
     prsOpened: [],
@@ -666,23 +777,23 @@ function main() {
   };
 
   const workspace = mkdtempSync(join(tmpdir(), "judges-daily-autofix-"));
-  const clonePath = join(workspace, repo);
+  const clonePath = join(workspace, `${owner}-${repo}`);
 
   try {
     if (!isPublicRepo(owner, repo)) {
-      summary.skipped.push("Target repository is not public. Skipping run.");
-      return;
+      repoRun.skipped.push("Target repository is not public. Skipping run.");
+      return repoRun;
     }
 
     const prEligibility = canSubmitPrWithoutExtraAuth(owner, repo);
     if (!prEligibility.allowed) {
-      summary.skipped.push(prEligibility.reason ?? "Current auth cannot create PRs for this repository.");
-      return;
+      repoRun.skipped.push(prEligibility.reason ?? "Current auth cannot create PRs for this repository.");
+      return repoRun;
     }
 
     run("git", ["clone", "--depth", "1", selectedRepo, clonePath]);
     const defaultBranch = detectDefaultBranch(clonePath);
-    summary.defaultBranch = defaultBranch;
+    repoRun.defaultBranch = defaultBranch;
 
     run("git", ["config", "user.name", "judges-bot"], clonePath);
     run("git", ["config", "user.email", "judges-bot@users.noreply.github.com"], clonePath);
@@ -691,7 +802,7 @@ function main() {
     ensureFork(owner, repo, login);
     ensureForkRemote(clonePath, login, repo);
 
-    summary.judgesFindingsScanned = countTotalFindings(clonePath, 0);
+    repoRun.judgesFindingsScanned = countTotalFindings(clonePath, 0);
 
     let candidates = discoverFixCandidates(clonePath, {
       minConfidence,
@@ -711,28 +822,26 @@ function main() {
 
       if (fallbackCandidates.length > 0) {
         candidates = fallbackCandidates;
-        candidateConfidenceUsed = fallbackMinConfidence;
-        fallbackUsed = true;
-        summary.skipped.push(
+        repoRun.candidateConfidenceUsed = fallbackMinConfidence;
+        repoRun.fallbackUsed = true;
+        repoRun.skipped.push(
           `Fallback mode engaged at confidence ${fallbackMinConfidence} (${fallbackHighCriticalOnly ? "high/critical only" : "all severities"}).`
         );
       } else {
-        summary.skipped.push(
+        repoRun.skipped.push(
           `Fallback mode found no safe candidates at confidence ${fallbackMinConfidence}.`
         );
       }
     }
 
-    summary.candidateConfidenceUsed = candidateConfidenceUsed;
-    summary.fallbackUsed = fallbackUsed;
-    summary.candidatesInspected = candidates.length;
+    repoRun.candidatesInspected = candidates.length;
 
     if (candidates.length === 0) {
-      summary.skipped.push("No safe auto-fix candidates found at configured confidence threshold.");
+      repoRun.skipped.push("No safe auto-fix candidates found at configured confidence threshold.");
     }
 
     for (let index = 0; index < candidates.length; index += 1) {
-      if (summary.prsOpened.length >= maxPrs) break;
+      if (repoRun.prsOpened.length >= maxPrs) break;
 
       const candidate = candidates[index];
       checkoutDefault(clonePath, defaultBranch);
@@ -740,16 +849,16 @@ function main() {
       const branchName = `judges-autofix-${new Date().toISOString().slice(0, 10)}-${index + 1}`;
       run("git", ["checkout", "-b", branchName], clonePath);
 
-      const changed = applySingleLineFix(clonePath, candidate, candidateConfidenceUsed);
+      const changed = applySingleLineFix(clonePath, candidate, repoRun.candidateConfidenceUsed);
       if (!changed) {
-        summary.skipped.push(
+        repoRun.skipped.push(
           `Skipped ${candidate.ruleId} (${candidate.severity}) ${candidate.filePath}:${candidate.line} (did not improve finding count).`
         );
         continue;
       }
 
       if (dryRun) {
-        summary.skipped.push(
+        repoRun.skipped.push(
           `Dry run: prepared ${candidate.ruleId} (${candidate.severity}) fix for ${candidate.filePath}:${candidate.line} on branch ${branchName}.`
         );
         continue;
@@ -766,7 +875,7 @@ function main() {
           candidate
         );
 
-        summary.prsOpened.push({
+        repoRun.prsOpened.push({
           branch: branchName,
           title: `fix: ${candidate.ruleId} remediation in ${candidate.filePath}`,
           url: prUrl,
@@ -775,17 +884,86 @@ function main() {
           line: candidate.line,
         });
       } catch (error) {
-        summary.skipped.push(
+        repoRun.skipped.push(
           `Failed PR for ${candidate.ruleId} (${candidate.severity}) ${candidate.filePath}:${candidate.line}: ${
             error instanceof Error ? error.message : String(error)
           }`
         );
       }
     }
+
+    return repoRun;
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+  }
+}
+
+function main() {
+  if (!hasGitHubAuth()) {
+    throw new Error("GitHub CLI is not authenticated. Set GH_TOKEN/GITHUB_TOKEN before running.");
+  }
+
+  const dryRun = (process.env.DRY_RUN ?? "false").toLowerCase() === "true";
+  const parsedMaxPrs = Number.parseInt(process.env.MAX_PRS ?? "5", 10);
+  const parsedMaxReposPerDay = Number.parseInt(
+    process.env.MAX_REPOS_PER_DAY ?? `${DEFAULT_MAX_REPOS_PER_DAY}`,
+    10
+  );
+  const parsedMinConfidence = Number.parseFloat(process.env.MIN_CONFIDENCE ?? "0.9");
+  const fallbackEnabled = (process.env.ENABLE_FALLBACK ?? "true").toLowerCase() === "true";
+  const parsedFallbackMinConfidence = Number.parseFloat(process.env.FALLBACK_MIN_CONFIDENCE ?? "0.8");
+  const fallbackHighCriticalOnly = (process.env.FALLBACK_HIGH_CRITICAL_ONLY ?? "true").toLowerCase() !== "false";
+  const maxPrs = Number.isFinite(parsedMaxPrs) && parsedMaxPrs > 0 ? parsedMaxPrs : 5;
+  const maxReposPerDay = Number.isFinite(parsedMaxReposPerDay) && parsedMaxReposPerDay > 0
+    ? parsedMaxReposPerDay
+    : DEFAULT_MAX_REPOS_PER_DAY;
+  const minConfidence = Number.isFinite(parsedMinConfidence) ? parsedMinConfidence : 0.9;
+  const fallbackMinConfidence = Number.isFinite(parsedFallbackMinConfidence)
+    ? parsedFallbackMinConfidence
+    : 0.8;
+
+  const selectedRepos = selectRepositories(maxReposPerDay);
+  const summary: Summary = {
+    selectedRepos,
+    generatedAt: new Date().toISOString(),
+    dryRun,
+    maxPrsPerRepo: maxPrs,
+    maxReposPerDay,
+    repoRuns: [],
+    skipped: [],
+  };
+
+  try {
+    for (const selectedRepo of selectedRepos) {
+      try {
+        const repoRun = processRepository(
+          selectedRepo,
+          dryRun,
+          maxPrs,
+          minConfidence,
+          fallbackEnabled,
+          fallbackMinConfidence,
+          fallbackHighCriticalOnly
+        );
+        summary.repoRuns.push(repoRun);
+      } catch (error) {
+        summary.repoRuns.push({
+          repoUrl: selectedRepo,
+          defaultBranch: "",
+          candidateConfidenceUsed: minConfidence,
+          fallbackUsed: false,
+          judgesFindingsScanned: 0,
+          candidatesInspected: 0,
+          prsOpened: [],
+          skipped: [
+            `Repository run failed: ${error instanceof Error ? error.message : String(error)}`,
+          ],
+        });
+      }
+    }
   } finally {
     const outputPath = resolve(process.env.SUMMARY_PATH ?? "daily-autofix-summary.json");
     writeFileSync(outputPath, JSON.stringify(summary, null, 2), "utf8");
-    rmSync(workspace, { recursive: true, force: true });
   }
 }
 

@@ -652,7 +652,7 @@ judges/
 | `npm run demo` | Run the sample tribunal demo |
 | `npm run report:public-repo -- --repoUrl <url>` | Generate a full tribunal report for a public repository URL |
 | `npm run report:quickstart -- --repoUrl <url>` | Run opinionated high-signal report defaults for fast adoption |
-| `npm run automation:daily-popular` | Analyze one rotating popular repo and open up to 5 remediation PRs |
+| `npm run automation:daily-popular` | Analyze up to 10 rotating popular repos/day and open up to 5 remediation PRs per repo |
 | `npm start` | Start the MCP server |
 | `npm run clean` | Remove `dist/` |
 
@@ -661,10 +661,10 @@ judges/
 ## Daily Popular Repo Automation
 
 This repo includes a scheduled workflow at `.github/workflows/daily-popular-repo-autofix.yml` that:
-- selects one popular repository per day (or a manually supplied target),
+- selects up to 10 repositories per day from a default pool of 100+ popular repos (or a manually supplied target),
 - runs the full Judges evaluation across supported source languages,
 - applies only conservative, single-line remediations that reduce matching finding counts,
-- opens up to 5 PRs with attribution to both Judges and the target repository,
+- opens up to 5 PRs per repository with attribution to both Judges and the target repository,
 - skips repositories unless they are public and PR creation is possible with existing GitHub auth (no additional auth flow).
 
 Required secret:
@@ -672,7 +672,7 @@ Required secret:
 
 Manual run:
 ```bash
-gh workflow run "Judges Daily Popular Repo Autofix" -f targetRepoUrl=https://github.com/owner/repo -f maxPrs=5
+gh workflow run "Judges Daily Full-Run Autofix PRs" -f targetRepoUrl=https://github.com/owner/repo -f maxPrs=5 -f maxReposPerDay=10
 ```
 
 ---
