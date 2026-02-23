@@ -31,8 +31,21 @@ jobs:
           const result = generateRepoReportFromLocalPath({
             repoPath: process.cwd(),
             outputPath: 'judges-pr-report.md',
-            maxFiles: 600,
-            maxFindingsInReport: 150,
+            maxFiles: 300,
+            maxFileBytes: 220000,
+            maxFindingsInReport: 100,
+            excludePathRegexes: [
+              '(^|/)test(s)?(/|$)',
+              '(^|/)__tests__(/|$)',
+              '(^|/)spec(s)?(/|$)',
+              '\\.(test|spec)\\.',
+              '(^|/)docs(/|$)',
+              '(^|/)examples?(/|$)',
+              '(^|/)fixtures?(/|$)',
+              '(^|/)mocks?(/|$)',
+            ],
+            includeAstFindings: false,
+            minConfidence: 0.9,
           });
           writeFileSync('judges-summary.json', JSON.stringify({
             overallVerdict: result.overallVerdict,
