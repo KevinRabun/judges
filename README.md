@@ -666,13 +666,14 @@ This repo includes a scheduled workflow at `.github/workflows/daily-popular-repo
 - applies only conservative, single-line remediations that reduce matching finding counts,
 - opens up to 5 PRs per repository with attribution to both Judges and the target repository,
 - skips repositories unless they are public and PR creation is possible with existing GitHub auth (no additional auth flow).
+- enforces hard runtime caps of 10 repositories/day and 5 PRs/repository.
 
 Required secret:
 - `JUDGES_AUTOFIX_GH_TOKEN` — GitHub token with permission to fork/push/create PRs for target repositories.
 
 Manual run:
 ```bash
-gh workflow run "Judges Daily Full-Run Autofix PRs" -f targetRepoUrl=https://github.com/owner/repo -f maxPrs=5 -f maxReposPerDay=10
+gh workflow run "Judges Daily Full-Run Autofix PRs" -f targetRepoUrl=https://github.com/owner/repo
 ```
 
 ---

@@ -145,6 +145,7 @@ const DEFAULT_POPULAR_REPOS = [
 ];
 
 const DEFAULT_MAX_REPOS_PER_DAY = 10;
+const DEFAULT_MAX_PRS_PER_REPO = 5;
 
 const SOURCE_EXTENSIONS = new Set([
   ".ts",
@@ -914,7 +915,7 @@ function main() {
   }
 
   const dryRun = (process.env.DRY_RUN ?? "false").toLowerCase() === "true";
-  const parsedMaxPrs = Number.parseInt(process.env.MAX_PRS ?? "5", 10);
+  const parsedMaxPrs = Number.parseInt(process.env.MAX_PRS ?? `${DEFAULT_MAX_PRS_PER_REPO}`, 10);
   const parsedMaxReposPerDay = Number.parseInt(
     process.env.MAX_REPOS_PER_DAY ?? `${DEFAULT_MAX_REPOS_PER_DAY}`,
     10
@@ -923,10 +924,14 @@ function main() {
   const fallbackEnabled = (process.env.ENABLE_FALLBACK ?? "true").toLowerCase() === "true";
   const parsedFallbackMinConfidence = Number.parseFloat(process.env.FALLBACK_MIN_CONFIDENCE ?? "0.8");
   const fallbackHighCriticalOnly = (process.env.FALLBACK_HIGH_CRITICAL_ONLY ?? "true").toLowerCase() !== "false";
-  const maxPrs = Number.isFinite(parsedMaxPrs) && parsedMaxPrs > 0 ? parsedMaxPrs : 5;
-  const maxReposPerDay = Number.isFinite(parsedMaxReposPerDay) && parsedMaxReposPerDay > 0
+  const requestedMaxPrs = Number.isFinite(parsedMaxPrs) && parsedMaxPrs > 0
+    ? parsedMaxPrs
+    : DEFAULT_MAX_PRS_PER_REPO;
+  const maxPrs = Math.min(DEFAULT_MAX_PRS_PER_REPO, requestedMaxPrs);
+  const requestedMaxReposPerDay = Number.isFinite(parsedMaxReposPerDay) && parsedMaxReposPerDay > 0
     ? parsedMaxReposPerDay
     : DEFAULT_MAX_REPOS_PER_DAY;
+  const maxReposPerDay = Math.min(DEFAULT_MAX_REPOS_PER_DAY, requestedMaxReposPerDay);
   const minConfidence = Number.isFinite(parsedMinConfidence) ? parsedMinConfidence : 0.9;
   const fallbackMinConfidence = Number.isFinite(parsedFallbackMinConfidence)
     ? parsedFallbackMinConfidence

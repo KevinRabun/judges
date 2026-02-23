@@ -9,16 +9,6 @@ on:
         description: "Optional explicit repository URL to analyze"
         required: false
         type: string
-      maxPrs:
-        description: "Maximum PRs to open for this run"
-        required: false
-        default: "5"
-        type: string
-      maxReposPerDay:
-        description: "Maximum repositories to analyze in this run"
-        required: false
-        default: "10"
-        type: string
       dryRun:
         description: "Prepare fixes without creating PRs"
         required: false
@@ -47,8 +37,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.JUDGES_AUTOFIX_GH_TOKEN }}
           TARGET_REPO_URL: ${{ inputs.targetRepoUrl }}
-          MAX_PRS: ${{ inputs.maxPrs }}
-          MAX_REPOS_PER_DAY: ${{ inputs.maxReposPerDay }}
+          MAX_PRS: "5"
+          MAX_REPOS_PER_DAY: "10"
           MIN_CONFIDENCE: "0.9"
           DRY_RUN: ${{ inputs.dryRun }}
           SUMMARY_PATH: "daily-autofix-summary.json"
