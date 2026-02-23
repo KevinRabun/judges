@@ -59,7 +59,7 @@ jobs:
           path: judges-pr-report.md
 
       - name: Post Judges summary comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           JUDGES_VERDICT: ${{ steps.judges_summary.outputs.verdict }}
           JUDGES_SCORE: ${{ steps.judges_summary.outputs.score }}
