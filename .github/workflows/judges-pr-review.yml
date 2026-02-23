@@ -53,7 +53,7 @@ jobs:
           echo "files=$(jq -r '.analyzedFileCount' judges-summary.json)" >> "$GITHUB_OUTPUT"
 
       - name: Upload Judges report artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: judges-pr-report
           path: judges-pr-report.md
