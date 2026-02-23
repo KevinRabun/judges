@@ -26,15 +26,28 @@ jobs:
 
       - name: Generate Judges report
         run: |
-          npx tsx -e "import { generateRepoReportFromLocalPath } from './src/reports/public-repo-report.ts';
+          npx tsx -e "import { writeFileSync } from 'node:fs';
+          import { generateRepoReportFromLocalPath } from './src/reports/public-repo-report.ts';
           const result = generateRepoReportFromLocalPath({
             repoPath: process.cwd(),
             outputPath: 'judges-pr-report.md',
-            maxFiles: 600,
-            maxFindingsInReport: 150,
+            maxFiles: 300,
+            maxFileBytes: 220000,
+            maxFindingsInReport: 100,
+            excludePathRegexes: [
+              '(^|/)test(s)?(/|$)',
+              '(^|/)__tests__(/|$)',
+              '(^|/)spec(s)?(/|$)',
+              '\\.(test|spec)\\.',
+              '(^|/)docs(/|$)',
+              '(^|/)examples?(/|$)',
+              '(^|/)fixtures?(/|$)',
+              '(^|/)mocks?(/|$)',
+            ],
+            includeAstFindings: false,
+            minConfidence: 0.9,
           });
-          const fs = await import('node:fs');
-          fs.writeFileSync('judges-summary.json', JSON.stringify({
+          writeFileSync('judges-summary.json', JSON.stringify({
             overallVerdict: result.overallVerdict,
             averageScore: result.averageScore,
             totalFindings: result.totalFindings,
@@ -53,13 +66,13 @@ jobs:
           echo "files=$(jq -r '.analyzedFileCount' judges-summary.json)" >> "$GITHUB_OUTPUT"
 
       - name: Upload Judges report artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: judges-pr-report
           path: judges-pr-report.md
 
       - name: Post Judges summary comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           JUDGES_VERDICT: ${{ steps.judges_summary.outputs.verdict }}
           JUDGES_SCORE: ${{ steps.judges_summary.outputs.score }}
