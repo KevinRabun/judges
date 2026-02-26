@@ -307,17 +307,49 @@ function dayOfYear(now: Date): number {
   return Math.floor(diff / 86_400_000);
 }
 
+function listPublicReposForOwner(owner: string): string[] {
+  const output = run("gh", [
+    "api",
+    "--paginate",
+    `users/${owner}/repos?per_page=100&type=public&sort=updated`,
+    "--jq",
+    '.[] | select((.private == false) and (.archived == false) and (.fork == false)) | .html_url',
+  ]);
+
+  return output
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 function selectRepositories(maxReposPerDay: number): string[] {
+  const forced = process.env.TARGET_REPO_URL?.trim();
+  if (forced) {
+    return [forced];
+  }
+
+  const targetOwner = process.env.TARGET_REPO_OWNER?.trim();
+  if (targetOwner) {
+    const ownerRepos = [...new Set(listPublicReposForOwner(targetOwner))];
+    if (ownerRepos.length === 0) {
+      throw new Error(`No public non-fork repositories found for TARGET_REPO_OWNER=${targetOwner}.`);
+    }
+
+    const reposToPick = Math.max(1, Math.min(maxReposPerDay, ownerRepos.length));
+    const startIndex = dayOfYear(new Date()) % ownerRepos.length;
+    const selected: string[] = [];
+    for (let offset = 0; offset < reposToPick; offset += 1) {
+      selected.push(ownerRepos[(startIndex + offset) % ownerRepos.length]);
+    }
+    return selected;
+  }
+
   const fromEnv = process.env.POPULAR_REPOS
     ?.split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 
   const repos = [...new Set(fromEnv && fromEnv.length > 0 ? fromEnv : DEFAULT_POPULAR_REPOS)];
-  const forced = process.env.TARGET_REPO_URL?.trim();
-  if (forced) {
-    return [forced];
-  }
 
   const reposToPick = Math.max(1, Math.min(maxReposPerDay, repos.length));
   const startIndex = dayOfYear(new Date()) % repos.length;
@@ -771,6 +803,7 @@ function processRepository(
   dryRun: boolean,
   maxPrs: number,
   minConfidence: number,
+  includeTotalFindingsScan: boolean,
   fallbackEnabled: boolean,
   fallbackMinConfidence: number,
   fallbackHighCriticalOnly: boolean
@@ -813,7 +846,9 @@ function processRepository(
     ensureFork(owner, repo, login);
     ensureForkRemote(clonePath, login, repo);
 
-    repoRun.judgesFindingsScanned = countTotalFindings(clonePath, 0);
+    if (includeTotalFindingsScan) {
+      repoRun.judgesFindingsScanned = countTotalFindings(clonePath, 0);
+    }
 
     let candidates = discoverFixCandidates(clonePath, {
       minConfidence,
@@ -921,6 +956,7 @@ function main() {
     10
   );
   const parsedMinConfidence = Number.parseFloat(process.env.MIN_CONFIDENCE ?? "0.9");
+  const includeTotalFindingsScan = (process.env.INCLUDE_TOTAL_FINDINGS_SCAN ?? "false").toLowerCase() === "true";
   const fallbackEnabled = (process.env.ENABLE_FALLBACK ?? "true").toLowerCase() === "true";
   const parsedFallbackMinConfidence = Number.parseFloat(process.env.FALLBACK_MIN_CONFIDENCE ?? "0.8");
   const fallbackHighCriticalOnly = (process.env.FALLBACK_HIGH_CRITICAL_ONLY ?? "true").toLowerCase() !== "false";
@@ -956,6 +992,7 @@ function main() {
           dryRun,
           maxPrs,
           minConfidence,
+          includeTotalFindingsScan,
           fallbackEnabled,
           fallbackMinConfidence,
           fallbackHighCriticalOnly
