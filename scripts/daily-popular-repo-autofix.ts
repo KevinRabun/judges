@@ -195,6 +195,7 @@ type CandidateFix = {
   language: string;
   ruleId: string;
   severity: Finding["severity"];
+  confidence: number;
   title: string;
   previousLine: string;
   replacementLine: string;
@@ -424,6 +425,63 @@ function countRule(findings: Finding[], ruleId: string): number {
 
 function countHighOrCritical(findings: Finding[]): number {
   return findings.filter((finding) => finding.severity === "critical" || finding.severity === "high").length;
+}
+
+function severityPriority(severity: Finding["severity"]): number {
+  switch (severity) {
+    case "critical":
+      return 5;
+    case "high":
+      return 4;
+    case "medium":
+      return 3;
+    case "low":
+      return 2;
+    case "info":
+      return 1;
+  }
+}
+
+function normalizeConfidence(confidence?: number): number {
+  if (typeof confidence !== "number" || Number.isNaN(confidence)) {
+    return 0.75;
+  }
+
+  return Math.max(0, Math.min(1, confidence));
+}
+
+function parsePriorityRulePrefixes(): string[] {
+  const configured = process.env.AUTOFIX_PRIORITY_RULE_PREFIXES
+    ?.split(",")
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean);
+
+  if (configured && configured.length > 0) {
+    return [...new Set(configured)];
+  }
+
+  return ["AUTH", "CYBER", "DATA", "CFG", "COMP"];
+}
+
+function candidatePriorityScore(candidate: CandidateFix, priorityPrefixes: string[]): number {
+  const prefix = candidate.ruleId.split("-")[0].toUpperCase();
+  const prefixBoost = priorityPrefixes.includes(prefix) ? 3 : 0;
+  return severityPriority(candidate.severity) * 100 + prefixBoost * 100 + Math.round(candidate.confidence * 100);
+}
+
+function prioritizeCandidates(candidates: CandidateFix[], priorityPrefixes: string[]): CandidateFix[] {
+  return [...candidates].sort((left, right) => {
+    const scoreDiff = candidatePriorityScore(right, priorityPrefixes) - candidatePriorityScore(left, priorityPrefixes);
+    if (scoreDiff !== 0) return scoreDiff;
+
+    const severityDiff = severityPriority(right.severity) - severityPriority(left.severity);
+    if (severityDiff !== 0) return severityDiff;
+
+    const confidenceDiff = right.confidence - left.confidence;
+    if (confidenceDiff !== 0) return confidenceDiff;
+
+    return left.ruleId.localeCompare(right.ruleId);
+  });
 }
 
 function isNonProductionPath(path: string): boolean {
@@ -656,6 +714,7 @@ function discoverFixCandidates(rootPath: string, options: CandidateDiscoveryOpti
         language,
         ruleId: finding.ruleId,
         severity: finding.severity,
+        confidence: normalizeConfidence(finding.confidence),
         title: finding.title,
         previousLine,
         replacementLine,
@@ -819,6 +878,7 @@ function processRepository(
     prsOpened: [],
     skipped: [],
   };
+  const priorityRulePrefixes = parsePriorityRulePrefixes();
 
   const workspace = mkdtempSync(join(tmpdir(), "judges-daily-autofix-"));
   const clonePath = join(workspace, `${owner}-${repo}`);
@@ -855,6 +915,8 @@ function processRepository(
       highCriticalOnly: false,
     });
 
+    candidates = prioritizeCandidates(candidates, priorityRulePrefixes);
+
     if (
       candidates.length === 0 &&
       fallbackEnabled &&
@@ -867,7 +929,7 @@ function processRepository(
       });
 
       if (fallbackCandidates.length > 0) {
-        candidates = fallbackCandidates;
+        candidates = prioritizeCandidates(fallbackCandidates, priorityRulePrefixes);
         repoRun.candidateConfidenceUsed = fallbackMinConfidence;
         repoRun.fallbackUsed = true;
         repoRun.skipped.push(

@@ -419,7 +419,9 @@ Clone a **public repository URL**, run the full judges panel across eligible sou
 | `credentialMode` | string | no | Credential detection mode: `standard` (default) or `strict` |
 | `includeAstFindings` | boolean | no | Include AST/code-structure findings (default: true) |
 | `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
-| `quickStart` | flag | no | Opinionated high-signal defaults for onboarding (`minConfidence=0.9`, `credentialMode=strict`, path exclusions) |
+| `enableMustFixGate` | boolean | no | Enable must-fix gate summary for high-confidence dangerous findings (default: false) |
+| `mustFixMinConfidence` | number | no | Confidence threshold for must-fix gate triggers (0-1, default: 0.85) |
+| `mustFixDangerousRulePrefixes` | string[] | no | Optional dangerous rule prefixes for gate matching (e.g., `AUTH`, `CYBER`, `DATA`) |
 | `keepClone` | boolean | no | Keep cloned repo on disk for inspection |
 
 **Quick examples**
@@ -438,6 +440,9 @@ npm run report:public-repo -- --repoUrl https://github.com/openclaw/openclaw --i
 # show only findings at 80%+ confidence
 npm run report:public-repo -- --repoUrl https://github.com/openclaw/openclaw --minConfidence 0.8 --output reports/openclaw-judges-report-high-confidence.md
 
+# include must-fix gate summary in the generated report
+npm run report:public-repo -- --repoUrl https://github.com/openclaw/openclaw --enableMustFixGate true --mustFixMinConfidence 0.9 --mustFixDangerousPrefix AUTH --mustFixDangerousPrefix CYBER --output reports/openclaw-judges-report-mustfix.md
+
 # opinionated quick-start mode (recommended first run)
 npm run report:quickstart -- --repoUrl https://github.com/openclaw/openclaw --output reports/openclaw-quickstart.md
 ```
@@ -455,6 +460,9 @@ Call from MCP client:
     "credentialMode": "strict",
     "includeAstFindings": false,
     "minConfidence": 0.8,
+    "enableMustFixGate": true,
+    "mustFixMinConfidence": 0.9,
+    "mustFixDangerousRulePrefixes": ["AUTH", "CYBER", "DATA"],
     "outputPath": "reports/vscode-judges-report.md"
   }
 }
