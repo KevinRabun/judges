@@ -207,8 +207,21 @@ type RepoRunSummary = {
   defaultBranch: string;
   candidateConfidenceUsed: number;
   fallbackUsed: boolean;
+  priorityRulePrefixesUsed: string[];
   judgesFindingsScanned: number;
   candidatesInspected: number;
+  topPrioritizedRuleCounts: Array<{
+    ruleId: string;
+    count: number;
+  }>;
+  topPrioritizedCandidates: Array<{
+    ruleId: string;
+    severity: Finding["severity"];
+    confidence: number;
+    filePath: string;
+    line: number;
+    priorityScore: number;
+  }>;
   prsOpened: Array<{
     branch: string;
     title: string;
@@ -482,6 +495,36 @@ function prioritizeCandidates(candidates: CandidateFix[], priorityPrefixes: stri
 
     return left.ruleId.localeCompare(right.ruleId);
   });
+}
+
+function summarizePrioritizedRuleCounts(candidates: CandidateFix[]): Array<{ ruleId: string; count: number }> {
+  const counts = new Map<string, number>();
+
+  for (const candidate of candidates) {
+    counts.set(candidate.ruleId, (counts.get(candidate.ruleId) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([ruleId, count]) => ({ ruleId, count }))
+    .sort((left, right) => {
+      if (right.count !== left.count) return right.count - left.count;
+      return left.ruleId.localeCompare(right.ruleId);
+    })
+    .slice(0, 10);
+}
+
+function summarizeTopPrioritizedCandidates(
+  candidates: CandidateFix[],
+  priorityPrefixes: string[]
+): RepoRunSummary["topPrioritizedCandidates"] {
+  return candidates.slice(0, 10).map((candidate) => ({
+    ruleId: candidate.ruleId,
+    severity: candidate.severity,
+    confidence: candidate.confidence,
+    filePath: candidate.filePath,
+    line: candidate.line,
+    priorityScore: candidatePriorityScore(candidate, priorityPrefixes),
+  }));
 }
 
 function isNonProductionPath(path: string): boolean {
@@ -873,12 +916,16 @@ function processRepository(
     defaultBranch: "",
     candidateConfidenceUsed: minConfidence,
     fallbackUsed: false,
+    priorityRulePrefixesUsed: [],
     judgesFindingsScanned: 0,
     candidatesInspected: 0,
+    topPrioritizedRuleCounts: [],
+    topPrioritizedCandidates: [],
     prsOpened: [],
     skipped: [],
   };
   const priorityRulePrefixes = parsePriorityRulePrefixes();
+  repoRun.priorityRulePrefixesUsed = [...priorityRulePrefixes];
 
   const workspace = mkdtempSync(join(tmpdir(), "judges-daily-autofix-"));
   const clonePath = join(workspace, `${owner}-${repo}`);
@@ -943,6 +990,11 @@ function processRepository(
     }
 
     repoRun.candidatesInspected = candidates.length;
+    repoRun.topPrioritizedRuleCounts = summarizePrioritizedRuleCounts(candidates);
+    repoRun.topPrioritizedCandidates = summarizeTopPrioritizedCandidates(
+      candidates,
+      priorityRulePrefixes
+    );
 
     if (candidates.length === 0) {
       repoRun.skipped.push("No safe auto-fix candidates found at configured confidence threshold.");
