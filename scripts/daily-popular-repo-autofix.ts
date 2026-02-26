@@ -210,6 +210,10 @@ type RepoRunSummary = {
   priorityRulePrefixesUsed: string[];
   judgesFindingsScanned: number;
   candidatesInspected: number;
+  prioritizedRuleCounts: Array<{
+    ruleId: string;
+    count: number;
+  }>;
   topPrioritizedRuleCounts: Array<{
     ruleId: string;
     count: number;
@@ -239,6 +243,17 @@ type Summary = {
   dryRun: boolean;
   maxPrsPerRepo: number;
   maxReposPerDay: number;
+  runAggregate: {
+    reposProcessed: number;
+    reposWithPrioritizedCandidates: number;
+    reposWithOpenedPrs: number;
+    totalPrioritizedCandidates: number;
+    totalPrioritizedRuleOccurrences: number;
+    topPrioritizedRules: Array<{
+      ruleId: string;
+      count: number;
+    }>;
+  };
   repoRuns: RepoRunSummary[];
   skipped: string[];
 };
@@ -509,8 +524,7 @@ function summarizePrioritizedRuleCounts(candidates: CandidateFix[]): Array<{ rul
     .sort((left, right) => {
       if (right.count !== left.count) return right.count - left.count;
       return left.ruleId.localeCompare(right.ruleId);
-    })
-    .slice(0, 10);
+    });
 }
 
 function summarizeTopPrioritizedCandidates(
@@ -525,6 +539,44 @@ function summarizeTopPrioritizedCandidates(
     line: candidate.line,
     priorityScore: candidatePriorityScore(candidate, priorityPrefixes),
   }));
+}
+
+function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] {
+  const topRuleCounts = new Map<string, number>();
+
+  for (const repoRun of repoRuns) {
+    for (const entry of repoRun.prioritizedRuleCounts) {
+      topRuleCounts.set(entry.ruleId, (topRuleCounts.get(entry.ruleId) ?? 0) + entry.count);
+    }
+  }
+
+  const topPrioritizedRules = [...topRuleCounts.entries()]
+    .map(([ruleId, count]) => ({ ruleId, count }))
+    .sort((left, right) => {
+      if (right.count !== left.count) return right.count - left.count;
+      return left.ruleId.localeCompare(right.ruleId);
+    })
+    .slice(0, 10);
+
+  const reposWithPrioritizedCandidates = repoRuns.filter((repoRun) => repoRun.candidatesInspected > 0).length;
+  const reposWithOpenedPrs = repoRuns.filter((repoRun) => repoRun.prsOpened.length > 0).length;
+  const totalPrioritizedCandidates = repoRuns.reduce(
+    (sum, repoRun) => sum + repoRun.candidatesInspected,
+    0
+  );
+  const totalPrioritizedRuleOccurrences = [...topRuleCounts.values()].reduce(
+    (sum, count) => sum + count,
+    0
+  );
+
+  return {
+    reposProcessed: repoRuns.length,
+    reposWithPrioritizedCandidates,
+    reposWithOpenedPrs,
+    totalPrioritizedCandidates,
+    totalPrioritizedRuleOccurrences,
+    topPrioritizedRules,
+  };
 }
 
 function isNonProductionPath(path: string): boolean {
@@ -919,6 +971,7 @@ function processRepository(
     priorityRulePrefixesUsed: [],
     judgesFindingsScanned: 0,
     candidatesInspected: 0,
+    prioritizedRuleCounts: [],
     topPrioritizedRuleCounts: [],
     topPrioritizedCandidates: [],
     prsOpened: [],
@@ -990,7 +1043,8 @@ function processRepository(
     }
 
     repoRun.candidatesInspected = candidates.length;
-    repoRun.topPrioritizedRuleCounts = summarizePrioritizedRuleCounts(candidates);
+    repoRun.prioritizedRuleCounts = summarizePrioritizedRuleCounts(candidates);
+    repoRun.topPrioritizedRuleCounts = repoRun.prioritizedRuleCounts.slice(0, 10);
     repoRun.topPrioritizedCandidates = summarizeTopPrioritizedCandidates(
       candidates,
       priorityRulePrefixes
@@ -1094,6 +1148,14 @@ function main() {
     dryRun,
     maxPrsPerRepo: maxPrs,
     maxReposPerDay,
+    runAggregate: {
+      reposProcessed: 0,
+      reposWithPrioritizedCandidates: 0,
+      reposWithOpenedPrs: 0,
+      totalPrioritizedCandidates: 0,
+      totalPrioritizedRuleOccurrences: 0,
+      topPrioritizedRules: [],
+    },
     repoRuns: [],
     skipped: [],
   };
@@ -1118,8 +1180,12 @@ function main() {
           defaultBranch: "",
           candidateConfidenceUsed: minConfidence,
           fallbackUsed: false,
+          priorityRulePrefixesUsed: [],
           judgesFindingsScanned: 0,
           candidatesInspected: 0,
+          prioritizedRuleCounts: [],
+          topPrioritizedRuleCounts: [],
+          topPrioritizedCandidates: [],
           prsOpened: [],
           skipped: [
             `Repository run failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -1128,6 +1194,7 @@ function main() {
       }
     }
   } finally {
+    summary.runAggregate = buildRunAggregate(summary.repoRuns);
     const outputPath = resolve(process.env.SUMMARY_PATH ?? "daily-autofix-summary.json");
     writeFileSync(outputPath, JSON.stringify(summary, null, 2), "utf8");
   }

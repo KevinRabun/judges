@@ -677,6 +677,7 @@ This repo includes a scheduled workflow at `.github/workflows/daily-popular-repo
 - enforces hard runtime caps of 10 repositories/day and 5 PRs/repository.
 
 Each run writes `daily-autofix-summary.json` (or `SUMMARY_PATH`) with per-repository telemetry, including:
+- `runAggregate` — compact run-level totals and cross-repo top prioritized rules,
 - `priorityRulePrefixesUsed` — dangerous rule prefixes used during prioritization,
 - `topPrioritizedRuleCounts` — most common rule IDs among ranked candidates,
 - `topPrioritizedCandidates` — top ranked candidate samples (rule, severity, confidence, file, line, priority score).
