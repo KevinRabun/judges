@@ -408,6 +408,11 @@ Supports:
 ### `evaluate_public_repo_report`
 Clone a **public repository URL**, run the full judges panel across eligible source files, and generate a consolidated markdown report.
 
+Report prioritization behavior includes:
+- weighted risk ranking (`severity × confidence × fixability`)
+- root-cause clustering to collapse duplicate findings across files
+- actionable top-risk output with confidence and suggested-fix snippets when available
+
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `repoUrl` | string | yes | Public repository URL (`https://...`) |
@@ -464,7 +469,8 @@ Typical response summary includes:
 - overall verdict and average score
 - analyzed file count and total findings
 - per-judge score table
-- highest-risk findings and lowest-scoring files
+- highest-risk findings with risk scores and occurrence counts
+- unique root-cause cluster count and lowest-scoring files
 
 Sample report snippet:
 
