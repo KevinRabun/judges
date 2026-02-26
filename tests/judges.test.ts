@@ -1671,6 +1671,40 @@ function deeplyNested(input: any) {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("should include must-fix gate summary when enabled", () => {
+    const root = mkdtempSync(join(tmpdir(), "judges-report-mustfix-test-"));
+    const srcDir = join(root, "src");
+
+    try {
+      mkdirSync(srcDir, { recursive: true });
+      writeFileSync(
+        join(srcDir, "danger.ts"),
+        `
+function run(userInput: string) {
+  eval(userInput);
+}
+`,
+        "utf8"
+      );
+
+      const report = generateRepoReportFromLocalPath({
+        repoPath: root,
+        repoLabel: "local-mustfix",
+        maxFiles: 50,
+        mustFixGate: {
+          enabled: true,
+          minConfidence: 0.6,
+        },
+      });
+
+      assert.ok(report.markdown.includes("Must-Fix Gate Summary"));
+      assert.ok(report.markdown.includes("Triggered files:"));
+      assert.ok(report.markdown.includes("Matched must-fix findings:"));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("Tribunal Options", () => {

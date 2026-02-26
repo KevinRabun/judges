@@ -122,6 +122,20 @@ server.tool(
       .max(1)
       .optional()
       .describe("Minimum finding confidence to include (0-1, default: 0)"),
+    enableMustFixGate: z
+      .boolean()
+      .optional()
+      .describe("Enable must-fix gate for high-confidence dangerous findings (default: false)"),
+    mustFixMinConfidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe("Minimum confidence threshold for must-fix gate triggers (0-1, default: 0.85)"),
+    mustFixDangerousRulePrefixes: z
+      .array(z.string())
+      .optional()
+      .describe("Optional rule prefixes considered dangerous for must-fix gate"),
     keepClone: z
       .boolean()
       .optional()
@@ -137,6 +151,9 @@ server.tool(
     credentialMode,
     includeAstFindings,
     minConfidence,
+    enableMustFixGate,
+    mustFixMinConfidence,
+    mustFixDangerousRulePrefixes,
     keepClone,
   }) => {
     try {
@@ -150,6 +167,13 @@ server.tool(
         credentialMode,
         includeAstFindings,
         minConfidence,
+        mustFixGate: enableMustFixGate
+          ? {
+              enabled: true,
+              minConfidence: mustFixMinConfidence,
+              dangerousRulePrefixes: mustFixDangerousRulePrefixes,
+            }
+          : undefined,
         keepClone,
       });
 
@@ -162,6 +186,9 @@ server.tool(
       summary += `- Credential mode: ${(credentialMode ?? "standard").toUpperCase()}\n`;
       summary += `- AST findings: ${(includeAstFindings ?? true) ? "INCLUDED" : "EXCLUDED"}\n`;
       summary += `- Min confidence: ${minConfidence ?? 0}\n`;
+      if (enableMustFixGate) {
+        summary += `- Must-fix gate: ENABLED (min confidence: ${mustFixMinConfidence ?? 0.85})\n`;
+      }
       if (report.outputPath) {
         summary += `- Report path: ${report.outputPath}\n`;
       }

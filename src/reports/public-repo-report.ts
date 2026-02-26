@@ -4,7 +4,7 @@ import { tmpdir } from "os";
 import { basename, dirname, extname, join, resolve } from "path";
 
 import { evaluateWithTribunal } from "../evaluators/index.js";
-import { Finding, JudgeEvaluation, Severity, Verdict } from "../types.js";
+import { Finding, JudgeEvaluation, MustFixGateOptions, Severity, Verdict } from "../types.js";
 
 type SourceFile = {
   absolutePath: string;
@@ -20,6 +20,9 @@ type FileEvaluation = {
   verdict: Verdict;
   judgeEvaluations: JudgeEvaluation[];
   findings: Finding[];
+  mustFixGateTriggered?: boolean;
+  mustFixMatchedCount?: number;
+  mustFixMatchedRuleIds?: string[];
 };
 
 type FindingWithFile = Finding & {
@@ -45,6 +48,7 @@ export interface PublicRepoReportOptions {
   credentialMode?: CredentialMode;
   includeAstFindings?: boolean;
   minConfidence?: number;
+  mustFixGate?: MustFixGateOptions;
   outputPath?: string;
   keepClone?: boolean;
 }
@@ -70,6 +74,7 @@ export interface LocalRepoReportOptions {
   credentialMode?: CredentialMode;
   includeAstFindings?: boolean;
   minConfidence?: number;
+  mustFixGate?: MustFixGateOptions;
   outputPath?: string;
 }
 
@@ -474,6 +479,15 @@ function buildMarkdownReport(params: {
   const overallVerdict: Verdict = failCount > 0 ? "fail" : warningCount > 0 ? "warning" : "pass";
 
   const severityCounts = countBySeverity(allFindings);
+  const mustFixEnabled = evaluations.some((entry) => entry.mustFixGateTriggered !== undefined);
+  const mustFixTriggeredFileCount = evaluations.filter((entry) => entry.mustFixGateTriggered).length;
+  const mustFixMatchedCount = evaluations.reduce(
+    (sum, entry) => sum + (entry.mustFixMatchedCount ?? 0),
+    0
+  );
+  const mustFixRuleIds = [...new Set(
+    evaluations.flatMap((entry) => entry.mustFixMatchedRuleIds ?? [])
+  )];
 
   const judgeScoreAverages = new Map<string, { name: string; scores: number[]; findings: Finding[] }>();
   for (const fileEvaluation of evaluations) {
@@ -522,6 +536,13 @@ function buildMarkdownReport(params: {
   md += `- File verdict distribution: PASS ${passCount}, WARNING ${warningCount}, FAIL ${failCount}\n`;
   md += `- Total findings: **${allFindings.length}** (critical ${severityCounts.critical}, high ${severityCounts.high}, medium ${severityCounts.medium}, low ${severityCounts.low}, info ${severityCounts.info})\n`;
   md += `- Unique root-cause clusters: **${rankedFindings.length}**\n\n`;
+
+  if (mustFixEnabled) {
+    md += `## Must-Fix Gate Summary\n\n`;
+    md += `- Triggered files: **${mustFixTriggeredFileCount}/${evaluations.length}**\n`;
+    md += `- Matched must-fix findings: **${mustFixMatchedCount}**\n`;
+    md += `- Matched rule IDs: ${mustFixRuleIds.length > 0 ? mustFixRuleIds.map((id) => `\`${id}\``).join(", ") : "none"}\n\n`;
+  }
 
   md += `## Per-Judge Breakdown\n\n`;
   md += `| Judge | Avg Score | Critical | High | Medium | Low | Info |\n`;
@@ -617,6 +638,7 @@ export function generateRepoReportFromLocalPath(
   const credentialMode = options.credentialMode ?? DEFAULT_CREDENTIAL_MODE;
   const includeAstFindings = options.includeAstFindings ?? true;
   const minConfidence = options.minConfidence;
+  const mustFixGate = options.mustFixGate;
   const repoPath = resolve(options.repoPath);
   const excludePathRegexes = compileExcludeRegexes(options.excludePathRegexes);
 
@@ -630,6 +652,7 @@ export function generateRepoReportFromLocalPath(
       const verdict = evaluateWithTribunal(file.content, file.language, undefined, {
         includeAstFindings,
         minConfidence,
+        mustFixGate,
       });
       const judgeEvaluations = verdict.evaluations.map((evaluation) => ({
         ...evaluation,
@@ -646,6 +669,9 @@ export function generateRepoReportFromLocalPath(
         verdict: verdict.overallVerdict,
         judgeEvaluations,
         findings,
+        mustFixGateTriggered: verdict.mustFixGate?.triggered,
+        mustFixMatchedCount: verdict.mustFixGate?.matchedCount,
+        mustFixMatchedRuleIds: verdict.mustFixGate?.matchedRuleIds,
       };
     })
   );
@@ -696,6 +722,7 @@ export function generatePublicRepoReport(options: PublicRepoReportOptions): Publ
       credentialMode: options.credentialMode,
       includeAstFindings: options.includeAstFindings,
       minConfidence: options.minConfidence,
+      mustFixGate: options.mustFixGate,
       outputPath: options.outputPath,
     });
 

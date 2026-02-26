@@ -77,6 +77,9 @@ Options:
   --credentialMode <mode>    Credential detection mode: standard|strict (default: standard)
   --includeAstFindings <b>   Include AST/code-structure findings: true|false (default: true)
   --minConfidence <0-1>      Minimum finding confidence to include (default: 0)
+  --enableMustFixGate <b>    Enable must-fix gate for high-confidence dangerous findings (default: false)
+  --mustFixMinConfidence <0-1>  Confidence threshold for must-fix gate (default: 0.85)
+  --mustFixDangerousPrefix <prefix>  Rule prefix treated as dangerous by gate (repeatable)
   --quickStart               Use opinionated defaults for fast, high-signal onboarding
   --keepClone                Keep cloned temp directory for inspection
 `);
@@ -147,6 +150,15 @@ async function main() {
     "minConfidence",
     quickStart ? 0.9 : 0
   );
+  const enableMustFixGate = parseBooleanArg(
+    "enableMustFixGate",
+    quickStart ? true : false
+  ) ?? false;
+  const mustFixMinConfidence = parseFloatArg(
+    "mustFixMinConfidence",
+    quickStart ? 0.9 : 0.85
+  );
+  const mustFixDangerousPrefixes = parseArgs("mustFixDangerousPrefix");
 
   if (quickStart) {
     console.log("Quick start mode enabled with opinionated high-signal defaults.");
@@ -163,6 +175,13 @@ async function main() {
     credentialMode,
     includeAstFindings,
     minConfidence,
+    mustFixGate: enableMustFixGate
+      ? {
+          enabled: true,
+          minConfidence: mustFixMinConfidence,
+          dangerousRulePrefixes: mustFixDangerousPrefixes.length > 0 ? mustFixDangerousPrefixes : undefined,
+        }
+      : undefined,
     keepClone: hasFlag("keepClone"),
   });
 
