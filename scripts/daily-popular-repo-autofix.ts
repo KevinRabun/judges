@@ -251,6 +251,7 @@ type Summary = {
     reposWithOpenedPrs: number;
     totalCandidatesDiscovered: number;
     totalCandidatesAfterLocationDedupe: number;
+    dedupeReductionPercent: number;
     totalPrioritizedCandidates: number;
     totalPrioritizedRuleOccurrences: number;
     topPrioritizedRules: Array<{
@@ -601,6 +602,10 @@ function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] 
     (sum, repoRun) => sum + repoRun.candidatesInspected,
     0
   );
+  const dedupeReductionPercent =
+    totalCandidatesDiscovered > 0
+      ? Number((((totalCandidatesDiscovered - totalCandidatesAfterLocationDedupe) / totalCandidatesDiscovered) * 100).toFixed(2))
+      : 0;
   const totalPrioritizedRuleOccurrences = [...topRuleCounts.values()].reduce(
     (sum, count) => sum + count,
     0
@@ -612,6 +617,7 @@ function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] 
     reposWithOpenedPrs,
     totalCandidatesDiscovered,
     totalCandidatesAfterLocationDedupe,
+    dedupeReductionPercent,
     totalPrioritizedCandidates,
     totalPrioritizedRuleOccurrences,
     topPrioritizedRules,
@@ -1202,6 +1208,7 @@ function main() {
       reposWithOpenedPrs: 0,
       totalCandidatesDiscovered: 0,
       totalCandidatesAfterLocationDedupe: 0,
+      dedupeReductionPercent: 0,
       totalPrioritizedCandidates: 0,
       totalPrioritizedRuleOccurrences: 0,
       topPrioritizedRules: [],
