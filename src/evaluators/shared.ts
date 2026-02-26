@@ -148,6 +148,30 @@ export function calculateScore(findings: Finding[]): number {
   return Math.max(0, Math.min(100, score));
 }
 
+function findingPriorityValue(finding: Finding): number {
+  const severityWeight: Record<Severity, number> = {
+    critical: 100,
+    high: 70,
+    medium: 40,
+    low: 15,
+    info: 5,
+  };
+
+  const confidence = typeof finding.confidence === "number"
+    ? Math.max(0, Math.min(1, finding.confidence))
+    : 0.75;
+
+  return severityWeight[finding.severity] * (0.6 + confidence * 0.4);
+}
+
+function sortFindingsByPriority(findings: Finding[]): Finding[] {
+  return [...findings].sort((a, b) => {
+    const priorityDiff = findingPriorityValue(b) - findingPriorityValue(a);
+    if (priorityDiff !== 0) return priorityDiff;
+    return a.ruleId.localeCompare(b.ruleId);
+  });
+}
+
 export function deriveVerdict(findings: Finding[], score: number): Verdict {
   if (findings.some((f) => f.severity === "critical")) return "fail";
   if (score < 60) return "fail";
@@ -176,9 +200,9 @@ export function buildSummary(
     summary += "No pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.";
   } else {
     summary += "Key issues:\n";
-    for (const f of findings.filter((f) =>
+    for (const f of sortFindingsByPriority(findings.filter((f) =>
       ["critical", "high"].includes(f.severity)
-    )) {
+    ))) {
       summary += `- [${f.ruleId}] (${f.severity}) ${f.title}: ${f.description}\n`;
     }
   }
@@ -225,7 +249,7 @@ export function formatVerdictAsMarkdown(verdict: TribunalVerdict): string {
   md += `\n## Detailed Findings\n\n`;
 
   for (const evaluation of verdict.evaluations) {
-    for (const finding of evaluation.findings) {
+    for (const finding of sortFindingsByPriority(evaluation.findings)) {
       const severityBadge =
         finding.severity === "critical"
           ? "🔴 CRITICAL"
@@ -264,7 +288,7 @@ export function formatEvaluationAsMarkdown(evaluation: JudgeEvaluation): string 
 
   md += `## Detailed Findings\n\n`;
 
-  for (const finding of evaluation.findings) {
+  for (const finding of sortFindingsByPriority(evaluation.findings)) {
     const severityBadge =
       finding.severity === "critical"
         ? "🔴 CRITICAL"

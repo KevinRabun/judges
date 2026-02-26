@@ -22,6 +22,17 @@ type FileEvaluation = {
   findings: Finding[];
 };
 
+type FindingWithFile = Finding & {
+  file: string;
+};
+
+type ClusteredFinding = {
+  finding: FindingWithFile;
+  occurrences: number;
+  affectedFiles: number;
+  riskScore: number;
+};
+
 type CredentialMode = "standard" | "strict";
 
 export interface PublicRepoReportOptions {
@@ -157,6 +168,101 @@ function severityOrder(severity: Severity): number {
     case "info":
       return 1;
   }
+}
+
+function severityRiskWeight(severity: Severity): number {
+  switch (severity) {
+    case "critical":
+      return 100;
+    case "high":
+      return 70;
+    case "medium":
+      return 40;
+    case "low":
+      return 15;
+    case "info":
+      return 5;
+  }
+}
+
+function normalizeFindingText(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function confidenceFactor(confidence?: number): number {
+  if (typeof confidence !== "number" || Number.isNaN(confidence)) {
+    return 0.75;
+  }
+
+  const bounded = Math.max(0, Math.min(1, confidence));
+  return 0.6 + bounded * 0.4;
+}
+
+function fixabilityFactor(finding: Finding): number {
+  if (finding.suggestedFix?.trim()) {
+    return 1.1;
+  }
+
+  if (finding.recommendation?.trim()) {
+    return 1;
+  }
+
+  return 0.9;
+}
+
+function findingRiskScore(finding: Finding): number {
+  const severityWeight = severityRiskWeight(finding.severity);
+  return Number((severityWeight * confidenceFactor(finding.confidence) * fixabilityFactor(finding)).toFixed(2));
+}
+
+function findingClusterKey(finding: FindingWithFile): string {
+  return [
+    finding.ruleId,
+    normalizeFindingText(finding.title),
+    normalizeFindingText(finding.description),
+    normalizeFindingText(finding.recommendation),
+  ].join("|");
+}
+
+function clusterAndRankFindings(findings: FindingWithFile[]): ClusteredFinding[] {
+  const clusters = new Map<string, { representative: FindingWithFile; items: FindingWithFile[]; files: Set<string> }>();
+
+  for (const finding of findings) {
+    const key = findingClusterKey(finding);
+    const existing = clusters.get(key);
+
+    if (!existing) {
+      clusters.set(key, {
+        representative: finding,
+        items: [finding],
+        files: new Set([finding.file]),
+      });
+      continue;
+    }
+
+    existing.items.push(finding);
+    existing.files.add(finding.file);
+    if (findingRiskScore(finding) > findingRiskScore(existing.representative)) {
+      existing.representative = finding;
+    }
+  }
+
+  return [...clusters.values()]
+    .map((cluster) => ({
+      finding: cluster.representative,
+      occurrences: cluster.items.length,
+      affectedFiles: cluster.files.size,
+      riskScore: findingRiskScore(cluster.representative),
+    }))
+    .sort((a, b) => {
+      const riskDiff = b.riskScore - a.riskScore;
+      if (riskDiff !== 0) return riskDiff;
+
+      const severityDiff = severityOrder(b.finding.severity) - severityOrder(a.finding.severity);
+      if (severityDiff !== 0) return severityDiff;
+
+      return a.finding.ruleId.localeCompare(b.finding.ruleId);
+    });
 }
 
 function countBySeverity(findings: Finding[]): Record<Severity, number> {
@@ -325,15 +431,11 @@ function buildMarkdownReport(params: {
 } {
   const { repoUrl, branch, commitSha, analyzedFiles, evaluations, maxFindingsInReport } = params;
 
-  const allFindings = evaluations.flatMap((entry) =>
+  const allFindings: FindingWithFile[] = evaluations.flatMap((entry) =>
     entry.findings.map((finding) => ({ ...finding, file: entry.path }))
   );
 
-  const findingsSorted = allFindings.sort((a, b) => {
-    const severityDiff = severityOrder(b.severity) - severityOrder(a.severity);
-    if (severityDiff !== 0) return severityDiff;
-    return a.ruleId.localeCompare(b.ruleId);
-  });
+  const rankedFindings = clusterAndRankFindings(allFindings);
 
   const averageScore =
     evaluations.length > 0
@@ -395,7 +497,8 @@ function buildMarkdownReport(params: {
   md += `- Overall verdict: **${overallVerdict.toUpperCase()}**\n`;
   md += `- Average file score: **${averageScore}/100**\n`;
   md += `- File verdict distribution: PASS ${passCount}, WARNING ${warningCount}, FAIL ${failCount}\n`;
-  md += `- Total findings: **${allFindings.length}** (critical ${severityCounts.critical}, high ${severityCounts.high}, medium ${severityCounts.medium}, low ${severityCounts.low}, info ${severityCounts.info})\n\n`;
+  md += `- Total findings: **${allFindings.length}** (critical ${severityCounts.critical}, high ${severityCounts.high}, medium ${severityCounts.medium}, low ${severityCounts.low}, info ${severityCounts.info})\n`;
+  md += `- Unique root-cause clusters: **${rankedFindings.length}**\n\n`;
 
   md += `## Per-Judge Breakdown\n\n`;
   md += `| Judge | Avg Score | Critical | High | Medium | Low | Info |\n`;
@@ -405,13 +508,22 @@ function buildMarkdownReport(params: {
   }
   md += `\n`;
 
-  md += `## Highest-Risk Findings (Top ${Math.min(maxFindingsInReport, findingsSorted.length)})\n\n`;
-  for (const finding of findingsSorted.slice(0, maxFindingsInReport)) {
+  md += `## Highest-Risk Findings (Top ${Math.min(maxFindingsInReport, rankedFindings.length)})\n\n`;
+  for (const entry of rankedFindings.slice(0, maxFindingsInReport)) {
+    const finding = entry.finding;
     const lines = finding.lineNumbers?.length ? ` (lines ${finding.lineNumbers.join(", ")})` : "";
     md += `### [${finding.severity.toUpperCase()}] ${finding.ruleId} — ${finding.title}\n`;
+    md += `- Risk score: ${entry.riskScore}\n`;
     md += `- File: \`${finding.file}\`${lines}\n`;
+    md += `- Occurrences: ${entry.occurrences} across ${entry.affectedFiles} file(s)\n`;
+    if (typeof finding.confidence === "number") {
+      md += `- Confidence: ${Math.round(Math.max(0, Math.min(1, finding.confidence)) * 100)}%\n`;
+    }
     md += `- Description: ${finding.description}\n`;
     md += `- Recommendation: ${finding.recommendation}\n`;
+    if (finding.suggestedFix?.trim()) {
+      md += `- Suggested fix:\n\n\`\`\`\n${finding.suggestedFix.trim()}\n\`\`\`\n`;
+    }
     if (finding.reference) {
       md += `- Reference: ${finding.reference}\n`;
     }
