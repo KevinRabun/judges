@@ -678,7 +678,9 @@ This repo includes a scheduled workflow at `.github/workflows/daily-popular-repo
 
 Each run writes `daily-autofix-summary.json` (or `SUMMARY_PATH`) with per-repository telemetry, including:
 - `runAggregate` — compact run-level totals and cross-repo top prioritized rules,
+- `runAggregate.totalCandidatesDiscovered` and `runAggregate.totalCandidatesAfterLocationDedupe` — signal how much overlap was removed before attempting fixes,
 - `priorityRulePrefixesUsed` — dangerous rule prefixes used during prioritization,
+- `candidatesDiscovered` and `candidatesAfterLocationDedupe` — per-repo pre/post dedupe candidate counts,
 - `topPrioritizedRuleCounts` — most common rule IDs among ranked candidates,
 - `topPrioritizedCandidates` — top ranked candidate samples (rule, severity, confidence, file, line, priority score).
 

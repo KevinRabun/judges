@@ -209,6 +209,8 @@ type RepoRunSummary = {
   fallbackUsed: boolean;
   priorityRulePrefixesUsed: string[];
   judgesFindingsScanned: number;
+  candidatesDiscovered: number;
+  candidatesAfterLocationDedupe: number;
   candidatesInspected: number;
   prioritizedRuleCounts: Array<{
     ruleId: string;
@@ -247,6 +249,8 @@ type Summary = {
     reposProcessed: number;
     reposWithPrioritizedCandidates: number;
     reposWithOpenedPrs: number;
+    totalCandidatesDiscovered: number;
+    totalCandidatesAfterLocationDedupe: number;
     totalPrioritizedCandidates: number;
     totalPrioritizedRuleOccurrences: number;
     topPrioritizedRules: Array<{
@@ -541,6 +545,31 @@ function summarizeTopPrioritizedCandidates(
   }));
 }
 
+function dedupeCandidatesByLocation(
+  candidates: CandidateFix[],
+  priorityPrefixes: string[]
+): CandidateFix[] {
+  const byLocation = new Map<string, CandidateFix>();
+
+  for (const candidate of candidates) {
+    const key = `${candidate.filePath}:${candidate.line}`;
+    const existing = byLocation.get(key);
+
+    if (!existing) {
+      byLocation.set(key, candidate);
+      continue;
+    }
+
+    const nextScore = candidatePriorityScore(candidate, priorityPrefixes);
+    const existingScore = candidatePriorityScore(existing, priorityPrefixes);
+    if (nextScore > existingScore) {
+      byLocation.set(key, candidate);
+    }
+  }
+
+  return prioritizeCandidates([...byLocation.values()], priorityPrefixes);
+}
+
 function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] {
   const topRuleCounts = new Map<string, number>();
 
@@ -560,6 +589,14 @@ function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] 
 
   const reposWithPrioritizedCandidates = repoRuns.filter((repoRun) => repoRun.candidatesInspected > 0).length;
   const reposWithOpenedPrs = repoRuns.filter((repoRun) => repoRun.prsOpened.length > 0).length;
+  const totalCandidatesDiscovered = repoRuns.reduce(
+    (sum, repoRun) => sum + repoRun.candidatesDiscovered,
+    0
+  );
+  const totalCandidatesAfterLocationDedupe = repoRuns.reduce(
+    (sum, repoRun) => sum + repoRun.candidatesAfterLocationDedupe,
+    0
+  );
   const totalPrioritizedCandidates = repoRuns.reduce(
     (sum, repoRun) => sum + repoRun.candidatesInspected,
     0
@@ -573,6 +610,8 @@ function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] 
     reposProcessed: repoRuns.length,
     reposWithPrioritizedCandidates,
     reposWithOpenedPrs,
+    totalCandidatesDiscovered,
+    totalCandidatesAfterLocationDedupe,
     totalPrioritizedCandidates,
     totalPrioritizedRuleOccurrences,
     topPrioritizedRules,
@@ -970,6 +1009,8 @@ function processRepository(
     fallbackUsed: false,
     priorityRulePrefixesUsed: [],
     judgesFindingsScanned: 0,
+    candidatesDiscovered: 0,
+    candidatesAfterLocationDedupe: 0,
     candidatesInspected: 0,
     prioritizedRuleCounts: [],
     topPrioritizedRuleCounts: [],
@@ -1015,7 +1056,11 @@ function processRepository(
       highCriticalOnly: false,
     });
 
+    repoRun.candidatesDiscovered = candidates.length;
+
     candidates = prioritizeCandidates(candidates, priorityRulePrefixes);
+    candidates = dedupeCandidatesByLocation(candidates, priorityRulePrefixes);
+    repoRun.candidatesAfterLocationDedupe = candidates.length;
 
     if (
       candidates.length === 0 &&
@@ -1030,6 +1075,9 @@ function processRepository(
 
       if (fallbackCandidates.length > 0) {
         candidates = prioritizeCandidates(fallbackCandidates, priorityRulePrefixes);
+        repoRun.candidatesDiscovered = fallbackCandidates.length;
+        candidates = dedupeCandidatesByLocation(candidates, priorityRulePrefixes);
+        repoRun.candidatesAfterLocationDedupe = candidates.length;
         repoRun.candidateConfidenceUsed = fallbackMinConfidence;
         repoRun.fallbackUsed = true;
         repoRun.skipped.push(
@@ -1152,6 +1200,8 @@ function main() {
       reposProcessed: 0,
       reposWithPrioritizedCandidates: 0,
       reposWithOpenedPrs: 0,
+      totalCandidatesDiscovered: 0,
+      totalCandidatesAfterLocationDedupe: 0,
       totalPrioritizedCandidates: 0,
       totalPrioritizedRuleOccurrences: 0,
       topPrioritizedRules: [],
@@ -1182,6 +1232,8 @@ function main() {
           fallbackUsed: false,
           priorityRulePrefixesUsed: [],
           judgesFindingsScanned: 0,
+          candidatesDiscovered: 0,
+          candidatesAfterLocationDedupe: 0,
           candidatesInspected: 0,
           prioritizedRuleCounts: [],
           topPrioritizedRuleCounts: [],
