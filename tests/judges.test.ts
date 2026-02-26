@@ -1612,6 +1612,8 @@ export { handler };
       assert.ok(report.markdown.includes("Public Repository Full Judges Report"));
       assert.ok(report.markdown.includes("local-test-repo"));
       assert.ok(report.markdown.includes("Executive Summary"));
+      assert.ok(report.markdown.includes("Unique root-cause clusters"));
+      assert.ok(report.markdown.includes("Risk score:"));
       assert.ok(report.analyzedFileCount >= 1);
       assert.ok(report.totalFindings >= 0);
 
@@ -1739,5 +1741,21 @@ function deeplyNested(input: any) {
       strictFindings.every((finding) => (finding.confidence ?? 0) >= 0.99),
       "Expected remaining findings to satisfy the configured confidence threshold"
     );
+  });
+
+  it("should provide must-fix gate metadata when enabled", () => {
+    const verdict = evaluateWithTribunal(sampleCode, "typescript", undefined, {
+      includeAstFindings: true,
+      minConfidence: 0,
+      mustFixGate: {
+        enabled: true,
+        minConfidence: 0.6,
+      },
+    });
+
+    assert.ok(verdict.mustFixGate, "Expected must-fix gate metadata to be present");
+    assert.equal(verdict.mustFixGate?.enabled, true);
+    assert.ok(typeof verdict.mustFixGate?.matchedCount === "number");
+    assert.ok(verdict.summary.includes("Must-Fix Gate"));
   });
 });

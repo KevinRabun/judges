@@ -378,6 +378,32 @@ export interface TribunalVerdict {
   highCount: number;
   /** Timestamp of evaluation */
   timestamp: string;
+  /** Optional high-confidence must-fix gate outcome */
+  mustFixGate?: MustFixGateResult;
+}
+
+/**
+ * Must-fix gate configuration for high-risk findings.
+ */
+export interface MustFixGateOptions {
+  /** Enable must-fix evaluation and verdict override */
+  enabled?: boolean;
+  /** Minimum confidence required for a finding to trigger the gate (0-1) */
+  minConfidence?: number;
+  /** Rule prefixes considered dangerous for must-fix gating (e.g. AUTH-, CYBER-) */
+  dangerousRulePrefixes?: string[];
+}
+
+/**
+ * Outcome of running the must-fix gate.
+ */
+export interface MustFixGateResult {
+  enabled: boolean;
+  triggered: boolean;
+  minConfidence: number;
+  matchedCount: number;
+  matchedRuleIds: string[];
+  summary: string;
 }
 
 /**

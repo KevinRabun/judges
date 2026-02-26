@@ -16,6 +16,8 @@ import {
   AppBuilderWorkflowResult,
   PlainLanguageFinding,
   WorkflowTask,
+  MustFixGateOptions,
+  MustFixGateResult,
 } from "../types.js";
 import { JUDGES } from "../judges/index.js";
 
@@ -69,6 +71,61 @@ import { analyzeAgentInstructions } from "./agent-instructions.js";
 export interface EvaluationOptions {
   includeAstFindings?: boolean;
   minConfidence?: number;
+  mustFixGate?: MustFixGateOptions;
+}
+
+const DEFAULT_MUST_FIX_PREFIXES = [
+  "AUTH-",
+  "CYBER-",
+  "DATA-",
+  "ERR-",
+  "REL-",
+  "RATE-",
+  "DB-",
+  "COMP-",
+  "LOGPRIV-",
+];
+
+function evaluateMustFixGate(
+  findings: Finding[],
+  options?: MustFixGateOptions
+): MustFixGateResult | undefined {
+  if (!options?.enabled) {
+    return undefined;
+  }
+
+  const minConfidence = clampConfidence(options.minConfidence ?? 0.85);
+  const prefixes = options.dangerousRulePrefixes?.length
+    ? options.dangerousRulePrefixes
+    : DEFAULT_MUST_FIX_PREFIXES;
+
+  const dangerSignal = /(injection|command\s*execution|sql|xss|ssrf|deseriali[sz]ation|auth(?:entication|orization)?\s*bypass|hardcoded\s+(?:secret|credential|password|token)|unsafe\s+eval|\beval\(|\bexec\()/i;
+
+  const matched = findings.filter((finding) => {
+    const severityMatch = finding.severity === "critical" || finding.severity === "high";
+    if (!severityMatch) return false;
+
+    const confidence = finding.confidence ?? 0;
+    if (confidence < minConfidence) return false;
+
+    const prefixMatch = prefixes.some((prefix) => finding.ruleId.startsWith(prefix));
+    const contentMatch = dangerSignal.test(`${finding.title} ${finding.description} ${finding.recommendation}`);
+    return prefixMatch || contentMatch;
+  });
+
+  const matchedRuleIds = [...new Set(matched.map((finding) => finding.ruleId))];
+  const triggered = matched.length > 0;
+
+  return {
+    enabled: true,
+    triggered,
+    minConfidence,
+    matchedCount: matched.length,
+    matchedRuleIds,
+    summary: triggered
+      ? `Must-fix gate triggered by ${matched.length} high-confidence dangerous finding(s).`
+      : "Must-fix gate passed with no high-confidence dangerous findings.",
+  };
 }
 
 function clampConfidence(value: number): number {
@@ -316,27 +373,33 @@ export function evaluateWithTribunal(
     : "pass";
 
   const allFindings = evaluations.flatMap((e) => e.findings);
+  const mustFixGate = evaluateMustFixGate(allFindings, options?.mustFixGate);
   const criticalCount = allFindings.filter(
     (f) => f.severity === "critical"
   ).length;
   const highCount = allFindings.filter((f) => f.severity === "high").length;
 
+  const effectiveVerdict: Verdict = mustFixGate?.triggered ? "fail" : overallVerdict;
+
   const summary = buildTribunalSummary(
     evaluations,
-    overallVerdict,
+    effectiveVerdict,
     overallScore,
     criticalCount,
     highCount
-  );
+  ) + (mustFixGate
+    ? `\n\n## Must-Fix Gate\n\n- Status: **${mustFixGate.triggered ? "TRIGGERED" : "PASS"}**\n- Minimum confidence: **${Math.round(mustFixGate.minConfidence * 100)}%**\n- Matched findings: **${mustFixGate.matchedCount}**\n- Matched rule IDs: ${mustFixGate.matchedRuleIds.length > 0 ? mustFixGate.matchedRuleIds.map((id) => `\`${id}\``).join(", ") : "none"}\n`
+    : "");
 
   return {
-    overallVerdict,
+    overallVerdict: effectiveVerdict,
     overallScore,
     summary,
     evaluations,
     criticalCount,
     highCount,
     timestamp: new Date().toISOString(),
+    mustFixGate,
   };
 }
 
