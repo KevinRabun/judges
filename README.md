@@ -681,6 +681,7 @@ Each run writes `daily-autofix-summary.json` (or `SUMMARY_PATH`) with per-reposi
 - `runAggregate.totalCandidatesDiscovered` and `runAggregate.totalCandidatesAfterLocationDedupe` — signal how much overlap was removed before attempting fixes,
 - `runAggregate.totalCandidatesAfterPriorityThreshold` — candidates that remain after applying minimum priority score,
 - `runAggregate.dedupeReductionPercent` — percent reduction from location dedupe for quick runtime-efficiency tracking,
+- `runAggregate.priorityThresholdReductionPercent` — percent reduction from minimum-priority filtering after dedupe,
 - `priorityRulePrefixesUsed` — dangerous rule prefixes used during prioritization,
 - `minPriorityScoreUsed` — minimum `candidatePriorityScore` applied for candidate inclusion,
 - `candidatesDiscovered`, `candidatesAfterLocationDedupe`, and `candidatesAfterPriorityThreshold` — per-repo candidate counts after each filter stage,

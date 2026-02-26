@@ -255,6 +255,7 @@ type Summary = {
     totalCandidatesAfterLocationDedupe: number;
     totalCandidatesAfterPriorityThreshold: number;
     dedupeReductionPercent: number;
+    priorityThresholdReductionPercent: number;
     totalPrioritizedCandidates: number;
     totalPrioritizedRuleOccurrences: number;
     topPrioritizedRules: Array<{
@@ -625,6 +626,10 @@ function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] 
     totalCandidatesDiscovered > 0
       ? Number((((totalCandidatesDiscovered - totalCandidatesAfterLocationDedupe) / totalCandidatesDiscovered) * 100).toFixed(2))
       : 0;
+  const priorityThresholdReductionPercent =
+    totalCandidatesAfterLocationDedupe > 0
+      ? Number((((totalCandidatesAfterLocationDedupe - totalCandidatesAfterPriorityThreshold) / totalCandidatesAfterLocationDedupe) * 100).toFixed(2))
+      : 0;
   const totalPrioritizedRuleOccurrences = [...topRuleCounts.values()].reduce(
     (sum, count) => sum + count,
     0
@@ -638,6 +643,7 @@ function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] 
     totalCandidatesAfterLocationDedupe,
     totalCandidatesAfterPriorityThreshold,
     dedupeReductionPercent,
+    priorityThresholdReductionPercent,
     totalPrioritizedCandidates,
     totalPrioritizedRuleOccurrences,
     topPrioritizedRules,
@@ -1241,6 +1247,7 @@ function main() {
       totalCandidatesAfterLocationDedupe: 0,
       totalCandidatesAfterPriorityThreshold: 0,
       dedupeReductionPercent: 0,
+      priorityThresholdReductionPercent: 0,
       totalPrioritizedCandidates: 0,
       totalPrioritizedRuleOccurrences: 0,
       topPrioritizedRules: [],
