@@ -679,11 +679,16 @@ This repo includes a scheduled workflow at `.github/workflows/daily-popular-repo
 Each run writes `daily-autofix-summary.json` (or `SUMMARY_PATH`) with per-repository telemetry, including:
 - `runAggregate` — compact run-level totals and cross-repo top prioritized rules,
 - `runAggregate.totalCandidatesDiscovered` and `runAggregate.totalCandidatesAfterLocationDedupe` — signal how much overlap was removed before attempting fixes,
+- `runAggregate.totalCandidatesAfterPriorityThreshold` — candidates that remain after applying minimum priority score,
 - `runAggregate.dedupeReductionPercent` — percent reduction from location dedupe for quick runtime-efficiency tracking,
 - `priorityRulePrefixesUsed` — dangerous rule prefixes used during prioritization,
-- `candidatesDiscovered` and `candidatesAfterLocationDedupe` — per-repo pre/post dedupe candidate counts,
+- `minPriorityScoreUsed` — minimum `candidatePriorityScore` applied for candidate inclusion,
+- `candidatesDiscovered`, `candidatesAfterLocationDedupe`, and `candidatesAfterPriorityThreshold` — per-repo candidate counts after each filter stage,
 - `topPrioritizedRuleCounts` — most common rule IDs among ranked candidates,
 - `topPrioritizedCandidates` — top ranked candidate samples (rule, severity, confidence, file, line, priority score).
+
+Optional runtime control:
+- `AUTOFIX_MIN_PRIORITY_SCORE` — minimum candidate priority score required after dedupe (default: `0`, disabled).
 
 Required secret:
 - `JUDGES_AUTOFIX_GH_TOKEN` — GitHub token with permission to fork/push/create PRs for target repositories.

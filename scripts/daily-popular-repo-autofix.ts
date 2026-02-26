@@ -208,9 +208,11 @@ type RepoRunSummary = {
   candidateConfidenceUsed: number;
   fallbackUsed: boolean;
   priorityRulePrefixesUsed: string[];
+  minPriorityScoreUsed: number;
   judgesFindingsScanned: number;
   candidatesDiscovered: number;
   candidatesAfterLocationDedupe: number;
+  candidatesAfterPriorityThreshold: number;
   candidatesInspected: number;
   prioritizedRuleCounts: Array<{
     ruleId: string;
@@ -251,6 +253,7 @@ type Summary = {
     reposWithOpenedPrs: number;
     totalCandidatesDiscovered: number;
     totalCandidatesAfterLocationDedupe: number;
+    totalCandidatesAfterPriorityThreshold: number;
     dedupeReductionPercent: number;
     totalPrioritizedCandidates: number;
     totalPrioritizedRuleOccurrences: number;
@@ -571,6 +574,18 @@ function dedupeCandidatesByLocation(
   return prioritizeCandidates([...byLocation.values()], priorityPrefixes);
 }
 
+function applyMinimumPriorityThreshold(
+  candidates: CandidateFix[],
+  priorityPrefixes: string[],
+  minPriorityScore: number
+): CandidateFix[] {
+  if (!Number.isFinite(minPriorityScore) || minPriorityScore <= 0) {
+    return candidates;
+  }
+
+  return candidates.filter((candidate) => candidatePriorityScore(candidate, priorityPrefixes) >= minPriorityScore);
+}
+
 function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] {
   const topRuleCounts = new Map<string, number>();
 
@@ -598,6 +613,10 @@ function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] 
     (sum, repoRun) => sum + repoRun.candidatesAfterLocationDedupe,
     0
   );
+  const totalCandidatesAfterPriorityThreshold = repoRuns.reduce(
+    (sum, repoRun) => sum + repoRun.candidatesAfterPriorityThreshold,
+    0
+  );
   const totalPrioritizedCandidates = repoRuns.reduce(
     (sum, repoRun) => sum + repoRun.candidatesInspected,
     0
@@ -617,6 +636,7 @@ function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] 
     reposWithOpenedPrs,
     totalCandidatesDiscovered,
     totalCandidatesAfterLocationDedupe,
+    totalCandidatesAfterPriorityThreshold,
     dedupeReductionPercent,
     totalPrioritizedCandidates,
     totalPrioritizedRuleOccurrences,
@@ -1005,7 +1025,8 @@ function processRepository(
   includeTotalFindingsScan: boolean,
   fallbackEnabled: boolean,
   fallbackMinConfidence: number,
-  fallbackHighCriticalOnly: boolean
+  fallbackHighCriticalOnly: boolean,
+  minPriorityScore: number
 ): RepoRunSummary {
   const { owner, repo } = parseRepoFromUrl(selectedRepo);
   const repoRun: RepoRunSummary = {
@@ -1014,9 +1035,11 @@ function processRepository(
     candidateConfidenceUsed: minConfidence,
     fallbackUsed: false,
     priorityRulePrefixesUsed: [],
+    minPriorityScoreUsed: minPriorityScore,
     judgesFindingsScanned: 0,
     candidatesDiscovered: 0,
     candidatesAfterLocationDedupe: 0,
+    candidatesAfterPriorityThreshold: 0,
     candidatesInspected: 0,
     prioritizedRuleCounts: [],
     topPrioritizedRuleCounts: [],
@@ -1067,6 +1090,8 @@ function processRepository(
     candidates = prioritizeCandidates(candidates, priorityRulePrefixes);
     candidates = dedupeCandidatesByLocation(candidates, priorityRulePrefixes);
     repoRun.candidatesAfterLocationDedupe = candidates.length;
+    candidates = applyMinimumPriorityThreshold(candidates, priorityRulePrefixes, minPriorityScore);
+    repoRun.candidatesAfterPriorityThreshold = candidates.length;
 
     if (
       candidates.length === 0 &&
@@ -1084,6 +1109,8 @@ function processRepository(
         repoRun.candidatesDiscovered = fallbackCandidates.length;
         candidates = dedupeCandidatesByLocation(candidates, priorityRulePrefixes);
         repoRun.candidatesAfterLocationDedupe = candidates.length;
+        candidates = applyMinimumPriorityThreshold(candidates, priorityRulePrefixes, minPriorityScore);
+        repoRun.candidatesAfterPriorityThreshold = candidates.length;
         repoRun.candidateConfidenceUsed = fallbackMinConfidence;
         repoRun.fallbackUsed = true;
         repoRun.skipped.push(
@@ -1178,6 +1205,7 @@ function main() {
     10
   );
   const parsedMinConfidence = Number.parseFloat(process.env.MIN_CONFIDENCE ?? "0.9");
+  const parsedMinPriorityScore = Number.parseInt(process.env.AUTOFIX_MIN_PRIORITY_SCORE ?? "0", 10);
   const includeTotalFindingsScan = (process.env.INCLUDE_TOTAL_FINDINGS_SCAN ?? "false").toLowerCase() === "true";
   const fallbackEnabled = (process.env.ENABLE_FALLBACK ?? "true").toLowerCase() === "true";
   const parsedFallbackMinConfidence = Number.parseFloat(process.env.FALLBACK_MIN_CONFIDENCE ?? "0.8");
@@ -1191,6 +1219,9 @@ function main() {
     : DEFAULT_MAX_REPOS_PER_DAY;
   const maxReposPerDay = Math.min(DEFAULT_MAX_REPOS_PER_DAY, requestedMaxReposPerDay);
   const minConfidence = Number.isFinite(parsedMinConfidence) ? parsedMinConfidence : 0.9;
+  const minPriorityScore = Number.isFinite(parsedMinPriorityScore) && parsedMinPriorityScore > 0
+    ? parsedMinPriorityScore
+    : 0;
   const fallbackMinConfidence = Number.isFinite(parsedFallbackMinConfidence)
     ? parsedFallbackMinConfidence
     : 0.8;
@@ -1208,6 +1239,7 @@ function main() {
       reposWithOpenedPrs: 0,
       totalCandidatesDiscovered: 0,
       totalCandidatesAfterLocationDedupe: 0,
+      totalCandidatesAfterPriorityThreshold: 0,
       dedupeReductionPercent: 0,
       totalPrioritizedCandidates: 0,
       totalPrioritizedRuleOccurrences: 0,
@@ -1228,7 +1260,8 @@ function main() {
           includeTotalFindingsScan,
           fallbackEnabled,
           fallbackMinConfidence,
-          fallbackHighCriticalOnly
+          fallbackHighCriticalOnly,
+          minPriorityScore
         );
         summary.repoRuns.push(repoRun);
       } catch (error) {
@@ -1238,9 +1271,11 @@ function main() {
           candidateConfidenceUsed: minConfidence,
           fallbackUsed: false,
           priorityRulePrefixesUsed: [],
+          minPriorityScoreUsed: minPriorityScore,
           judgesFindingsScanned: 0,
           candidatesDiscovered: 0,
           candidatesAfterLocationDedupe: 0,
+          candidatesAfterPriorityThreshold: 0,
           candidatesInspected: 0,
           prioritizedRuleCounts: [],
           topPrioritizedRuleCounts: [],
