@@ -21,6 +21,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       description: "Source code without any testing framework, test scripts, or test functions. CI pipelines need tests to provide value — without them, CI is just 'continuous building.'",
       recommendation: "Add a test framework (Jest, Vitest, pytest, JUnit). Write tests alongside code. Configure test scripts in package.json or equivalent.",
       reference: "Continuous Integration Best Practices",
+      suggestedFix: "Add a `\"test\": \"jest\"` (or equivalent) script to `package.json` and create a first test file, e.g., `src/__tests__/example.test.ts`.",
     });
   }
 
@@ -34,6 +35,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       description: "No linter or formatter configuration found. Without automated code quality checks, inconsistent code style and common mistakes slip through.",
       recommendation: "Configure ESLint + Prettier (JS/TS), Black + Ruff (Python), or equivalent tools. Add lint scripts and run them in CI.",
       reference: "CI/CD Pipeline Best Practices",
+      suggestedFix: "Add a `\"lint\": \"eslint .\"` script to `package.json` and create an `.eslintrc` (or `eslint.config.js`) configuration file.",
     });
   }
 
@@ -48,6 +50,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       lineNumbers: processExitLines,
       recommendation: "Use proper error propagation instead of hard exits. In production, handle SIGTERM gracefully. Let the runtime manage process lifecycle.",
       reference: "12-Factor App: Disposability / Kubernetes Pod Lifecycle",
+      suggestedFix: "Replace `process.exit(1)` with `throw new Error('reason')` and register a `process.on('SIGTERM', …)` handler for graceful shutdown.",
     });
   }
 
@@ -62,6 +65,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       lineNumbers: tsNoCheckLines,
       recommendation: "Fix the underlying issues instead of suppressing them. If suppression is necessary, add a comment explaining why and create a tracking issue to resolve it.",
       reference: "TypeScript / ESLint Best Practices",
+      suggestedFix: "Remove the `// @ts-ignore` or `// eslint-disable` comment and fix the underlying type error or lint violation directly.",
     });
   }
 
@@ -76,6 +80,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       description: "No build script or build tool configuration found. CI pipelines need reproducible builds. Without a build script, builds rely on manual or undocumented steps.",
       recommendation: "Define build scripts in package.json, Makefile, or equivalent. Ensure builds are reproducible from a clean checkout.",
       reference: "Reproducible Builds / CI/CD Best Practices",
+      suggestedFix: "Add a `\"build\": \"tsc\"` (or `vite build`, `webpack`, etc.) script to `package.json` so CI can run `npm run build`.",
     });
   }
 
@@ -91,6 +96,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       lineNumbers: latestTagLines,
       recommendation: "Pin Docker images to specific versions or SHA digests: FROM node:20.11.0-alpine or FROM node@sha256:abc123...",
       reference: "Docker Best Practices / Supply Chain Security",
+      suggestedFix: "Replace `FROM node:latest` with a pinned version such as `FROM node:20.11.0-alpine` or a SHA digest.",
     });
   }
 
@@ -106,6 +112,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       description: "COPY . . or ADD . . copies the entire build context including node_modules, .git, .env, and other unnecessary files. This bloats images and may expose secrets.",
       recommendation: "Create a .dockerignore file excluding node_modules, .git, .env, test files, and build artifacts. Only copy files needed for production.",
       reference: "Docker Best Practices: .dockerignore / Multi-Stage Builds",
+      suggestedFix: "Create a `.dockerignore` file containing `node_modules`, `.git`, `.env`, and `*.test.*` to exclude unnecessary files from the build context.",
     });
   }
 
@@ -118,6 +125,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       description: "Docker container has no HEALTHCHECK defined. Without health checks, orchestrators (Docker Compose, Kubernetes) cannot detect unhealthy containers for restart.",
       recommendation: "Add a HEALTHCHECK instruction: HEALTHCHECK --interval=30s CMD curl -f http://localhost:3000/health || exit 1. Or define health checks in docker-compose/k8s.",
       reference: "Docker HEALTHCHECK / Container Health Best Practices",
+      suggestedFix: "Add `HEALTHCHECK --interval=30s CMD curl -f http://localhost:3000/health || exit 1` before the final `CMD` instruction in the Dockerfile.",
     });
   }
 
@@ -132,6 +140,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       description: "Test tooling is referenced but no code coverage configuration is visible. Without coverage tracking, gaps in test coverage go undetected.",
       recommendation: "Configure coverage reporting (jest --coverage, c8, nyc). Set minimum coverage thresholds. Integrate coverage reports into CI/CD pipeline.",
       reference: "Jest Coverage / Istanbul.js",
+      suggestedFix: "Add `--coverage` to the test script (e.g., `\"test\": \"jest --coverage\"`) and set a `coverageThreshold` in the Jest/Vitest config.",
     });
   }
 
@@ -148,6 +157,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       lineNumbers: npmInstallLines,
       recommendation: "Use 'npm ci' in CI/CD pipelines for clean, reproducible installs from the lockfile. Only use 'npm install' during local development.",
       reference: "npm ci Documentation / Reproducible Builds",
+      suggestedFix: "Replace `npm install` with `npm ci` in the CI workflow step to ensure a clean, lockfile-based install.",
     });
   }
 
@@ -162,6 +172,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       description: "No non-root USER instruction found in Dockerfile. Running as root inside containers increases the blast radius of container escape vulnerabilities.",
       recommendation: "Add a non-root user: RUN addgroup -S app && adduser -S app -G app, then USER app. Use the --chown flag with COPY.",
       reference: "Docker Security: Run as Non-Root / CIS Docker Benchmark",
+      suggestedFix: "Add `RUN addgroup -S app && adduser -S app -G app` then `USER app` before the `CMD` instruction in the Dockerfile.",
     });
   }
 

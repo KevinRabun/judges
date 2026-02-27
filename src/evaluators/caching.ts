@@ -20,6 +20,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
       lineNumbers: inMemoryCacheLines,
       recommendation: "Use a bounded cache with an eviction policy (LRU, TTL). Consider libraries like lru-cache, node-cache, or a distributed cache (Redis, Memcached) for multi-instance deployments.",
       reference: "Caching Best Practices / LRU Cache Pattern",
+      suggestedFix: "Replace the raw Map/object with a bounded LRU cache, e.g. `const cache = new LRUCache({ max: 500, ttl: 1000 * 60 * 5 })`.",
     });
   }
 
@@ -35,6 +36,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
       description: "Code performs database queries or external API calls without any caching layer. Every request triggers a full backend operation even for data that rarely changes.",
       recommendation: "Implement cache-aside (lazy loading) for read-heavy operations. Use Redis or Memcached for shared caching. Set appropriate TTLs based on data freshness requirements.",
       reference: "Cache-Aside Pattern / AWS Caching Best Practices",
+      suggestedFix: "Wrap expensive DB/API calls with a cache-aside helper: check cache first, return on hit, otherwise fetch, store with a TTL, and return.",
     });
   }
 
@@ -49,6 +51,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
       description: "HTTP responses are sent without Cache-Control, ETag, or Last-Modified headers. Clients and CDNs cannot cache responses, increasing server load and latency.",
       recommendation: "Set appropriate Cache-Control headers for static and semi-static responses. Use ETags for conditional requests. Configure CDN caching rules.",
       reference: "RFC 7234: HTTP Caching / MDN Cache-Control",
+      suggestedFix: "Add `res.set('Cache-Control', 'public, max-age=300')` (or an appropriate directive) before sending responses for cacheable endpoints.",
     });
   }
 
@@ -65,6 +68,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
       lineNumbers: cacheSetLines,
       recommendation: "Implement cache invalidation when underlying data changes. Use TTLs as a safety net. Consider write-through or write-behind patterns for consistency.",
       reference: "Cache Invalidation Strategies",
+      suggestedFix: "Add a `cache.del(key)` call in every write/update/delete path that mutates the underlying data, and set a TTL on each `cache.set` as a safety net.",
     });
   }
 
@@ -80,6 +84,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
       lineNumbers: globalCacheLines,
       recommendation: "Replace with a proper caching library (node-cache, lru-cache) or a distributed cache (Redis). These provide TTL, eviction policies, and memory limits.",
       reference: "In-Memory Caching Best Practices",
+      suggestedFix: "Replace `let cache = {}` with a library like `const cache = new NodeCache({ stdTTL: 600, maxKeys: 1000 })` to get automatic eviction and TTL support.",
     });
   }
 
@@ -95,6 +100,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
       lineNumbers: cacheKeyLines,
       recommendation: "Use namespaced, structured cache keys: 'users:byId:${id}'. Include version or tenant info for multi-tenant apps. Consider hashing complex keys.",
       reference: "Cache Key Design Best Practices",
+      suggestedFix: "Prefix cache keys with a namespace and version, e.g. `cache.set(\`v1:users:byId:\${userId}\`, data)`, to prevent collisions across features.",
     });
   }
 
@@ -110,6 +116,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
       description: "Cache reads without stampede protection. When a popular cache entry expires, many concurrent requests will all miss and hit the backend simultaneously.",
       recommendation: "Implement request coalescing (singleflight pattern) so only one request fetches on a miss. Use stale-while-revalidate or lock-based refresh.",
       reference: "Cache Stampede / Thundering Herd Problem",
+      suggestedFix: "Wrap the cache-miss fetch in a singleflight/coalescing helper so concurrent callers share one in-flight request instead of each hitting the backend.",
     });
   }
 
@@ -125,6 +132,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
       lineNumbers: cacheSecretLines,
       recommendation: "Never cache secrets or authentication tokens. Use a dedicated secrets manager with built-in rotation. If token caching is necessary, encrypt values and set strict TTLs.",
       reference: "OWASP Secrets Management / Cache Security",
+      suggestedFix: "Remove secrets from the cache and retrieve them from a secrets manager (e.g. AWS Secrets Manager, Azure Key Vault) at runtime instead.",
     });
   }
 
@@ -139,6 +147,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
       description: "Data is cached and served without any revalidation strategy. Clients may receive stale data indefinitely until the TTL expires.",
       recommendation: "Implement stale-while-revalidate: serve stale data immediately while refreshing in the background. Use ETags or Last-Modified for conditional fetches.",
       reference: "HTTP Stale-While-Revalidate / RFC 5861",
+      suggestedFix: "Add a stale-while-revalidate wrapper: return cached data immediately and trigger an async background refresh when the entry is near expiry.",
     });
   }
 
@@ -153,6 +162,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
       description: "Application uses caching but has no visible cache warming on startup. After deployments or restarts, all requests will miss the cache and hit backends simultaneously.",
       recommendation: "Implement cache warming on startup for critical data. Pre-populate frequently accessed keys during deployment. Consider gradual traffic ramp-up after deploys.",
       reference: "Cache Warming / Blue-Green Deployment Best Practices",
+      suggestedFix: "Add a `warmCache()` function that pre-populates critical keys at startup, and call it from your init/bootstrap routine before accepting traffic.",
     });
   }
 

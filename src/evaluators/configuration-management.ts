@@ -78,6 +78,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       description: "Configuration values are present but no environment variable reads are visible. The application cannot be configured differently per environment without code changes.",
       recommendation: "Read all configuration from environment variables. Provide sensible defaults for development. Validate required config at startup and fail fast if missing.",
       reference: "12-Factor App: Config (Factor III)",
+      suggestedFix: "Read config from environment variables: const host = process.env.DB_HOST || 'localhost'; and validate at startup.",
     });
   }
 
@@ -91,6 +92,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       description: "Configuration values are used but never validated at startup. Missing or invalid configuration will cause runtime failures instead of clear startup errors.",
       recommendation: "Validate all required configuration at application startup. Fail fast with a clear error message listing which config is missing or invalid.",
       reference: "Fail-Fast Principle / 12-Factor App",
+      suggestedFix: "Add startup validation: if (!process.env.REQUIRED_VAR) throw new Error('Missing REQUIRED_VAR'); at the top of your entry point.",
     });
   }
 
@@ -107,6 +109,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       description: ".env files are useful for development but must not be committed to version control. Ensure .env is listed in .gitignore and provide a .env.example template instead.",
       recommendation: "Add .env to .gitignore. Create a .env.example with placeholder values documenting required environment variables. Use CI/CD variables for deployment.",
       reference: "12-Factor App: Config / dotenv Best Practices",
+      suggestedFix: "Add '.env' to .gitignore and create a .env.example with placeholder values for each required variable.",
     });
   }
 
@@ -124,6 +127,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       lineNumbers: envAccessLines.slice(0, 5),
       recommendation: "Provide defaults: process.env.PORT || 3000, or validate at startup that required variables are present. Use a config library that enforces defaults.",
       reference: "Node.js Configuration Best Practices",
+      suggestedFix: "Add fallback defaults: const port = process.env.PORT ?? '3000'; or validate with a config schema library like convict or zod.",
     });
   }
 
@@ -139,6 +143,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       lineNumbers: featureFlagLines,
       recommendation: "Use a feature flag service (LaunchDarkly, Unleash, AWS AppConfig) or environment variables. This allows toggling features without deploying.",
       reference: "Feature Flag Best Practices / Martin Fowler: Feature Toggles",
+      suggestedFix: "Replace hardcoded flags with environment reads: const ENABLE_FEATURE_X = process.env.ENABLE_FEATURE_X === 'true';",
     });
   }
 
@@ -153,6 +158,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       description: "Secrets are used but no rotation logic is visible. Secrets that cannot be rotated become a liability — a single leak requires emergency credential replacement.",
       recommendation: "Design for secret rotation: use short-lived tokens, implement token refresh flows, and use secrets managers with automatic rotation (Azure Key Vault, AWS Secrets Manager).",
       reference: "NIST 800-53: Secret Rotation / Zero Trust Principles",
+      suggestedFix: "Use a secrets manager client with automatic rotation, e.g. new SecretClient(vaultUrl, credential).getSecret('key'), and implement token refresh logic.",
     });
   }
 
@@ -166,6 +172,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       description: "Environment variables are read but no config schema is defined. New developers won't know which variables are required, what types they should be, or what values are valid.",
       recommendation: "Define a config schema using convict, Zod, or Joi. Document every env var in a .env.example file with comments explaining purpose, type, and valid values.",
       reference: "Configuration Schema Validation / 12-Factor App",
+      suggestedFix: "Define a config schema: const configSchema = z.object({ PORT: z.coerce.number().default(3000) }); and parse process.env at startup.",
     });
   }
 
@@ -181,6 +188,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       lineNumbers: envSpecificLines.slice(0, 5),
       recommendation: "Centralize environment-specific config in a config module. Use dependency injection or config objects rather than environment checks throughout the codebase.",
       reference: "12-Factor App: Config / Clean Architecture",
+      suggestedFix: "Move environment checks into a single config module that exports resolved values, and inject the config object where needed.",
     });
   }
 
@@ -200,6 +208,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
           "Gate debug settings behind environment variables (e.g. DEBUG=process.env.DEBUG). Default to debug=false. Never hardcode debug=true in committed source.",
         reference:
           "CWE-489: Active Debug Code — 12-Factor App: Config",
+        suggestedFix: "Replace hardcoded debug flags with: const debug = process.env.DEBUG === 'true'; to default off in production.",
       });
     }
   }

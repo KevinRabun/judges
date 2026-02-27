@@ -28,6 +28,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       lineNumbers: promiseAllLines,
       recommendation: "Use a concurrency limiter (p-limit, p-map with concurrency option) or batch the operations. Consider Promise.allSettled for fault tolerance.",
       reference: "Node.js Concurrency Patterns",
+      suggestedFix: "Replace `Promise.all(items.map(fn))` with `pMap(items, fn, { concurrency: 5 })` using the `p-map` library, or chunk the array and process batches sequentially.",
     });
   }
 
@@ -51,6 +52,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       lineNumbers: globalMutableLines,
       recommendation: "Use request-scoped/context-scoped state, atomic operations, or proper synchronization mechanisms instead of shared mutable variables.",
       reference: "Concurrency: Shared State Hazards",
+      suggestedFix: "Move the mutable variable into a request-scoped context (e.g., pass it as a function parameter or store it in `AsyncLocalStorage`) instead of using a module-level `let`.",
     });
   }
 
@@ -75,6 +77,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       lineNumbers: missingAwaitLines,
       recommendation: "Add await to async operations, or explicitly handle the returned promise with .catch(). Use ESLint's no-floating-promises rule.",
       reference: "Async/Await Error Handling",
+      suggestedFix: "Prepend `await` to the async call (e.g., `await db.save(entity)`) and enable the `@typescript-eslint/no-floating-promises` lint rule to catch future occurrences.",
     });
   }
 
@@ -98,6 +101,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       lineNumbers: awaitInLoopLines,
       recommendation: "For independent operations, collect promises and use Promise.all() (with concurrency limits). Keep sequential only if order matters.",
       reference: "Async Patterns: Parallel vs Sequential",
+      suggestedFix: "Refactor the loop body to build an array of promises and resolve them with `await Promise.all(promises)` (or `pMap` for bounded concurrency) outside the loop.",
     });
   }
 
@@ -118,6 +122,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       lineNumbers: setIntervalLines,
       recommendation: "Store the interval ID and call clearInterval in cleanup/unmount/dispose handlers.",
       reference: "Resource Cleanup Patterns",
+      suggestedFix: "Assign the return value to a variable (`const intervalId = setInterval(...)`) and call `clearInterval(intervalId)` in the component's cleanup or `process.on('SIGTERM')` handler.",
     });
   }
 
@@ -140,6 +145,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       lineNumbers: readModifyWriteLines,
       recommendation: "Use atomic operations (findOneAndUpdate, INCR), optimistic locking (version field), or database transactions.",
       reference: "Race Conditions / Optimistic Concurrency Control",
+      suggestedFix: "Replace the separate read-then-write with an atomic operation such as `db.collection.findOneAndUpdate({ _id }, { $inc: { count: 1 } })` or wrap both calls in a database transaction.",
     });
   }
 
@@ -160,6 +166,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       lineNumbers: workerLines,
       recommendation: "Use a worker/thread pool with a bounded size. Reuse workers for subsequent tasks.",
       reference: "Thread Pool Pattern / Worker Pools",
+      suggestedFix: "Create a fixed-size pool (e.g., `new Piscina({ maxThreads: 4 })` in Node.js or `Executors.newFixedThreadPool(4)` in Java) and submit tasks to it instead of spawning new threads.",
     });
   }
 
@@ -182,6 +189,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       lineNumbers: mixedAsyncLines,
       recommendation: "Standardize on async/await. Wrap callback-based APIs with util.promisify() or manual Promise wrappers.",
       reference: "Node.js util.promisify / Async Patterns",
+      suggestedFix: "Wrap the callback API with `const asyncFn = util.promisify(callbackFn)` and then call it with `await asyncFn(...)` to unify the async style.",
     });
   }
 
@@ -204,6 +212,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       lineNumbers: concurrentDataLines,
       recommendation: "Use ConcurrentHashMap (Java), sync.Map or Mutex (Go), Mutex/RwLock (Rust), ConcurrentDictionary (C#), or atomic operations. In Node.js, consider request-scoped state.",
       reference: "Concurrent Data Access Patterns",
+      suggestedFix: "Replace the plain collection with a thread-safe alternative (e.g., `new ConcurrentHashMap<>()` in Java, `sync.Map{}` in Go) or guard access with a `Mutex`/`RwLock`.",
     });
   }
 
@@ -226,6 +235,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       lineNumbers: nestedAwaitLines,
       recommendation: "Acquire locks in a consistent order, use lock-free algorithms, or use a single coarser lock. Add deadlock detection/timeouts.",
       reference: "Deadlock Prevention / Lock Ordering",
+      suggestedFix: "Enforce a global lock-ordering convention (e.g., always acquire lock A before lock B) or merge the nested locks into a single lock scope to eliminate the deadlock window.",
     });
   }
 

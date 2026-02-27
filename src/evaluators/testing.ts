@@ -31,6 +31,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         lineNumbers: testBlockLines,
         recommendation: "Add meaningful assertions to every test case. Each test should verify at least one expected behavior.",
         reference: "Unit Testing Best Practices",
+        suggestedFix: "Add at least one `expect(...)` / `assert` / `Assert.*` call in each test verifying the expected return value, state change, or thrown error.",
       });
     }
 
@@ -50,6 +51,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         lineNumbers: vagueTestLines,
         recommendation: "Use descriptive test names that explain the scenario and expected outcome: 'should return 404 when user not found'.",
         reference: "Test Naming Conventions",
+        suggestedFix: "Rename each test to follow the pattern `should <expected behavior> when <scenario>` (e.g., `'should throw ValidationError when email is empty'`).",
       });
     }
 
@@ -69,6 +71,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         lineNumbers: hardcodedDateLines,
         recommendation: "Use relative dates, time-freezing libraries (sinon.useFakeTimers, freezegun), or inject clock dependencies.",
         reference: "Testing Best Practices: Time-Dependent Tests",
+        suggestedFix: "Replace hardcoded date strings with a helper like `new Date()` offset or use `jest.useFakeTimers()` / `freezegun.freeze_time()` to control the clock in tests.",
       });
     }
 
@@ -88,6 +91,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         lineNumbers: externalDepLines,
         recommendation: "Mock external dependencies using test doubles (jest.mock, sinon, nock, msw, unittest.mock, mockito, Moq, httptest). Use in-memory databases for integration tests.",
         reference: "Test Doubles: Mocks, Stubs, and Fakes",
+        suggestedFix: "Wrap the external call behind an interface and inject a mock/stub in the test (e.g., `jest.mock('./httpClient')` or `@patch('requests.get')`).",
       });
     }
 
@@ -110,6 +114,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         lineNumbers: sharedStateLines,
         recommendation: "Initialize mutable test state in beforeEach/setUp hooks, or use const for immutable test data.",
         reference: "Test Isolation Best Practices",
+        suggestedFix: "Move the `let` declaration inside a `beforeEach` (or `setUp`) block so each test starts with a fresh instance of the variable.",
       });
     }
 
@@ -123,6 +128,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         description: "No error, exception, or edge case tests detected. Tests should cover both success and failure scenarios.",
         recommendation: "Add tests for error cases, boundary conditions, invalid inputs, and edge cases. Test both what it does and what it prevents.",
         reference: "Test Coverage: Error Paths",
+        suggestedFix: "Add dedicated test cases that pass invalid/empty input and assert the expected error, rejection, or exception is thrown.",
       });
     }
 
@@ -142,6 +148,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         lineNumbers: sleepLines,
         recommendation: "Use waitFor, polling, or event-based assertions instead of arbitrary delays. Use fake timers for timer-dependent logic.",
         reference: "Testing Library waitFor / Flaky Test Prevention",
+        suggestedFix: "Replace `sleep()`/`setTimeout()` with `await waitFor(() => expect(...))` or use `jest.useFakeTimers()` / `sinon.useFakeTimers()` to advance time deterministically.",
       });
     }
 
@@ -154,6 +161,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         description: `Test file has ${lines.length} lines. Very large test files are hard to navigate and may indicate the test subject needs refactoring.`,
         recommendation: "Split test files by feature or behavior. Consider if the production code under test should be broken into smaller modules.",
         reference: "Test Organization Best Practices",
+        suggestedFix: "Extract related `describe` blocks into separate test files grouped by feature (e.g., `auth.test.ts`, `payments.test.ts`) to keep each file under ~300 lines.",
       });
     }
 
@@ -173,6 +181,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         lineNumbers: snapshotLines.slice(0, 5),
         recommendation: "Prefer explicit assertions for logic. Use snapshots sparingly for UI structure. Review snapshot updates carefully.",
         reference: "Snapshot Testing Best Practices",
+        suggestedFix: "Replace `toMatchSnapshot()` with targeted assertions (e.g., `expect(result.status).toBe(200)`) and reserve snapshots only for large UI structure comparisons.",
       });
     }
   } else {
@@ -191,6 +200,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         description: "This file contains significant logic (multiple branches/loops) but no accompanying tests were detected.",
         recommendation: "Write unit tests covering the main functions, edge cases, and error paths. Aim for meaningful coverage of critical paths.",
         reference: "Test-Driven Development / Testing Pyramid",
+        suggestedFix: "Create a co-located test file (e.g., `<filename>.test.ts`) with at least one test per exported function covering a happy path, an edge case, and an error path.",
       });
     }
   }

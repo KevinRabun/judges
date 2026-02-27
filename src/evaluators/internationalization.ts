@@ -30,6 +30,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
       lineNumbers: [...new Set(hardcodedStringLines)].slice(0, 8),
       recommendation: "Use an i18n library (react-intl, i18next, vue-i18n) and extract strings to translation files.",
       reference: "Internationalization Best Practices",
+      suggestedFix: "Replace hardcoded text with translation keys: use t('greeting_message') or <FormattedMessage id='greeting_message' /> instead of inline strings.",
     });
   }
 
@@ -49,6 +50,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
       lineNumbers: concatMsgLines,
       recommendation: "Use parameterized translation strings with named placeholders: t('greeting', { name }) instead of 'Hello ' + name.",
       reference: "ICU MessageFormat / i18n Parameterization",
+      suggestedFix: "Replace string concatenation with parameterized translations: t('greeting', { name }) instead of 'Hello ' + name + '!'.",
     });
   }
 
@@ -71,6 +73,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
       lineNumbers: localeSensitiveLines,
       recommendation: "Pass explicit locale to toLocaleDateString(), use Intl.DateTimeFormat, and Intl.Collator for string comparison.",
       reference: "JavaScript Intl API",
+      suggestedFix: "Pass an explicit locale argument: date.toLocaleDateString(userLocale) or new Intl.DateTimeFormat(userLocale).format(date).",
     });
   }
 
@@ -90,6 +93,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
       lineNumbers: currencyLines,
       recommendation: "Use Intl.NumberFormat with style: 'currency' for locale-aware currency formatting.",
       reference: "JavaScript Intl.NumberFormat",
+      suggestedFix: "Replace hardcoded currency symbols with Intl.NumberFormat: new Intl.NumberFormat(locale, { style: 'currency', currency: currencyCode }).format(amount).",
     });
   }
 
@@ -109,6 +113,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
       lineNumbers: ltrAssumptionLines,
       recommendation: "Use logical CSS properties (inline-start/inline-end) or CSS logical properties (margin-inline-start) instead of left/right.",
       reference: "CSS Logical Properties / RTL Support",
+      suggestedFix: "Replace directional CSS with logical properties: use margin-inline-start instead of margin-left and text-align: start instead of text-align: left.",
     });
   }
 
@@ -128,6 +133,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
       lineNumbers: pluralLines,
       recommendation: "Use ICU MessageFormat plural syntax or i18n library plural support: t('items', { count }).",
       reference: "CLDR Plural Rules / ICU MessageFormat",
+      suggestedFix: "Use ICU plural syntax in translation keys: '{count, plural, one {# item} other {# items}}' instead of manual count === 1 ternary logic.",
     });
   }
 
@@ -150,6 +156,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
       lineNumbers: [...new Set(formatLines)],
       recommendation: "Use Intl.DateTimeFormat and Intl.NumberFormat for locale-aware formatting. Never hardcode date patterns.",
       reference: "JavaScript Intl API / CLDR",
+      suggestedFix: "Replace hardcoded format patterns with Intl APIs: new Intl.DateTimeFormat(locale, { dateStyle: 'short' }).format(date) instead of MM/DD/YYYY strings.",
     });
   }
 
@@ -169,6 +176,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
       lineNumbers: phoneFormatLines,
       recommendation: "Use libraries like libphonenumber for phone validation, and flexible address components for international addresses.",
       reference: "International Phone Numbers / Address Standards",
+      suggestedFix: "Use google-libphonenumber for phone validation and accept international postal codes instead of enforcing US-only zip code patterns.",
     });
   }
 
@@ -183,6 +191,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
       description: "File/text operations without explicit encoding specification may produce garbled text for non-ASCII characters.",
       recommendation: "Always specify UTF-8 encoding when reading/writing text files. Set charset=utf-8 in Content-Type headers.",
       reference: "Unicode / UTF-8 Best Practices",
+      suggestedFix: "Specify encoding explicitly: fs.readFileSync(path, 'utf-8') and set Content-Type: 'application/json; charset=utf-8' in HTTP responses.",
     });
   }
 

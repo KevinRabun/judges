@@ -43,6 +43,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: suppressLines,
       recommendation: "Fix the underlying issue instead of suppressing it. If suppression is truly necessary, add a comment explaining why.",
       reference: "Strict Mode Best Practices",
+      suggestedFix: "Remove the suppression directive and fix the underlying type or lint error.",
     });
   }
 
@@ -63,6 +64,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: filteredMagicLines,
       recommendation: "Extract magic numbers into named constants (e.g., const MAX_RETRIES = 3, TIMEOUT_MS = 5000) for clarity and maintainability.",
       reference: "Clean Code (Robert C. Martin) — Chapter 17",
+      suggestedFix: "Extract the numeric literal into a named constant (e.g., `const MAX_RETRIES = 3;`).",
     });
   }
 
@@ -106,6 +108,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: longFunctions,
       recommendation: "Break the function into smaller, well-named helper functions. Each function should do one thing and do it well.",
       reference: "Clean Code — Single Responsibility Principle",
+      suggestedFix: "Extract logical sections of the long function into smaller, well-named helper functions.",
     });
   }
 
@@ -120,6 +123,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: todoLines,
       recommendation: "Track TODOs as work items in your issue tracker. Resolve FIXMEs and HACKs before merging to main. Set a code quality gate that flags unresolved TODOs.",
       reference: "Software Engineering Best Practices",
+      suggestedFix: "Convert each TODO/FIXME/HACK into a tracked issue and resolve or remove the comment.",
     });
   }
 
@@ -134,6 +138,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: emptyCatchLines,
       recommendation: "At minimum, log the error. Better: handle the error appropriately (retry, fallback, re-throw with context). Never leave a catch block empty.",
       reference: "Clean Code — Error Handling / CWE-390",
+      suggestedFix: "Add error logging or handling inside the empty catch block (e.g., `console.error(err);`).",
     });
   }
 
@@ -149,6 +154,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: inputLines,
       recommendation: "Use a validation library (Zod/Joi for JS, Pydantic for Python, DataAnnotations for C#, @Valid for Java) to validate and sanitize all external input.",
       reference: "OWASP Input Validation — Defense in Depth",
+      suggestedFix: "Add schema validation for all external inputs using a library like Zod, Joi, or Pydantic.",
     });
   }
 
@@ -164,6 +170,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: debugLines,
       recommendation: "Remove debug log statements before committing. Use a proper logging library with log levels to control verbosity.",
       reference: "Code Review Best Practices",
+      suggestedFix: "Remove the debug log statement or replace it with a structured logger call at an appropriate log level.",
     });
   }
 
@@ -184,6 +191,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: deepNestLines.slice(0, 5),
       recommendation: "Use early returns (guard clauses), extract methods, or the strategy pattern to reduce nesting depth. Aim for max 3 levels.",
       reference: "Clean Code — Guard Clauses / Flatten Arrow Code",
+      suggestedFix: "Refactor using early returns (guard clauses) or extract nested logic into helper functions to reduce nesting.",
     });
   }
 
@@ -217,6 +225,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: mutableDefaultLines,
       recommendation: "Use None as default and create new mutable objects inside the function: def f(items=None): items = items or [].",
       reference: "Python Common Gotchas — Mutable Default Arguments",
+      suggestedFix: "Change the default to `None` and initialize the mutable value inside the function body.",
     });
   }
 
@@ -231,6 +240,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: bareExceptLines,
       recommendation: "Catch specific exception types. In Python, use 'except ValueError' (not bare 'except:'). In Java/C#, catch specific exception classes.",
       reference: "Exception Handling Best Practices",
+      suggestedFix: "Replace the bare except/catch-all with a specific exception type (e.g., `except ValueError` or `catch (IOException e)`).",
     });
   }
 
@@ -265,6 +275,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       description: `File has ${codeLines.length} lines and ${functionLines.length} functions. This suggests the module has too many responsibilities.`,
       recommendation: "Split into smaller, focused modules. Apply Single Responsibility Principle. Group related functions into their own files.",
       reference: "SOLID Principles — Single Responsibility",
+      suggestedFix: "Split this file into smaller modules, grouping related functions by responsibility.",
     });
   }
 
@@ -288,6 +299,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: callbackHellLines.slice(0, 5),
       recommendation: "Refactor to use async/await, Promises, or extract named functions to flatten the nesting.",
       reference: "Callback Hell / Async Patterns",
+      suggestedFix: "Refactor nested callbacks to use async/await or extract each callback into a named function.",
     });
   }
 
@@ -303,6 +315,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: deadCodeLines,
       recommendation: "Remove unreachable code. Use linter rules (no-unreachable) to prevent dead code accumulation.",
       reference: "Code Quality — Dead Code Elimination",
+      suggestedFix: "Delete the unreachable code after the return statement.",
     });
   }
 
@@ -318,6 +331,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       lineNumbers: boolParamLines,
       recommendation: "Replace boolean flags with an options object (e.g., doThing({ verbose: true, force: false })) or separate functions.",
       reference: "Clean Code — Function Arguments",
+      suggestedFix: "Replace the boolean parameters with a named options object (e.g., `{ verbose: true, dryRun: false }`).",
     });
   }
 
@@ -333,6 +347,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       description: "Retry logic uses fixed delays between attempts. Under load, all retries fire simultaneously (thundering herd), overwhelming the downstream service and causing cascading failures.",
       recommendation: "Use exponential backoff with jitter: delay = baseDelay * 2^attempt + random(0, baseDelay). Libraries like p-retry, retry, or Polly handle this automatically.",
       reference: "Exponential Backoff / AWS Best Practices for Retry",
+      suggestedFix: "Replace the fixed delay with exponential backoff: `delay = baseDelay * 2 ** attempt + Math.random() * baseDelay`.",
     });
   }
 

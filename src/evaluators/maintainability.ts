@@ -19,6 +19,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       lineNumbers: anyLines.slice(0, 10),
       recommendation: "Replace weak types with specific types: use 'unknown' with type guards (TS), generics (Java/C#), concrete types (Go), safe wrappers (Rust).",
       reference: "Type Safety Best Practices / Clean Code",
+      suggestedFix: "Replace 'any' with 'unknown' and add a type guard, or define a specific interface/type that describes the expected shape.",
     });
   }
 
@@ -43,6 +44,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       lineNumbers: magicLines.slice(0, 5),
       recommendation: "Extract magic numbers into named constants (e.g., const HEARTBEAT_INTERVAL_MS = 5000). Use enums for related sets of values.",
       reference: "Clean Code: Chapter 17 — Smells and Heuristics (G25)",
+      suggestedFix: "Extract each numeric literal into a descriptive const (e.g., `const TIMEOUT_MS = 5000;`) and reference the constant instead.",
     });
   }
 
@@ -57,6 +59,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       lineNumbers: todoLines,
       recommendation: "Convert TODO/FIXME comments into tracked issues in your project management tool. Resolve HACK comments with proper implementations.",
       reference: "Clean Code: Technical Debt Management",
+      suggestedFix: "Create a tracked issue for each TODO/FIXME, then either resolve the underlying problem or replace the comment with a link to the issue.",
     });
   }
 
@@ -73,6 +76,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
         lineNumbers: varLines,
         recommendation: "Use 'const' for values that don't change and 'let' for values that do. Never use 'var' in modern JavaScript/TypeScript.",
         reference: "ESLint no-var rule / Modern JavaScript Best Practices",
+        suggestedFix: "Replace each 'var' with 'const' (if never reassigned) or 'let' (if reassigned) to get proper block scoping.",
       });
     }
   }
@@ -89,6 +93,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       description: `Average function length is approximately ${Math.round(totalLines / funcCount)} lines. Long functions are harder to understand, test, and maintain.`,
       recommendation: "Break long functions into smaller, focused units. Each function should do one thing and do it well. Aim for functions under 30 lines.",
       reference: "Clean Code: Functions (Chapter 3)",
+      suggestedFix: "Identify distinct logical steps within long functions and extract each into a well-named helper function.",
     });
   }
 
@@ -112,6 +117,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       lineNumbers: deepNestLines.slice(0, 5),
       recommendation: "Use early returns (guard clauses), extract nested logic into helper functions, or use functional patterns (map, filter, reduce) to flatten nesting.",
       reference: "Cognitive Complexity (SonarSource) / Clean Code",
+      suggestedFix: "Add guard-clause early returns at the top of each branch to invert conditions and reduce nesting by one or more levels.",
     });
   }
 
@@ -127,6 +133,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       lineNumbers: commentedCodeLines.slice(0, 5),
       recommendation: "Remove commented-out code. Use version control (git) to retrieve old code if needed. Dead code reduces readability.",
       reference: "Clean Code: Comments (Chapter 4)",
+      suggestedFix: "Delete the commented-out lines; rely on git history to recover old code if ever needed.",
     });
   }
 
@@ -139,6 +146,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       description: `File is ${totalLines} lines long. Large files are harder to navigate, understand, and test. They often indicate multiple responsibilities.`,
       recommendation: "Break the file into smaller modules with single responsibilities. Extract related functionality into separate files/classes.",
       reference: "Single Responsibility Principle / Clean Architecture",
+      suggestedFix: "Split the file by responsibility—move each logical group of exports into its own module and re-export from an index file.",
     });
   }
 
@@ -153,6 +161,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       description: `Found both camelCase (${camelCaseVars}) and snake_case (${snakeCaseVars}) variable names. Inconsistent naming makes the codebase harder to navigate.`,
       recommendation: "Adopt a single naming convention for the project. In JavaScript/TypeScript, use camelCase for variables and functions, PascalCase for classes and types.",
       reference: "Clean Code: Meaningful Names (Chapter 2)",
+      suggestedFix: "Rename snake_case variables to camelCase (or vice-versa) to match the project's dominant convention, then enable a linter rule to enforce it.",
     });
   }
 
@@ -172,6 +181,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       lineNumbers: manyParamLines,
       recommendation: "Use an options object parameter: func({ name, age, ...opts }). This is self-documenting, order-independent, and extensible.",
       reference: "Clean Code: Functions (Chapter 3) / Code Complete",
+      suggestedFix: "Group related parameters into an options/config object (e.g., `function create(opts: CreateOptions)`) and destructure inside the function.",
     });
   }
 
@@ -194,6 +204,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       lineNumbers: singleLetterLines.slice(0, 5),
       recommendation: "Use descriptive variable names that reveal intent: 'user' instead of 'u', 'index' instead of 'i' (outside loops). Good names are self-documenting.",
       reference: "Clean Code: Meaningful Names (Chapter 2)",
+      suggestedFix: "Rename single-letter variables to descriptive names that convey purpose (e.g., rename `x` to `userCount`).",
     });
   }
 
@@ -224,6 +235,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       lineNumbers: unusedImportLines.slice(0, 5),
       recommendation: "Remove unused imports. Enable ESLint no-unused-vars and TypeScript noUnusedLocals. Most editors can auto-remove unused imports on save.",
       reference: "ESLint no-unused-vars / TypeScript Best Practices",
+      suggestedFix: "Delete the unused import statements, or run your editor's 'Organize Imports' command to auto-remove them.",
     });
   }
 
@@ -244,6 +256,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       description: `Found ${duplicateStrings.length} string value(s) repeated 3+ times. Duplicate strings are easy to typo and hard to update consistently.`,
       recommendation: "Extract repeated strings into named constants. This makes updates a single-point change and prevents typos.",
       reference: "DRY Principle / Clean Code",
+      suggestedFix: "Create a shared constants file and export each repeated string as a named const, then import and use the constant everywhere.",
     });
   }
 
