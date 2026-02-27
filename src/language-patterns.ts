@@ -203,7 +203,7 @@ export const MISSING_AWAIT = {
 };
 
 export const SHARED_MUTABLE = {
-  jsts: String.raw`(?:let|var)\s+\w+\s*=.*(?:setTimeout|setInterval|addEventListener)`,
+  jsts: String.raw`(?:let|var)\s+\w+\s*=\s*(?:\{|\[|\d+|new\s)`,
   python: String.raw`(?:threading\.Thread|multiprocessing\.Process).*(?:global\s|nonlocal\s)`,
   rust: String.raw`(?:static\s+mut\b|Arc<Mutex|Rc<RefCell)`,
   csharp: String.raw`(?:static\s+(?!readonly)[\w<>\[\]]+\s+\w+\s*=|volatile\s)`,

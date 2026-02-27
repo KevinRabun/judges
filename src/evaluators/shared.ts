@@ -24,6 +24,7 @@ export function getLineNumbers(code: string, pattern: RegExp): number[] {
   const lines = code.split("\n");
   const matches: number[] = [];
   for (let i = 0; i < lines.length; i++) {
+    pattern.lastIndex = 0;
     if (pattern.test(lines[i])) {
       matches.push(i + 1);
     }

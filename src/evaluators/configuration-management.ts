@@ -10,7 +10,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
 
   // Hardcoded secrets / credentials
   const secretPattern = /(?:password|passwd|secret|api_?key|token|private_?key)\s*[:=]\s*["'`][^"'`]{3,}/gi;
-  const nonProductionContextPattern = /\b(?:test|tests|mock|mocks|fixture|fixtures|harness|e2e|example|sample|dummy)\b/i;
+  const nonProductionContextPattern = /\b(?:test|tests|mock|mocks|fixture|fixtures|harness|e2e|dummy)\b|(?<!\.)(?:\bexample\b|\bsample\b)(?!\.)/i;
   const productionContextPattern = /\b(?:prod|production|release|deploy|deployment)\b/i;
   const secretLines: number[] = [];
 
