@@ -19,6 +19,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       lineNumbers: globalStateLines,
       recommendation: "Externalize state to a database, cache (Redis), or message queue. Use const/final/immutable for configuration. Each instance should be stateless.",
       reference: "12-Factor App: Processes (Factor VI)",
+      suggestedFix: "Replace the top-level mutable variable with a call to an external store (e.g., `await redis.get(key)`) so each instance remains stateless.",
+      confidence: 0.9,
     });
   }
 
@@ -34,6 +36,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       lineNumbers: inMemLines,
       recommendation: "Use a distributed store (Redis, Memcached, database) for session data, caches, and shared state.",
       reference: "Distributed Systems Best Practices",
+      suggestedFix: "Swap the in-memory `Map`/object store for a Redis-backed store (e.g., `new RedisStore(...)`) so data is shared across instances.",
+      confidence: 0.85,
     });
   }
 
@@ -49,6 +53,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       lineNumbers: blockingLines,
       recommendation: "Use asynchronous alternatives (async/await, promises, non-blocking I/O). Move long-running work to background queues.",
       reference: "Reactive & Non-Blocking Architecture Patterns",
+      suggestedFix: "Replace the synchronous call with its async counterpart (e.g., `fs.readFileSync` → `await fs.promises.readFile`) to avoid blocking the event loop.",
+      confidence: 0.9,
     });
   }
 
@@ -64,6 +70,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       lineNumbers: fetchLines,
       recommendation: "Set explicit timeouts on all external calls (e.g., 5-30 seconds). Implement circuit breakers (e.g., using libraries like cockatiel or opossum) for critical dependencies.",
       reference: "Release It! — Stability Patterns",
+      suggestedFix: "Add a timeout option to the HTTP call (e.g., `fetch(url, { signal: AbortSignal.timeout(5000) })`) to prevent indefinite hangs.",
+      confidence: 0.7,
     });
   }
 
@@ -82,6 +90,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       lineNumbers: cpuOpsLines.length > 0 ? cpuOpsLines : undefined,
       recommendation: "Offload CPU-intensive work to worker threads, a job queue (Bull, Celery), or a dedicated compute service. Use async variants of crypto operations (pbkdf2, scrypt). Consider WebAssembly for hot-path computation.",
       reference: "Node.js Worker Threads / Job Queue Patterns",
+      suggestedFix: "Move the heavy computation into a worker thread or use the async variant (e.g., `crypto.pbkdf2` instead of `crypto.pbkdf2Sync`) to keep the main thread free.",
+      confidence: 0.8,
     });
   }
 
@@ -95,6 +105,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       description: "No rate limiting or throttling mechanism is visible. Without rate limiting, the system is vulnerable to being overwhelmed by traffic spikes or abuse.",
       recommendation: "Implement rate limiting at the API gateway or application level. Consider token bucket or sliding window algorithms. Use libraries like express-rate-limit or a cloud-native solution.",
       reference: "API Security & Scalability Best Practices",
+      suggestedFix: "Add a rate-limiting middleware (e.g., `app.use(rateLimit({ windowMs: 60000, max: 100 }))`) to protect endpoints from traffic spikes.",
+      confidence: 0.7,
     });
   }
 
@@ -110,6 +122,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       lineNumbers: fileLockLines,
       recommendation: "Use distributed locks (Redis SETNX/Redlock, ZooKeeper, etcd) or database-level locking for cross-instance coordination.",
       reference: "Distributed Locking Patterns",
+      suggestedFix: "Replace the local file/mutex lock with a distributed lock (e.g., Redlock via `await redlock.acquire([resource], ttl)`) for cross-instance safety.",
+      confidence: 0.9,
     });
   }
 
@@ -126,6 +140,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       lineNumbers: stickySessionLines,
       recommendation: "Use an external session store (Redis, DynamoDB, database) so any instance can serve any request. This enables zero-downtime deployments.",
       reference: "Scalable Session Management",
+      suggestedFix: "Configure the session middleware to use an external store (e.g., `session({ store: new RedisStore({ client }) })`) instead of the default in-memory store.",
+      confidence: 0.75,
     });
   }
 
@@ -141,6 +157,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       lineNumbers: hardcodedPoolLines,
       recommendation: "Configure pool sizes via environment variables or derive from available resources (os.cpus().length). Allow runtime tuning.",
       reference: "Resource Configuration Best Practices",
+      suggestedFix: "Replace the hardcoded pool size with a configurable value (e.g., `parseInt(process.env.POOL_SIZE) || os.cpus().length`) to adapt to each environment.",
+      confidence: 0.85,
     });
   }
 
@@ -155,6 +173,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       description: "Multiple external service calls detected without circuit breaker protection. A failing dependency can cascade and bring down the entire system.",
       recommendation: "Implement circuit breakers (opossum, cockatiel, Resilience4j, Polly) to fail fast when dependencies are down. Configure fallbacks.",
       reference: "Release It! — Circuit Breaker Pattern",
+      suggestedFix: "Wrap external service calls with a circuit breaker (e.g., `const breaker = new CircuitBreaker(callFn, { timeout: 3000 }); await breaker.fire()`).",
+      confidence: 0.7,
     });
   }
 
@@ -168,6 +188,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       description: "Large response payloads increase serialization time, network transfer, and client memory usage. This limits throughput at scale.",
       recommendation: "Implement pagination, field filtering (sparse fieldsets), or streaming for large responses. Consider GraphQL for client-driven field selection.",
       reference: "API Scalability Patterns",
+      suggestedFix: "Add pagination parameters (e.g., `?page=1&limit=50`) and return only the requested slice instead of the full dataset.",
+      confidence: 0.8,
     });
   }
 
@@ -184,6 +206,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       lineNumbers: wsLines,
       recommendation: "Set maxPayload size, maximum connection limits, and implement connection throttling. Use a WebSocket gateway for production scale.",
       reference: "WebSocket Security & Scalability",
+      suggestedFix: "Pass connection limits when creating the WebSocket server (e.g., `new WebSocketServer({ maxPayload: 1048576, maxConnections: 1000 })`).",
+      confidence: 0.75,
     });
   }
 

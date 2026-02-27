@@ -1,5 +1,5 @@
 import { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeDocumentation(code: string, language: string): Finding[] {
@@ -28,6 +28,8 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       lineNumbers: undocFnLines,
       recommendation: "Add documentation comments (JSDoc/TSDoc, docstrings, /// doc comments, Javadoc, GoDoc) for all exported functions, describing purpose, parameters, return values, and thrown errors.",
       reference: "TSDoc / JSDoc / Docstring Standards",
+      suggestedFix: "Add a `/** ... */` (or language-equivalent) doc comment immediately above each exported function describing its purpose, `@param` tags for every parameter, and a `@returns` tag.",
+      confidence: 0.7,
     });
   }
 
@@ -48,6 +50,8 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       lineNumbers: magicNumberLines.slice(0, 5),
       recommendation: "Extract magic numbers into named constants with descriptive names (e.g., MAX_RETRY_COUNT = 3, TIMEOUT_MS = 5000).",
       reference: "Clean Code: Meaningful Names",
+      suggestedFix: "Replace each numeric literal with a `const` (e.g., `const TIMEOUT_MS = 5000;`) and reference the constant in place of the raw number.",
+      confidence: 0.75,
     });
   }
 
@@ -67,6 +71,8 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       lineNumbers: todoLines,
       recommendation: "Link TODOs to issue tracker tickets (e.g., TODO(#123): ...). Create tracking issues for existing unlinked TODOs.",
       reference: "Technical Debt Management",
+      suggestedFix: "Append an issue reference to each TODO comment (e.g., `// TODO(#1234): refactor auth flow`) and create a tracking issue if one does not exist.",
+      confidence: 0.75,
     });
   }
 
@@ -112,6 +118,8 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       lineNumbers: complexFnLines,
       recommendation: "Add section comments explaining the 'why' behind complex logic. Consider refactoring long functions into smaller, well-named functions.",
       reference: "Clean Code: Functions",
+      suggestedFix: "Break the function into smaller helper functions with descriptive names, and add inline `//` comments before each logical section explaining its intent.",
+      confidence: 0.75,
     });
   }
 
@@ -126,6 +134,8 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
         description: "Large files should have a module-level comment explaining the file's purpose, responsibilities, and key exports.",
         recommendation: "Add a file header comment or @module/@fileoverview docblock explaining the module's purpose and public API.",
         reference: "Code Documentation Standards",
+        suggestedFix: "Add a `/** @module <name> — <one-line purpose> */` or `/** @fileoverview ... */` block at the top of the file before any imports.",
+        confidence: 0.7,
       });
     }
   }
@@ -149,6 +159,8 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       lineNumbers: routeLines,
       recommendation: "Add OpenAPI/Swagger annotations or JSDoc comments documenting request body, query params, response schema, and error codes.",
       reference: "OpenAPI Specification / Swagger",
+      suggestedFix: "Add a JSDoc or OpenAPI decorator above each route handler documenting the HTTP method, path, request/response schema, and possible status codes.",
+      confidence: 0.7,
     });
   }
 
@@ -173,6 +185,8 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       lineNumbers: complexTypeLines,
       recommendation: "Add TSDoc/JSDoc comments to interfaces and their properties, especially for shared/exported types.",
       reference: "TypeScript Documentation / TSDoc",
+      suggestedFix: "Add a `/** ... */` comment above the interface and add per-property `/** ... */` comments explaining each field's purpose and constraints.",
+      confidence: 0.7,
     });
   }
 
@@ -196,6 +210,8 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       lineNumbers: throwLines,
       recommendation: "Always include descriptive error messages: throw new Error('Failed to parse config: missing required field \"name\"').",
       reference: "Error Handling Best Practices",
+      suggestedFix: "Pass a descriptive message string to the Error constructor (e.g., `throw new Error('Failed to connect to DB: connection string missing')`).",
+      confidence: 0.85,
     });
   }
 
@@ -218,6 +234,8 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       lineNumbers: deprecatedLines,
       recommendation: "Add migration path: @deprecated Since v2.0. Use newMethod() instead. Will be removed in v3.0.",
       reference: "API Deprecation Best Practices",
+      suggestedFix: "Expand the `@deprecated` tag to include a version and replacement: `@deprecated Since v2.0. Use `newMethod()` instead. Will be removed in v3.0.`",
+      confidence: 0.75,
     });
   }
 
@@ -240,6 +258,8 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       lineNumbers: noReturnDocLines,
       recommendation: "Add @returns (or @return) to document what the function returns and when it might return undefined/null.",
       reference: "JSDoc @returns Tag",
+      suggestedFix: "Add a `@returns {Type} description` line to the existing JSDoc block describing the return value and any nullable/undefined cases.",
+      confidence: 0.7,
     });
   }
 

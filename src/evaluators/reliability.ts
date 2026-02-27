@@ -1,5 +1,5 @@
 import { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeReliability(code: string, language: string): Finding[] {
@@ -20,6 +20,8 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: emptyCatchLines,
       recommendation: "At minimum, log the error. Ideally, handle it appropriately, rethrow, or propagate to a global error handler.",
       reference: "Error Handling Best Practices",
+      suggestedFix: "Log in catch blocks: catch (err) { logger.error({ err }, 'Operation failed'); throw err; } — never leave catch blocks empty.",
+      confidence: 0.9,
     });
   }
 
@@ -42,6 +44,8 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: noTimeoutLines,
       recommendation: "Set explicit timeouts on all network calls. Use AbortController with setTimeout for fetch, or timeout options for HTTP clients.",
       reference: "Resilience Patterns: Timeout",
+      suggestedFix: "Add timeout: const controller = new AbortController(); setTimeout(() => controller.abort(), 5000); fetch(url, { signal: controller.signal });",
+      confidence: 0.8,
     });
   }
 
@@ -59,6 +63,8 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: externalCallLines.slice(0, 5),
       recommendation: "Implement retry with exponential backoff for transient failures. Use libraries like p-retry, tenacity, Polly, Resilience4j, or backoff crate.",
       reference: "Resilience Patterns: Retry with Backoff",
+      suggestedFix: "Add retry: import pRetry from 'p-retry'; const result = await pRetry(() => fetchData(), { retries: 3, minTimeout: 1000 });",
+      confidence: 0.7,
     });
   }
 
@@ -78,6 +84,8 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: singleConnLines,
       recommendation: "Use connection pooling to improve resilience and throughput. Most database drivers support connection pools.",
       reference: "Database Connection Management",
+      suggestedFix: "Replace single connection with pool: const pool = new Pool({ max: 10, idleTimeoutMillis: 30000 }); const client = await pool.connect(); try { ... } finally { client.release(); }",
+      confidence: 0.8,
     });
   }
 
@@ -97,6 +105,8 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: unsafeAccessLines.slice(0, 5),
       recommendation: "Use optional chaining (?.) or explicit null checks for deeply nested property access.",
       reference: "Defensive Programming Practices",
+      suggestedFix: "Use optional chaining: const value = obj?.nested?.deep?.prop ?? defaultValue; — prevents TypeError on null/undefined intermediaries.",
+      confidence: 0.75,
     });
   }
 
@@ -111,6 +121,8 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: processExitLines,
       recommendation: "Throw errors or use graceful shutdown patterns instead. Let the process exit naturally after cleanup. Reserve panics for truly unrecoverable situations.",
       reference: "Graceful Shutdown Patterns",
+      suggestedFix: "Replace process.exit() with graceful shutdown: process.on('SIGTERM', async () => { await server.close(); await db.disconnect(); });",
+      confidence: 0.9,
     });
   }
 
@@ -125,6 +137,8 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       description: "Multiple external calls without circuit breaker protection. A failing dependency can cause cascading failure across your system.",
       recommendation: "Implement the circuit breaker pattern (opossum, cockatiel, Polly) to fail fast when external dependencies are unhealthy.",
       reference: "Resilience Patterns: Circuit Breaker (Martin Fowler)",
+      suggestedFix: "Add circuit breaker: import CircuitBreaker from 'opossum'; const breaker = new CircuitBreaker(fetchData, { timeout: 3000, errorThresholdPercentage: 50 }); await breaker.fire();",
+      confidence: 0.7,
     });
   }
 
@@ -147,6 +161,8 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: criticalCallLines,
       recommendation: "Provide fallback behavior: cached responses, default values, or gracefully degraded features when dependencies fail.",
       reference: "Resilience Patterns: Fallback / Graceful Degradation",
+      suggestedFix: "Add fallback: try { data = await fetchFromApi(); } catch { data = await cache.get(key) ?? DEFAULT_VALUE; logger.warn('Using fallback data'); }",
+      confidence: 0.8,
     });
   }
 
@@ -167,6 +183,8 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: writeEndpointLines.slice(0, 3),
       recommendation: "Accept an idempotency key header (Idempotency-Key) and use it to deduplicate write operations.",
       reference: "API Idempotency / Stripe Idempotency Pattern",
+      suggestedFix: "Add idempotency: const key = req.headers['idempotency-key']; if (key && await cache.has(key)) return res.json(await cache.get(key)); // process then cache result.",
+      confidence: 0.7,
     });
   }
 
@@ -193,6 +211,8 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: unhandledPromiseLines,
       recommendation: "Always handle promise rejections with .catch() or try/catch around await. Set up global unhandledRejection handler as safety net.",
       reference: "Node.js Unhandled Rejections",
+      suggestedFix: "Add rejection handling: new Promise((resolve, reject) => { ... }).catch(err => logger.error(err)); or use try/catch with await.",
+      confidence: 0.8,
     });
   }
 

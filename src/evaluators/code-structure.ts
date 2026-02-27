@@ -48,6 +48,7 @@ export function analyzeCodeStructure(
       reference: "McCabe Cyclomatic Complexity — Software Engineering Institute",
       suggestedFix:
         "Break the function into smaller, focused functions with single responsibilities.",
+      confidence: 0.75,
     });
   }
 
@@ -87,6 +88,7 @@ export function analyzeCodeStructure(
       reference: "Cognitive Complexity — SonarSource",
       suggestedFix:
         "Invert conditions and return early to reduce nesting, or extract nested logic into well-named helper functions.",
+      confidence: 0.85,
     });
   }
 
@@ -108,6 +110,9 @@ export function analyzeCodeStructure(
       recommendation:
         "Break into smaller functions following the Single Responsibility Principle. Each function should do one thing well. Aim for ≤ 30 lines.",
       reference: "Clean Code (Robert C. Martin) — Chapter 3: Functions",
+      suggestedFix:
+        "Extract logical sections of the function into smaller, well-named helper functions that each do one thing.",
+      confidence: 0.8,
     });
   }
 
@@ -133,6 +138,7 @@ export function analyzeCodeStructure(
       reference: "Clean Code — Function Arguments",
       suggestedFix:
         "Replace multiple parameters with an options/config object: function create(opts: CreateOptions)",
+      confidence: 0.85,
     });
   }
 
@@ -147,6 +153,9 @@ export function analyzeCodeStructure(
       recommendation:
         "Remove unreachable code. Enable linter rules for unreachable code detection (no-unreachable in ESLint, dead_code in Rust).",
       reference: "Code Quality — Dead Code Elimination",
+      suggestedFix:
+        "Delete the unreachable statements after return/throw/break/continue, or restructure control flow so the code is reachable.",
+      confidence: 0.85,
     });
   }
 
@@ -161,6 +170,9 @@ export function analyzeCodeStructure(
       recommendation:
         "Replace with specific types or constrained generics. In TypeScript use 'unknown' instead of 'any'. In Go use concrete interfaces. In Rust avoid unnecessary unsafe blocks.",
       reference: "Type Safety Best Practices",
+      suggestedFix:
+        "Replace 'any' with 'unknown' or a specific interface/type that describes the expected shape of the data.",
+      confidence: 0.9,
     });
   }
 
@@ -174,6 +186,9 @@ export function analyzeCodeStructure(
       recommendation:
         "Split the file into smaller modules. Move related functions into their own files/modules. Aim for file-level complexity < 30.",
       reference: "Software Complexity Metrics — SEI",
+      suggestedFix:
+        "Move related functions into separate module files and re-export them from an index to reduce per-file complexity.",
+      confidence: 0.75,
     });
   }
 
@@ -197,6 +212,9 @@ export function analyzeCodeStructure(
       recommendation:
         "This function needs immediate refactoring. Use the Strategy pattern, table-driven logic, or break it into a pipeline of smaller functions.",
       reference: "McCabe Complexity — Critical Threshold",
+      suggestedFix:
+        "Replace long if/else or switch chains with a strategy map or lookup table, and extract each branch into its own function.",
+      confidence: 0.75,
     });
   }
 
@@ -220,6 +238,9 @@ export function analyzeCodeStructure(
       recommendation:
         "Immediately refactor: use a builder pattern, configuration struct, or split the function's responsibilities.",
       reference: "Clean Code — Function Arguments / Builder Pattern",
+      suggestedFix:
+        "Introduce a builder or configuration object to encapsulate the parameters: e.g., new Builder().setX(x).setY(y).build().",
+      confidence: 0.9,
     });
   }
 
@@ -243,6 +264,9 @@ export function analyzeCodeStructure(
       recommendation:
         "This function needs immediate decomposition. Extract logical sections into named helper functions.",
       reference: "Clean Code — Function Length",
+      suggestedFix:
+        "Identify distinct logical sections within the function and extract each into a descriptively named helper function.",
+      confidence: 0.85,
     });
   }
 

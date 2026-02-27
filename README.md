@@ -1,6 +1,6 @@
 # Judges Panel
 
-An MCP (Model Context Protocol) server that provides a panel of **33 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Includes **built-in AST analysis** powered by the TypeScript Compiler API — no separate parser server needed.
+An MCP (Model Context Protocol) server that provides a panel of **34 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Includes **built-in AST analysis** powered by the TypeScript Compiler API — no separate parser server needed.
 
 **Highlights:**
 - Includes an **App Builder Workflow (3-step)** demo for release decisions, plain-language risk summaries, and prioritized fixes — see [Try the Demo](#2-try-the-demo).
@@ -26,7 +26,7 @@ npm run build
 
 ### 2. Try the Demo
 
-Run the included demo to see all 33 judges evaluate a purposely flawed API server:
+Run the included demo to see all 34 judges evaluate a purposely flawed API server:
 
 ```bash
 npm run demo
@@ -419,7 +419,9 @@ Clone a **public repository URL**, run the full judges panel across eligible sou
 | `credentialMode` | string | no | Credential detection mode: `standard` (default) or `strict` |
 | `includeAstFindings` | boolean | no | Include AST/code-structure findings (default: true) |
 | `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
-| `quickStart` | flag | no | Opinionated high-signal defaults for onboarding (`minConfidence=0.9`, `credentialMode=strict`, path exclusions) |
+| `enableMustFixGate` | boolean | no | Enable must-fix gate summary for high-confidence dangerous findings (default: false) |
+| `mustFixMinConfidence` | number | no | Confidence threshold for must-fix gate triggers (0-1, default: 0.85) |
+| `mustFixDangerousRulePrefixes` | string[] | no | Optional dangerous rule prefixes for gate matching (e.g., `AUTH`, `CYBER`, `DATA`) |
 | `keepClone` | boolean | no | Keep cloned repo on disk for inspection |
 
 **Quick examples**
@@ -438,6 +440,9 @@ npm run report:public-repo -- --repoUrl https://github.com/openclaw/openclaw --i
 # show only findings at 80%+ confidence
 npm run report:public-repo -- --repoUrl https://github.com/openclaw/openclaw --minConfidence 0.8 --output reports/openclaw-judges-report-high-confidence.md
 
+# include must-fix gate summary in the generated report
+npm run report:public-repo -- --repoUrl https://github.com/openclaw/openclaw --enableMustFixGate true --mustFixMinConfidence 0.9 --mustFixDangerousPrefix AUTH --mustFixDangerousPrefix CYBER --output reports/openclaw-judges-report-mustfix.md
+
 # opinionated quick-start mode (recommended first run)
 npm run report:quickstart -- --repoUrl https://github.com/openclaw/openclaw --output reports/openclaw-quickstart.md
 ```
@@ -455,6 +460,9 @@ Call from MCP client:
     "credentialMode": "strict",
     "includeAstFindings": false,
     "minConfidence": 0.8,
+    "enableMustFixGate": true,
+    "mustFixMinConfidence": 0.9,
+    "mustFixDangerousRulePrefixes": ["AUTH", "CYBER", "DATA"],
     "outputPath": "reports/vscode-judges-report.md"
   }
 }
@@ -483,7 +491,7 @@ Generated from https://github.com/microsoft/vscode on 2026-02-21T12:00:00.000Z.
 List all available judges with their domains and descriptions.
 
 ### `evaluate_code`
-Submit code to the **full judges panel**. All 33 judges evaluate independently and return a combined verdict.
+Submit code to the **full judges panel**. All 34 judges evaluate independently and return a combined verdict.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -505,7 +513,7 @@ Submit code to a **specific judge** for targeted review.
 | `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
 
 ### `evaluate_project`
-Submit multiple files for **project-level analysis**. All 33 judges evaluate each file, plus cross-file architectural analysis detects code duplication, inconsistent error handling, and dependency cycles.
+Submit multiple files for **project-level analysis**. All 34 judges evaluate each file, plus cross-file architectural analysis detects code duplication, inconsistent error handling, and dependency cycles.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -515,7 +523,7 @@ Submit multiple files for **project-level analysis**. All 33 judges evaluate eac
 | `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
 
 ### `evaluate_diff`
-Evaluate only the **changed lines** in a code diff. Runs all 33 judges on the full file but filters findings to lines you specify. Ideal for PR reviews and incremental analysis.
+Evaluate only the **changed lines** in a code diff. Runs all 34 judges on the full file but filters findings to lines you specify. Ideal for PR reviews and incremental analysis.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -537,7 +545,7 @@ Analyze a dependency manifest file for supply-chain risks, version pinning issue
 
 #### Judge IDs
 
-`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure` · `agent-instructions`
+`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure` · `agent-instructions` · `ai-code-safety`
 
 ---
 
@@ -580,7 +588,8 @@ Each judge has a corresponding prompt for LLM-powered deep analysis:
 | `judge-ci-cd` | Deep CI/CD pipeline review |
 | `judge-code-structure` | Deep AST-based structural analysis review |
 | `judge-agent-instructions` | Deep review of agent instruction markdown quality and safety |
-| `full-tribunal` | All 33 judges in a single prompt |
+| `judge-ai-code-safety` | Deep review of AI-generated code risks: prompt injection, insecure LLM output handling, debug defaults, missing validation |
+| `full-tribunal` | All 34 judges in a single prompt |
 
 ---
 
@@ -601,7 +610,7 @@ Each judge scores the code from **0 to 100**:
 - **WARNING** — Any high finding, any medium finding, or score < 80
 - **PASS** — Score ≥ 80 with no critical, high, or medium findings
 
-The **overall tribunal score** is the average of all 33 judges. The overall verdict fails if **any** judge fails.
+The **overall tribunal score** is the average of all 34 judges. The overall verdict fails if **any** judge fails.
 
 ---
 
@@ -667,6 +676,21 @@ This repo includes a scheduled workflow at `.github/workflows/daily-popular-repo
 - opens up to 5 PRs per repository with attribution to both Judges and the target repository,
 - skips repositories unless they are public and PR creation is possible with existing GitHub auth (no additional auth flow).
 - enforces hard runtime caps of 10 repositories/day and 5 PRs/repository.
+
+Each run writes `daily-autofix-summary.json` (or `SUMMARY_PATH`) with per-repository telemetry, including:
+- `runAggregate` — compact run-level totals and cross-repo top prioritized rules,
+- `runAggregate.totalCandidatesDiscovered` and `runAggregate.totalCandidatesAfterLocationDedupe` — signal how much overlap was removed before attempting fixes,
+- `runAggregate.totalCandidatesAfterPriorityThreshold` — candidates that remain after applying minimum priority score,
+- `runAggregate.dedupeReductionPercent` — percent reduction from location dedupe for quick runtime-efficiency tracking,
+- `runAggregate.priorityThresholdReductionPercent` — percent reduction from minimum-priority filtering after dedupe,
+- `priorityRulePrefixesUsed` — dangerous rule prefixes used during prioritization,
+- `minPriorityScoreUsed` — minimum `candidatePriorityScore` applied for candidate inclusion,
+- `candidatesDiscovered`, `candidatesAfterLocationDedupe`, and `candidatesAfterPriorityThreshold` — per-repo candidate counts after each filter stage,
+- `topPrioritizedRuleCounts` — most common rule IDs among ranked candidates,
+- `topPrioritizedCandidates` — top ranked candidate samples (rule, severity, confidence, file, line, priority score).
+
+Optional runtime control:
+- `AUTOFIX_MIN_PRIORITY_SCORE` — minimum candidate priority score required after dedupe (default: `0`, disabled).
 
 Required secret:
 - `JUDGES_AUTOFIX_GH_TOKEN` — GitHub token with permission to fork/push/create PRs for target repositories.

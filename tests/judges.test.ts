@@ -76,8 +76,8 @@ function findingsAreWellFormed(findings: Finding[]): void {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Judge Registry", () => {
-  it("should have exactly 33 judges registered", () => {
-    assert.equal(JUDGES.length, 33);
+  it("should have exactly 34 judges registered", () => {
+    assert.equal(JUDGES.length, 34);
   });
 
   it("should allow lookup of every judge by ID", () => {
@@ -1791,5 +1791,2300 @@ function deeplyNested(input: any) {
     assert.equal(verdict.mustFixGate?.enabled, true);
     assert.ok(typeof verdict.mustFixGate?.matchedCount === "number");
     assert.ok(verdict.summary.includes("Must-Fix Gate"));
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AI Code Safety Judge
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AI Code Safety Judge", () => {
+  const llmCodeWithIssues = `
+import OpenAI from "openai";
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// TODO: add authentication
+// TODO: add input validation
+
+app.post("/chat", async (req, res) => {
+  const userMessage = req.body.message;
+
+  // User input concatenated into prompt
+  const response = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [
+      { role: "system", content: "You are a helpful assistant." },
+      { role: "user", content: userMessage },
+    ],
+  });
+
+  const result = response.choices[0].message.content;
+
+  // LLM output piped to innerHTML
+  document.getElementById("output").innerHTML = result;
+
+  res.json({ answer: result });
+});
+
+app.listen(8080);
+`;
+
+  const safeLlmCode = `
+import OpenAI from "openai";
+import { z } from "zod";
+import rateLimit from "express-rate-limit";
+import DOMPurify from "dompurify";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const limiter = rateLimit({ windowMs: 60_000, max: 10 });
+const inputSchema = z.object({ message: z.string().max(2000) });
+
+app.post("/chat", limiter, async (req, res) => {
+  const { message } = inputSchema.parse(req.body);
+
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 30_000);
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [
+      { role: "system", content: "You are a helpful assistant." },
+      { role: "user", content: message },
+    ],
+  }, { signal: controller.signal });
+
+  const result = response.choices[0].message.content;
+  const sanitized = DOMPurify.sanitize(result);
+
+  res.json({ answer: sanitized });
+});
+
+app.listen(parseInt(process.env.PORT || "3000"), "127.0.0.1");
+`;
+
+  it("should detect AICS findings in risky AI-generated code", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const evaluation = evaluateWithJudge(judge!, llmCodeWithIssues, "typescript");
+    assert.ok(
+      hasRulePrefix(evaluation.findings, "AICS"),
+      "Expected AICS-* findings"
+    );
+    assert.ok(evaluation.findings.length >= 2, "Expected multiple AI code safety findings");
+  });
+
+  it("should produce fewer findings for well-guarded AI code", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const risky = evaluateWithJudge(judge!, llmCodeWithIssues, "typescript");
+    const safe = evaluateWithJudge(judge!, safeLlmCode, "typescript");
+
+    assert.ok(
+      safe.findings.length < risky.findings.length,
+      `Expected safer code to have fewer findings (safe=${safe.findings.length}, risky=${risky.findings.length})`
+    );
+  });
+
+  it("should detect placeholder security comments", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const evaluation = evaluateWithJudge(judge!, llmCodeWithIssues, "typescript");
+    const placeholder = evaluation.findings.filter((f) => f.ruleId === "AICS-003");
+    assert.ok(placeholder.length > 0, "Expected AICS-003 for TODO security comments");
+  });
+
+  it("should detect debug mode left enabled", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const debugCode = `
+const app = express();
+app.set("debug", true);
+const debug = true;
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, debugCode, "typescript");
+    const debugFindings = evaluation.findings.filter((f) => f.ruleId === "AICS-004");
+    assert.ok(debugFindings.length > 0, "Expected AICS-004 for debug mode enabled");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Cybersecurity Enhanced Rules (NoSQL injection, mass assignment, etc.)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Cybersecurity Enhanced Rules", () => {
+  it("should detect NoSQL injection via direct req.body passthrough", () => {
+    const judge = getJudge("cybersecurity");
+    assert.ok(judge, "cybersecurity judge should exist");
+
+    const nosqlCode = `
+app.post("/users", async (req, res) => {
+  const user = await User.findOne(req.body);
+  const docs = await db.collection("users").find(req.query).toArray();
+  res.json(user);
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, nosqlCode, "typescript");
+    const nosql = evaluation.findings.filter((f) => f.title.includes("NoSQL injection"));
+    assert.ok(nosql.length > 0, "Expected NoSQL injection finding for direct req.body passthrough");
+  });
+
+  it("should detect mass assignment via raw req.body to ORM", () => {
+    const judge = getJudge("cybersecurity");
+    assert.ok(judge, "cybersecurity judge should exist");
+
+    const massAssignCode = `
+app.post("/users", async (req, res) => {
+  const user = await User.create(req.body);
+  await Profile.findByIdAndUpdate(profileId, req.body);
+  res.status(201).json(user);
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, massAssignCode, "typescript");
+    const massAssign = evaluation.findings.filter((f) => f.title.includes("Mass assignment"));
+    assert.ok(massAssign.length > 0, "Expected mass assignment finding for raw req.body to ORM");
+  });
+
+  it("should detect cloud metadata endpoint references", () => {
+    const judge = getJudge("cybersecurity");
+    assert.ok(judge, "cybersecurity judge should exist");
+
+    const metadataCode = `
+async function getInstanceRole() {
+  const response = await fetch("http://169.254.169.254/latest/meta-data/iam/security-credentials/");
+  return response.json();
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, metadataCode, "typescript");
+    const metadata = evaluation.findings.filter((f) => f.title.includes("Cloud metadata"));
+    assert.ok(metadata.length > 0, "Expected cloud metadata endpoint reference finding");
+  });
+
+  it("should detect insecure ECB encryption mode", () => {
+    const judge = getJudge("cybersecurity");
+    assert.ok(judge, "cybersecurity judge should exist");
+
+    const ecbCode = `
+const crypto = require("crypto");
+const cipher = crypto.createCipheriv("aes-256-ecb", key, null);
+const encrypted = cipher.update(data, "utf8", "hex") + cipher.final("hex");
+`;
+    const evaluation = evaluateWithJudge(judge!, ecbCode, "typescript");
+    const ecb = evaluation.findings.filter((f) => f.title.includes("ECB"));
+    assert.ok(ecb.length > 0, "Expected insecure ECB encryption mode finding");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Error Handling Enhanced Rules
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Error Handling Enhanced Rules", () => {
+  it("should detect .then() without .catch()", () => {
+    const judge = getJudge("error-handling");
+    assert.ok(judge, "error-handling judge should exist");
+
+    const thenCode = `
+function loadData() {
+  fetch("/api/users")
+    .then((res) => res.json())
+    .then((data) => renderUsers(data));
+}
+
+function loadMore() {
+  fetch("/api/items")
+    .then((res) => res.json())
+    .then((items) => renderItems(items));
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, thenCode, "typescript");
+    const thenNoCatch = evaluation.findings.filter((f) => f.title.includes(".then()") && f.title.includes(".catch()"));
+    assert.ok(thenNoCatch.length > 0, "Expected .then() without .catch() finding");
+  });
+
+  it("should detect stack trace exposure to clients", () => {
+    const judge = getJudge("error-handling");
+    assert.ok(judge, "error-handling judge should exist");
+
+    const stackCode = `
+app.get("/api/data", async (req, res) => {
+  try {
+    const data = await fetchData();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json(err);
+  }
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, stackCode, "typescript");
+    const stackExposure = evaluation.findings.filter((f) => f.title.includes("Stack trace") || f.title.includes("error internals"));
+    assert.ok(stackExposure.length > 0, "Expected stack trace exposure finding");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Data Security Enhanced Rules
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Data Security Enhanced Rules", () => {
+  it("should detect secrets in URL query parameters", () => {
+    const judge = getJudge("data-security");
+    assert.ok(judge, "data-security judge should exist");
+
+    const secretUrlCode = `
+const apiUrl = "https://api.stripe.com/v1/charges?api_key=sk_live_abc123def456";
+const response = await fetch(apiUrl);
+`;
+    const evaluation = evaluateWithJudge(judge!, secretUrlCode, "typescript");
+    const secretUrl = evaluation.findings.filter((f) => f.title.includes("Secret") && f.title.includes("URL"));
+    assert.ok(secretUrl.length > 0, "Expected secret-in-URL finding");
+  });
+
+  it("should detect sensitive data in error messages", () => {
+    const judge = getJudge("data-security");
+    assert.ok(judge, "data-security judge should exist");
+
+    const sensitiveErrorCode = `
+function authenticate(email: string, password: string) {
+  const user = findUser(email);
+  if (!user || user.password !== hash(password)) {
+    throw new Error("Invalid password for user " + email + " with token " + user?.token);
+  }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, sensitiveErrorCode, "typescript");
+    const sensitiveErr = evaluation.findings.filter((f) => f.title.includes("Sensitive data") && f.title.includes("error"));
+    assert.ok(sensitiveErr.length > 0, "Expected sensitive-data-in-error finding");
+  });
+
+  it("should detect logging raw request bodies", () => {
+    const judge = getJudge("data-security");
+    assert.ok(judge, "data-security judge should exist");
+
+    const logCode = `
+app.post("/register", (req, res) => {
+  console.log("Registration request:", req.body);
+  logger.info("Incoming data:", req.body);
+  const user = createUser(req.body);
+  res.json(user);
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, logCode, "typescript");
+    const logBody = evaluation.findings.filter((f) => f.title.includes("Logging raw"));
+    assert.ok(logBody.length > 0, "Expected logging-raw-body finding");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Authentication Enhanced Rules
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Authentication Enhanced Rules", () => {
+  it("should detect missing session regeneration after login", () => {
+    const judge = getJudge("authentication");
+    assert.ok(judge, "authentication judge should exist");
+
+    const sessionFixCode = `
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  const user = await User.findOne({ email });
+  const valid = await bcrypt.compare(password, user.password);
+  if (valid) {
+    req.session.user = user;
+    req.session.isAuthenticated = true;
+    res.redirect("/dashboard");
+  } else {
+    res.status(401).send("Invalid credentials");
+  }
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, sessionFixCode, "typescript");
+    const sessionFix = evaluation.findings.filter((f) => f.title.includes("session regeneration"));
+    assert.ok(sessionFix.length > 0, "Expected session fixation finding for missing session.regenerate()");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Dependency Health Enhanced Rules
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Dependency Health Enhanced Rules", () => {
+  it("should detect potential typosquatting package imports", () => {
+    const judge = getJudge("dependency-health");
+    assert.ok(judge, "dependency-health judge should exist");
+
+    const typosquatCode = `
+import axois from "axois";
+import { debounce } from "lod-ash";
+const expresss = require("expresss");
+`;
+    const evaluation = evaluateWithJudge(judge!, typosquatCode, "typescript");
+    const typosquat = evaluation.findings.filter((f) => f.title.includes("typosquatting"));
+    assert.ok(typosquat.length > 0, "Expected typosquatting package finding");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Software Practices Enhanced Rules
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Software Practices Enhanced Rules", () => {
+  it("should detect retry without exponential backoff", () => {
+    const judge = getJudge("software-practices");
+    assert.ok(judge, "software-practices judge should exist");
+
+    const retryCode = `
+async function fetchWithRetry(url: string, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fetch(url);
+    } catch (err) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, retryCode, "typescript");
+    const retryBackoff = evaluation.findings.filter((f) => f.title.includes("Retry") && f.title.includes("backoff"));
+    assert.ok(retryBackoff.length > 0, "Expected retry-without-backoff finding");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Agent Instructions — New Rules (AGENT-008, 009, 010)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Agent Instructions — Expanded Rules", () => {
+  it("should detect agent capabilities without sandboxing guidance", () => {
+    const judge = getJudge("agent-instructions");
+    assert.ok(judge, "agent-instructions judge should exist");
+
+    const unsandboxedInstructions = `
+# Agent Rules
+
+You may execute shell commands to install packages.
+Use exec to run build scripts when needed.
+Access the filesystem to read and write project files.
+Make network requests to fetch missing dependencies.
+`;
+    const evaluation = evaluateWithJudge(judge!, unsandboxedInstructions, "markdown");
+    const sandboxFindings = evaluation.findings.filter((f) => f.title.includes("sandboxing"));
+    assert.ok(sandboxFindings.length > 0, "Expected finding for capabilities without sandboxing");
+  });
+
+  it("should NOT detect sandboxing issue when sandbox guidance is present", () => {
+    const judge = getJudge("agent-instructions");
+    assert.ok(judge, "agent-instructions judge should exist");
+
+    const sandboxedInstructions = `
+# Agent Rules
+
+You may execute shell commands only within the Docker container sandbox.
+Use restricted exec with permission allowlists.
+Access the filesystem only within the isolation boundary.
+`;
+    const evaluation = evaluateWithJudge(judge!, sandboxedInstructions, "markdown");
+    const sandboxFindings = evaluation.findings.filter((f) => f.title.includes("sandboxing"));
+    assert.strictEqual(sandboxFindings.length, 0, "Expected no sandboxing finding when sandbox guidance is present");
+  });
+
+  it("should detect tool definitions without parameter constraints", () => {
+    const judge = getJudge("agent-instructions");
+    assert.ok(judge, "agent-instructions judge should exist");
+
+    const noConstraintTools = `
+# Agent Tools
+
+## Available Tools
+- tool: file_search — search for files in workspace
+- action: run_command — run a terminal command
+- function: read_url — fetch a web page
+- command: edit_file — modify a file
+
+Use these tools to complete user tasks.
+Do not ask for confirmation before using tools.
+Follow the user instructions carefully.
+Always check outputs before proceeding.
+Be concise in your responses to the user.
+Do not explain what you are doing unless asked.
+Report errors clearly with context.
+`;
+    const evaluation = evaluateWithJudge(judge!, noConstraintTools, "markdown");
+    const toolFindings = evaluation.findings.filter((f) => f.title.includes("parameter constraints"));
+    assert.ok(toolFindings.length > 0, "Expected finding for tool definitions without constraints");
+  });
+
+  it("should detect agent loop without termination condition", () => {
+    const judge = getJudge("agent-instructions");
+    assert.ok(judge, "agent-instructions judge should exist");
+
+    const loopInstructions = `
+# Agent Rules
+
+When tests fail, iterate over the failing tests and fix each one.
+Continue to retry until all tests pass.
+Loop through each module and repeat the analysis.
+`;
+    const evaluation = evaluateWithJudge(judge!, loopInstructions, "markdown");
+    const loopFindings = evaluation.findings.filter((f) => f.title.includes("loop") || f.title.includes("termination"));
+    assert.ok(loopFindings.length > 0, "Expected finding for loop without termination condition");
+  });
+
+  it("should NOT detect loop issue when termination conditions exist", () => {
+    const judge = getJudge("agent-instructions");
+    assert.ok(judge, "agent-instructions judge should exist");
+
+    const boundedLoop = `
+# Agent Rules
+
+When tests fail, iterate with a maximum of 3 retries (max_iterations: 3).
+Set a timeout of 60 seconds for iterative repair.
+Stop if the budget is exceeded.
+`;
+    const evaluation = evaluateWithJudge(judge!, boundedLoop, "markdown");
+    const loopFindings = evaluation.findings.filter((f) => f.title.includes("loop") && f.title.includes("termination"));
+    assert.strictEqual(loopFindings.length, 0, "Expected no loop termination finding when conditions present");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-016 — Tool-call results without validation
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-016 Tool-Call Result Validation", () => {
+  it("should detect tool_result used without validation", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const unsafeToolUse = `
+async function handleToolCall(response) {
+  const tool_result = response.tool_calls[0].result;
+  const output = tool_result.content;
+  document.getElementById("display").innerHTML = output;
+  return output;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, unsafeToolUse, "typescript");
+    const toolFindings = evaluation.findings.filter((f) => f.ruleId === "AICS-016");
+    assert.ok(toolFindings.length > 0, "Expected AICS-016 for tool results without validation");
+  });
+
+  it("should NOT fire AICS-016 when tool results are validated", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const safeToolUse = `
+import { z } from "zod";
+const resultSchema = z.object({ content: z.string() });
+
+async function handleToolCall(response) {
+  const tool_result = response.tool_calls[0].result;
+  const parsed = resultSchema.parse(tool_result);
+  const sanitized = DOMPurify.sanitize(parsed.content);
+  return sanitized;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, safeToolUse, "typescript");
+    const toolFindings = evaluation.findings.filter((f) => f.ruleId === "AICS-016");
+    assert.strictEqual(toolFindings.length, 0, "Expected no AICS-016 when tool results are validated");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-017 — Weak cryptographic hashing (MD5/SHA-1)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-017 Weak Cryptographic Hashing", () => {
+  it("should detect MD5 usage in TypeScript", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import crypto from "crypto";
+function hashPassword(password: string): string {
+  return crypto.createHash("md5").update(password).digest("hex");
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-017");
+    assert.ok(findings.length > 0, "Expected AICS-017 for MD5 usage");
+  });
+
+  it("should detect SHA-1 usage in Python", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import hashlib
+def hash_token(token):
+    return hashlib.sha1(token.encode()).hexdigest()
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "python");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-017");
+    assert.ok(findings.length > 0, "Expected AICS-017 for SHA-1 usage");
+  });
+
+  it("should NOT fire AICS-017 for SHA-256", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import crypto from "crypto";
+function hashData(data: string): string {
+  return crypto.createHash("sha256").update(data).digest("hex");
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-017");
+    assert.strictEqual(findings.length, 0, "Expected no AICS-017 for SHA-256");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-018 — Empty catch blocks
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-018 Empty Catch Blocks", () => {
+  it("should detect empty catch block in TypeScript", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+async function fetchData(url: string) {
+  try {
+    const response = await fetch(url);
+    return await response.json();
+  } catch (err) { }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-018");
+    assert.ok(findings.length > 0, "Expected AICS-018 for empty catch block");
+  });
+
+  it("should detect empty except block in Python", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+def load_config():
+    try:
+        with open("config.json") as f:
+            return json.load(f)
+    except Exception: pass
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "python");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-018");
+    assert.ok(findings.length > 0, "Expected AICS-018 for empty except/pass block");
+  });
+
+  it("should NOT fire AICS-018 when error is logged", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+async function fetchData(url: string) {
+  try {
+    const response = await fetch(url);
+    return await response.json();
+  } catch (err) {
+    logger.error("Fetch failed", { error: err, url });
+    throw err;
+  }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-018");
+    assert.strictEqual(findings.length, 0, "Expected no AICS-018 when error is logged");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-019 — Placeholder/dummy credentials
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-019 Placeholder Credentials", () => {
+  it("should detect 'changeme' credential", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+const config = {
+  database: {
+    host: "localhost",
+    password: "changeme",
+    port: 5432,
+  }
+};
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-019");
+    assert.ok(findings.length > 0, "Expected AICS-019 for 'changeme' credential");
+  });
+
+  it("should detect 'your_api_key_here'", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+const API_KEY = "your_api_key_here";
+async function callService() {
+  return fetch("/api/data", { headers: { Authorization: API_KEY } });
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-019");
+    assert.ok(findings.length > 0, "Expected AICS-019 for 'your_api_key_here'");
+  });
+
+  it("should detect 'password123'", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+DB_PASSWORD = "password123"
+connection = psycopg2.connect(host="localhost", password=DB_PASSWORD)
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "python");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-019");
+    assert.ok(findings.length > 0, "Expected AICS-019 for 'password123'");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-020 — TLS certificate verification disabled
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-020 TLS Verification Disabled", () => {
+  it("should detect rejectUnauthorized: false in TypeScript", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import https from "https";
+const agent = new https.Agent({
+  rejectUnauthorized: false,
+});
+const response = await fetch("https://api.example.com", { agent });
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-020");
+    assert.ok(findings.length > 0, "Expected AICS-020 for rejectUnauthorized: false");
+  });
+
+  it("should detect verify=False in Python", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import requests
+response = requests.get("https://api.example.com", verify=False)
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "python");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-020");
+    assert.ok(findings.length > 0, "Expected AICS-020 for verify=False");
+  });
+
+  it("should detect InsecureSkipVerify in Go", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+package main
+import "crypto/tls"
+func createClient() *http.Client {
+    tr := &http.Transport{
+        TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+    }
+    return &http.Client{Transport: tr}
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "go");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-020");
+    assert.ok(findings.length > 0, "Expected AICS-020 for InsecureSkipVerify: true");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-021 — Overly permissive CORS
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-021 Overly Permissive CORS", () => {
+  it("should detect wildcard CORS origin in Express", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import express from "express";
+import cors from "cors";
+const app = express();
+app.use(cors('*'));
+app.get("/api/data", (req, res) => { res.json({ ok: true }); });
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-021");
+    assert.ok(findings.length > 0, "Expected AICS-021 for wildcard CORS origin");
+  });
+
+  it("should NOT fire AICS-021 for specific CORS origin", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import express from "express";
+import cors from "cors";
+const app = express();
+app.use(cors({ origin: "https://myapp.example.com", credentials: true }));
+app.get("/api/data", (req, res) => { res.json({ ok: true }); });
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-021");
+    assert.strictEqual(findings.length, 0, "Expected no AICS-021 for specific CORS origin");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-022 — Unsafe deserialization
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-022 Unsafe Deserialization", () => {
+  it("should detect pickle.loads in Python", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import pickle
+def load_user_data(raw_bytes):
+    return pickle.loads(raw_bytes)
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "python");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-022");
+    assert.ok(findings.length > 0, "Expected AICS-022 for pickle.loads");
+  });
+
+  it("should detect yaml.load without SafeLoader in Python", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import yaml
+def parse_config(raw):
+    return yaml.load(raw)
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "python");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-022");
+    assert.ok(findings.length > 0, "Expected AICS-022 for yaml.load without SafeLoader");
+  });
+
+  it("should detect ObjectInputStream.readObject in Java", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import java.io.*;
+public class Deserializer {
+    public Object deserialize(byte[] data) throws Exception {
+        ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(data));
+        return ois.readUnshared();
+    }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "java");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-022");
+    assert.ok(findings.length > 0, "Expected AICS-022 for unsafe deserialization via readUnshared");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Data Sovereignty — Expanded Rules (SOV-007..010)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Data Sovereignty — Expanded Rules", () => {
+  it("should detect external CDN assets without integrity checks", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const cdnCode = `
+const styles = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css";
+const script = "https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js";
+
+function loadAssets() {
+  const link = document.createElement("link");
+  link.href = styles;
+  document.head.appendChild(link);
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, cdnCode, "typescript");
+    const cdnFindings = evaluation.findings.filter((f) => f.title.includes("CDN") || f.title.includes("third-party"));
+    assert.ok(cdnFindings.length > 0, "Expected finding for CDN assets without integrity checks");
+  });
+
+  it("should detect telemetry sent to external analytics services", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const telemetryCode = `
+import mixpanel from "mixpanel-browser";
+import * as Sentry from "@sentry/node";
+
+mixpanel.init("project-token-123");
+Sentry.init({ dsn: "https://abc@sentry.io/123" });
+
+function trackEvent(name: string, data: Record<string, unknown>) {
+  mixpanel.track(name, data);
+  Sentry.captureMessage(name);
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, telemetryCode, "typescript");
+    const telemetryFindings = evaluation.findings.filter((f) => f.title.includes("Telemetry") || f.title.includes("analytics"));
+    assert.ok(telemetryFindings.length > 0, "Expected finding for telemetry to external services");
+  });
+
+  it("should detect PII storage without geographic partitioning", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const piiCode = `
+interface UserProfile {
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  firstName: string;
+  lastName: string;
+  address: string;
+  nationalId: string;
+}
+
+async function createUser(profile: UserProfile) {
+  await db.collection("users").insert(profile);
+  await UserModel.create(profile);
+  return { success: true };
+}
+
+async function updateUser(id: string, data: Partial<UserProfile>) {
+  await db.collection("users").update({ _id: id }, data);
+}
+
+async function deleteUser(id: string) {
+  await db.collection("users").remove({ _id: id });
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, piiCode, "typescript");
+    const piiFindings = evaluation.findings.filter((f) => f.title.includes("PII") || f.title.includes("geographic"));
+    assert.ok(piiFindings.length > 0, "Expected finding for PII without geo partitioning");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Compliance Judge Dedicated Tests
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Compliance Judge Dedicated Tests", () => {
+  it("should detect PII fields without protection", () => {
+    const judge = getJudge("compliance");
+    assert.ok(judge, "compliance judge should exist");
+
+    const riskyCode = `
+const user = { ssn: req.body.ssn, passport: req.body.passport, taxId: req.body.taxId };
+await db.insert(user);
+`;
+    const evaluation = evaluateWithJudge(judge!, riskyCode, "typescript");
+    const piiFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("COMP-") && f.severity === "critical");
+    assert.ok(piiFindings.length > 0, "Expected critical PII findings from compliance judge");
+  });
+
+  it("should detect tracking without consent", () => {
+    const judge = getJudge("compliance");
+    assert.ok(judge, "compliance judge should exist");
+
+    const trackingCode = `
+import analytics from 'analytics';
+analytics.track('page_view', { userId: user.id });
+gtag('event', 'purchase', { value: 100 });
+`;
+    const evaluation = evaluateWithJudge(judge!, trackingCode, "typescript");
+    const trackingFindings = evaluation.findings.filter((f) => f.title.includes("consent") || f.title.includes("Tracking"));
+    assert.ok(trackingFindings.length > 0, "Expected tracking without consent finding");
+  });
+
+  it("should detect sensitive data in logs", () => {
+    const judge = getJudge("compliance");
+    assert.ok(judge, "compliance judge should exist");
+
+    const logCode = `
+console.log("User auth:", password, token, secret);
+logger.info("Processing SSN:", ssn);
+`;
+    const evaluation = evaluateWithJudge(judge!, logCode, "typescript");
+    const sensitiveLogFindings = evaluation.findings.filter((f) => f.title.includes("Sensitive data in log"));
+    assert.ok(sensitiveLogFindings.length > 0, "Expected sensitive data in logs finding");
+  });
+
+  it("should include suggestedFix on critical compliance findings", () => {
+    const judge = getJudge("compliance");
+    assert.ok(judge, "compliance judge should exist");
+
+    const riskyCode = `
+const user = { ssn: req.body.ssn, passport: req.body.passport };
+await db.insert(user);
+console.log("Auth:", password, token);
+`;
+    const evaluation = evaluateWithJudge(judge!, riskyCode, "typescript");
+    const compFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("COMP-") && f.suggestedFix);
+    assert.ok(compFindings.length > 0, "Expected at least one COMP finding with suggestedFix");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Logging Privacy Judge Dedicated Tests
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Logging Privacy Judge Dedicated Tests", () => {
+  it("should detect auth tokens logged", () => {
+    const judge = getJudge("logging-privacy");
+    assert.ok(judge, "logging-privacy judge should exist");
+
+    const logCode = `
+console.log("Auth header:", req.headers.authorization);
+console.log("Token:", bearerToken);
+`;
+    const evaluation = evaluateWithJudge(judge!, logCode, "typescript");
+    const authLogFindings = evaluation.findings.filter((f) => f.ruleId === "LOGPRIV-001");
+    assert.ok(authLogFindings.length > 0, "Expected LOGPRIV-001 for logged auth tokens");
+    assert.ok(authLogFindings[0].suggestedFix, "LOGPRIV-001 should have suggestedFix");
+  });
+
+  it("should detect passwords logged", () => {
+    const judge = getJudge("logging-privacy");
+    assert.ok(judge, "logging-privacy judge should exist");
+
+    const logCode = `
+console.log("User password:", password);
+console.debug("secret value:", secret);
+`;
+    const evaluation = evaluateWithJudge(judge!, logCode, "typescript");
+    const pwdFindings = evaluation.findings.filter((f) => f.title.includes("Password") || f.title.includes("secret"));
+    assert.ok(pwdFindings.length > 0, "Expected password/secret logging finding");
+    assert.ok(pwdFindings[0].suggestedFix, "Password logging finding should have suggestedFix");
+  });
+
+  it("should detect stack traces in API responses", () => {
+    const judge = getJudge("logging-privacy");
+    assert.ok(judge, "logging-privacy judge should exist");
+
+    const stackCode = `
+app.use((err, req, res, next) => {
+  res.status(500).json({ error: err.message, stack: err.stack });
+  res.send(error.stackTrace);
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, stackCode, "typescript");
+    const stackFindings = evaluation.findings.filter((f) => f.title.includes("Stack trace"));
+    assert.ok(stackFindings.length > 0, "Expected stack trace exposure finding");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Rate Limiting Judge Dedicated Tests
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Rate Limiting Judge Dedicated Tests", () => {
+  it("should detect missing rate limiting on server apps", () => {
+    const judge = getJudge("rate-limiting");
+    assert.ok(judge, "rate-limiting judge should exist");
+
+    const serverCode = `
+const app = express();
+app.use(express.json());
+app.post("/api/login", async (req, res) => {
+  const user = await authenticate(req.body);
+  res.json({ token: user.token });
+});
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, serverCode, "typescript");
+    const rateFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("RATE-"));
+    assert.ok(rateFindings.length > 0, "Expected RATE findings for unprotected server");
+  });
+
+  it("should detect auth endpoints without rate limiting", () => {
+    const judge = getJudge("rate-limiting");
+    assert.ok(judge, "rate-limiting judge should exist");
+
+    const authCode = `
+const app = express();
+app.post("/login", loginHandler);
+app.post("/signin", signinHandler);
+app.post("/authenticate", authHandler);
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, authCode, "typescript");
+    const authRateFindings = evaluation.findings.filter((f) => f.title.includes("auth") || f.title.includes("Auth"));
+    assert.ok(authRateFindings.length > 0, "Expected auth rate limiting finding");
+  });
+
+  it("should include suggestedFix on RATE findings", () => {
+    const judge = getJudge("rate-limiting");
+    assert.ok(judge, "rate-limiting judge should exist");
+
+    const serverCode = `
+const app = express();
+app.use(express.json());
+app.post("/login", loginHandler);
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, serverCode, "typescript");
+    const fixFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("RATE-") && f.suggestedFix);
+    assert.ok(fixFindings.length > 0, "Expected at least one RATE finding with suggestedFix");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Database Judge Dedicated Tests
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Database Judge Dedicated Tests", () => {
+  it("should detect SQL injection via string concatenation", () => {
+    const judge = getJudge("database");
+    assert.ok(judge, "database judge should exist");
+
+    const sqlCode = `
+const userId = req.params.id;
+const result = await db.query(\`SELECT * FROM users WHERE id = \${req.params.id}\`);
+`;
+    const evaluation = evaluateWithJudge(judge!, sqlCode, "typescript");
+    const sqlInjection = evaluation.findings.filter((f) => f.title.includes("SQL injection"));
+    assert.ok(sqlInjection.length > 0, "Expected SQL injection finding");
+    assert.ok(sqlInjection[0].suggestedFix, "SQL injection finding should have suggestedFix");
+  });
+
+  it("should detect hardcoded connection strings", () => {
+    const judge = getJudge("database");
+    assert.ok(judge, "database judge should exist");
+
+    const connCode = `
+const db = new Client("postgres://admin:password123@prod-server:5432/mydb");
+const mongo = mongoose.connect("mongodb://root:secret@db-host:27017/app");
+`;
+    const evaluation = evaluateWithJudge(judge!, connCode, "typescript");
+    const connFindings = evaluation.findings.filter((f) => f.title.includes("connection string") || f.title.includes("credentials"));
+    assert.ok(connFindings.length > 0, "Expected hardcoded connection string finding");
+  });
+
+  it("should detect destructive DDL in application code", () => {
+    const judge = getJudge("database");
+    assert.ok(judge, "database judge should exist");
+
+    const ddlCode = `
+async function cleanup() {
+  await db.query("DROP TABLE users");
+  await db.query("TRUNCATE TABLE sessions");
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, ddlCode, "typescript");
+    const ddlFindings = evaluation.findings.filter((f) => f.title.includes("Destructive") || f.title.includes("DROP"));
+    assert.ok(ddlFindings.length > 0, "Expected destructive DDL finding");
+    assert.ok(ddlFindings[0].suggestedFix, "DB-008 should have suggestedFix");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Reliability Judge Dedicated Tests
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Reliability Judge Dedicated Tests", () => {
+  it("should detect empty catch blocks", () => {
+    const judge = getJudge("reliability");
+    assert.ok(judge, "reliability judge should exist");
+
+    const catchCode = `
+try { await fetchData(); } catch (err) { }
+try { processItem(); } catch (e) { }
+const data = await fetch("https://api.example.com/data");
+const resp = await axios.get("https://api.example.com/users");
+`;
+    const evaluation = evaluateWithJudge(judge!, catchCode, "typescript");
+    const relFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("REL-"));
+    assert.ok(relFindings.length > 0, "Expected REL findings from reliability judge");
+    const fixFindings = relFindings.filter((f) => f.suggestedFix);
+    assert.ok(fixFindings.length > 0, "Expected at least one REL finding with suggestedFix");
+  });
+
+  it("should detect network calls without timeout", () => {
+    const judge = getJudge("reliability");
+    assert.ok(judge, "reliability judge should exist");
+
+    const fetchCode = `
+const response = await fetch("https://api.example.com/data");
+const data = await axios.get("https://api.example.com/users");
+`;
+    const evaluation = evaluateWithJudge(judge!, fetchCode, "typescript");
+    const noTimeout = evaluation.findings.filter((f) => f.title.includes("timeout") || f.title.includes("Timeout"));
+    assert.ok(noTimeout.length > 0, "Expected network timeout finding");
+  });
+
+  it("should detect process.exit usage", () => {
+    const judge = getJudge("reliability");
+    assert.ok(judge, "reliability judge should exist");
+
+    const exitCode = `
+if (config.invalid) {
+  process.exit(1);
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, exitCode, "typescript");
+    const exitFindings = evaluation.findings.filter((f) => f.title.includes("process") || f.title.includes("termination"));
+    assert.ok(exitFindings.length > 0, "Expected process exit finding");
+    assert.ok(exitFindings[0].suggestedFix, "REL-006 should have suggestedFix");
+  });
+});
+
+// =============================================================================
+// Accessibility Judge Dedicated Tests
+// =============================================================================
+describe("Accessibility Judge Dedicated Tests", () => {
+  it("should detect images missing alt attributes", () => {
+    const judge = getJudge("accessibility");
+    assert.ok(judge, "accessibility judge should exist");
+
+    const htmlCode = `
+const html = \`
+<img src="photo.jpg">
+<img src="logo.png">
+<div>Welcome</div>
+\`;
+`;
+    const evaluation = evaluateWithJudge(judge!, htmlCode, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId.startsWith("A11Y-"));
+    assert.ok(findings.length > 0, "Expected A11Y findings for missing alt attributes");
+  });
+
+  it("should detect click handlers without keyboard equivalents", () => {
+    const judge = getJudge("accessibility");
+    assert.ok(judge, "accessibility judge should exist");
+
+    const jsxCode = `
+function Menu() {
+  return (
+    <div onClick={handleClick}>Click me</div>
+    <span onClick={toggle}>Toggle</span>
+  );
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, jsxCode, "typescript");
+    const keyboardFindings = evaluation.findings.filter((f) =>
+      f.title.includes("keyboard") || f.title.includes("Click")
+    );
+    assert.ok(keyboardFindings.length > 0, "Expected keyboard accessibility findings");
+  });
+
+  it("should detect non-semantic elements with ARIA roles", () => {
+    const judge = getJudge("accessibility");
+    assert.ok(judge, "accessibility judge should exist");
+
+    const ariaCode = `
+const el = \`
+<div role="button">Submit</div>
+<span role="link">Go back</span>
+\`;
+`;
+    const evaluation = evaluateWithJudge(judge!, ariaCode, "typescript");
+    const ariaFindings = evaluation.findings.filter((f) =>
+      f.title.includes("ARIA") || f.title.includes("semantic") || f.title.includes("Non-semantic")
+    );
+    assert.ok(ariaFindings.length > 0, "Expected ARIA role findings");
+  });
+});
+
+// =============================================================================
+// API Design Judge Dedicated Tests
+// =============================================================================
+describe("API Design Judge Dedicated Tests", () => {
+  it("should detect verbs in REST endpoint URLs", () => {
+    const judge = getJudge("api-design");
+    assert.ok(judge, "api-design judge should exist");
+
+    const routeCode = `
+app.post("/api/createUser", (req, res) => {
+  const user = req.body;
+  res.json(user);
+});
+app.delete("/api/deleteItem/:id", (req, res) => {
+  res.json({ ok: true });
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, routeCode, "typescript");
+    const verbFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("API-") && (f.title.includes("Verb") || f.title.includes("verb"))
+    );
+    assert.ok(verbFindings.length > 0, "Expected verb-in-URL findings");
+  });
+
+  it("should detect error responses without proper HTTP status", () => {
+    const judge = getJudge("api-design");
+    assert.ok(judge, "api-design judge should exist");
+
+    const errorCode = `
+app.get("/api/users", async (req, res) => {
+  try {
+    const users = await db.find();
+    res.json(users);
+  } catch (err) {
+    res.json({ error: "Failed" });
+  }
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, errorCode, "typescript");
+    const statusFindings = evaluation.findings.filter((f) =>
+      f.title.includes("status") || f.title.includes("Error response")
+    );
+    assert.ok(statusFindings.length > 0, "Expected error status code findings");
+  });
+
+  it("should detect SELECT * in API handlers", () => {
+    const judge = getJudge("api-design");
+    assert.ok(judge, "api-design judge should exist");
+
+    const selectAllCode = `
+app.get("/api/users", async (req, res) => {
+  const result = await db.query("SELECT * FROM users");
+  res.json(result.rows);
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, selectAllCode, "typescript");
+    const selectFindings = evaluation.findings.filter((f) =>
+      f.title.includes("SELECT *") || f.title.includes("select")
+    );
+    assert.ok(selectFindings.length > 0, "Expected SELECT * findings");
+  });
+});
+
+// =============================================================================
+// Backwards Compatibility Judge Dedicated Tests
+// =============================================================================
+describe("Backwards Compatibility Judge Dedicated Tests", () => {
+  it("should detect API endpoints without versioning", () => {
+    const judge = getJudge("backwards-compatibility");
+    assert.ok(judge, "backwards-compatibility judge should exist");
+
+    const routeCode = `
+app.get("/api/users", handler);
+app.post("/api/orders", handler);
+app.put("/api/products/:id", handler);
+`;
+    const evaluation = evaluateWithJudge(judge!, routeCode, "typescript");
+    const versionFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("COMPAT-") && (f.title.includes("version") || f.title.includes("Version"))
+    );
+    assert.ok(versionFindings.length > 0, "Expected API versioning findings");
+  });
+
+  it("should detect field deletion that could break consumers", () => {
+    const judge = getJudge("backwards-compatibility");
+    assert.ok(judge, "backwards-compatibility judge should exist");
+
+    const deleteCode = `
+function migrateUser(user) {
+  delete user.legacyField;
+  delete user.oldName;
+  return user;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, deleteCode, "typescript");
+    const deleteFindings = evaluation.findings.filter((f) =>
+      f.title.includes("delete") || f.title.includes("break") || f.title.includes("Field")
+    );
+    assert.ok(deleteFindings.length > 0, "Expected field deletion findings");
+  });
+});
+
+// =============================================================================
+// Caching Judge Dedicated Tests
+// =============================================================================
+describe("Caching Judge Dedicated Tests", () => {
+  it("should detect unbounded in-memory caches", () => {
+    const judge = getJudge("caching");
+    assert.ok(judge, "caching judge should exist");
+
+    const cacheCode = `
+const cache = new Map();
+const userCache = {};
+
+function getUser(id) {
+  if (cache.has(id)) return cache.get(id);
+  const user = db.findUser(id);
+  cache.set(id, user);
+  return user;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, cacheCode, "typescript");
+    const unboundedFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("CACHE-") && (f.title.includes("Unbounded") || f.title.includes("unbounded") || f.title.includes("memory"))
+    );
+    assert.ok(unboundedFindings.length > 0, "Expected unbounded cache findings");
+  });
+
+  it("should detect missing HTTP caching headers", () => {
+    const judge = getJudge("caching");
+    assert.ok(judge, "caching judge should exist");
+
+    const noCacheHeaderCode = `
+import express from "express";
+const app = express();
+
+app.get("/api/products", async (req, res) => {
+  const products = await db.query("SELECT * FROM products");
+  res.json(products);
+});
+
+app.get("/api/categories", async (req, res) => {
+  const categories = await db.query("SELECT * FROM categories");
+  res.send(categories);
+});
+
+app.get("/api/featured", async (req, res) => {
+  const featured = await db.query("SELECT * FROM featured_items");
+  res.json(featured);
+});
+
+app.get("/api/popular", async (req, res) => {
+  const popular = await getPopularItems();
+  res.json(popular);
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, noCacheHeaderCode, "typescript");
+    const headerFindings = evaluation.findings.filter((f) =>
+      f.title.includes("caching header") || f.title.includes("Cache-Control") || f.title.includes("HTTP caching")
+    );
+    assert.ok(headerFindings.length > 0, "Expected HTTP caching header findings");
+  });
+});
+
+// =============================================================================
+// CI/CD Judge Dedicated Tests
+// =============================================================================
+describe("CI/CD Judge Dedicated Tests", () => {
+  it("should detect hard process termination calls", () => {
+    const judge = getJudge("ci-cd");
+    assert.ok(judge, "ci-cd judge should exist");
+
+    const exitCode = `
+function startServer() {
+  if (!config.databaseUrl) {
+    console.error("No DB URL");
+    process.exit(1);
+  }
+  if (!config.port) {
+    process.exit(1);
+  }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, exitCode, "typescript");
+    const exitFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("CICD-") && (f.title.includes("termination") || f.title.includes("process") || f.title.includes("exit"))
+    );
+    assert.ok(exitFindings.length > 0, "Expected process exit findings from CI/CD judge");
+  });
+
+  it("should detect no test infrastructure in code", () => {
+    const judge = getJudge("ci-cd");
+    assert.ok(judge, "ci-cd judge should exist");
+
+    const noTestCode = `
+class UserService {
+  constructor(private db: Database) {}
+
+  async getUser(id: string) {
+    return this.db.findById(id);
+  }
+
+  async createUser(data: UserInput) {
+    return this.db.insert(data);
+  }
+
+  async deleteUser(id: string) {
+    return this.db.delete(id);
+  }
+
+  async updateUser(id: string, data: Partial<UserInput>) {
+    return this.db.update(id, data);
+  }
+
+  async listUsers(limit: number = 10) {
+    return this.db.findAll({ limit });
+  }
+
+  async searchUsers(query: string) {
+    return this.db.search(query);
+  }
+
+  async countUsers() {
+    return this.db.count();
+  }
+
+  async getUserByEmail(email: string) {
+    return this.db.findByField("email", email);
+  }
+
+  async getUserRoles(id: string) {
+    return this.db.query("SELECT * FROM roles WHERE user_id = $1", [id]);
+  }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, noTestCode, "typescript");
+    const testFindings = evaluation.findings.filter((f) =>
+      f.title.includes("test") || f.title.includes("Test")
+    );
+    assert.ok(testFindings.length > 0, "Expected no-test-infrastructure findings");
+  });
+});
+
+// =============================================================================
+// Cloud Readiness Judge Dedicated Tests
+// =============================================================================
+describe("Cloud Readiness Judge Dedicated Tests", () => {
+  it("should detect hardcoded localhost references", () => {
+    const judge = getJudge("cloud-readiness");
+    assert.ok(judge, "cloud-readiness judge should exist");
+
+    const localhostCode = `
+const API_URL = "http://localhost:3000/api";
+const DB_HOST = "127.0.0.1:5432";
+fetch("http://localhost:8080/health");
+`;
+    const evaluation = evaluateWithJudge(judge!, localhostCode, "typescript");
+    const findings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("CLOUD-") && (f.title.includes("localhost") || f.title.includes("Hardcoded"))
+    );
+    assert.ok(findings.length > 0, "Expected hardcoded localhost findings");
+  });
+
+  it("should detect local filesystem path dependencies", () => {
+    const judge = getJudge("cloud-readiness");
+    assert.ok(judge, "cloud-readiness judge should exist");
+
+    const fsPathCode = `
+const uploadDir = "/tmp/uploads";
+const dataPath = "C:\\Users\\data\\files";
+const logFile = "/var/log/app.log";
+`;
+    const evaluation = evaluateWithJudge(judge!, fsPathCode, "typescript");
+    const pathFindings = evaluation.findings.filter((f) =>
+      f.title.includes("filesystem") || f.title.includes("path") || f.title.includes("Local")
+    );
+    assert.ok(pathFindings.length > 0, "Expected filesystem path findings");
+  });
+
+  it("should detect missing health check endpoints", () => {
+    const judge = getJudge("cloud-readiness");
+    assert.ok(judge, "cloud-readiness judge should exist");
+
+    const noHealthCheckCode = `
+import express from "express";
+const app = express();
+
+app.get("/api/users", async (req, res) => {
+  const users = await db.query("SELECT * FROM users");
+  res.json(users);
+});
+
+app.post("/api/users", async (req, res) => {
+  const user = await db.insert("users", req.body);
+  res.json(user);
+});
+
+app.get("/api/products", async (req, res) => {
+  const products = await db.query("SELECT * FROM products");
+  res.json(products);
+});
+
+app.post("/api/orders", async (req, res) => {
+  const order = await db.insert("orders", req.body);
+  res.json(order);
+});
+
+app.get("/api/categories", async (req, res) => {
+  const categories = await db.query("SELECT * FROM categories");
+  res.json(categories);
+});
+
+app.get("/api/search", async (req, res) => {
+  const results = await db.search(req.query.q);
+  res.json(results);
+});
+
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, noHealthCheckCode, "typescript");
+    const healthFindings = evaluation.findings.filter((f) =>
+      f.title.includes("health") || f.title.includes("Health")
+    );
+    assert.ok(healthFindings.length > 0, "Expected missing health check findings");
+  });
+});
+
+// =============================================================================
+// Concurrency Judge Dedicated Tests
+// =============================================================================
+describe("Concurrency Judge Dedicated Tests", () => {
+  it("should detect unbounded Promise.all with dynamic arrays", () => {
+    const judge = getJudge("concurrency");
+    assert.ok(judge, "concurrency judge should exist");
+
+    const promiseCode = `
+async function processAll(items) {
+  const results = await Promise.all(items.map(item => fetchData(item.id)));
+  return results;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, promiseCode, "typescript");
+    const findings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("CONC-") && (f.title.includes("Promise.all") || f.title.includes("Unbounded"))
+    );
+    assert.ok(findings.length > 0, "Expected unbounded Promise.all findings");
+  });
+
+  it("should detect shared mutable state in async context", () => {
+    const judge = getJudge("concurrency");
+    assert.ok(judge, "concurrency judge should exist");
+
+    const mutableStateCode = `
+let requestCount = 0;
+let activeConnections = [];
+
+async function handleRequest(req) {
+  requestCount++;
+  activeConnections.push(req.id);
+  const result = await processRequest(req);
+  return result;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, mutableStateCode, "typescript");
+    const stateFindings = evaluation.findings.filter((f) =>
+      f.title.includes("mutable") || f.title.includes("Shared") || f.title.includes("shared")
+    );
+    assert.ok(stateFindings.length > 0, "Expected shared mutable state findings");
+  });
+
+  it("should detect missing await on async operations", () => {
+    const judge = getJudge("concurrency");
+    assert.ok(judge, "concurrency judge should exist");
+
+    const noAwaitCode = `
+async function saveData(items) {
+  for (const item of items) {
+    db.save(item);
+    cache.invalidate(item.id);
+  }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, noAwaitCode, "typescript");
+    const awaitFindings = evaluation.findings.filter((f) =>
+      f.title.includes("await") || f.title.includes("Potentially missing")
+    );
+    assert.ok(awaitFindings.length > 0, "Expected missing await findings");
+  });
+});
+
+// =============================================================================
+// Configuration Management Judge Dedicated Tests
+// =============================================================================
+describe("Configuration Management Judge Dedicated Tests", () => {
+  it("should detect hardcoded secrets in source code", () => {
+    const judge = getJudge("configuration-management");
+    assert.ok(judge, "configuration-management judge should exist");
+
+    const secretCode = `
+const password = "mySecret123";
+const api_key = "sk-abc123def456";
+const dbConnection = "postgresql://admin:password123@db.example.com:5432/mydb";
+`;
+    const evaluation = evaluateWithJudge(judge!, secretCode, "typescript");
+    const secretFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("CFG-") && f.severity === "critical"
+    );
+    assert.ok(secretFindings.length > 0, "Expected critical secret findings");
+  });
+
+  it("should detect hardcoded configuration values", () => {
+    const judge = getJudge("configuration-management");
+    assert.ok(judge, "configuration-management judge should exist");
+
+    const configCode = `
+const PORT = 3000;
+const HOST = "db.example.com";
+const MAX_RETRIES = 5;
+const API_URL = "https://api.production.example.com";
+`;
+    const evaluation = evaluateWithJudge(judge!, configCode, "typescript");
+    const configFindings = evaluation.findings.filter((f) =>
+      f.title.includes("hardcoded") || f.title.includes("Hardcoded") || f.title.includes("Configuration")
+    );
+    assert.ok(configFindings.length > 0, "Expected hardcoded configuration findings");
+  });
+});
+
+// =============================================================================
+// Cost Effectiveness Judge Dedicated Tests
+// =============================================================================
+describe("Cost Effectiveness Judge Dedicated Tests", () => {
+  it("should detect nested loops with O(n²) complexity", () => {
+    const judge = getJudge("cost-effectiveness");
+    assert.ok(judge, "cost-effectiveness judge should exist");
+
+    const nestedLoopCode = `
+function findDuplicates(items) {
+  const duplicates = [];
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      if (items[i].id === items[j].id) {
+        duplicates.push(items[i]);
+      }
+    }
+  }
+  return duplicates;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, nestedLoopCode, "typescript");
+    const loopFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("COST-") && (f.title.includes("Nested") || f.title.includes("O(n"))
+    );
+    assert.ok(loopFindings.length > 0, "Expected nested loop O(n²) findings");
+  });
+
+  it("should detect N+1 query patterns (await in loop)", () => {
+    const judge = getJudge("cost-effectiveness");
+    assert.ok(judge, "cost-effectiveness judge should exist");
+
+    const n1Code = `
+async function getUsersWithPosts(userIds) {
+  const results = [];
+  for (const id of userIds) {
+    const user = await db.findUser(id);
+    const posts = await db.findPosts(id);
+    results.push({ user, posts });
+  }
+  return results;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, n1Code, "typescript");
+    const n1Findings = evaluation.findings.filter((f) =>
+      f.title.includes("N+1") || f.title.includes("await") || f.title.includes("query")
+    );
+    assert.ok(n1Findings.length > 0, "Expected N+1 query pattern findings");
+  });
+
+  it("should detect unbounded data queries", () => {
+    const judge = getJudge("cost-effectiveness");
+    assert.ok(judge, "cost-effectiveness judge should exist");
+
+    const unboundedCode = `
+async function getAllData() {
+  const users = await db.query("SELECT * FROM users");
+  const orders = await Order.findAll();
+  const products = await Product.find({});
+  return { users, orders, products };
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, unboundedCode, "typescript");
+    const unboundedFindings = evaluation.findings.filter((f) =>
+      f.title.includes("Unbounded") || f.title.includes("unbounded") || f.title.includes("SELECT *")
+    );
+    assert.ok(unboundedFindings.length > 0, "Expected unbounded query findings");
+  });
+});
+
+// =============================================================================
+// Documentation Judge Dedicated Tests
+// =============================================================================
+describe("Documentation Judge Dedicated Tests", () => {
+  it("should detect exported functions without documentation", () => {
+    const judge = getJudge("documentation");
+    assert.ok(judge, "documentation judge should exist");
+
+    const noDocCode = `
+export function calculateTax(amount: number, rate: number): number {
+  return amount * rate;
+}
+
+export function formatCurrency(value: number): string {
+  return "$" + value.toFixed(2);
+}
+
+export function validateEmail(email: string): boolean {
+  return email.includes("@");
+}
+
+export async function fetchUserData(id: string) {
+  return await db.find(id);
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, noDocCode, "typescript");
+    const docFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("DOC-") && (f.title.includes("documentation") || f.title.includes("Documentation"))
+    );
+    assert.ok(docFindings.length > 0, "Expected missing documentation findings");
+  });
+
+  it("should detect TODO/FIXME without issue tracking reference", () => {
+    const judge = getJudge("documentation");
+    assert.ok(judge, "documentation judge should exist");
+
+    const todoCode = `
+function processOrder(order) {
+  // TODO: fix this later
+  // FIXME: handle edge case
+  // HACK: workaround for now
+  return order;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, todoCode, "typescript");
+    const todoFindings = evaluation.findings.filter((f) =>
+      f.title.includes("TODO") || f.title.includes("FIXME") || f.title.includes("issue")
+    );
+    assert.ok(todoFindings.length > 0, "Expected TODO/FIXME findings");
+  });
+});
+
+// =============================================================================
+// Ethics & Bias Judge Dedicated Tests
+// =============================================================================
+describe("Ethics & Bias Judge Dedicated Tests", () => {
+  it("should detect demographic-based conditional logic", () => {
+    const judge = getJudge("ethics-bias");
+    assert.ok(judge, "ethics-bias judge should exist");
+
+    const biasCode = `
+function calculateDiscount(user) {
+  if (user.gender === "male") {
+    return 0.1;
+  }
+  if (user.race !== "caucasian") {
+    return 0.05;
+  }
+  return 0;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, biasCode, "typescript");
+    const biasFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("ETHICS-") && f.severity === "critical"
+    );
+    assert.ok(biasFindings.length > 0, "Expected demographic bias findings");
+  });
+
+  it("should detect automated decisions without human review", () => {
+    const judge = getJudge("ethics-bias");
+    assert.ok(judge, "ethics-bias judge should exist");
+
+    const autoDecisionCode = `
+async function processLoanApplication(application) {
+  const score = calculateCreditScore(application);
+  if (score < 500) {
+    await autoReject(application);
+  } else {
+    await autoApprove(application);
+  }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, autoDecisionCode, "typescript");
+    const decisionFindings = evaluation.findings.filter((f) =>
+      f.title.includes("Automated") || f.title.includes("human") || f.title.includes("review")
+    );
+    assert.ok(decisionFindings.length > 0, "Expected automated decision findings");
+  });
+});
+
+// =============================================================================
+// Internationalization Judge Dedicated Tests
+// =============================================================================
+describe("Internationalization Judge Dedicated Tests", () => {
+  it("should detect hardcoded user-facing strings", () => {
+    const judge = getJudge("internationalization");
+    assert.ok(judge, "internationalization judge should exist");
+
+    const hardcodedStringCode = `
+function LoginForm() {
+  return (
+    <form>
+      <label>Username</label>
+      <input type="text" />
+      <button>Submit Form</button>
+      <p>Welcome back!</p>
+    </form>
+  );
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, hardcodedStringCode, "typescript");
+    const i18nFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("I18N-") && (f.title.includes("Hardcoded") || f.title.includes("hardcoded"))
+    );
+    assert.ok(i18nFindings.length > 0, "Expected hardcoded string findings");
+  });
+
+  it("should detect string concatenation for user messages", () => {
+    const judge = getJudge("internationalization");
+    assert.ok(judge, "internationalization judge should exist");
+
+    const concatCode = `
+function greetUser(name, count) {
+  const message = "Hello " + name + "!";
+  const text = "You have " + count + " items in your cart.";
+  return message + " " + text;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, concatCode, "typescript");
+    const concatFindings = evaluation.findings.filter((f) =>
+      f.title.includes("concatenation") || f.title.includes("String")
+    );
+    assert.ok(concatFindings.length > 0, "Expected string concatenation findings");
+  });
+
+  it("should detect locale-sensitive operations without explicit locale", () => {
+    const judge = getJudge("internationalization");
+    assert.ok(judge, "internationalization judge should exist");
+
+    const localeCode = `
+function formatDate(date) {
+  return date.toLocaleDateString();
+}
+function formatNumber(num) {
+  return num.toLocaleString();
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, localeCode, "typescript");
+    const localeFindings = evaluation.findings.filter((f) =>
+      f.title.includes("locale") || f.title.includes("Locale")
+    );
+    assert.ok(localeFindings.length > 0, "Expected locale findings");
+  });
+});
+
+// =============================================================================
+// Maintainability Judge Dedicated Tests
+// =============================================================================
+describe("Maintainability Judge Dedicated Tests", () => {
+  it("should detect weak or unsafe type usage", () => {
+    const judge = getJudge("maintainability");
+    assert.ok(judge, "maintainability judge should exist");
+
+    const weakTypeCode = `
+function processData(input: any): any {
+  const result: any = transform(input);
+  return result as any;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, weakTypeCode, "typescript");
+    const typeFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("MAINT-") && (f.title.includes("type") || f.title.includes("Type") || f.title.includes("unsafe"))
+    );
+    assert.ok(typeFindings.length > 0, "Expected weak type usage findings");
+  });
+
+  it("should detect TODO/FIXME/HACK markers", () => {
+    const judge = getJudge("maintainability");
+    assert.ok(judge, "maintainability judge should exist");
+
+    const debtCode = `
+function calculate(x: number) {
+  // TODO: refactor this
+  // FIXME: this is broken
+  // HACK: temporary workaround
+  // XXX: needs review
+  return x * 2;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, debtCode, "typescript");
+    const debtFindings = evaluation.findings.filter((f) =>
+      f.title.includes("TODO") || f.title.includes("FIXME") || f.title.includes("debt") || f.title.includes("Technical")
+    );
+    assert.ok(debtFindings.length > 0, "Expected technical debt marker findings");
+  });
+
+  it("should detect magic numbers", () => {
+    const judge = getJudge("maintainability");
+    assert.ok(judge, "maintainability judge should exist");
+
+    const magicCode = `
+function processTimeout() {
+  setTimeout(callback, 86400);
+  const maxRetries = 3600;
+  if (count > 5000) {
+    resize(1024);
+  }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, magicCode, "typescript");
+    const magicFindings = evaluation.findings.filter((f) =>
+      f.title.includes("Magic") || f.title.includes("magic")
+    );
+    assert.ok(magicFindings.length > 0, "Expected magic number findings");
+  });
+});
+
+// =============================================================================
+// Observability Judge Dedicated Tests
+// =============================================================================
+describe("Observability Judge Dedicated Tests", () => {
+  it("should detect console logging instead of structured logger", () => {
+    const judge = getJudge("observability");
+    assert.ok(judge, "observability judge should exist");
+
+    const consoleCode = `
+function handleRequest(req) {
+  console.log("Request received");
+  console.log("Processing:", req.body);
+  console.error("Something failed");
+  console.log("Returning response");
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, consoleCode, "typescript");
+    const logFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("OBS-") && (f.title.includes("Console") || f.title.includes("console") || f.title.includes("structured"))
+    );
+    assert.ok(logFindings.length > 0, "Expected console logging findings");
+  });
+
+  it("should detect errors logged without error context", () => {
+    const judge = getJudge("observability");
+    assert.ok(judge, "observability judge should exist");
+
+    const noContextCode = `
+async function fetchData() {
+  try {
+    const data = await api.get("/users");
+    return data;
+  } catch (err) {
+    console.log("Failed to fetch data");
+  }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, noContextCode, "typescript");
+    const contextFindings = evaluation.findings.filter((f) =>
+      f.title.includes("context") || f.title.includes("Error logged") || f.title.includes("error context")
+    );
+    assert.ok(contextFindings.length > 0, "Expected error-without-context findings");
+  });
+
+  it("should detect missing health check endpoint", () => {
+    const judge = getJudge("observability");
+    assert.ok(judge, "observability judge should exist");
+
+    const noHealthCode = `
+const app = express();
+app.get("/api/users", listUsers);
+app.post("/api/users", createUser);
+app.get("/api/orders", listOrders);
+app.post("/api/orders", createOrder);
+app.get("/api/items", listItems);
+`;
+    const evaluation = evaluateWithJudge(judge!, noHealthCode, "typescript");
+    const healthFindings = evaluation.findings.filter((f) =>
+      f.title.includes("health") || f.title.includes("Health")
+    );
+    assert.ok(healthFindings.length > 0, "Expected missing health check findings");
+  });
+});
+
+// =============================================================================
+// Performance Judge Dedicated Tests
+// =============================================================================
+describe("Performance Judge Dedicated Tests", () => {
+  it("should detect N+1 query patterns", () => {
+    const judge = getJudge("performance");
+    assert.ok(judge, "performance judge should exist");
+
+    const n1Code = `
+async function loadUsersWithOrders() {
+  const users = await db.find("SELECT * FROM users");
+  for (const user of users) {
+    user.orders = await db.find("SELECT * FROM orders WHERE user_id = " + user.id);
+  }
+  return users;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, n1Code, "typescript");
+    const perfFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("PERF-") && (f.title.includes("N+1") || f.title.includes("query"))
+    );
+    assert.ok(perfFindings.length > 0, "Expected N+1 query findings");
+  });
+
+  it("should detect synchronous blocking I/O", () => {
+    const judge = getJudge("performance");
+    assert.ok(judge, "performance judge should exist");
+
+    const syncCode = `
+const fs = require("fs");
+const config = fs.readFileSync("/etc/app/config.json", "utf8");
+const data = fs.writeFileSync("/tmp/output.txt", results);
+`;
+    const evaluation = evaluateWithJudge(judge!, syncCode, "typescript");
+    const syncFindings = evaluation.findings.filter((f) =>
+      f.title.includes("Synchronous") || f.title.includes("blocking") || f.title.includes("readFileSync")
+    );
+    assert.ok(syncFindings.length > 0, "Expected synchronous I/O findings");
+  });
+});
+
+// =============================================================================
+// Portability Judge Dedicated Tests
+// =============================================================================
+describe("Portability Judge Dedicated Tests", () => {
+  it("should detect OS-specific file paths", () => {
+    const judge = getJudge("portability");
+    assert.ok(judge, "portability judge should exist");
+
+    const osPathCode = `
+const configPath = "C:\\\\Users\\\\admin\\\\config.ini";
+const logDir = "/var/log/myapp/";
+const homeDir = "/home/user/.config";
+`;
+    const evaluation = evaluateWithJudge(judge!, osPathCode, "typescript");
+    const pathFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("PORTA-") && (f.title.includes("path") || f.title.includes("OS") || f.title.includes("Platform"))
+    );
+    assert.ok(pathFindings.length > 0, "Expected OS-specific path findings");
+  });
+
+  it("should detect platform-specific shell commands", () => {
+    const judge = getJudge("portability");
+    assert.ok(judge, "portability judge should exist");
+
+    const shellCode = `
+const { exec } = require("child_process");
+exec("cmd /c dir", callback);
+exec("bash -c 'rm -rf /tmp/*'", callback);
+exec("rm -rf ./build", callback);
+`;
+    const evaluation = evaluateWithJudge(judge!, shellCode, "typescript");
+    const shellFindings = evaluation.findings.filter((f) =>
+      f.title.includes("shell") || f.title.includes("Shell") || f.title.includes("Platform") || f.title.includes("command")
+    );
+    assert.ok(shellFindings.length > 0, "Expected platform-specific shell command findings");
+  });
+});
+
+// =============================================================================
+// Scalability Judge Dedicated Tests
+// =============================================================================
+describe("Scalability Judge Dedicated Tests", () => {
+  it("should detect global mutable state", () => {
+    const judge = getJudge("scalability");
+    assert.ok(judge, "scalability judge should exist");
+
+    const globalStateCode = `
+let sessions = {};
+let connectionPool = [];
+var requestCounter = 0;
+
+function handleRequest(req) {
+  requestCounter++;
+  sessions[req.id] = req;
+  connectionPool.push(req.conn);
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, globalStateCode, "typescript");
+    const stateFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("SCALE-") && (f.title.includes("Global") || f.title.includes("mutable") || f.title.includes("global"))
+    );
+    assert.ok(stateFindings.length > 0, "Expected global mutable state findings");
+  });
+
+  it("should detect in-memory data stores that may not scale", () => {
+    const judge = getJudge("scalability");
+    assert.ok(judge, "scalability judge should exist");
+
+    const memoryStoreCode = `
+const store = new Map();
+const session = {};
+const cache = new Map();
+
+app.use(expressSession({
+  store: new MemoryStore(),
+  secret: "keyboard cat"
+}));
+`;
+    const evaluation = evaluateWithJudge(judge!, memoryStoreCode, "typescript");
+    const scaleFindings = evaluation.findings.filter((f) =>
+      f.title.includes("memory") || f.title.includes("In-memory") || f.title.includes("scale")
+    );
+    assert.ok(scaleFindings.length > 0, "Expected in-memory store scalability findings");
+  });
+
+  it("should detect synchronous blocking operations", () => {
+    const judge = getJudge("scalability");
+    assert.ok(judge, "scalability judge should exist");
+
+    const blockingCode = `
+const data = fs.readFileSync("./config.json");
+Thread.sleep(5000);
+const result = heavyComputation();
+`;
+    const evaluation = evaluateWithJudge(judge!, blockingCode, "typescript");
+    const blockFindings = evaluation.findings.filter((f) =>
+      f.title.includes("Synchronous") || f.title.includes("blocking") || f.title.includes("Blocking")
+    );
+    assert.ok(blockFindings.length > 0, "Expected synchronous blocking findings");
+  });
+});
+
+// =============================================================================
+// Testing Judge Dedicated Tests
+// =============================================================================
+describe("Testing Judge Dedicated Tests", () => {
+  it("should detect test cases with no assertions", () => {
+    const judge = getJudge("testing");
+    assert.ok(judge, "testing judge should exist");
+
+    const noAssertCode = `
+describe("UserService", () => {
+  it("should create a user", () => {
+    const user = createUser({ name: "Alice" });
+    console.log(user);
+  });
+
+  it("should delete a user", () => {
+    deleteUser("123");
+  });
+
+  test("updates user profile", () => {
+    const result = updateProfile("123", { name: "Bob" });
+    console.log("done", result);
+  });
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, noAssertCode, "typescript");
+    const assertionFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("TEST-") && (f.title.includes("assertion") || f.title.includes("Assertion") || f.title.includes("no assert"))
+    );
+    assert.ok(assertionFindings.length > 0, "Expected missing assertion findings");
+  });
+
+  it("should detect vague test names", () => {
+    const judge = getJudge("testing");
+    assert.ok(judge, "testing judge should exist");
+
+    const vagueTestCode = `
+describe("Tests", () => {
+  it("works", () => {
+    expect(add(1, 2)).toBe(3);
+  });
+  it("test 1", () => {
+    expect(subtract(5, 3)).toBe(2);
+  });
+  it("should work", () => {
+    expect(multiply(2, 3)).toBe(6);
+  });
+  test("basic test", () => {
+    expect(divide(10, 2)).toBe(5);
+  });
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, vagueTestCode, "typescript");
+    const vagueFindings = evaluation.findings.filter((f) =>
+      f.title.includes("Vague") || f.title.includes("vague") || f.title.includes("test name")
+    );
+    assert.ok(vagueFindings.length > 0, "Expected vague test name findings");
+  });
+
+  it("should detect hardcoded dates in tests", () => {
+    const judge = getJudge("testing");
+    assert.ok(judge, "testing judge should exist");
+
+    const hardcodedDateCode = `
+describe("DateUtils", () => {
+  it("should format dates", () => {
+    const result = formatDate("2024-01-15");
+    expect(result).toBe("January 15, 2024");
+  });
+  it("should calculate age", () => {
+    const age = calculateAge("1990-05-20");
+    expect(age).toBeGreaterThan(0);
+  });
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, hardcodedDateCode, "typescript");
+    const dateFindings = evaluation.findings.filter((f) =>
+      f.title.includes("date") || f.title.includes("Hardcoded date")
+    );
+    assert.ok(dateFindings.length > 0, "Expected hardcoded date findings");
+  });
+});
+
+// =============================================================================
+// UX Judge Dedicated Tests
+// =============================================================================
+describe("UX Judge Dedicated Tests", () => {
+  it("should detect form submission without loading state", () => {
+    const judge = getJudge("ux");
+    assert.ok(judge, "ux judge should exist");
+
+    const formCode = `
+function ContactForm() {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await sendMessage(formData);
+  };
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="email" />
+      <textarea name="message" />
+      <button type="submit">Send</button>
+    </form>
+  );
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, formCode, "typescript");
+    const formFindings = evaluation.findings.filter((f) =>
+      f.ruleId.startsWith("UX-") && (f.title.includes("loading") || f.title.includes("Form") || f.title.includes("submit"))
+    );
+    assert.ok(formFindings.length > 0, "Expected form loading state findings");
+  });
+
+  it("should detect generic error messages", () => {
+    const judge = getJudge("ux");
+    assert.ok(judge, "ux judge should exist");
+
+    const genericErrorCode = `
+async function loadData() {
+  try {
+    const data = await fetchAPI();
+    return data;
+  } catch (err) {
+    showToast("Something went wrong");
+    alert("An error occurred");
+  }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, genericErrorCode, "typescript");
+    const errorFindings = evaluation.findings.filter((f) =>
+      f.title.includes("Generic") || f.title.includes("generic") || f.title.includes("error message")
+    );
+    assert.ok(errorFindings.length > 0, "Expected generic error message findings");
+  });
+
+  it("should detect inline event handlers in HTML", () => {
+    const judge = getJudge("ux");
+    assert.ok(judge, "ux judge should exist");
+
+    const inlineHandlerCode = `
+const html = \`
+<button onClick="doStuff()">Click</button>
+<div onMouseOver="highlight()">Hover me</div>
+<a onClick="navigate()">Link</a>
+\`;
+`;
+    const evaluation = evaluateWithJudge(judge!, inlineHandlerCode, "typescript");
+    const inlineFindings = evaluation.findings.filter((f) =>
+      f.title.includes("Inline") || f.title.includes("inline") || f.title.includes("event handler")
+    );
+    assert.ok(inlineFindings.length > 0, "Expected inline event handler findings");
   });
 });

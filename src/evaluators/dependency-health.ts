@@ -1,5 +1,5 @@
 import { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeDependencyHealth(code: string, language: string): Finding[] {
@@ -25,6 +25,8 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       lineNumbers: wildcardLines,
       recommendation: "Pin dependencies to specific versions or use caret (^) ranges at minimum. Use a lockfile (package-lock.json, yarn.lock).",
       reference: "Dependency Management Best Practices",
+      suggestedFix: "Replace `\"*\"` or `\"latest\"` with a pinned version such as `\"^2.1.0\"` and run `npm install` to regenerate the lockfile.",
+      confidence: 0.9,
     });
   }
 
@@ -45,6 +47,8 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       lineNumbers: riskyPkgLines,
       recommendation: "Replace deprecated packages: moment->date-fns/luxon, request->node-fetch/axios, underscore->lodash-es or native methods.",
       reference: "npm deprecation notices / package health scores",
+      suggestedFix: "Replace the deprecated import with its modern alternative, e.g. change `require('request')` to `require('node-fetch')` or `require('axios')`.",
+      confidence: 0.9,
     });
   }
 
@@ -64,6 +68,8 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       lineNumbers: importLines.slice(0, 5),
       recommendation: "Evaluate whether all dependencies are necessary. Consider implementing simple utilities natively to reduce the dependency tree.",
       reference: "Dependency Minimization / Supply Chain Security",
+      suggestedFix: "Remove unused imports and replace trivial utility packages (e.g. `is-odd`, `left-pad`) with inline implementations.",
+      confidence: 0.75,
     });
   }
 
@@ -83,6 +89,8 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       lineNumbers: deepImportLines,
       recommendation: "Configure path aliases (tsconfig paths, webpack aliases, babel module resolver) for cleaner imports.",
       reference: "TypeScript Path Mapping / Module Resolution",
+      suggestedFix: "Add a path alias in `tsconfig.json` (e.g. `\"@src/*\": [\"src/*\"]`) and replace deep `../../../` imports with the alias.",
+      confidence: 0.85,
     });
   }
 
@@ -107,6 +115,8 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       lineNumbers: httpClientLines,
       recommendation: "Standardize on a single HTTP client library across the project. Wrap it in an abstraction if needed.",
       reference: "Dependency Consolidation",
+      suggestedFix: "Pick one HTTP client (e.g. `axios` or native `fetch`) and replace all other HTTP client imports with it.",
+      confidence: 0.9,
     });
   }
 
@@ -126,6 +136,8 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       lineNumbers: broadVersionLines,
       recommendation: "Use caret (^) for minor updates or tilde (~) for patch updates. Avoid >= ranges in production dependencies.",
       reference: "Semantic Versioning / npm Version Ranges",
+      suggestedFix: "Replace `>=` version ranges with caret ranges, e.g. change `\">=3.0.0\"` to `\"^3.0.0\"` to allow only non-breaking updates.",
+      confidence: 0.85,
     });
   }
 
@@ -141,29 +153,32 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
         description: "No engines field specifying required Node.js version. Different Node versions may have incompatible behavior.",
         recommendation: "Add an 'engines' field to specify minimum Node.js and npm versions: \"engines\": { \"node\": \">=18.0.0\" }.",
         reference: "package.json engines field",
+        suggestedFix: "Add `\"engines\": { \"node\": \">=18.0.0\" }` to the top level of `package.json`.",
+        confidence: 0.7,
       });
     }
   }
 
-  // Detect importing specific vs barrel imports
+  // Detect importing specific vs barrel imports (multi-language wildcard detection)
   const barrelImportLines: number[] = [];
+  const wildcardImportLines = getLangLineNumbers(code, language, LP.WILDCARD_IMPORT);
   lines.forEach((line, i) => {
     if (/import\s+\{[^}]{100,}\}\s+from/i.test(line)) {
       barrelImportLines.push(i + 1);
     }
-    if (/import\s+\*\s+as\s+\w+\s+from\s+["'](?!.*node_modules)/i.test(line)) {
-      barrelImportLines.push(i + 1);
-    }
   });
-  if (barrelImportLines.length > 0) {
+  const allBarrelLines = [...new Set([...barrelImportLines, ...wildcardImportLines])].sort((a, b) => a - b);
+  if (allBarrelLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
-      title: "Barrel imports may prevent tree-shaking",
-      description: "Importing everything from a barrel file or using 'import *' can prevent tree-shaking and increase bundle size.",
-      lineNumbers: barrelImportLines,
+      title: "Barrel or wildcard imports may prevent tree-shaking",
+      description: "Importing everything from a barrel file or using wildcard imports (import *, from x import *, using static *) can prevent tree-shaking and increase bundle size.",
+      lineNumbers: allBarrelLines,
       recommendation: "Import directly from specific module files instead of barrel/index files for better tree-shaking.",
       reference: "Tree Shaking / Module Bundling",
+      suggestedFix: "Replace wildcard or barrel imports (e.g. `import * from 'lib'`) with named imports from specific sub-modules (e.g. `import { fn } from 'lib/fn'`).",
+      confidence: 0.9,
     });
   }
 
@@ -186,6 +201,8 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       lineNumbers: devDepLines,
       recommendation: "Move test imports to test files. Ensure devDependencies are only used in test/config files.",
       reference: "npm devDependencies vs dependencies",
+      suggestedFix: "Remove the dev-only `require('jest')` (or similar) from this production file and move it to a `.test.ts` or `.spec.ts` file.",
+      confidence: 0.85,
     });
   }
 
@@ -205,6 +222,51 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       lineNumbers: supplyChainLines,
       recommendation: "Audit install scripts carefully. Use --ignore-scripts flag and allowlists. Consider using npm audit signatures.",
       reference: "Supply Chain Security / npm install scripts",
+      suggestedFix: "Remove or audit the `postinstall`/`preinstall` script and run `npm install --ignore-scripts` to prevent automatic execution.",
+      confidence: 0.9,
+    });
+  }
+
+  // Potential typosquatting — misspelled popular package names
+  const typosquatTargets: Record<string, string[]> = {
+    lodash: ["lod-ash", "lodashs", "lodahs", "1odash", "lodash-utils"],
+    axios: ["axois", "axio", "axxios", "axioss", "axious"],
+    express: ["expresss", "expres", "xpress", "exress"],
+    react: ["reacrt", "raect", "reactt", "reakt"],
+    mongoose: ["mongose", "mongoosse", "mongooes", "mongoos"],
+    chalk: ["chalks", "chalkk", "chalck"],
+    commander: ["comander", "commanderr", "comanderr"],
+    dotenv: ["dotnev", "dotenvs", "dotenev"],
+    webpack: ["webpackk", "weback", "webpac"],
+    "cross-env": ["crossenv", "cross-envv"],
+    "event-stream": ["event-streams", "events-stream", "eventstream"],
+    colors: ["colour", "colorsss"],
+  };
+  const typosquatLines: number[] = [];
+  const typosquatNames: string[] = [];
+  lines.forEach((line, i) => {
+    const match = line.match(/(?:require\s*\(\s*["']|from\s+["'])([^"'/]+)["']/);
+    if (match) {
+      const pkg = match[1].toLowerCase();
+      for (const [legit, squats] of Object.entries(typosquatTargets)) {
+        if (squats.includes(pkg)) {
+          typosquatLines.push(i + 1);
+          typosquatNames.push(`"${pkg}" (likely meant "${legit}")`);
+        }
+      }
+    }
+  });
+  if (typosquatLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "critical",
+      title: "Potential typosquatting package import",
+      description: `Suspicious package name(s) detected: ${typosquatNames.join(", ")}. Typosquatting attacks publish malicious packages with names similar to popular ones to steal credentials, inject backdoors, or mine cryptocurrency.`,
+      lineNumbers: typosquatLines,
+      recommendation: "Verify the package name is correct. Use 'npm info <package>' to check if it's a legitimate package. Enable npm audit and consider using Socket.dev or Snyk for supply chain monitoring.",
+      reference: "Supply Chain Attack — Typosquatting / CWE-1357",
+      suggestedFix: "Correct the misspelled package name in the import statement, e.g. change `require('axois')` to `require('axios')`.",
+      confidence: 0.9,
     });
   }
 

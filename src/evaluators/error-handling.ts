@@ -8,18 +8,19 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   const prefix = "ERR";
   const lang = getLangFamily(language);
 
-  // Empty catch blocks
-  const emptyCatchPattern = /catch\s*\([^)]*\)\s*\{\s*\}/g;
-  const emptyCatchLines = getLineNumbers(code, emptyCatchPattern);
+  // Empty catch blocks (multi-language)
+  const emptyCatchLines = getLangLineNumbers(code, language, LP.EMPTY_CATCH);
   if (emptyCatchLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
-      title: "Empty catch block swallows errors",
-      description: `Found ${emptyCatchLines.length} empty catch block(s). Silently swallowing errors hides bugs, makes debugging impossible, and can leave the application in an inconsistent state.`,
+      title: "Empty catch/error block swallows errors",
+      description: `Found ${emptyCatchLines.length} empty error-handling block(s). Silently swallowing errors hides bugs, makes debugging impossible, and can leave the application in an inconsistent state.`,
       lineNumbers: emptyCatchLines,
       recommendation: "Log the error with context, re-throw it, or handle it meaningfully. If intentionally ignoring, add a comment explaining why.",
       reference: "ESLint no-empty / Error Handling Best Practices",
+      suggestedFix: "Add error handling: catch (error) { logger.error('Operation failed', { error }); throw error; } (JS/TS), except Exception as e: logger.error(e); raise (Python), .map_err(|e| { log::error!(\"{e}\"); e }) (Rust).",
+      confidence: 0.9,
     });
   }
 
@@ -35,6 +36,8 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: catchNoParamLines,
       recommendation: "Capture the error parameter: catch(error) { ... } and use it for logging, error classification, or re-throwing.",
       reference: "Error Handling Best Practices",
+      suggestedFix: "Add error parameter: catch (error) { ... } instead of catch () { ... }.",
+      confidence: 0.9,
     });
   }
 
@@ -52,6 +55,8 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       description: "Server code without a global error handler. Unhandled errors will crash the process or return raw stack traces to clients.",
       recommendation: "Add Express error middleware (app.use((err, req, res, next) => { ... })), process.on('uncaughtException'), and process.on('unhandledRejection') handlers.",
       reference: "Express Error Handling / Node.js Best Practices",
+      suggestedFix: "Add global error middleware: app.use((err, req, res, next) => { logger.error(err); res.status(500).json({ error: 'Internal error' }); }); and process.on('unhandledRejection', handler).",
+      confidence: 0.7,
     });
   }
 
@@ -67,22 +72,24 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: genericErrorLines,
       recommendation: "Return structured error responses with error codes, human-readable messages, and suggested actions. Use a consistent error response schema.",
       reference: "RFC 7807 (Problem Details for HTTP APIs)",
+      suggestedFix: "Return structured errors: res.status(400).json({ type: 'validation_error', title: 'Invalid input', detail: 'Field email is required', instance: req.path }).",
+      confidence: 0.75,
     });
   }
 
-  // Async function without try/catch or .catch
-  const asyncFuncPattern = /async\s+(?:function\s+\w+|\([^)]*\)\s*=>|\w+\s*=\s*async)/g;
-  const hasTryCatch = /try\s*\{/g;
-  const asyncMatches = code.match(asyncFuncPattern)?.length || 0;
-  const tryCatchMatches = code.match(hasTryCatch)?.length || 0;
-  if (asyncMatches > 0 && tryCatchMatches === 0) {
+  // Async function without try/catch or .catch (multi-language)
+  const asyncFuncLines = getLangLineNumbers(code, language, LP.ASYNC_FUNCTION);
+  const tryCatchLines = getLangLineNumbers(code, language, LP.TRY_CATCH);
+  if (asyncFuncLines.length > 0 && tryCatchLines.length === 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Async functions without error handling",
-      description: `Found ${asyncMatches} async function(s) but no try/catch blocks. Unhandled promise rejections can crash the process in Node.js.`,
-      recommendation: "Wrap async operations in try/catch or use .catch() on promises. Consider a global unhandledRejection handler as a safety net.",
-      reference: "Node.js Unhandled Rejections / Async Error Handling",
+      description: `Found ${asyncFuncLines.length} async function(s) but no error-handling blocks. Unhandled async errors can crash the process or cause silent failures.`,
+      recommendation: "Wrap async operations in try/catch (JS/TS/C#/Java), try/except (Python), or check errors explicitly (Go/Rust).",
+      reference: "Async Error Handling Best Practices",
+      suggestedFix: "Wrap async handlers: try { await operation(); } catch (error) { logger.error(error); } (JS/TS), try: await operation() except Exception as e: ... (Python), if err != nil { ... } (Go).",
+      confidence: 0.7,
     });
   }
 
@@ -98,6 +105,8 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       description: "Code uses callbacks but doesn't appear to check for errors. In Node.js, the error-first callback pattern requires checking the error parameter.",
       recommendation: "Always check the error parameter first in callbacks: if (err) { return handleError(err); }",
       reference: "Node.js Error-First Callbacks",
+      suggestedFix: "Add error-first check: function callback(err, result) { if (err) { return handleError(err); } // proceed with result }.",
+      confidence: 0.7,
     });
   }
 
@@ -113,21 +122,24 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: throwStringLines,
       recommendation: "Always throw Error objects: throw new Error('message') or custom error classes that extend Error.",
       reference: "ESLint no-throw-literal / JavaScript Error Handling",
+      suggestedFix: "Replace throw 'message' with throw new Error('message').",
+      confidence: 0.9,
     });
   }
 
-  // process.exit() without error handling
-  const processExitPattern = /process\.exit\s*\(/g;
-  const processExitLines = getLineNumbers(code, processExitPattern);
-  if (processExitLines.length > 0) {
+  // Abrupt process termination (multi-language: process.exit, sys.exit, panic, unwrap, etc.)
+  const panicExitLines = getLangLineNumbers(code, language, LP.PANIC_UNWRAP);
+  if (panicExitLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
-      title: "process.exit() used instead of proper error handling",
-      description: "process.exit() immediately terminates the process, skipping cleanup handlers, dropping in-flight requests, and potentially corrupting data.",
-      lineNumbers: processExitLines,
-      recommendation: "Use proper error propagation instead of process.exit(). In HTTP servers, return error responses. Let the process shutdown gracefully.",
-      reference: "Node.js Graceful Shutdown Best Practices",
+      title: "Abrupt process termination instead of proper error handling",
+      description: `Found ${panicExitLines.length} abrupt termination call(s) (process.exit, sys.exit, panic, .unwrap). These skip cleanup handlers, drop in-flight requests, and can corrupt data.`,
+      lineNumbers: panicExitLines,
+      recommendation: "Use proper error propagation instead of abrupt termination. Return error responses in HTTP servers. Let the process shutdown gracefully.",
+      reference: "Graceful Shutdown Best Practices / CWE-705",
+      suggestedFix: "Replace abrupt exits with graceful shutdown: server.close(() => cleanup()) (JS), raise SystemExit (Python), return Err(...) instead of .unwrap() (Rust), os.Exit only in main() (Go).",
+      confidence: 0.9,
     });
   }
 
@@ -143,6 +155,8 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: catchRethrowLines,
       recommendation: "Either add context when rethrowing (new Error('context', { cause: err })) or remove the try/catch entirely and let the error propagate naturally.",
       reference: "Error Handling Best Practices / Error Wrapping",
+      suggestedFix: "Add context when rethrowing: throw new Error('Failed to process order', { cause: err }); or remove the redundant try/catch entirely.",
+      confidence: 0.85,
     });
   }
 
@@ -158,6 +172,8 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: swallowedLines,
       recommendation: "After logging, rethrow the error, return an error response, or propagate the failure to the caller. Silent failures are as dangerous as empty catch blocks.",
       reference: "Error Handling Patterns / Don't Swallow Errors",
+      suggestedFix: "After logging, propagate the failure: catch (error) { logger.error(error); throw error; } or return an error response to the caller.",
+      confidence: 0.85,
     });
   }
 
@@ -174,6 +190,8 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: errorRespLines.slice(0, 5),
       recommendation: "Include a machine-readable error code in responses: { code: 'VALIDATION_ERROR', message: '...' }. Use RFC 7807 Problem Details format.",
       reference: "RFC 7807: Problem Details for HTTP APIs",
+      suggestedFix: "Add machine-readable error codes: res.status(422).json({ code: 'VALIDATION_FAILED', message: '...', details: [...] }).",
+      confidence: 0.7,
     });
   }
 
@@ -189,6 +207,54 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       description: `Found ${consoleErrorLines.length} console.error call(s) with no error reporting service. Console output is transient — errors won't be tracked, aggregated, or alerted on.`,
       recommendation: "Integrate an error reporting service (Sentry, Bugsnag, Application Insights). These provide aggregation, alerting, and stack trace analysis.",
       reference: "Error Monitoring Best Practices",
+      suggestedFix: "Integrate an error reporting service: Sentry.captureException(error) or appInsights.trackException({ exception: error }) for aggregation and alerting.",
+      confidence: 0.7,
+    });
+  }
+
+  // Promise .then() chains without .catch()
+  const thenWithoutCatch: number[] = [];
+  const cLines = code.split("\n");
+  cLines.forEach((line, i) => {
+    if (/\.then\s*\(/i.test(line) && thenWithoutCatch.length < 10) {
+      const context = cLines.slice(i, Math.min(cLines.length, i + 6)).join("\n");
+      if (!/\.catch\s*\(|\.finally\s*\(/.test(context)) {
+        // Also check preceding lines for await (which handles rejection differently)
+        const precedingContext = cLines.slice(Math.max(0, i - 2), i + 1).join("\n");
+        if (!/\bawait\b/.test(precedingContext)) {
+          thenWithoutCatch.push(i + 1);
+        }
+      }
+    }
+  });
+  if (thenWithoutCatch.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Promise .then() chain without .catch()",
+      description: `Found ${thenWithoutCatch.length} Promise .then() chain(s) without a .catch() handler. Unhandled promise rejections crash Node.js processes and cause silent failures in browsers.`,
+      lineNumbers: thenWithoutCatch,
+      recommendation: "Always add .catch() at the end of Promise chains, or refactor to async/await with try/catch. Enable the 'no-floating-promises' ESLint rule.",
+      reference: "Node.js Unhandled Rejections / CWE-755",
+      suggestedFix: "Append .catch(error => { logger.error(error); }) to the Promise chain, or refactor to async/await with try/catch.",
+      confidence: 0.75,
+    });
+  }
+
+  // Stack trace or full error object sent to client
+  const stackExposurePattern = /(?:res\.(?:json|send|status)\s*\(.*(?:\.stack|err\b|error\b)\s*\)|\.json\s*\(\s*(?:err|error)\s*\)|\.send\s*\(\s*(?:err|error)\s*\))/gi;
+  const stackExposureLines = getLineNumbers(code, stackExposurePattern);
+  if (stackExposureLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Stack trace or error internals exposed to client",
+      description: `Found ${stackExposureLines.length} location(s) where error objects or stack traces may be sent directly in HTTP responses. This leaks internal file paths, library versions, and system details to attackers.`,
+      lineNumbers: stackExposureLines,
+      recommendation: "Never send raw error objects to clients. Return a generic error message with a correlation ID. Log the full error server-side. Use environment checks to show details only in development.",
+      reference: "CWE-209: Information Exposure Through Error Messages",
+      suggestedFix: "Return a generic message with correlation ID: res.status(500).json({ error: 'Internal error', correlationId: req.id }); and log the full error server-side.",
+      confidence: 0.85,
     });
   }
 

@@ -159,20 +159,25 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       lineNumbers: credentialLines,
       recommendation: "Use environment variables or a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault). Never commit credentials to version control.",
       reference: "OWASP: Credential Management / CWE-798",
+      suggestedFix: "Replace hardcoded credentials with environment variables: process.env.SECRET_NAME (Node.js), os.environ['SECRET_NAME'] (Python), or inject from a secrets manager.",
+      confidence: 0.9,
     });
   }
 
-  // No auth middleware on routes
-  const hasRoutes = /app\.(get|post|put|delete|patch)\s*\(\s*["'`]/gi.test(code);
-  const hasAuthMiddleware = /(?:authenticate|authorize|requireAuth|ensureAuth|isAuthenticated|verifyToken|passport\.authenticate|jwt\.verify|auth\(\)|protect|guard|requireLogin)/gi.test(code);
+  // No auth middleware on routes (multi-language)
+  const routeLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
+  const hasRoutes = routeLines.length > 0;
+  const hasAuthMiddleware = /(?:authenticate|authorize|requireAuth|ensureAuth|isAuthenticated|verifyToken|passport\.authenticate|jwt\.verify|auth\(\)|protect|guard|requireLogin|@login_required|@requires_auth|@Authorize|@PreAuthorize|@Secured)/gi.test(code);
   if (hasRoutes && !hasAuthMiddleware && code.split("\n").length > 20) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "API routes without authentication middleware",
       description: "API endpoints are defined without any visible authentication middleware. Any client can access these endpoints without proving their identity.",
-      recommendation: "Apply authentication middleware to routes that require it. Use app.use(authMiddleware) for global protection or per-route middleware for selective protection.",
+      recommendation: "Apply authentication middleware to routes that require it. Use framework-specific auth guards: Express middleware, Python decorators (@login_required), Java annotations (@PreAuthorize), or Go middleware.",
       reference: "OWASP API Security Top 10: API2 — Broken Authentication",
+      suggestedFix: "Add auth middleware: app.use(authenticateJWT) (Express), @login_required (Django/Flask), @PreAuthorize (Spring), or middleware.Auth(handler) (Go).",
+      confidence: 0.7,
     });
   }
 
@@ -188,11 +193,14 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       lineNumbers: tokenQueryLines,
       recommendation: "Pass tokens in the Authorization header (Bearer scheme) or in httpOnly cookies. Never use query parameters for sensitive credentials.",
       reference: "OWASP: Transport Layer Security / RFC 6750",
+      suggestedFix: "Read tokens from the Authorization header instead: const token = req.headers.authorization?.replace('Bearer ', '');",
+      confidence: 0.9,
     });
   }
 
-  // Weak password hashing
-  const weakHashLines = getWeakCredentialHashLines(code);
+  // Weak password hashing (multi-language)
+  const weakHashByLang = getLangLineNumbers(code, language, LP.WEAK_HASH);
+  const weakHashLines = weakHashByLang.length > 0 ? weakHashByLang : getWeakCredentialHashLines(code);
   if (weakHashLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -202,6 +210,8 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       lineNumbers: weakHashLines,
       recommendation: "Use bcrypt, scrypt, or Argon2 for password hashing. These algorithms are intentionally slow and include salt by default.",
       reference: "OWASP Password Storage Cheat Sheet / NIST 800-63b",
+      suggestedFix: "Replace with bcrypt/argon2: bcrypt.hash(password, 12) (JS), bcrypt.hashpw(password, bcrypt.gensalt()) (Python), Argon2::default().hash_password() (Rust), BCrypt.HashPassword() (C#).",
+      confidence: 0.9,
     });
   }
 
@@ -215,6 +225,8 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "No role or permission checks found. Without authorization, any authenticated user could access any resource, including admin functions.",
       recommendation: "Implement role-based access control (RBAC) or attribute-based access control (ABAC). Check permissions at each endpoint or resource access.",
       reference: "OWASP API Security Top 10: API5 — Broken Function Level Authorization",
+      suggestedFix: "Add role-based middleware: const requireRole = (role) => (req, res, next) => { if (req.user.role !== role) return res.status(403).json({ error: 'Forbidden' }); next(); };",
+      confidence: 0.7,
     });
   }
 
@@ -230,12 +242,13 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "JWT tokens are being created but no verification logic is visible. Tokens could be tampered with or forged without the server detecting it.",
       recommendation: "Always verify JWT tokens on every request: check signature, expiration (exp), issuer (iss), and audience (aud).",
       reference: "RFC 7519: JWT / OWASP JWT Cheat Sheet",
+      suggestedFix: "Add JWT verification: const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'], issuer: 'myapp', audience: 'myapp' });",
+      confidence: 0.8,
     });
   }
 
-  // Disabled TLS / certificate validation
-  const tlsDisabledPattern = /NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*["'`]?0|rejectUnauthorized\s*:\s*false|verify\s*=\s*False|InsecureSkipVerify\s*:\s*true/gi;
-  const tlsLines = getLineNumbers(code, tlsDisabledPattern);
+  // Disabled TLS / certificate validation (multi-language)
+  const tlsLines = getLangLineNumbers(code, language, LP.TLS_DISABLED);
   if (tlsLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -245,6 +258,8 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       lineNumbers: tlsLines,
       recommendation: "Never disable TLS verification in production. Fix certificate issues properly. Use CA bundles for self-signed certs in development only.",
       reference: "CWE-295: Improper Certificate Validation",
+      suggestedFix: "Remove TLS bypass: delete rejectUnauthorized:false (JS), verify=False (Python), InsecureSkipVerify:true (Go), danger_accept_invalid_certs(true) (Rust), TrustAllCerts (Java).",
+      confidence: 0.9,
     });
   }
 
@@ -259,6 +274,8 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "Session middleware is used without visible expiration settings. Sessions that never expire allow stolen session tokens to be used indefinitely.",
       recommendation: "Set session maxAge (e.g., 30 minutes for sensitive apps). Implement idle timeout. Invalidate sessions on password change or logout.",
       reference: "OWASP Session Management Cheat Sheet",
+      suggestedFix: "Set session expiry: app.use(session({ cookie: { maxAge: 30 * 60 * 1000 }, rolling: true })); and invalidate sessions on password change.",
+      confidence: 0.7,
     });
   }
 
@@ -273,6 +290,8 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "User registration logic without visible password policy. Users can set weak passwords like '123456' or 'password', which are trivially guessable.",
       recommendation: "Enforce minimum password length (12+ chars), check against known breached passwords (HaveIBeenPwned API), and use a strength estimator like zxcvbn.",
       reference: "NIST 800-63b / OWASP Password Guidelines",
+      suggestedFix: "Enforce password policy: if (password.length < 12) throw new Error('Min 12 chars'); and check against breached passwords via the HaveIBeenPwned API.",
+      confidence: 0.7,
     });
   }
 
@@ -287,6 +306,8 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "Login logic without account lockout or rate limiting. Attackers can brute-force passwords by trying unlimited login attempts.",
       recommendation: "Implement progressive delays or temporary lockout after 5-10 failed attempts. Use rate limiting on login endpoints. Consider CAPTCHA for repeated failures.",
       reference: "OWASP Brute Force Prevention / CWE-307",
+      suggestedFix: "Add rate limiting and lockout: after 5 failed attempts, lock the account for 15 minutes. Use express-rate-limit on the login endpoint.",
+      confidence: 0.7,
     });
   }
 
@@ -303,6 +324,8 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       lineNumbers: cookieLines,
       recommendation: "Set cookies with { secure: true, httpOnly: true, sameSite: 'strict' }. Use Secure for all auth cookies. HttpOnly prevents JavaScript access.",
       reference: "OWASP Secure Cookie Best Practices / CWE-614",
+      suggestedFix: "Add security flags: res.cookie('session', token, { httpOnly: true, secure: true, sameSite: 'strict' });",
+      confidence: 0.8,
     });
   }
 
@@ -317,6 +340,42 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "POST endpoints with session-based auth but no CSRF tokens. Attackers can craft pages that submit forms on behalf of authenticated users.",
       recommendation: "Use CSRF tokens (csurf middleware, Django CSRF, Rails authenticity_token). Set SameSite=Strict on cookies. Use custom headers for API calls.",
       reference: "OWASP CSRF Prevention Cheat Sheet / CWE-352",
+      suggestedFix: "Add CSRF middleware: app.use(csrf({ cookie: { sameSite: 'strict' } })); and include the token in forms: <input type='hidden' name='_csrf' value='{{csrfToken}}'>.",
+      confidence: 0.8,
+    });
+  }
+
+  // Session fixation — no session regeneration after login
+  const hasLoginHandler = /(?:login|signin|sign.?in|authenticate)\s*(?:=|=>|\(|async)|(?:\.post|\.get|\.put)\s*\(\s*["'][^"']*(?:login|signin|sign.?in|auth)["']/gi.test(code);
+  const hasSessionUsage = /req\.session|session\[|session\./gi.test(code);
+  const hasSessionRegen = /session\.regenerate|regenerateSession|session\.cycle|rotate.*session|new.*session|session\.create/gi.test(code);
+  if (hasLoginHandler && hasSessionUsage && !hasSessionRegen && code.split("\n").length > 10) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "No session regeneration after authentication",
+      description: "Login handler uses sessions but does not regenerate the session ID after successful authentication. This enables session fixation attacks where an attacker pre-sets the session ID.",
+      recommendation: "Call req.session.regenerate() (Express), session.cycle() (Phoenix), or equivalent immediately after successful login. This invalidates the pre-authentication session ID.",
+      reference: "OWASP Session Fixation — CWE-384",
+      suggestedFix: "Regenerate session after login: req.session.regenerate((err) => { req.session.userId = user.id; res.redirect('/dashboard'); });",
+      confidence: 0.8,
+    });
+  }
+
+  // No MFA/2FA consideration in authentication flows
+  const hasAuthFlow = /(?:login|signin|sign.?in|authenticate|password.*reset|change.*password)\s*(?:\(|=>|=|async)|(?:\.post|\.get|\.put)\s*\(\s*["'][^"']*(?:login|signin|sign.?in|auth|password)["']/gi.test(code);
+  const hasProtectedOps = /(?:transfer|payment|withdraw|approve|delete.*account|change.*email|wire|payout)/gi.test(code);
+  const hasMfa = /(?:mfa|2fa|two.?factor|totp|otp|authenticator|verification.?code|sms.?code|security.?code|second.?factor)/gi.test(code);
+  if ((hasAuthFlow || hasProtectedOps) && !hasMfa && code.split("\n").length > 40) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "No MFA/2FA consideration in authentication flow",
+      description: "Authentication or sensitive operation flow with no references to multi-factor authentication. Password-only auth is insufficient for protecting high-value operations.",
+      recommendation: "Implement or integrate MFA (TOTP, WebAuthn, SMS). At minimum, support optional MFA for users and require it for admin/sensitive operations. Consider FIDO2/WebAuthn for phishing-resistant auth.",
+      reference: "NIST 800-63B / OWASP MFA Cheat Sheet",
+      suggestedFix: "Integrate TOTP-based MFA: const verified = speakeasy.totp.verify({ secret: user.mfaSecret, token: req.body.totpCode }); and require MFA for admin and sensitive operations.",
+      confidence: 0.7,
     });
   }
 

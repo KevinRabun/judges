@@ -8,9 +8,25 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
   const prefix = "LOGPRIV";
   const lang = getLangFamily(language);
 
-  // Logging authorization/token headers
-  const logAuthPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:authorization|bearer|token|auth)/gi;
-  const logAuthLines = getLineNumbers(code, logAuthPattern);
+  // Helper: find log statement lines that contain sensitive data (multi-language)
+  const logLineSet = new Set([
+    ...getLangLineNumbers(code, language, LP.CONSOLE_LOG),
+    ...getLangLineNumbers(code, language, LP.STRUCTURED_LOG),
+  ]);
+  const codeLines = code.split("\n");
+  function getLogLinesMatching(sensitivePattern: RegExp): number[] {
+    const flagged: number[] = [];
+    for (const lineNum of logLineSet) {
+      const line = codeLines[lineNum - 1];
+      if (line && sensitivePattern.test(line)) {
+        flagged.push(lineNum);
+      }
+    }
+    return flagged;
+  }
+
+  // Logging authorization/token headers (multi-language)
+  const logAuthLines = getLogLinesMatching(/(?:authorization|bearer|token|auth)/i);
   if (logAuthLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -20,12 +36,13 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logAuthLines,
       recommendation: "Never log authentication tokens, Authorization headers, or session IDs. If request logging is needed, redact sensitive headers before logging.",
       reference: "OWASP Logging Cheat Sheet / CWE-532",
+      suggestedFix: "Redact auth headers: const safeHeaders = { ...req.headers, authorization: '[REDACTED]' }; logger.info({ headers: safeHeaders });",
+      confidence: 0.9,
     });
   }
 
-  // Logging passwords
-  const logPasswordPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:password|passwd|pwd|secret|credential)/gi;
-  const logPasswordLines = getLineNumbers(code, logPasswordPattern);
+  // Logging passwords (multi-language)
+  const logPasswordLines = getLogLinesMatching(/(?:password|passwd|pwd|secret|credential)/i);
   if (logPasswordLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -35,12 +52,13 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logPasswordLines,
       recommendation: "Never log passwords, credentials, or secrets. Implement a log sanitizer that redacts sensitive fields automatically.",
       reference: "OWASP Logging Cheat Sheet / GDPR Art. 5(1)(f)",
+      suggestedFix: "Remove password from log output: const { password, ...safeData } = userData; logger.info({ user: safeData });",
+      confidence: 0.9,
     });
   }
 
-  // Logging PII (email, name, SSN, phone)
-  const logPiiPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:email|ssn|phone|address|name|firstName|lastName|dateOfBirth|dob|social.?security)/gi;
-  const logPiiLines = getLineNumbers(code, logPiiPattern);
+  // Logging PII (email, name, SSN, phone) (multi-language)
+  const logPiiLines = getLogLinesMatching(/(?:email|ssn|phone|address|name|firstName|lastName|dateOfBirth|dob|social.?security)/i);
   if (logPiiLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -50,12 +68,13 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logPiiLines,
       recommendation: "Redact PII before logging. Use anonymized identifiers. Implement a log redaction filter that automatically masks sensitive fields.",
       reference: "GDPR Article 5: Data Minimization / OWASP Logging Cheat Sheet",
+      suggestedFix: "Mask PII in logs: logger.info({ email: maskEmail(user.email), id: user.id }); function maskEmail(e) { return e[0] + '***@' + e.split('@')[1]; }",
+      confidence: 0.9,
     });
   }
 
-  // Logging full request/response bodies
-  const logBodyPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:req\.body|request\.body|res\.body|response\.body|JSON\.stringify\s*\(\s*req)/gi;
-  const logBodyLines = getLineNumbers(code, logBodyPattern);
+  // Logging full request/response bodies (multi-language)
+  const logBodyLines = getLogLinesMatching(/(?:req\.body|request\.body|res\.body|response\.body|JSON\.stringify\s*\(\s*req|request\.data|request\.json)/i);
   if (logBodyLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -65,12 +84,13 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logBodyLines,
       recommendation: "Log only necessary metadata (method, URL, status, duration). If body logging is needed, implement a whitelist of safe fields and redact everything else.",
       reference: "Log Sanitization Best Practices",
+      suggestedFix: "Log safe fields only: const safeBody = pick(req.body, ['action', 'timestamp']); logger.info({ method: req.method, url: req.url, body: safeBody });",
+      confidence: 0.85,
     });
   }
 
-  // Logging financial data
-  const logFinancePattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:card.?number|credit.?card|cvv|expir|bank.?account|routing.?number|iban|swift)/gi;
-  const logFinanceLines = getLineNumbers(code, logFinancePattern);
+  // Logging financial data (multi-language)
+  const logFinanceLines = getLogLinesMatching(/(?:card.?number|credit.?card|cvv|expir|bank.?account|routing.?number|iban|swift)/i);
   if (logFinanceLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -80,26 +100,36 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logFinanceLines,
       recommendation: "Never log financial data. Mask card numbers (show only last 4 digits). PCI DSS prohibits storing CVV data in any form.",
       reference: "PCI DSS Requirement 3: Protect Stored Data",
+      suggestedFix: "Mask card numbers: const masked = cardNumber.replace(/.(?=.{4})/g, '*'); logger.info({ card: masked }); never log CVV.",
+      confidence: 0.9,
     });
   }
 
-  // Console.log used instead of proper logger (with privacy context)
-  const consoleLogCount = (code.match(/console\.(log|info|warn|error|debug)\s*\(/g) || []).length;
+  // Console.log used instead of proper logger (multi-language detection)
+  const consoleLogLines = getLangLineNumbers(code, language, LP.CONSOLE_LOG);
   const hasProperLogger = /winston|pino|bunyan|log4j|serilog|NLog|structuredLog|logger\./gi.test(code);
-  if (consoleLogCount > 3 && !hasProperLogger) {
+  const structuredLogLines = getLangLineNumbers(code, language, LP.STRUCTURED_LOG);
+  if (consoleLogLines.length > 3 && !hasProperLogger && structuredLogLines.length === 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
-      title: "Console.log lacks redaction capabilities",
-      description: `Found ${consoleLogCount} console.log statements. Console.log has no built-in redaction, log level filtering, or structured output — making it impossible to automatically strip sensitive data.`,
+      title: "Unstructured logging lacks redaction capabilities",
+      description: `Found ${consoleLogLines.length} unstructured log statement(s). Console/print logging has no built-in redaction, log level filtering, or structured output — making it impossible to automatically strip sensitive data.`,
       recommendation: "Use a structured logging library (pino, winston) that supports field-level redaction, log level filtering, and structured output for automated sensitivity scanning.",
       reference: "Structured Logging / Log Redaction Patterns",
+      suggestedFix: "Use pino with redaction: import pino from 'pino'; const logger = pino({ redact: ['req.headers.authorization', '*.password', '*.ssn'] });",
+      confidence: 0.75,
     });
   }
 
-  // String concatenation in logs (prevents redaction)
-  const logConcatPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*\+/g;
-  const logConcatLines = getLineNumbers(code, logConcatPattern);
+  // String concatenation in logs
+  const logConcatLines: number[] = [];
+  for (const lineNum of logLineSet) {
+    const line = codeLines[lineNum - 1];
+    if (line && /\+/.test(line)) {
+      logConcatLines.push(lineNum);
+    }
+  }
   if (logConcatLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -109,12 +139,13 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logConcatLines.slice(0, 5),
       recommendation: "Use structured logging with named fields: logger.info({ userId, action }, 'User action performed'). This allows automated redaction of specific fields.",
       reference: "Structured Logging Best Practices",
+      suggestedFix: "Replace concatenation with structured fields: instead of console.log('User ' + id + ' did ' + action), use logger.info({ userId: id, action }, 'User action performed');",
+      confidence: 0.75,
     });
   }
 
-  // Logging IP addresses
-  const logIpPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:ip|ipAddress|remoteAddress|x-forwarded-for|req\.ip|req\.connection\.remoteAddress)/gi;
-  const logIpLines = getLineNumbers(code, logIpPattern);
+  // Logging IP addresses (multi-language)
+  const logIpLines = getLogLinesMatching(/(?:ip|ipAddress|remoteAddress|x-forwarded-for|req\.ip|req\.connection\.remoteAddress|REMOTE_ADDR)/i);
   if (logIpLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -124,12 +155,13 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logIpLines,
       recommendation: "Anonymize IP addresses in logs (truncate last octet for IPv4, mask prefix for IPv6). If full IP is needed for security, ensure log retention complies with privacy policy.",
       reference: "GDPR Recital 30: IP Addresses as Personal Data",
+      suggestedFix: "Anonymize IPs: function anonymizeIp(ip) { return ip.replace(/\\d+$/, '0'); } logger.info({ ip: anonymizeIp(req.ip) });",
+      confidence: 0.9,
     });
   }
 
-  // Logging database queries with parameters
-  const logQueryPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:query|sql|SELECT|INSERT|UPDATE|DELETE)/gi;
-  const logQueryLines = getLineNumbers(code, logQueryPattern);
+  // Logging database queries with parameters (multi-language)
+  const logQueryLines = getLogLinesMatching(/(?:query|sql|SELECT|INSERT|UPDATE|DELETE)/i);
   if (logQueryLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -139,6 +171,8 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logQueryLines,
       recommendation: "Log query templates without parameter values. Use parameterized query logging that replaces bind values with placeholders. Redact sensitive column values.",
       reference: "Database Logging Privacy / OWASP Logging Cheat Sheet",
+      suggestedFix: "Log queries safely: logger.info({ query: 'SELECT * FROM users WHERE id = $1', paramCount: params.length }); // never log actual parameter values.",
+      confidence: 0.8,
     });
   }
 
@@ -154,6 +188,8 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: stackExposedLines,
       recommendation: "Never send stack traces in production API responses. Log them server-side for debugging. Return a generic error ID that correlates to internal logs.",
       reference: "OWASP: Improper Error Handling / CWE-209",
+      suggestedFix: "Return safe errors: const errorId = crypto.randomUUID(); logger.error({ errorId, stack: err.stack }); res.status(500).json({ error: 'Internal error', errorId });",
+      confidence: 0.85,
     });
   }
 

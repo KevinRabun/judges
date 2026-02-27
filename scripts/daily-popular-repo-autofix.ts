@@ -195,6 +195,7 @@ type CandidateFix = {
   language: string;
   ruleId: string;
   severity: Finding["severity"];
+  confidence: number;
   title: string;
   previousLine: string;
   replacementLine: string;
@@ -206,8 +207,29 @@ type RepoRunSummary = {
   defaultBranch: string;
   candidateConfidenceUsed: number;
   fallbackUsed: boolean;
+  priorityRulePrefixesUsed: string[];
+  minPriorityScoreUsed: number;
   judgesFindingsScanned: number;
+  candidatesDiscovered: number;
+  candidatesAfterLocationDedupe: number;
+  candidatesAfterPriorityThreshold: number;
   candidatesInspected: number;
+  prioritizedRuleCounts: Array<{
+    ruleId: string;
+    count: number;
+  }>;
+  topPrioritizedRuleCounts: Array<{
+    ruleId: string;
+    count: number;
+  }>;
+  topPrioritizedCandidates: Array<{
+    ruleId: string;
+    severity: Finding["severity"];
+    confidence: number;
+    filePath: string;
+    line: number;
+    priorityScore: number;
+  }>;
   prsOpened: Array<{
     branch: string;
     title: string;
@@ -225,6 +247,22 @@ type Summary = {
   dryRun: boolean;
   maxPrsPerRepo: number;
   maxReposPerDay: number;
+  runAggregate: {
+    reposProcessed: number;
+    reposWithPrioritizedCandidates: number;
+    reposWithOpenedPrs: number;
+    totalCandidatesDiscovered: number;
+    totalCandidatesAfterLocationDedupe: number;
+    totalCandidatesAfterPriorityThreshold: number;
+    dedupeReductionPercent: number;
+    priorityThresholdReductionPercent: number;
+    totalPrioritizedCandidates: number;
+    totalPrioritizedRuleOccurrences: number;
+    topPrioritizedRules: Array<{
+      ruleId: string;
+      count: number;
+    }>;
+  };
   repoRuns: RepoRunSummary[];
   skipped: string[];
 };
@@ -424,6 +462,192 @@ function countRule(findings: Finding[], ruleId: string): number {
 
 function countHighOrCritical(findings: Finding[]): number {
   return findings.filter((finding) => finding.severity === "critical" || finding.severity === "high").length;
+}
+
+function severityPriority(severity: Finding["severity"]): number {
+  switch (severity) {
+    case "critical":
+      return 5;
+    case "high":
+      return 4;
+    case "medium":
+      return 3;
+    case "low":
+      return 2;
+    case "info":
+      return 1;
+  }
+}
+
+function normalizeConfidence(confidence?: number): number {
+  if (typeof confidence !== "number" || Number.isNaN(confidence)) {
+    return 0.75;
+  }
+
+  return Math.max(0, Math.min(1, confidence));
+}
+
+function parsePriorityRulePrefixes(): string[] {
+  const configured = process.env.AUTOFIX_PRIORITY_RULE_PREFIXES
+    ?.split(",")
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean);
+
+  if (configured && configured.length > 0) {
+    return [...new Set(configured)];
+  }
+
+  return ["AUTH", "CYBER", "DATA", "CFG", "COMP", "AICS"];
+}
+
+function candidatePriorityScore(candidate: CandidateFix, priorityPrefixes: string[]): number {
+  const prefix = candidate.ruleId.split("-")[0].toUpperCase();
+  const prefixBoost = priorityPrefixes.includes(prefix) ? 3 : 0;
+  return severityPriority(candidate.severity) * 100 + prefixBoost * 100 + Math.round(candidate.confidence * 100);
+}
+
+function prioritizeCandidates(candidates: CandidateFix[], priorityPrefixes: string[]): CandidateFix[] {
+  return [...candidates].sort((left, right) => {
+    const scoreDiff = candidatePriorityScore(right, priorityPrefixes) - candidatePriorityScore(left, priorityPrefixes);
+    if (scoreDiff !== 0) return scoreDiff;
+
+    const severityDiff = severityPriority(right.severity) - severityPriority(left.severity);
+    if (severityDiff !== 0) return severityDiff;
+
+    const confidenceDiff = right.confidence - left.confidence;
+    if (confidenceDiff !== 0) return confidenceDiff;
+
+    return left.ruleId.localeCompare(right.ruleId);
+  });
+}
+
+function summarizePrioritizedRuleCounts(candidates: CandidateFix[]): Array<{ ruleId: string; count: number }> {
+  const counts = new Map<string, number>();
+
+  for (const candidate of candidates) {
+    counts.set(candidate.ruleId, (counts.get(candidate.ruleId) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([ruleId, count]) => ({ ruleId, count }))
+    .sort((left, right) => {
+      if (right.count !== left.count) return right.count - left.count;
+      return left.ruleId.localeCompare(right.ruleId);
+    });
+}
+
+function summarizeTopPrioritizedCandidates(
+  candidates: CandidateFix[],
+  priorityPrefixes: string[]
+): RepoRunSummary["topPrioritizedCandidates"] {
+  return candidates.slice(0, 10).map((candidate) => ({
+    ruleId: candidate.ruleId,
+    severity: candidate.severity,
+    confidence: candidate.confidence,
+    filePath: candidate.filePath,
+    line: candidate.line,
+    priorityScore: candidatePriorityScore(candidate, priorityPrefixes),
+  }));
+}
+
+function dedupeCandidatesByLocation(
+  candidates: CandidateFix[],
+  priorityPrefixes: string[]
+): CandidateFix[] {
+  const byLocation = new Map<string, CandidateFix>();
+
+  for (const candidate of candidates) {
+    const key = `${candidate.filePath}:${candidate.line}`;
+    const existing = byLocation.get(key);
+
+    if (!existing) {
+      byLocation.set(key, candidate);
+      continue;
+    }
+
+    const nextScore = candidatePriorityScore(candidate, priorityPrefixes);
+    const existingScore = candidatePriorityScore(existing, priorityPrefixes);
+    if (nextScore > existingScore) {
+      byLocation.set(key, candidate);
+    }
+  }
+
+  return prioritizeCandidates([...byLocation.values()], priorityPrefixes);
+}
+
+function applyMinimumPriorityThreshold(
+  candidates: CandidateFix[],
+  priorityPrefixes: string[],
+  minPriorityScore: number
+): CandidateFix[] {
+  if (!Number.isFinite(minPriorityScore) || minPriorityScore <= 0) {
+    return candidates;
+  }
+
+  return candidates.filter((candidate) => candidatePriorityScore(candidate, priorityPrefixes) >= minPriorityScore);
+}
+
+function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] {
+  const topRuleCounts = new Map<string, number>();
+
+  for (const repoRun of repoRuns) {
+    for (const entry of repoRun.prioritizedRuleCounts) {
+      topRuleCounts.set(entry.ruleId, (topRuleCounts.get(entry.ruleId) ?? 0) + entry.count);
+    }
+  }
+
+  const topPrioritizedRules = [...topRuleCounts.entries()]
+    .map(([ruleId, count]) => ({ ruleId, count }))
+    .sort((left, right) => {
+      if (right.count !== left.count) return right.count - left.count;
+      return left.ruleId.localeCompare(right.ruleId);
+    })
+    .slice(0, 10);
+
+  const reposWithPrioritizedCandidates = repoRuns.filter((repoRun) => repoRun.candidatesInspected > 0).length;
+  const reposWithOpenedPrs = repoRuns.filter((repoRun) => repoRun.prsOpened.length > 0).length;
+  const totalCandidatesDiscovered = repoRuns.reduce(
+    (sum, repoRun) => sum + repoRun.candidatesDiscovered,
+    0
+  );
+  const totalCandidatesAfterLocationDedupe = repoRuns.reduce(
+    (sum, repoRun) => sum + repoRun.candidatesAfterLocationDedupe,
+    0
+  );
+  const totalCandidatesAfterPriorityThreshold = repoRuns.reduce(
+    (sum, repoRun) => sum + repoRun.candidatesAfterPriorityThreshold,
+    0
+  );
+  const totalPrioritizedCandidates = repoRuns.reduce(
+    (sum, repoRun) => sum + repoRun.candidatesInspected,
+    0
+  );
+  const dedupeReductionPercent =
+    totalCandidatesDiscovered > 0
+      ? Number((((totalCandidatesDiscovered - totalCandidatesAfterLocationDedupe) / totalCandidatesDiscovered) * 100).toFixed(2))
+      : 0;
+  const priorityThresholdReductionPercent =
+    totalCandidatesAfterLocationDedupe > 0
+      ? Number((((totalCandidatesAfterLocationDedupe - totalCandidatesAfterPriorityThreshold) / totalCandidatesAfterLocationDedupe) * 100).toFixed(2))
+      : 0;
+  const totalPrioritizedRuleOccurrences = [...topRuleCounts.values()].reduce(
+    (sum, count) => sum + count,
+    0
+  );
+
+  return {
+    reposProcessed: repoRuns.length,
+    reposWithPrioritizedCandidates,
+    reposWithOpenedPrs,
+    totalCandidatesDiscovered,
+    totalCandidatesAfterLocationDedupe,
+    totalCandidatesAfterPriorityThreshold,
+    dedupeReductionPercent,
+    priorityThresholdReductionPercent,
+    totalPrioritizedCandidates,
+    totalPrioritizedRuleOccurrences,
+    topPrioritizedRules,
+  };
 }
 
 function isNonProductionPath(path: string): boolean {
@@ -656,6 +880,7 @@ function discoverFixCandidates(rootPath: string, options: CandidateDiscoveryOpti
         language,
         ruleId: finding.ruleId,
         severity: finding.severity,
+        confidence: normalizeConfidence(finding.confidence),
         title: finding.title,
         previousLine,
         replacementLine,
@@ -806,7 +1031,8 @@ function processRepository(
   includeTotalFindingsScan: boolean,
   fallbackEnabled: boolean,
   fallbackMinConfidence: number,
-  fallbackHighCriticalOnly: boolean
+  fallbackHighCriticalOnly: boolean,
+  minPriorityScore: number
 ): RepoRunSummary {
   const { owner, repo } = parseRepoFromUrl(selectedRepo);
   const repoRun: RepoRunSummary = {
@@ -814,11 +1040,21 @@ function processRepository(
     defaultBranch: "",
     candidateConfidenceUsed: minConfidence,
     fallbackUsed: false,
+    priorityRulePrefixesUsed: [],
+    minPriorityScoreUsed: minPriorityScore,
     judgesFindingsScanned: 0,
+    candidatesDiscovered: 0,
+    candidatesAfterLocationDedupe: 0,
+    candidatesAfterPriorityThreshold: 0,
     candidatesInspected: 0,
+    prioritizedRuleCounts: [],
+    topPrioritizedRuleCounts: [],
+    topPrioritizedCandidates: [],
     prsOpened: [],
     skipped: [],
   };
+  const priorityRulePrefixes = parsePriorityRulePrefixes();
+  repoRun.priorityRulePrefixesUsed = [...priorityRulePrefixes];
 
   const workspace = mkdtempSync(join(tmpdir(), "judges-daily-autofix-"));
   const clonePath = join(workspace, `${owner}-${repo}`);
@@ -855,6 +1091,14 @@ function processRepository(
       highCriticalOnly: false,
     });
 
+    repoRun.candidatesDiscovered = candidates.length;
+
+    candidates = prioritizeCandidates(candidates, priorityRulePrefixes);
+    candidates = dedupeCandidatesByLocation(candidates, priorityRulePrefixes);
+    repoRun.candidatesAfterLocationDedupe = candidates.length;
+    candidates = applyMinimumPriorityThreshold(candidates, priorityRulePrefixes, minPriorityScore);
+    repoRun.candidatesAfterPriorityThreshold = candidates.length;
+
     if (
       candidates.length === 0 &&
       fallbackEnabled &&
@@ -867,7 +1111,12 @@ function processRepository(
       });
 
       if (fallbackCandidates.length > 0) {
-        candidates = fallbackCandidates;
+        candidates = prioritizeCandidates(fallbackCandidates, priorityRulePrefixes);
+        repoRun.candidatesDiscovered = fallbackCandidates.length;
+        candidates = dedupeCandidatesByLocation(candidates, priorityRulePrefixes);
+        repoRun.candidatesAfterLocationDedupe = candidates.length;
+        candidates = applyMinimumPriorityThreshold(candidates, priorityRulePrefixes, minPriorityScore);
+        repoRun.candidatesAfterPriorityThreshold = candidates.length;
         repoRun.candidateConfidenceUsed = fallbackMinConfidence;
         repoRun.fallbackUsed = true;
         repoRun.skipped.push(
@@ -881,6 +1130,12 @@ function processRepository(
     }
 
     repoRun.candidatesInspected = candidates.length;
+    repoRun.prioritizedRuleCounts = summarizePrioritizedRuleCounts(candidates);
+    repoRun.topPrioritizedRuleCounts = repoRun.prioritizedRuleCounts.slice(0, 10);
+    repoRun.topPrioritizedCandidates = summarizeTopPrioritizedCandidates(
+      candidates,
+      priorityRulePrefixes
+    );
 
     if (candidates.length === 0) {
       repoRun.skipped.push("No safe auto-fix candidates found at configured confidence threshold.");
@@ -956,6 +1211,7 @@ function main() {
     10
   );
   const parsedMinConfidence = Number.parseFloat(process.env.MIN_CONFIDENCE ?? "0.9");
+  const parsedMinPriorityScore = Number.parseInt(process.env.AUTOFIX_MIN_PRIORITY_SCORE ?? "0", 10);
   const includeTotalFindingsScan = (process.env.INCLUDE_TOTAL_FINDINGS_SCAN ?? "false").toLowerCase() === "true";
   const fallbackEnabled = (process.env.ENABLE_FALLBACK ?? "true").toLowerCase() === "true";
   const parsedFallbackMinConfidence = Number.parseFloat(process.env.FALLBACK_MIN_CONFIDENCE ?? "0.8");
@@ -969,6 +1225,9 @@ function main() {
     : DEFAULT_MAX_REPOS_PER_DAY;
   const maxReposPerDay = Math.min(DEFAULT_MAX_REPOS_PER_DAY, requestedMaxReposPerDay);
   const minConfidence = Number.isFinite(parsedMinConfidence) ? parsedMinConfidence : 0.9;
+  const minPriorityScore = Number.isFinite(parsedMinPriorityScore) && parsedMinPriorityScore > 0
+    ? parsedMinPriorityScore
+    : 0;
   const fallbackMinConfidence = Number.isFinite(parsedFallbackMinConfidence)
     ? parsedFallbackMinConfidence
     : 0.8;
@@ -980,6 +1239,19 @@ function main() {
     dryRun,
     maxPrsPerRepo: maxPrs,
     maxReposPerDay,
+    runAggregate: {
+      reposProcessed: 0,
+      reposWithPrioritizedCandidates: 0,
+      reposWithOpenedPrs: 0,
+      totalCandidatesDiscovered: 0,
+      totalCandidatesAfterLocationDedupe: 0,
+      totalCandidatesAfterPriorityThreshold: 0,
+      dedupeReductionPercent: 0,
+      priorityThresholdReductionPercent: 0,
+      totalPrioritizedCandidates: 0,
+      totalPrioritizedRuleOccurrences: 0,
+      topPrioritizedRules: [],
+    },
     repoRuns: [],
     skipped: [],
   };
@@ -995,7 +1267,8 @@ function main() {
           includeTotalFindingsScan,
           fallbackEnabled,
           fallbackMinConfidence,
-          fallbackHighCriticalOnly
+          fallbackHighCriticalOnly,
+          minPriorityScore
         );
         summary.repoRuns.push(repoRun);
       } catch (error) {
@@ -1004,8 +1277,16 @@ function main() {
           defaultBranch: "",
           candidateConfidenceUsed: minConfidence,
           fallbackUsed: false,
+          priorityRulePrefixesUsed: [],
+          minPriorityScoreUsed: minPriorityScore,
           judgesFindingsScanned: 0,
+          candidatesDiscovered: 0,
+          candidatesAfterLocationDedupe: 0,
+          candidatesAfterPriorityThreshold: 0,
           candidatesInspected: 0,
+          prioritizedRuleCounts: [],
+          topPrioritizedRuleCounts: [],
+          topPrioritizedCandidates: [],
           prsOpened: [],
           skipped: [
             `Repository run failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -1014,6 +1295,7 @@ function main() {
       }
     }
   } finally {
+    summary.runAggregate = buildRunAggregate(summary.repoRuns);
     const outputPath = resolve(process.env.SUMMARY_PATH ?? "daily-autofix-summary.json");
     writeFileSync(outputPath, JSON.stringify(summary, null, 2), "utf8");
   }
