@@ -41,6 +41,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
       recommendation: "Review whether demographic-based logic is legally compliant and ethically justified. Document the business justification. Consider bias testing.",
       reference: "EU AI Act / Anti-Discrimination Laws / Algorithmic Fairness",
       suggestedFix: "Replace demographic conditionals with policy-driven rules or feature flags, and add bias-impact documentation for any remaining demographic logic.",
+      confidence: 0.8,
     });
   }
 
@@ -62,6 +63,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
       recommendation: "Log all factors contributing to scores. Provide mechanisms for users to understand and contest automated decisions.",
       reference: "GDPR Article 22 / EU AI Act Transparency Requirements",
       suggestedFix: "Add a scoring explanation object that logs each factor and weight, and expose a `getScoreExplanation()` method for audit and user queries.",
+      confidence: 0.75,
     });
   }
 
@@ -85,6 +87,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
       recommendation: "Implement human-in-the-loop for high-impact automated decisions. Provide appeal mechanisms and audit trails.",
       reference: "GDPR Article 22 / Right to Human Review",
       suggestedFix: "Route high-impact decisions through a review queue instead of executing immediately, and add an appeal/override endpoint for human reviewers.",
+      confidence: 0.75,
     });
   }
 
@@ -110,6 +113,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
       recommendation: "Ensure all consent mechanisms are opt-in (unchecked by default), clearly visible, and use plain language.",
       reference: "FTC Dark Patterns Guidelines / GDPR Valid Consent",
       suggestedFix: "Set `checked`/`defaultChecked` to `false` for consent checkboxes and change hidden consent inputs to visible, clearly-labeled form fields.",
+      confidence: 0.85,
     });
   }
 
@@ -130,6 +134,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
       recommendation: "Use inclusive alternatives: allowlist/denylist, primary/replica, placeholder, confidence check.",
       reference: "Inclusive Naming Initiative / Google Developer Style Guide",
       suggestedFix: "Rename `whitelist`→`allowlist`, `blacklist`→`denylist`, `master/slave`→`primary/replica`, and `sanity check`→`confidence check`.",
+      confidence: 0.85,
     });
   }
 
@@ -152,6 +157,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
       recommendation: "Implement data auditing for representation, test model outputs across demographic groups, and document data provenance.",
       reference: "ML Fairness / Responsible AI Practices",
       suggestedFix: "Add a bias-audit step (e.g., `auditDatasetBalance(dataset)`) before training, and log demographic distribution metrics for each dataset.",
+      confidence: 0.7,
     });
   }
 
@@ -172,6 +178,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
       recommendation: "Ensure scarcity/urgency messaging reflects real inventory or time limits. Verify claims are accurate and not manufactured.",
       reference: "FTC Dark Patterns / Consumer Protection",
       suggestedFix: "Replace hardcoded urgency strings with data-driven values sourced from real inventory or deadline APIs, and remove any fabricated scarcity copy.",
+      confidence: 0.85,
     });
   }
 
@@ -195,6 +202,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
       recommendation: "Only collect data necessary for the stated feature. Document the purpose and obtain consent before accessing device APIs.",
       reference: "GDPR Data Minimization / Privacy by Design",
       suggestedFix: "Gate device-API calls behind a consent check (e.g., `if (hasUserConsent('geolocation')) { ... }`) and document the data-collection purpose inline.",
+      confidence: 0.8,
     });
   }
 
@@ -215,6 +223,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
       recommendation: "If price varies by region, be transparent about it. Ensure pricing differences are based on legitimate factors (taxes, shipping) not user profiling.",
       reference: "Consumer Protection / Fair Pricing Laws",
       suggestedFix: "Separate tax/shipping adjustments from base price, remove device/userAgent from pricing logic, and display a price-breakdown to the user.",
+      confidence: 0.8,
     });
   }
 
@@ -238,6 +247,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
       recommendation: "Provide accessible CAPTCHA alternatives (audio, logic puzzles) or use invisible CAPTCHA methods that don't require visual interaction.",
       reference: "WCAG 1.1.1 Non-text Content / Digital Inclusion",
       suggestedFix: "Add an audio CAPTCHA fallback or switch to an invisible/accessible CAPTCHA provider (e.g., reCAPTCHA v3) that doesn't require visual interaction.",
+      confidence: 0.75,
     });
   }
 

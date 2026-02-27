@@ -21,6 +21,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       recommendation: "Add rate limiting: express-rate-limit (Express), django-ratelimit (Django), @RateLimiter (Spring), tollbooth (Go), governor (Rust).",
       reference: "OWASP API Security Top 10: API4 — Unrestricted Resource Consumption",
       suggestedFix: "Add rate limiting: app.use(rateLimit({ windowMs: 15*60*1000, max: 100 })) (Express), @ratelimit (Django), RateLimiter.of() (Spring), tollbooth.NewLimiter() (Go).",
+      confidence: 0.7,
     });
   }
 
@@ -36,6 +37,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       recommendation: "Configure body parser with a size limit: express.json({ limit: '1mb' }). Set limits appropriate for your use case.",
       reference: "Express Security Best Practices / OWASP",
       suggestedFix: "Set body size limit: app.use(express.json({ limit: '1mb' })); app.use(express.urlencoded({ limit: '1mb', extended: true }));",
+      confidence: 0.8,
     });
   }
 
@@ -52,6 +54,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       recommendation: "Always enforce a maximum result limit: db.find({}).limit(100). Implement pagination and enforce maximum page sizes.",
       reference: "API Rate Limiting / Database Query Safety",
       suggestedFix: "Add query limits: db.find({}).limit(100).skip(page * 100); enforce max page size: const limit = Math.min(req.query.limit || 20, 100);",
+      confidence: 0.85,
     });
   }
 
@@ -65,6 +68,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       recommendation: "Return rate limit headers on responses so clients can self-throttle. Include Retry-After on 429 responses.",
       reference: "IETF Rate Limit Headers / RFC 6585",
       suggestedFix: "Add rate limit headers: res.set({ 'X-RateLimit-Limit': limit, 'X-RateLimit-Remaining': remaining, 'X-RateLimit-Reset': resetTime, 'Retry-After': retrySeconds });",
+      confidence: 0.7,
     });
   }
 
@@ -81,6 +85,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       recommendation: "Implement exponential backoff with jitter for external API calls. Respect Retry-After headers. Use libraries like p-retry (JS), tenacity (Python), Polly (C#).",
       reference: "Exponential Backoff / Rate Limiting Best Practices",
       suggestedFix: "Add retry with backoff: pRetry(() => fetch(url), { retries: 3 }) (JS), @retry(stop=stop_after(3)) (Python), .AddPolicyHandler(GetRetryPolicy()) (C#).",
+      confidence: 0.8,
     });
   }
 
@@ -97,6 +102,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       recommendation: "Use setTimeout with re-scheduling instead of setInterval to prevent overlap. Add guards to skip execution if the previous run hasn't completed.",
       reference: "JavaScript Timer Best Practices",
       suggestedFix: "Replace setInterval with controlled scheduling: async function poll() { await doWork(); setTimeout(poll, interval); } poll(); — prevents overlapping executions.",
+      confidence: 0.75,
     });
   }
 
@@ -114,6 +120,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       recommendation: "Apply strict rate limits to auth endpoints (e.g., 5-10 requests/minute per IP). Use progressive delays or CAPTCHA after failed attempts. Consider using 'express-rate-limit' or 'rate-limiter-flexible'.",
       reference: "OWASP: Brute Force Protection / NIST 800-63B",
       suggestedFix: "Add auth rate limit: app.use('/auth', rateLimit({ windowMs: 60000, max: 5 })); from 'express-rate-limit'.",
+      confidence: 0.8,
     });
   }
 
@@ -131,6 +138,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       recommendation: "Set explicit file size limits (e.g., multer({ limits: { fileSize: 5 * 1024 * 1024 } })). Limit the number of files per request. Validate file types.",
       reference: "OWASP: Unrestricted File Upload / Multer Limits",
       suggestedFix: "Set upload limits: const upload = multer({ limits: { fileSize: 5 * 1024 * 1024, files: 5 }, fileFilter: allowedTypes });",
+      confidence: 0.8,
     });
   }
 
@@ -146,6 +154,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       recommendation: "Return 429 status with Retry-After header when rate limits are exceeded. Include rate limit headers (X-RateLimit-Remaining, X-RateLimit-Reset) in all responses.",
       reference: "RFC 6585: 429 Too Many Requests / IETF Rate Limiting Headers",
       suggestedFix: "Return 429 responses: if (isRateLimited) { res.status(429).set('Retry-After', '60').json({ error: 'Too many requests', retryAfter: 60 }); }",
+      confidence: 0.7,
     });
   }
 
@@ -163,6 +172,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       recommendation: "Set maxPayload to limit message sizes. Limit concurrent connections per client. Implement message rate limiting per connection. Set idle timeouts.",
       reference: "ws Package: Connection Limits / WebSocket Security",
       suggestedFix: "Set WebSocket limits: new WebSocket.Server({ maxPayload: 1024 * 1024, perMessageDeflate: false }); add per-connection message rate tracking.",
+      confidence: 0.8,
     });
   }
 
@@ -180,6 +190,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       recommendation: "Use exponential backoff with jitter: delay = baseDelay * Math.pow(2, attempt) + randomJitter. Set a maximum retry count. Use libraries like 'p-retry' or 'axios-retry'.",
       reference: "AWS Architecture Blog: Exponential Backoff and Jitter",
       suggestedFix: "Add backoff: import pRetry from 'p-retry'; await pRetry(() => fetchData(), { retries: 3, minTimeout: 1000, factor: 2 });",
+      confidence: 0.8,
     });
   }
 

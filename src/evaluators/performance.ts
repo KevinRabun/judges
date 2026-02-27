@@ -29,6 +29,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Batch queries outside the loop using WHERE IN clauses, JOINs, or DataLoader patterns. Fetch all needed data in a single query.",
       reference: "N+1 Query Problem",
       suggestedFix: "Batch queries outside the loop: const items = await db.findMany({ where: { id: { in: ids } } }); then iterate over the result.",
+      confidence: 0.85,
     });
   }
 
@@ -55,6 +56,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Use async/await versions, non-blocking APIs, or spawn blocking work on a separate thread/runtime. Sync I/O is only acceptable at startup.",
       reference: "Performance Best Practices",
       suggestedFix: "Use async variants: await fs.promises.readFile() instead of fs.readFileSync(), or asyncio.open() in Python.",
+      confidence: 0.9,
     });
   }
 
@@ -82,6 +84,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Cache responses or deduplicate requests. Use memoization, request coalescing, or an in-memory/distributed cache.",
       reference: "Caching Strategies",
       suggestedFix: "Cache or deduplicate: const cached = cache.get(url) ?? await fetch(url); cache.set(url, cached); or use a request deduplication layer.",
+      confidence: 0.8,
     });
   }
 
@@ -102,6 +105,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Use useCallback for event handlers or define handlers outside the render function.",
       reference: "React Performance Optimization",
       suggestedFix: "Extract handlers: const handleClick = useCallback(() => { ... }, [deps]); then use onClick={handleClick}.",
+      confidence: 0.8,
     });
   }
 
@@ -122,6 +126,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Consider the data size. Use structuredClone() instead of JSON round-trip. Sort on the database side when possible.",
       reference: "JavaScript Performance Patterns",
       suggestedFix: "Use structuredClone(obj) instead of JSON.parse(JSON.stringify(obj)). Sort on the database side or use a pre-sorted data structure.",
+      confidence: 0.85,
     });
   }
 
@@ -144,6 +149,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Move RegExp compilation outside the loop. Declare regex patterns as constants at module or function scope.",
       reference: "Regex Performance Best Practices",
       suggestedFix: "Hoist regex outside the loop: const pattern = new RegExp(expr); for (...) { pattern.test(item); } or use /literal/ syntax.",
+      confidence: 0.9,
     });
   }
 
@@ -165,6 +171,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Always remove event listeners on cleanup (componentWillUnmount, useEffect cleanup, ngOnDestroy). Use AbortController for fetch listeners.",
       reference: "Memory Leak Prevention",
       suggestedFix: "Clean up in useEffect: useEffect(() => { el.addEventListener('click', handler); return () => el.removeEventListener('click', handler); }, []);",
+      confidence: 0.8,
     });
   }
 
@@ -185,6 +192,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Use dynamic imports (import()) for heavy libraries. Import specific sub-modules (lodash/get instead of lodash). Consider tree-shakeable alternatives.",
       reference: "Code Splitting / Bundle Optimization",
       suggestedFix: "Use dynamic imports: const lodash = await import('lodash/get'); or import specific sub-modules: import get from 'lodash/get'.",
+      confidence: 0.9,
     });
   }
 
@@ -206,6 +214,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Wrap high-frequency event handlers with debounce(), throttle(), or requestAnimationFrame to limit execution rate.",
       reference: "Event Handler Performance",
       suggestedFix: "Wrap with debounce: const handleScroll = useMemo(() => debounce(onScroll, 150), []); or use requestAnimationFrame.",
+      confidence: 0.8,
     });
   }
 
@@ -229,6 +238,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Build DOM content in a DocumentFragment or string, then insert once. Use virtual DOM frameworks or batch updates.",
       reference: "DOM Performance / Layout Thrashing",
       suggestedFix: "Batch DOM updates: const fragment = document.createDocumentFragment(); items.forEach(item => fragment.appendChild(el)); container.appendChild(fragment);",
+      confidence: 0.85,
     });
   }
 
@@ -249,6 +259,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Add loading='lazy' to images below the fold. Use modern formats (WebP, AVIF) and responsive srcset attributes.",
       reference: "Image Optimization / Core Web Vitals",
       suggestedFix: "Add lazy loading: <img src=\"photo.jpg\" loading=\"lazy\" alt=\"...\"> for images below the fold. Use srcset for responsive images.",
+      confidence: 0.85,
     });
   }
 
@@ -269,6 +280,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Add 'async' or 'defer' attribute to script tags, or use type='module' which is deferred by default.",
       reference: "Script Loading Performance",
       suggestedFix: "Add async or defer: <script src=\"app.js\" defer></script> or use type=\"module\" which defers by default.",
+      confidence: 0.9,
     });
   }
 
@@ -291,6 +303,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Use StringBuilder (Java/C#), join() (Python/JS), or template literals with array.join() to build strings efficiently.",
       reference: "String Performance Optimization",
       suggestedFix: "Use array join: const parts = []; for (...) parts.push(str); return parts.join(''); or StringBuilder in Java/C#.",
+      confidence: 0.85,
     });
   }
 
@@ -314,6 +327,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Always use pagination (limit/offset or cursor-based) when querying collections. Set reasonable default page sizes.",
       reference: "Database Query Performance / API Pagination",
       suggestedFix: "Add pagination: db.find({}).limit(50).skip(page * 50) or use cursor-based pagination for large datasets.",
+      confidence: 0.85,
     });
   }
 
@@ -337,6 +351,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       recommendation: "Wrap expensive derived data computations with useMemo() to only recompute when dependencies change.",
       reference: "React useMemo / Performance",
       suggestedFix: "Memoize derived data: const filtered = useMemo(() => items.filter(...).sort(...), [items, sortKey]);",
+      confidence: 0.8,
     });
   }
 

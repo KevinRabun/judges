@@ -23,6 +23,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
       recommendation: "Use platform-independent path construction (path.join, os.path.join, Path.Combine). Use environment variables or config for base directories.",
       reference: "Cross-Platform File Path Best Practices",
       suggestedFix: "Replace hardcoded paths like `'C:\\Users\\...'` with `path.join(os.homedir(), 'relative', 'path')` or read the base directory from an environment variable.",
+      confidence: 0.9,
     });
   }
 
@@ -44,6 +45,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
       recommendation: "Use path.join() (Node.js), os.path.join() (Python), or Path.Combine() (C#) instead of hardcoded separators.",
       reference: "Node.js path module / Cross-Platform Development",
       suggestedFix: "Replace string-concatenated paths like `dir + '\\\\' + file` with `path.join(dir, file)` to let the runtime choose the correct separator.",
+      confidence: 0.8,
     });
   }
 
@@ -60,6 +62,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
       recommendation: "Use cross-platform APIs instead of shell commands (fs module instead of rm, path module instead of basename). If shell commands are required, use cross-platform alternatives.",
       reference: "Cross-Platform Development Best Practices",
       suggestedFix: "Replace shell calls like `exec('rm -rf dir')` with `fs.rmSync('dir', { recursive: true })` or use the `cross-spawn` package for unavoidable shell commands.",
+      confidence: 0.9,
     });
   }
 
@@ -83,6 +86,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
       recommendation: "Create an abstraction layer (interface/adapter pattern) around cloud services. This allows swapping implementations without changing business logic.",
       reference: "Cloud-Agnostic Architecture / Adapter Pattern",
       suggestedFix: "Define an interface (e.g. `IStorageProvider`) and wrap the vendor SDK in an adapter class so business logic depends only on the interface.",
+      confidence: 0.7,
     });
   }
 
@@ -99,6 +103,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
       recommendation: "Use environment variables for host configuration. In containers, use service names. In cloud, use DNS-based service discovery.",
       reference: "12-Factor App: Port Binding (Factor VII)",
       suggestedFix: "Replace `'localhost:3000'` with `process.env.HOST ?? 'localhost'` and `process.env.PORT ?? 3000` so the values are configurable per environment.",
+      confidence: 0.9,
     });
   }
 
@@ -116,6 +121,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
       recommendation: "Use 'utf-8' encoding explicitly. Consider normalizing line endings when reading files. Configure .gitattributes for consistent line endings in version control.",
       reference: "Git Line Endings / Cross-Platform File I/O",
       suggestedFix: "Normalize line endings after reading with `.replace(/\\r\\n/g, '\\n')` and add a `.gitattributes` file with `* text=auto eol=lf`.",
+      confidence: 0.7,
     });
   }
 
@@ -132,6 +138,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
       recommendation: "Use cross-platform helpers like os.homedir(), os.tmpdir(), or libraries like 'env-paths' to resolve platform-appropriate directories.",
       reference: "Node.js os Module / Cross-Platform File Paths",
       suggestedFix: "Replace `process.env.APPDATA` with `os.homedir()` or use the `env-paths` package to get platform-appropriate config/data directories.",
+      confidence: 0.9,
     });
   }
 
@@ -149,6 +156,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
       recommendation: "Guard browser API usage with typeof checks (e.g., typeof window !== 'undefined'). Use isomorphic libraries for code shared between client and server.",
       reference: "Universal JavaScript / SSR Best Practices",
       suggestedFix: "Wrap browser API calls in a guard: `if (typeof window !== 'undefined') { window.localStorage.setItem(...) }` or move them to a client-only module.",
+      confidence: 0.85,
     });
   }
 
@@ -166,6 +174,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
       recommendation: "Use import.meta.url with fileURLToPath() and path.dirname() for ESM-compatible directory resolution: const __dirname = path.dirname(fileURLToPath(import.meta.url))",
       reference: "Node.js ESM: import.meta.url",
       suggestedFix: "Replace `__dirname` with `path.dirname(fileURLToPath(import.meta.url))` after importing `fileURLToPath` from `'node:url'`.",
+      confidence: 0.9,
     });
   }
 
@@ -182,6 +191,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
       recommendation: "Use BigInt for values exceeding Number.MAX_SAFE_INTEGER. Be mindful of buffer sizes on memory-constrained platforms. Test on both 32-bit and 64-bit environments.",
       reference: "MDN: BigInt / Node.js Buffer Best Practices",
       suggestedFix: "Use `BigInt` literals (e.g. `9007199254740993n`) for values beyond `Number.MAX_SAFE_INTEGER` and validate buffer sizes against `os.freemem()` before allocating.",
+      confidence: 0.8,
     });
   }
 
@@ -198,6 +208,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
       recommendation: "Guard signal handlers with platform checks (process.platform !== 'win32'). Use cross-platform shutdown mechanisms. Consider using 'death' or 'signal-exit' packages.",
       reference: "Node.js Process Signals / Cross-Platform Considerations",
       suggestedFix: "Wrap the handler in a platform check: `if (process.platform !== 'win32') { process.on('SIGUSR1', handler); }` or use the `signal-exit` package.",
+      confidence: 0.9,
     });
   }
 

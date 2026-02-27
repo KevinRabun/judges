@@ -37,6 +37,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       recommendation: "Never log authentication tokens, Authorization headers, or session IDs. If request logging is needed, redact sensitive headers before logging.",
       reference: "OWASP Logging Cheat Sheet / CWE-532",
       suggestedFix: "Redact auth headers: const safeHeaders = { ...req.headers, authorization: '[REDACTED]' }; logger.info({ headers: safeHeaders });",
+      confidence: 0.9,
     });
   }
 
@@ -52,6 +53,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       recommendation: "Never log passwords, credentials, or secrets. Implement a log sanitizer that redacts sensitive fields automatically.",
       reference: "OWASP Logging Cheat Sheet / GDPR Art. 5(1)(f)",
       suggestedFix: "Remove password from log output: const { password, ...safeData } = userData; logger.info({ user: safeData });",
+      confidence: 0.9,
     });
   }
 
@@ -67,6 +69,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       recommendation: "Redact PII before logging. Use anonymized identifiers. Implement a log redaction filter that automatically masks sensitive fields.",
       reference: "GDPR Article 5: Data Minimization / OWASP Logging Cheat Sheet",
       suggestedFix: "Mask PII in logs: logger.info({ email: maskEmail(user.email), id: user.id }); function maskEmail(e) { return e[0] + '***@' + e.split('@')[1]; }",
+      confidence: 0.9,
     });
   }
 
@@ -82,6 +85,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       recommendation: "Log only necessary metadata (method, URL, status, duration). If body logging is needed, implement a whitelist of safe fields and redact everything else.",
       reference: "Log Sanitization Best Practices",
       suggestedFix: "Log safe fields only: const safeBody = pick(req.body, ['action', 'timestamp']); logger.info({ method: req.method, url: req.url, body: safeBody });",
+      confidence: 0.85,
     });
   }
 
@@ -97,6 +101,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       recommendation: "Never log financial data. Mask card numbers (show only last 4 digits). PCI DSS prohibits storing CVV data in any form.",
       reference: "PCI DSS Requirement 3: Protect Stored Data",
       suggestedFix: "Mask card numbers: const masked = cardNumber.replace(/.(?=.{4})/g, '*'); logger.info({ card: masked }); never log CVV.",
+      confidence: 0.9,
     });
   }
 
@@ -113,6 +118,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       recommendation: "Use a structured logging library (pino, winston) that supports field-level redaction, log level filtering, and structured output for automated sensitivity scanning.",
       reference: "Structured Logging / Log Redaction Patterns",
       suggestedFix: "Use pino with redaction: import pino from 'pino'; const logger = pino({ redact: ['req.headers.authorization', '*.password', '*.ssn'] });",
+      confidence: 0.75,
     });
   }
 
@@ -134,6 +140,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       recommendation: "Use structured logging with named fields: logger.info({ userId, action }, 'User action performed'). This allows automated redaction of specific fields.",
       reference: "Structured Logging Best Practices",
       suggestedFix: "Replace concatenation with structured fields: instead of console.log('User ' + id + ' did ' + action), use logger.info({ userId: id, action }, 'User action performed');",
+      confidence: 0.75,
     });
   }
 
@@ -149,6 +156,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       recommendation: "Anonymize IP addresses in logs (truncate last octet for IPv4, mask prefix for IPv6). If full IP is needed for security, ensure log retention complies with privacy policy.",
       reference: "GDPR Recital 30: IP Addresses as Personal Data",
       suggestedFix: "Anonymize IPs: function anonymizeIp(ip) { return ip.replace(/\\d+$/, '0'); } logger.info({ ip: anonymizeIp(req.ip) });",
+      confidence: 0.9,
     });
   }
 
@@ -164,6 +172,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       recommendation: "Log query templates without parameter values. Use parameterized query logging that replaces bind values with placeholders. Redact sensitive column values.",
       reference: "Database Logging Privacy / OWASP Logging Cheat Sheet",
       suggestedFix: "Log queries safely: logger.info({ query: 'SELECT * FROM users WHERE id = $1', paramCount: params.length }); // never log actual parameter values.",
+      confidence: 0.8,
     });
   }
 
@@ -180,6 +189,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       recommendation: "Never send stack traces in production API responses. Log them server-side for debugging. Return a generic error ID that correlates to internal logs.",
       reference: "OWASP: Improper Error Handling / CWE-209",
       suggestedFix: "Return safe errors: const errorId = crypto.randomUUID(); logger.error({ errorId, stack: err.stack }); res.status(500).json({ error: 'Internal error', errorId });",
+      confidence: 0.85,
     });
   }
 

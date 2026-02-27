@@ -20,6 +20,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
       recommendation: "Use addEventListener() or framework event bindings (React onClick, Vue @click). Separate behavior from markup for maintainability and CSP compliance.",
       reference: "MDN: Inline Event Handlers / Content Security Policy",
       suggestedFix: "Remove the inline `on*=` attribute and attach the handler in JavaScript via `element.addEventListener('click', handler)` or the framework equivalent.",
+      confidence: 0.85,
     });
   }
 
@@ -35,6 +36,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
       recommendation: "Disable the submit button during submission. Show a loading indicator. Prevent double-submission at the application layer.",
       reference: "Nielsen's Heuristic #1: Visibility of System Status",
       suggestedFix: "Add an `isSubmitting` state flag that disables the submit button and shows a spinner while the form request is in flight.",
+      confidence: 0.7,
     });
   }
 
@@ -51,6 +53,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
       recommendation: "Provide specific error messages explaining what went wrong and what the user can do ('Please check your internet connection and try again' vs 'Something went wrong').",
       reference: "Nielsen's Heuristic #9: Help Users Recognize Errors",
       suggestedFix: "Replace the generic string with a user-friendly message derived from the error type, e.g., `error.message || 'Unable to save your changes. Please try again.'`.",
+      confidence: 0.85,
     });
   }
 
@@ -67,6 +70,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
       recommendation: "Wrap responses in an envelope: { data: [...], meta: { total, page, limit }, links: { next, prev } }. This enables pagination UI and data status indicators.",
       reference: "JSON:API / REST API Design Guidelines",
       suggestedFix: "Wrap the raw `res.json(data)` call in an envelope: `res.json({ data, meta: { total: data.length } })`.",
+      confidence: 0.8,
     });
   }
 
@@ -84,6 +88,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
       recommendation: "Use <label for='inputId'> for every input. Add placeholder text for additional guidance. Both improve UX and accessibility.",
       reference: "WCAG 1.3.1: Info and Relationships",
       suggestedFix: "Add a `<label for='fieldId'>` element before each `<input>` and set a matching `id` attribute on the input.",
+      confidence: 0.75,
     });
   }
 
@@ -100,6 +105,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
       recommendation: "Add confirmation dialogs for destructive actions. Show what will be affected. Consider soft-delete with undo capability.",
       reference: "Nielsen's Heuristic #5: Error Prevention",
       suggestedFix: "Guard the delete handler with a confirmation prompt, e.g., `if (!confirm('Are you sure you want to delete this item?')) return;`.",
+      confidence: 0.7,
     });
   }
 
@@ -116,6 +122,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
       recommendation: "Implement pagination (offset-based or cursor-based). Return total count and page info. Enforce maximum page sizes.",
       reference: "REST API Pagination Best Practices",
       suggestedFix: "Accept `page` and `limit` query parameters (e.g., `const { page = 1, limit = 20 } = req.query`) and apply `.skip((page-1)*limit).limit(limit)` to the query.",
+      confidence: 0.7,
     });
   }
 
@@ -131,6 +138,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
       recommendation: "Always handle the empty state: show a helpful message, illustration, or call-to-action. Check array.length before rendering lists.",
       reference: "UX Design: Empty State Patterns",
       suggestedFix: "Add an `if (items.length === 0) return <EmptyState />` guard before the `.map()` call to render a friendly empty-state message.",
+      confidence: 0.7,
     });
   }
 
@@ -146,6 +154,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
       recommendation: "Show success notifications (toasts, alerts) after mutations. Provide clear visual feedback. Consider optimistic UI updates with rollback on failure.",
       reference: "Nielsen's Heuristic #1: Visibility of System Status",
       suggestedFix: "Add a `toast.success('Changes saved successfully')` call (or equivalent notification) in the `.then()` or after the `await` of the mutation request.",
+      confidence: 0.7,
     });
   }
 
@@ -162,6 +171,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
       recommendation: "Show progress bars for file operations. Use streaming progress events. Provide estimated time remaining for large operations.",
       reference: "UX: Progress Indicator Patterns / Nielsen's Heuristic #1",
       suggestedFix: "Track bytes processed via the stream's `'data'` event and emit a progress percentage (e.g., `onProgress(bytesRead / totalSize * 100)`).",
+      confidence: 0.7,
     });
   }
 
@@ -178,6 +188,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
       recommendation: "Extract UI strings to a constants file or i18n library. Use translation keys instead of hardcoded strings. This enables copy editing without code changes.",
       reference: "i18n Best Practices / Content Management",
       suggestedFix: "Replace the hardcoded string with a translation key lookup, e.g., `element.textContent = t('welcomeMessage')`, and add the string to your locale file.",
+      confidence: 0.85,
     });
   }
 
@@ -195,6 +206,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
       recommendation: "Add client-side validation before submission. Use schema validation libraries (Zod, Yup, Joi). Show inline validation feedback. Keep server-side validation as well.",
       reference: "UX: Form Validation Patterns / Nielsen's Heuristic #9: Error Recovery",
       suggestedFix: "Add a validation check at the top of the submit handler (e.g., `const result = schema.safeParse(formData); if (!result.success) return showErrors(result.error)`) before sending the request.",
+      confidence: 0.75,
     });
   }
 

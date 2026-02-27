@@ -26,6 +26,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       recommendation: "Pin dependencies to specific versions or use caret (^) ranges at minimum. Use a lockfile (package-lock.json, yarn.lock).",
       reference: "Dependency Management Best Practices",
       suggestedFix: "Replace `\"*\"` or `\"latest\"` with a pinned version such as `\"^2.1.0\"` and run `npm install` to regenerate the lockfile.",
+      confidence: 0.9,
     });
   }
 
@@ -47,6 +48,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       recommendation: "Replace deprecated packages: moment->date-fns/luxon, request->node-fetch/axios, underscore->lodash-es or native methods.",
       reference: "npm deprecation notices / package health scores",
       suggestedFix: "Replace the deprecated import with its modern alternative, e.g. change `require('request')` to `require('node-fetch')` or `require('axios')`.",
+      confidence: 0.9,
     });
   }
 
@@ -67,6 +69,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       recommendation: "Evaluate whether all dependencies are necessary. Consider implementing simple utilities natively to reduce the dependency tree.",
       reference: "Dependency Minimization / Supply Chain Security",
       suggestedFix: "Remove unused imports and replace trivial utility packages (e.g. `is-odd`, `left-pad`) with inline implementations.",
+      confidence: 0.75,
     });
   }
 
@@ -87,6 +90,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       recommendation: "Configure path aliases (tsconfig paths, webpack aliases, babel module resolver) for cleaner imports.",
       reference: "TypeScript Path Mapping / Module Resolution",
       suggestedFix: "Add a path alias in `tsconfig.json` (e.g. `\"@src/*\": [\"src/*\"]`) and replace deep `../../../` imports with the alias.",
+      confidence: 0.85,
     });
   }
 
@@ -112,6 +116,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       recommendation: "Standardize on a single HTTP client library across the project. Wrap it in an abstraction if needed.",
       reference: "Dependency Consolidation",
       suggestedFix: "Pick one HTTP client (e.g. `axios` or native `fetch`) and replace all other HTTP client imports with it.",
+      confidence: 0.9,
     });
   }
 
@@ -132,6 +137,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       recommendation: "Use caret (^) for minor updates or tilde (~) for patch updates. Avoid >= ranges in production dependencies.",
       reference: "Semantic Versioning / npm Version Ranges",
       suggestedFix: "Replace `>=` version ranges with caret ranges, e.g. change `\">=3.0.0\"` to `\"^3.0.0\"` to allow only non-breaking updates.",
+      confidence: 0.85,
     });
   }
 
@@ -148,6 +154,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
         recommendation: "Add an 'engines' field to specify minimum Node.js and npm versions: \"engines\": { \"node\": \">=18.0.0\" }.",
         reference: "package.json engines field",
         suggestedFix: "Add `\"engines\": { \"node\": \">=18.0.0\" }` to the top level of `package.json`.",
+        confidence: 0.7,
       });
     }
   }
@@ -171,6 +178,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       recommendation: "Import directly from specific module files instead of barrel/index files for better tree-shaking.",
       reference: "Tree Shaking / Module Bundling",
       suggestedFix: "Replace wildcard or barrel imports (e.g. `import * from 'lib'`) with named imports from specific sub-modules (e.g. `import { fn } from 'lib/fn'`).",
+      confidence: 0.9,
     });
   }
 
@@ -194,6 +202,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       recommendation: "Move test imports to test files. Ensure devDependencies are only used in test/config files.",
       reference: "npm devDependencies vs dependencies",
       suggestedFix: "Remove the dev-only `require('jest')` (or similar) from this production file and move it to a `.test.ts` or `.spec.ts` file.",
+      confidence: 0.85,
     });
   }
 
@@ -214,6 +223,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       recommendation: "Audit install scripts carefully. Use --ignore-scripts flag and allowlists. Consider using npm audit signatures.",
       reference: "Supply Chain Security / npm install scripts",
       suggestedFix: "Remove or audit the `postinstall`/`preinstall` script and run `npm install --ignore-scripts` to prevent automatic execution.",
+      confidence: 0.9,
     });
   }
 
@@ -256,6 +266,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       recommendation: "Verify the package name is correct. Use 'npm info <package>' to check if it's a legitimate package. Enable npm audit and consider using Socket.dev or Snyk for supply chain monitoring.",
       reference: "Supply Chain Attack — Typosquatting / CWE-1357",
       suggestedFix: "Correct the misspelled package name in the import statement, e.g. change `require('axois')` to `require('axios')`.",
+      confidence: 0.9,
     });
   }
 

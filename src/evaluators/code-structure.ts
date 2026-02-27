@@ -48,6 +48,7 @@ export function analyzeCodeStructure(
       reference: "McCabe Cyclomatic Complexity — Software Engineering Institute",
       suggestedFix:
         "Break the function into smaller, focused functions with single responsibilities.",
+      confidence: 0.75,
     });
   }
 
@@ -87,6 +88,7 @@ export function analyzeCodeStructure(
       reference: "Cognitive Complexity — SonarSource",
       suggestedFix:
         "Invert conditions and return early to reduce nesting, or extract nested logic into well-named helper functions.",
+      confidence: 0.85,
     });
   }
 
@@ -110,6 +112,7 @@ export function analyzeCodeStructure(
       reference: "Clean Code (Robert C. Martin) — Chapter 3: Functions",
       suggestedFix:
         "Extract logical sections of the function into smaller, well-named helper functions that each do one thing.",
+      confidence: 0.8,
     });
   }
 
@@ -135,6 +138,7 @@ export function analyzeCodeStructure(
       reference: "Clean Code — Function Arguments",
       suggestedFix:
         "Replace multiple parameters with an options/config object: function create(opts: CreateOptions)",
+      confidence: 0.85,
     });
   }
 
@@ -151,6 +155,7 @@ export function analyzeCodeStructure(
       reference: "Code Quality — Dead Code Elimination",
       suggestedFix:
         "Delete the unreachable statements after return/throw/break/continue, or restructure control flow so the code is reachable.",
+      confidence: 0.85,
     });
   }
 
@@ -167,6 +172,7 @@ export function analyzeCodeStructure(
       reference: "Type Safety Best Practices",
       suggestedFix:
         "Replace 'any' with 'unknown' or a specific interface/type that describes the expected shape of the data.",
+      confidence: 0.9,
     });
   }
 
@@ -182,6 +188,7 @@ export function analyzeCodeStructure(
       reference: "Software Complexity Metrics — SEI",
       suggestedFix:
         "Move related functions into separate module files and re-export them from an index to reduce per-file complexity.",
+      confidence: 0.75,
     });
   }
 
@@ -207,6 +214,7 @@ export function analyzeCodeStructure(
       reference: "McCabe Complexity — Critical Threshold",
       suggestedFix:
         "Replace long if/else or switch chains with a strategy map or lookup table, and extract each branch into its own function.",
+      confidence: 0.75,
     });
   }
 
@@ -232,6 +240,7 @@ export function analyzeCodeStructure(
       reference: "Clean Code — Function Arguments / Builder Pattern",
       suggestedFix:
         "Introduce a builder or configuration object to encapsulate the parameters: e.g., new Builder().setX(x).setY(y).build().",
+      confidence: 0.9,
     });
   }
 
@@ -257,6 +266,7 @@ export function analyzeCodeStructure(
       reference: "Clean Code — Function Length",
       suggestedFix:
         "Identify distinct logical sections within the function and extract each into a descriptively named helper function.",
+      confidence: 0.85,
     });
   }
 

@@ -21,6 +21,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       recommendation: "Use a structured logging library (winston/pino for JS, logging for Python, slog for Go, serilog for C#, log4j for Java, tracing for Rust) with log levels, timestamps, and correlation IDs.",
       reference: "Observability Best Practices: Structured Logging",
       suggestedFix: "Replace console.log calls with a structured logger: e.g., import pino from 'pino'; const logger = pino(); logger.info({ userId, action }, 'message');.",
+      confidence: 0.9,
     });
   }
 
@@ -45,6 +46,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       recommendation: "Always include the error object, stack trace, and relevant context (request ID, user ID, operation) in error logs.",
       reference: "Error Logging Best Practices",
       suggestedFix: "Pass the caught error to the logger: logger.error({ err, requestId }, 'Operation failed'); instead of logging a plain string.",
+      confidence: 0.85,
     });
   }
 
@@ -60,6 +62,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       recommendation: "Add /health or /healthz endpoint that checks critical dependencies (database, cache, external services).",
       reference: "Kubernetes Health Checks / Azure App Service Health Check",
       suggestedFix: "Add a GET /healthz route that returns { status: 'ok' } after verifying database and cache connectivity, returning 503 on failure.",
+      confidence: 0.7,
     });
   }
 
@@ -80,6 +83,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       recommendation: "Use structured log parameters: logger.info('User action', { userId, action }) instead of string concatenation.",
       reference: "Structured Logging Best Practices",
       suggestedFix: "Replace logger.info('User ' + userId) with logger.info({ userId }, 'User action') to enable structured log parsing.",
+      confidence: 0.85,
     });
   }
 
@@ -95,6 +99,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       recommendation: "Generate or propagate a unique request/correlation ID for each incoming request. Include it in all log entries.",
       reference: "Distributed Tracing: Correlation IDs",
       suggestedFix: "Add middleware that reads X-Request-Id from headers or generates a UUID, attaches it to req, and includes it in every log via async local storage or cls-hooked.",
+      confidence: 0.7,
     });
   }
 
@@ -116,6 +121,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       recommendation: "Never log sensitive data. Use redaction middleware or mask sensitive fields before logging. Audit all log statements for PII/secrets.",
       reference: "OWASP Logging Cheat Sheet / PCI DSS Requirement 3",
       suggestedFix: "Remove sensitive fields from log calls and configure redaction paths in your logger: e.g., pino({ redact: ['req.headers.authorization', 'password'] }).",
+      confidence: 0.85,
     });
   }
 
@@ -130,6 +136,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       recommendation: "Add metrics instrumentation (OpenTelemetry, Prometheus client, Application Insights SDK) to track RED metrics (Rate, Errors, Duration).",
       reference: "Google SRE: The Four Golden Signals",
       suggestedFix: "Install @opentelemetry/sdk-metrics and create a MeterProvider to record http_request_duration_seconds and http_requests_total counters in your request middleware.",
+      confidence: 0.7,
     });
   }
 
@@ -144,6 +151,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       recommendation: "Integrate OpenTelemetry or a tracing provider (Jaeger, Zipkin, Datadog APM) to track requests across service boundaries.",
       reference: "OpenTelemetry / Distributed Tracing Standard",
       suggestedFix: "Add @opentelemetry/sdk-trace-node with auto-instrumentations: registerInstrumentations({ instrumentations: [getNodeAutoInstrumentations()] }); and export spans to your collector.",
+      confidence: 0.7,
     });
   }
 
@@ -164,6 +172,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       recommendation: "Use appropriate log levels: debug for development, info for normal operations, warn for anomalies, error for failures.",
       reference: "Log Level Best Practices",
       suggestedFix: "Review each logger.error() call and downgrade informational messages to logger.info() or logger.warn(); reserve logger.error() for actual failures requiring attention.",
+      confidence: 0.75,
     });
   }
 
@@ -185,6 +194,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       recommendation: "Implement audit logging for authentication, authorization, and user management events. Include who, what, when, and from where.",
       reference: "OWASP Logging Cheat Sheet / SOC2 Audit Requirements",
       suggestedFix: "Create an auditLog(event, { actor, target, ip, timestamp }) helper and call it in every login, logout, role-change, and user-management handler.",
+      confidence: 0.75,
     });
   }
 

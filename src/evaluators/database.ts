@@ -20,6 +20,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       recommendation: "Use parameterized queries (placeholders) or prepared statements. ORMs handle this automatically. Never concatenate user input into SQL strings.",
       reference: "OWASP SQL Injection Prevention Cheat Sheet / CWE-89",
       suggestedFix: "Use parameterized queries: db.query('SELECT * FROM users WHERE id = $1', [userId]) (JS), cursor.execute('...WHERE id = %s', (uid,)) (Python), db.Query('...WHERE id = $1', id) (Go).",
+      confidence: 0.95,
     });
   }
 
@@ -36,6 +37,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       recommendation: "Select only the columns you need: SELECT id, name, email FROM users. This reduces network transfer, memory usage, and improves query plan optimization.",
       reference: "SQL Performance Best Practices",
       suggestedFix: "Replace SELECT * with explicit columns: SELECT id, name, email FROM users WHERE active = true; — reduces data transfer and enables index-only scans.",
+      confidence: 0.9,
     });
   }
 
@@ -75,6 +77,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       recommendation: "Use batch queries (WHERE id IN (...)), JOINs, or ORM eager loading (include/populate) to fetch related data in a single query.",
       reference: "N+1 Query Problem / ORM Performance Patterns",
       suggestedFix: "Batch queries: const items = await db.query('SELECT * FROM items WHERE parent_id = ANY($1)', [parentIds]); instead of querying in a loop.",
+      confidence: 0.75,
     });
   }
 
@@ -90,6 +93,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       recommendation: "Use connection pooling (e.g., pg.Pool, mysql2.createPool, mongoose connection pooling). Configure pool size based on expected concurrent connections.",
       reference: "Database Connection Pooling Best Practices",
       suggestedFix: "Use connection pool: const pool = new Pool({ max: 20, idleTimeoutMillis: 30000 }); const client = await pool.connect(); try { ... } finally { client.release(); }",
+      confidence: 0.7,
     });
   }
 
@@ -106,6 +110,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       recommendation: "Consider using a query builder (Knex, Prisma, Drizzle, SQLAlchemy) or ORM for type safety, parameterization, and database portability.",
       reference: "ORM vs Raw SQL Best Practices",
       suggestedFix: "Use a query builder: const users = await knex('users').select('id', 'name').where({ active: true }); — provides parameterization and type safety.",
+      confidence: 0.8,
     });
   }
 
@@ -121,6 +126,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       recommendation: "Wrap multi-step data mutations in transactions. Use BEGIN/COMMIT/ROLLBACK or ORM transaction APIs to ensure atomicity.",
       reference: "ACID Properties / Database Transaction Best Practices",
       suggestedFix: "Wrap mutations in transaction: await db.transaction(async (trx) => { await trx('orders').insert(order); await trx('inventory').decrement('qty', 1); });",
+      confidence: 0.7,
     });
   }
 
@@ -137,6 +143,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       recommendation: "Use environment variables for connection strings. Store credentials in a secrets manager. Use different connection strings per environment.",
       reference: "12-Factor App: Config / OWASP Secrets Management",
       suggestedFix: "Use env vars: const connectionString = process.env.DATABASE_URL; never hardcode credentials in source code.",
+      confidence: 0.9,
     });
   }
 
@@ -153,6 +160,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       recommendation: "Never run destructive DDL from application code. Use migration tools (Prisma, Flyway, Alembic) with review and rollback support. Require elevated permissions for DDL.",
       reference: "Database Migration Best Practices / Least Privilege",
       suggestedFix: "Move DDL to migration files: npx prisma migrate dev --name drop_legacy_table; never embed DROP TABLE in application code.",
+      confidence: 0.95,
     });
   }
 
@@ -168,6 +176,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       recommendation: "Use a database migration tool (Prisma, Knex, Flyway, Alembic) to version schema changes. Migrations should be idempotent and reversible.",
       reference: "Database Migration Best Practices / Evolutionary Database Design",
       suggestedFix: "Use migration tool: npx prisma migrate dev --name add_users_table; or knex migrate:make create_users — version-controlled, reversible schema changes.",
+      confidence: 0.7,
     });
   }
 
@@ -183,6 +192,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       recommendation: "Create indexes on columns used in WHERE, JOIN, and ORDER BY clauses. Monitor slow query logs. Use EXPLAIN to verify query plans.",
       reference: "SQL Indexing Best Practices / Use The Index, Luke!",
       suggestedFix: "Add indexes: CREATE INDEX idx_users_email ON users(email); CREATE INDEX idx_orders_user_date ON orders(user_id, created_at); use EXPLAIN to verify.",
+      confidence: 0.7,
     });
   }
 
@@ -199,6 +209,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       recommendation: "Use separate credential parameters or environment variables. Consider IAM/managed identity for passwordless database connections in cloud environments.",
       reference: "OWASP: Credential Management / Azure Managed Identity",
       suggestedFix: "Use env vars: const client = new Client({ host: process.env.DB_HOST, user: process.env.DB_USER, password: process.env.DB_PASSWORD });",
+      confidence: 0.9,
     });
   }
 

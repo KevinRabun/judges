@@ -160,6 +160,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Use environment variables or a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault). Never commit credentials to version control.",
       reference: "OWASP: Credential Management / CWE-798",
       suggestedFix: "Replace hardcoded credentials with environment variables: process.env.SECRET_NAME (Node.js), os.environ['SECRET_NAME'] (Python), or inject from a secrets manager.",
+      confidence: 0.9,
     });
   }
 
@@ -176,6 +177,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Apply authentication middleware to routes that require it. Use framework-specific auth guards: Express middleware, Python decorators (@login_required), Java annotations (@PreAuthorize), or Go middleware.",
       reference: "OWASP API Security Top 10: API2 — Broken Authentication",
       suggestedFix: "Add auth middleware: app.use(authenticateJWT) (Express), @login_required (Django/Flask), @PreAuthorize (Spring), or middleware.Auth(handler) (Go).",
+      confidence: 0.7,
     });
   }
 
@@ -192,6 +194,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Pass tokens in the Authorization header (Bearer scheme) or in httpOnly cookies. Never use query parameters for sensitive credentials.",
       reference: "OWASP: Transport Layer Security / RFC 6750",
       suggestedFix: "Read tokens from the Authorization header instead: const token = req.headers.authorization?.replace('Bearer ', '');",
+      confidence: 0.9,
     });
   }
 
@@ -208,6 +211,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Use bcrypt, scrypt, or Argon2 for password hashing. These algorithms are intentionally slow and include salt by default.",
       reference: "OWASP Password Storage Cheat Sheet / NIST 800-63b",
       suggestedFix: "Replace with bcrypt/argon2: bcrypt.hash(password, 12) (JS), bcrypt.hashpw(password, bcrypt.gensalt()) (Python), Argon2::default().hash_password() (Rust), BCrypt.HashPassword() (C#).",
+      confidence: 0.9,
     });
   }
 
@@ -222,6 +226,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Implement role-based access control (RBAC) or attribute-based access control (ABAC). Check permissions at each endpoint or resource access.",
       reference: "OWASP API Security Top 10: API5 — Broken Function Level Authorization",
       suggestedFix: "Add role-based middleware: const requireRole = (role) => (req, res, next) => { if (req.user.role !== role) return res.status(403).json({ error: 'Forbidden' }); next(); };",
+      confidence: 0.7,
     });
   }
 
@@ -238,6 +243,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Always verify JWT tokens on every request: check signature, expiration (exp), issuer (iss), and audience (aud).",
       reference: "RFC 7519: JWT / OWASP JWT Cheat Sheet",
       suggestedFix: "Add JWT verification: const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'], issuer: 'myapp', audience: 'myapp' });",
+      confidence: 0.8,
     });
   }
 
@@ -253,6 +259,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Never disable TLS verification in production. Fix certificate issues properly. Use CA bundles for self-signed certs in development only.",
       reference: "CWE-295: Improper Certificate Validation",
       suggestedFix: "Remove TLS bypass: delete rejectUnauthorized:false (JS), verify=False (Python), InsecureSkipVerify:true (Go), danger_accept_invalid_certs(true) (Rust), TrustAllCerts (Java).",
+      confidence: 0.9,
     });
   }
 
@@ -268,6 +275,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Set session maxAge (e.g., 30 minutes for sensitive apps). Implement idle timeout. Invalidate sessions on password change or logout.",
       reference: "OWASP Session Management Cheat Sheet",
       suggestedFix: "Set session expiry: app.use(session({ cookie: { maxAge: 30 * 60 * 1000 }, rolling: true })); and invalidate sessions on password change.",
+      confidence: 0.7,
     });
   }
 
@@ -283,6 +291,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Enforce minimum password length (12+ chars), check against known breached passwords (HaveIBeenPwned API), and use a strength estimator like zxcvbn.",
       reference: "NIST 800-63b / OWASP Password Guidelines",
       suggestedFix: "Enforce password policy: if (password.length < 12) throw new Error('Min 12 chars'); and check against breached passwords via the HaveIBeenPwned API.",
+      confidence: 0.7,
     });
   }
 
@@ -298,6 +307,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Implement progressive delays or temporary lockout after 5-10 failed attempts. Use rate limiting on login endpoints. Consider CAPTCHA for repeated failures.",
       reference: "OWASP Brute Force Prevention / CWE-307",
       suggestedFix: "Add rate limiting and lockout: after 5 failed attempts, lock the account for 15 minutes. Use express-rate-limit on the login endpoint.",
+      confidence: 0.7,
     });
   }
 
@@ -315,6 +325,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Set cookies with { secure: true, httpOnly: true, sameSite: 'strict' }. Use Secure for all auth cookies. HttpOnly prevents JavaScript access.",
       reference: "OWASP Secure Cookie Best Practices / CWE-614",
       suggestedFix: "Add security flags: res.cookie('session', token, { httpOnly: true, secure: true, sameSite: 'strict' });",
+      confidence: 0.8,
     });
   }
 
@@ -330,6 +341,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Use CSRF tokens (csurf middleware, Django CSRF, Rails authenticity_token). Set SameSite=Strict on cookies. Use custom headers for API calls.",
       reference: "OWASP CSRF Prevention Cheat Sheet / CWE-352",
       suggestedFix: "Add CSRF middleware: app.use(csrf({ cookie: { sameSite: 'strict' } })); and include the token in forms: <input type='hidden' name='_csrf' value='{{csrfToken}}'>.",
+      confidence: 0.8,
     });
   }
 
@@ -346,6 +358,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Call req.session.regenerate() (Express), session.cycle() (Phoenix), or equivalent immediately after successful login. This invalidates the pre-authentication session ID.",
       reference: "OWASP Session Fixation — CWE-384",
       suggestedFix: "Regenerate session after login: req.session.regenerate((err) => { req.session.userId = user.id; res.redirect('/dashboard'); });",
+      confidence: 0.8,
     });
   }
 
@@ -362,6 +375,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       recommendation: "Implement or integrate MFA (TOTP, WebAuthn, SMS). At minimum, support optional MFA for users and require it for admin/sensitive operations. Consider FIDO2/WebAuthn for phishing-resistant auth.",
       reference: "NIST 800-63B / OWASP MFA Cheat Sheet",
       suggestedFix: "Integrate TOTP-based MFA: const verified = speakeasy.totp.verify({ secret: user.mfaSecret, token: req.body.totpCode }); and require MFA for admin and sensitive operations.",
+      confidence: 0.7,
     });
   }
 

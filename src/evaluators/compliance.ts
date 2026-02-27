@@ -42,6 +42,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       recommendation: "Encrypt PII fields, mask them in logs and UI displays, and ensure they are stored with column-level encryption.",
       reference: "GDPR Article 32 / CCPA / HIPAA",
       suggestedFix: "Encrypt PII at rest: const encrypted = crypto.createCipheriv('aes-256-gcm', key, iv).update(piiValue, 'utf8', 'hex'); store only the ciphertext.",
+      confidence: 0.85,
     });
   }
 
@@ -63,6 +64,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       recommendation: "Implement a consent management system. Only load tracking scripts after obtaining explicit user consent.",
       reference: "GDPR Article 6 / ePrivacy Directive",
       suggestedFix: "Gate tracking behind consent: if (userConsent.analytics) { loadTrackingScripts(); } — use a consent management platform.",
+      confidence: 0.8,
     });
   }
 
@@ -86,6 +88,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       recommendation: "Define and implement data retention policies. Set TTLs, schedule purge jobs, or implement right-to-deletion workflows.",
       reference: "GDPR Article 5(1)(e) Storage Limitation",
       suggestedFix: "Add TTL to stored data: await db.collection('users').createIndex({ createdAt: 1 }, { expireAfterSeconds: 365 * 24 * 3600 }); or schedule retention purge jobs.",
+      confidence: 0.8,
     });
   }
 
@@ -110,6 +113,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       recommendation: "Never log sensitive data. Use redaction/masking utilities to sanitize log output. Audit all log statements.",
       reference: "OWASP Logging Cheat Sheet / PCI DSS Requirement 3",
       suggestedFix: "Redact sensitive fields before logging: logger.info({ ...data, password: undefined, ssn: '***' }); use a log-redaction middleware.",
+      confidence: 0.9,
     });
   }
 
@@ -135,6 +139,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       recommendation: "Add data classification comments or decorators (e.g., @PII, @Confidential) to help enforce appropriate handling.",
       reference: "Data Classification Best Practices",
       suggestedFix: "Add classification markers: interface User { /** @classification PII */ email: string; /** @classification Public */ displayName: string; }",
+      confidence: 0.75,
     });
   }
 
@@ -164,6 +169,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       recommendation: "Use a PCI-compliant payment processor (Stripe, Braintree). Never store, log, or transmit raw card numbers. Tokenize immediately.",
       reference: "PCI DSS Requirement 3: Protect Stored Cardholder Data",
       suggestedFix: "Replace raw card handling with tokenization: const { id } = await stripe.tokens.create({ card }); store only the token, never the card number.",
+      confidence: 0.85,
     });
   }
 
@@ -184,6 +190,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       recommendation: "Encrypt PHI at rest and in transit. Implement access controls, audit logging, and ensure BAA with cloud providers.",
       reference: "HIPAA Security Rule / 45 CFR Part 164",
       suggestedFix: "Encrypt PHI with AES-256-GCM and add access control: if (!user.roles.includes('healthcare_provider')) throw new ForbiddenError();",
+      confidence: 0.85,
     });
   }
 
@@ -199,6 +206,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       recommendation: "Implement a user data deletion endpoint that cascades across all storage systems (DB, cache, backups, third parties).",
       reference: "GDPR Article 17: Right to Erasure / CCPA Right to Delete",
       suggestedFix: "Add deletion endpoint: app.delete('/api/users/:id/data', auth, async (req, res) => { await deleteUserData(req.params.id); res.status(204).end(); });",
+      confidence: 0.7,
     });
   }
 
@@ -219,6 +227,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       recommendation: "Set Secure, HttpOnly, and SameSite=Strict on sensitive cookies. Review cookie consent requirements per jurisdiction.",
       reference: "OWASP Cookie Security / ePrivacy Directive",
       suggestedFix: "Set secure cookie flags: res.cookie('session', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600000 });",
+      confidence: 0.8,
     });
   }
 
@@ -240,6 +249,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       recommendation: "Implement age verification and parental consent flows for users under the applicable age threshold.",
       reference: "COPPA / GDPR Article 8 / Age Appropriate Design Code",
       suggestedFix: "Add age verification: if (calculateAge(user.dob) < 13) { requireParentalConsent(user.id); restrictDataCollection(); }",
+      confidence: 0.8,
     });
   }
 
@@ -261,6 +271,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       recommendation: "Implement immutable audit logging for all regulated operations. Log who, what, when, and the outcome.",
       reference: "SOX Compliance / SOC2 Trust Criteria",
       suggestedFix: "Add audit logging: auditLog.append({ actor: req.user.id, action: 'approve', resource, timestamp: new Date(), outcome: 'success' });",
+      confidence: 0.7,
     });
   }
 

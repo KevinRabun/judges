@@ -21,6 +21,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
       recommendation: "Add version prefixes to API routes: /api/v1/users. This allows old and new versions to coexist during migration. Use URL, header, or query param versioning.",
       reference: "API Versioning Best Practices / RESTful API Design",
       suggestedFix: "Replace `/api/` prefixes with `/api/v1/` in all route definitions and add a versioning middleware or router namespace.",
+      confidence: 0.7,
     });
   }
 
@@ -36,6 +37,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
       recommendation: "Set HTTP Deprecation and Sunset headers on deprecated endpoints. Document alternatives. Communicate timeline to consumers.",
       reference: "RFC 8594: The Sunset HTTP Header / API Lifecycle Management",
       suggestedFix: "Add `res.set('Deprecation', 'true')` and `res.set('Sunset', '<date>')` headers to each deprecated endpoint's response.",
+      confidence: 0.75,
     });
   }
 
@@ -52,6 +54,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
       recommendation: "Instead of deleting fields, use a response DTO/mapper that explicitly selects which fields to include. Version the API when removing fields.",
       reference: "Backwards-Compatible API Evolution",
       suggestedFix: "Replace `delete obj.field` with a DTO mapper (e.g., `pick(obj, ['allowed', 'fields'])`) so removed fields are controlled by the versioned schema.",
+      confidence: 0.8,
     });
   }
 
@@ -68,6 +71,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
       recommendation: "Use a consistent response envelope across all endpoints. Define response schemas (OpenAPI/Swagger) to enforce contracts.",
       reference: "API Contract Design / JSON:API Specification",
       suggestedFix: "Wrap all `res.json()` calls in a shared helper like `sendResponse(res, { data, meta })` to enforce a uniform envelope.",
+      confidence: 0.75,
     });
   }
 
@@ -84,6 +88,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
       recommendation: "Document backwards compatibility policy. Use semver: major bumps for breaking changes, minor for features, patch for fixes.",
       reference: "Semantic Versioning (semver.org)",
       suggestedFix: "Promote the version to a stable `1.0.0` (or higher) once the API is production-ready, and add a CHANGELOG documenting compatibility guarantees.",
+      confidence: 0.9,
     });
   }
 
@@ -100,6 +105,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
       recommendation: "Re-export removed symbols as deprecated wrappers. Mark them @deprecated with a migration guide. Remove only in the next major version.",
       reference: "Semantic Versioning / API Deprecation Lifecycle",
       suggestedFix: "Uncomment the export and re-export it as a thin deprecated wrapper (e.g., `/** @deprecated Use newName instead */ export const oldName = newName;`).",
+      confidence: 0.8,
     });
   }
 
@@ -116,6 +122,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
       recommendation: "Keep required parameters before optional ones. Use options objects for functions with many parameters to allow adding fields without breaking callers.",
       reference: "API Design: Function Signature Evolution",
       suggestedFix: "Reorder parameters so all required params precede optional ones, or refactor to accept a single options object (e.g., `fn(opts: { required: string; optional?: number })`).",
+      confidence: 0.75,
     });
   }
 
@@ -132,6 +139,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
       recommendation: "Never remove enum values in minor releases. Mark values as deprecated. If numeric, keep the slot allocated. Provide migration mapping for removed values.",
       reference: "Breaking Changes in Enums / Protocol Buffers Reserved Fields",
       suggestedFix: "Keep the deprecated enum value with a `/** @deprecated */` annotation and add a `reserved` comment for its numeric slot instead of deleting it.",
+      confidence: 0.75,
     });
   }
 
@@ -148,6 +156,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
       recommendation: "Use appropriate HTTP methods: DELETE for removal, PUT/PATCH for updates. If migrating methods, keep the old method working during a deprecation period.",
       reference: "RESTful API Design / HTTP Method Semantics",
       suggestedFix: "Change `app.post('/resource', deleteHandler)` to `app.delete('/resource', deleteHandler)` and keep the old POST route temporarily for backwards compatibility.",
+      confidence: 0.8,
     });
   }
 
@@ -164,6 +173,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
       recommendation: "Include both old and new field names during a transition period. Mark the old field as deprecated. Remove only in the next major version.",
       reference: "API Versioning / Backwards-Compatible JSON Evolution",
       suggestedFix: "Emit both the old and new field names in responses (e.g., `{ oldName: value, newName: value }`) until the next major version removes the old name.",
+      confidence: 0.75,
     });
   }
 

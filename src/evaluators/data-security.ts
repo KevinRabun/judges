@@ -173,6 +173,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         recommendation: `Move the ${sp.name} to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control.`,
         reference: "OWASP: Hardcoded Credentials — CWE-798",
         suggestedFix: `Replace hardcoded ${sp.name} with an environment variable: process.env.SECRET_NAME or inject from a secrets manager at runtime.`,
+        confidence: 0.9,
       });
     }
   }
@@ -190,6 +191,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Remove sensitive data from log statements. Use structured logging with redaction filters to automatically mask sensitive fields.",
       reference: "OWASP Logging Cheat Sheet — CWE-532",
       suggestedFix: "Remove sensitive fields from log calls or redact them: logger.info('User login', { userId: user.id }) instead of logging passwords/tokens.",
+      confidence: 0.85,
     });
   }
 
@@ -205,6 +207,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Use SHA-256/SHA-512 for integrity checks, or bcrypt/scrypt/argon2 for password hashing.",
       reference: "NIST SP 800-131A — CWE-328",
       suggestedFix: "Replace MD5/SHA1 with SHA-256 for integrity, or bcrypt/argon2 for passwords: crypto.createHash('sha256') or await bcrypt.hash(password, 12).",
+      confidence: 0.9,
     });
   }
 
@@ -220,6 +223,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Use parameterized queries or prepared statements. Never concatenate user input into SQL strings directly.",
       reference: "OWASP SQL Injection — CWE-89",
       suggestedFix: "Use parameterized queries: db.query('SELECT * FROM users WHERE id = $1', [userId]) instead of string concatenation.",
+      confidence: 0.95,
     });
   }
 
@@ -236,6 +240,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Use HTTPS for all non-local connections to ensure data in transit is encrypted with TLS.",
       reference: "OWASP Transport Layer Protection — CWE-319",
       suggestedFix: "Replace http:// with https:// for all non-localhost URLs to encrypt data in transit.",
+      confidence: 0.9,
     });
   }
 
@@ -251,6 +256,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Never deserialize untrusted data. Use safe alternatives: yaml.safe_load(), JSON instead of pickle, whitelist-based deserialization. Validate and sanitize all input before deserialization.",
       reference: "OWASP Deserialization — CWE-502",
       suggestedFix: "Replace unsafe deserialization: use yaml.safe_load() instead of yaml.load(), JSON.parse() instead of pickle/eval, or whitelist-based deserialization.",
+      confidence: 0.85,
     });
   }
 
@@ -269,6 +275,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         recommendation: "Set Secure, HttpOnly, and SameSite=Strict (or Lax) flags on all cookies. Use __Host- prefix for sensitive cookies.",
         reference: "OWASP Session Management — CWE-614",
         suggestedFix: "Add security flags: res.cookie('name', value, { secure: true, httpOnly: true, sameSite: 'strict' });",
+        confidence: 0.8,
       });
     }
   }
@@ -286,6 +293,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Always use jwt.verify() instead of jwt.decode(). Validate the signature, issuer, audience, and expiration claims.",
       reference: "OWASP JWT Security — CWE-345",
       suggestedFix: "Replace jwt.decode() with jwt.verify(token, secret, { algorithms: ['RS256'], issuer: 'expected-issuer' });",
+      confidence: 0.9,
     });
   }
 
@@ -304,6 +312,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         recommendation: "Validate file type (MIME + extension + magic bytes), enforce size limits, scan for malware, and store uploads outside the webroot.",
         reference: "OWASP Unrestricted File Upload — CWE-434",
         suggestedFix: "Add file validation: multer({ fileFilter, limits: { fileSize: 5 * 1024 * 1024 } }) with MIME type and extension checks.",
+        confidence: 0.8,
       });
     }
   }
@@ -323,6 +332,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         recommendation: "Hash passwords using bcrypt, argon2, or scrypt with a unique salt per password. Never store passwords in plaintext or with reversible encryption.",
         reference: "OWASP Password Storage — CWE-256",
         suggestedFix: "Hash passwords before storage: const hash = await bcrypt.hash(password, 12); and verify with await bcrypt.compare(input, hash).",
+        confidence: 0.85,
       });
     }
   }
@@ -340,6 +350,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Never combine credentials: true with origin: '*'. Whitelist specific trusted origins.",
       reference: "OWASP CORS — CWE-942",
       suggestedFix: "Replace origin: '*' with a specific allowlist: origin: ['https://app.example.com'] when credentials: true is used.",
+      confidence: 0.9,
     });
   }
 
@@ -356,6 +367,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Implement CSRF protection using tokens (csurf, django.middleware.csrf, @csrf_exempt annotations) or SameSite cookies.",
       reference: "OWASP CSRF — CWE-352",
       suggestedFix: "Add CSRF middleware: app.use(csurf({ cookie: { httpOnly: true, sameSite: 'strict' } })); and include token in forms.",
+      confidence: 0.7,
     });
   }
 
@@ -372,6 +384,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Return generic error messages to clients. Log detailed errors server-side only. Use different error handlers for development vs production.",
       reference: "OWASP Error Handling — CWE-209",
       suggestedFix: "Return generic errors to clients: res.status(500).json({ error: 'Internal error', requestId }); and log details server-side only.",
+      confidence: 0.85,
     });
   }
 
@@ -388,6 +401,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Generate encryption keys securely at runtime or load from a key management service. IVs/nonces must be random and unique per encryption operation.",
       reference: "CWE-321: Use of Hard-coded Cryptographic Key",
       suggestedFix: "Load encryption keys from a KMS or env var: const key = Buffer.from(process.env.ENCRYPTION_KEY, 'base64'); and generate IVs with crypto.randomBytes(16).",
+      confidence: 0.9,
     });
   }
 
@@ -412,6 +426,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         recommendation: "Use crypto.randomBytes() (Node.js), secrets.token_hex() (Python), SecureRandom (Java/Ruby), or crypto.getRandomValues() (browser).",
         reference: "CWE-330: Use of Insufficiently Random Values",
         suggestedFix: "Use crypto.randomBytes(32).toString('hex') (Node.js) or crypto.getRandomValues() (browser) for security-sensitive random values.",
+        confidence: 0.85,
       });
     }
   }
@@ -429,6 +444,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Validate and sanitize file paths. Use path.resolve() + startsWith() checks, or a whitelist of allowed paths. Never pass user input directly to file operations.",
       reference: "OWASP Path Traversal — CWE-22",
       suggestedFix: "Sanitize file paths: const safePath = path.resolve(baseDir, userInput); if (!safePath.startsWith(baseDir)) throw new Error('Invalid path');",
+      confidence: 0.85,
     });
   }
 
@@ -448,6 +464,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         recommendation: "Use field-level encryption for sensitive data, database-level TDE (Transparent Data Encryption), or application-level encryption before storage.",
         reference: "OWASP Cryptographic Storage — CWE-311",
         suggestedFix: "Encrypt sensitive fields before storage: const encrypted = crypto.createCipheriv('aes-256-gcm', key, iv).update(data); or enable database-level TDE.",
+        confidence: 0.7,
       });
     }
   }
@@ -465,6 +482,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Pass secrets via Authorization headers, request body, or environment variables — never as URL query parameters. Use SDK client libraries that handle auth properly.",
       reference: "CWE-598: Use of GET Request Method With Sensitive Query Strings",
       suggestedFix: "Move secrets from URL query params to the Authorization header: headers: { Authorization: `Bearer ${token}` }.",
+      confidence: 0.9,
     });
   }
 
@@ -487,6 +505,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         recommendation: "Use environment variables for connection strings. Use cloud-managed identity (Azure Managed Identity, AWS IAM) for passwordless authentication where possible.",
         reference: "CWE-798: Use of Hard-coded Credentials",
         suggestedFix: "Use environment variables for connection strings: const url = process.env.DATABASE_URL; or use managed identity for passwordless auth.",
+        confidence: 0.9,
       });
     }
   }
@@ -504,6 +523,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Use generic error messages for security failures: 'Authentication failed' instead of 'Invalid password for user@email.com'. Log sensitive context server-side only at debug level.",
       reference: "CWE-209: Information Exposure Through Error Messages",
       suggestedFix: "Use generic error messages: throw new AppError('Authentication failed') instead of including sensitive field names or values.",
+      confidence: 0.85,
     });
   }
 
@@ -520,6 +540,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       recommendation: "Log only specific, non-sensitive fields. Use structured logging with field-level redaction. Never log full request bodies — redact password, token, ssn, and creditCard fields.",
       reference: "CWE-532: Information Exposure Through Log Files",
       suggestedFix: "Log only metadata: logger.info({ method: req.method, url: req.url, status: res.statusCode }); instead of full request/response bodies.",
+      confidence: 0.85,
     });
   }
 

@@ -20,6 +20,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Log the error with context, re-throw it, or handle it meaningfully. If intentionally ignoring, add a comment explaining why.",
       reference: "ESLint no-empty / Error Handling Best Practices",
       suggestedFix: "Add error handling: catch (error) { logger.error('Operation failed', { error }); throw error; } (JS/TS), except Exception as e: logger.error(e); raise (Python), .map_err(|e| { log::error!(\"{e}\"); e }) (Rust).",
+      confidence: 0.9,
     });
   }
 
@@ -36,6 +37,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Capture the error parameter: catch(error) { ... } and use it for logging, error classification, or re-throwing.",
       reference: "Error Handling Best Practices",
       suggestedFix: "Add error parameter: catch (error) { ... } instead of catch () { ... }.",
+      confidence: 0.9,
     });
   }
 
@@ -54,6 +56,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Add Express error middleware (app.use((err, req, res, next) => { ... })), process.on('uncaughtException'), and process.on('unhandledRejection') handlers.",
       reference: "Express Error Handling / Node.js Best Practices",
       suggestedFix: "Add global error middleware: app.use((err, req, res, next) => { logger.error(err); res.status(500).json({ error: 'Internal error' }); }); and process.on('unhandledRejection', handler).",
+      confidence: 0.7,
     });
   }
 
@@ -70,6 +73,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Return structured error responses with error codes, human-readable messages, and suggested actions. Use a consistent error response schema.",
       reference: "RFC 7807 (Problem Details for HTTP APIs)",
       suggestedFix: "Return structured errors: res.status(400).json({ type: 'validation_error', title: 'Invalid input', detail: 'Field email is required', instance: req.path }).",
+      confidence: 0.75,
     });
   }
 
@@ -85,6 +89,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Wrap async operations in try/catch (JS/TS/C#/Java), try/except (Python), or check errors explicitly (Go/Rust).",
       reference: "Async Error Handling Best Practices",
       suggestedFix: "Wrap async handlers: try { await operation(); } catch (error) { logger.error(error); } (JS/TS), try: await operation() except Exception as e: ... (Python), if err != nil { ... } (Go).",
+      confidence: 0.7,
     });
   }
 
@@ -101,6 +106,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Always check the error parameter first in callbacks: if (err) { return handleError(err); }",
       reference: "Node.js Error-First Callbacks",
       suggestedFix: "Add error-first check: function callback(err, result) { if (err) { return handleError(err); } // proceed with result }.",
+      confidence: 0.7,
     });
   }
 
@@ -117,6 +123,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Always throw Error objects: throw new Error('message') or custom error classes that extend Error.",
       reference: "ESLint no-throw-literal / JavaScript Error Handling",
       suggestedFix: "Replace throw 'message' with throw new Error('message').",
+      confidence: 0.9,
     });
   }
 
@@ -132,6 +139,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Use proper error propagation instead of abrupt termination. Return error responses in HTTP servers. Let the process shutdown gracefully.",
       reference: "Graceful Shutdown Best Practices / CWE-705",
       suggestedFix: "Replace abrupt exits with graceful shutdown: server.close(() => cleanup()) (JS), raise SystemExit (Python), return Err(...) instead of .unwrap() (Rust), os.Exit only in main() (Go).",
+      confidence: 0.9,
     });
   }
 
@@ -148,6 +156,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Either add context when rethrowing (new Error('context', { cause: err })) or remove the try/catch entirely and let the error propagate naturally.",
       reference: "Error Handling Best Practices / Error Wrapping",
       suggestedFix: "Add context when rethrowing: throw new Error('Failed to process order', { cause: err }); or remove the redundant try/catch entirely.",
+      confidence: 0.85,
     });
   }
 
@@ -164,6 +173,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "After logging, rethrow the error, return an error response, or propagate the failure to the caller. Silent failures are as dangerous as empty catch blocks.",
       reference: "Error Handling Patterns / Don't Swallow Errors",
       suggestedFix: "After logging, propagate the failure: catch (error) { logger.error(error); throw error; } or return an error response to the caller.",
+      confidence: 0.85,
     });
   }
 
@@ -181,6 +191,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Include a machine-readable error code in responses: { code: 'VALIDATION_ERROR', message: '...' }. Use RFC 7807 Problem Details format.",
       reference: "RFC 7807: Problem Details for HTTP APIs",
       suggestedFix: "Add machine-readable error codes: res.status(422).json({ code: 'VALIDATION_FAILED', message: '...', details: [...] }).",
+      confidence: 0.7,
     });
   }
 
@@ -197,6 +208,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Integrate an error reporting service (Sentry, Bugsnag, Application Insights). These provide aggregation, alerting, and stack trace analysis.",
       reference: "Error Monitoring Best Practices",
       suggestedFix: "Integrate an error reporting service: Sentry.captureException(error) or appInsights.trackException({ exception: error }) for aggregation and alerting.",
+      confidence: 0.7,
     });
   }
 
@@ -225,6 +237,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Always add .catch() at the end of Promise chains, or refactor to async/await with try/catch. Enable the 'no-floating-promises' ESLint rule.",
       reference: "Node.js Unhandled Rejections / CWE-755",
       suggestedFix: "Append .catch(error => { logger.error(error); }) to the Promise chain, or refactor to async/await with try/catch.",
+      confidence: 0.75,
     });
   }
 
@@ -241,6 +254,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       recommendation: "Never send raw error objects to clients. Return a generic error message with a correlation ID. Log the full error server-side. Use environment checks to show details only in development.",
       reference: "CWE-209: Information Exposure Through Error Messages",
       suggestedFix: "Return a generic message with correlation ID: res.status(500).json({ error: 'Internal error', correlationId: req.id }); and log the full error server-side.",
+      confidence: 0.85,
     });
   }
 

@@ -25,6 +25,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Add meaningful alt text describing the image content. Use alt=\"\" only for purely decorative images.",
       reference: "WCAG 2.1 SC 1.1.1 Non-text Content",
       suggestedFix: "Add descriptive alt text: <img src=\"photo.jpg\" alt=\"Team photo at annual conference\"> or alt=\"\" for decorative images.",
+      confidence: 0.85,
     });
   }
 
@@ -45,6 +46,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Add onKeyDown or onKeyPress handlers alongside onClick. Ensure all interactive elements are keyboard accessible.",
       reference: "WCAG 2.1 SC 2.1.1 Keyboard",
       suggestedFix: "Add keyboard support: <button onClick={handler} onKeyDown={(e) => e.key === 'Enter' && handler()}> or use native <button> elements which handle this automatically.",
+      confidence: 0.75,
     });
   }
 
@@ -65,6 +67,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Use semantic HTML elements (button, a, h1-h6, nav, main) instead of divs with ARIA roles.",
       reference: "WCAG 2.1 SC 4.1.2 Name, Role, Value",
       suggestedFix: "Replace <div role=\"button\"> with <button>, <div role=\"link\"> with <a href>, <div role=\"navigation\"> with <nav>, etc.",
+      confidence: 0.85,
     });
   }
 
@@ -85,6 +88,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Associate each input with a <label> element using for/id, or use aria-label / aria-labelledby.",
       reference: "WCAG 2.1 SC 1.3.1 Info and Relationships",
       suggestedFix: "Associate labels: <label htmlFor=\"email\">Email</label><input id=\"email\"> or use aria-label={\"Email address\"} directly on the input.",
+      confidence: 0.85,
     });
   }
 
@@ -105,6 +109,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Use tabIndex={0} to add to natural tab order or tabIndex={-1} for programmatic focus only. Never use positive values.",
       reference: "WCAG 2.1 SC 2.4.3 Focus Order",
       suggestedFix: "Replace tabIndex={5} with tabIndex={0} to add to natural tab order, or tabIndex={-1} for programmatic focus only.",
+      confidence: 0.9,
     });
   }
 
@@ -125,6 +130,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Use text labels, icons, or patterns in addition to color to convey status information.",
       reference: "WCAG 2.1 SC 1.4.1 Use of Color",
       suggestedFix: "Add text or icon alongside color: <span className=\"error\"><ErrorIcon /> {errorMessage}</span> instead of relying on red color alone.",
+      confidence: 0.75,
     });
   }
 
@@ -145,6 +151,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Avoid autoplay or provide a mechanism to pause/stop/mute within the first 3 seconds.",
       reference: "WCAG 2.1 SC 1.4.2 Audio Control",
       suggestedFix: "Remove autoplay or add muted: <video muted autoPlay> and provide visible pause/stop controls within the first 3 seconds.",
+      confidence: 0.9,
     });
   }
 
@@ -165,6 +172,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Add lang attribute: <html lang=\"en\">. Use the appropriate BCP 47 language tag.",
       reference: "WCAG 2.1 SC 3.1.1 Language of Page",
       suggestedFix: "Add language attribute: <html lang=\"en\"> using the appropriate BCP 47 language tag for your content.",
+      confidence: 0.85,
     });
   }
 
@@ -180,6 +188,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Add a visually hidden 'Skip to main content' link as the first focusable element on the page.",
       reference: "WCAG 2.1 SC 2.4.1 Bypass Blocks",
       suggestedFix: "Add a skip link as the first focusable element: <a href=\"#main-content\" className=\"sr-only focus:not-sr-only\">Skip to main content</a>.",
+      confidence: 0.7,
     });
   }
 
@@ -203,6 +212,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "If removing outline, provide a visible alternative focus indicator (box-shadow, border, custom :focus-visible styles).",
       reference: "WCAG 2.1 SC 2.4.7 Focus Visible",
       suggestedFix: "Provide alternative focus styles: :focus-visible { outline: 2px solid #4A90D9; outline-offset: 2px; } instead of outline: none.",
+      confidence: 0.85,
     });
   }
 
@@ -224,6 +234,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Wrap dynamic notification areas with aria-live='polite' (or role='alert' for urgent messages).",
       reference: "WCAG 2.1 SC 4.1.3 Status Messages",
       suggestedFix: "Wrap notification areas: <div aria-live=\"polite\" role=\"status\">{statusMessage}</div> or use role=\"alert\" for urgent messages.",
+      confidence: 0.7,
     });
   }
 
@@ -251,6 +262,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Use headings in sequential order. Don't skip from h1 to h3. Use CSS for visual styling instead of choosing heading levels by appearance.",
       reference: "WCAG 2.1 SC 1.3.1 Info and Relationships",
       suggestedFix: "Fix heading hierarchy: change <h3> to <h2> if its parent heading is <h1>. Use CSS for visual sizing instead of skipping heading levels.",
+      confidence: 0.85,
     });
   }
 
@@ -271,6 +283,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Ensure interactive elements have a minimum touch/click target size of 44x44 CSS pixels (WCAG) or 48x48dp (Material Design).",
       reference: "WCAG 2.1 SC 2.5.5 Target Size",
       suggestedFix: "Ensure minimum size: .icon-button { min-width: 44px; min-height: 44px; padding: 12px; } to meet WCAG touch target requirements.",
+      confidence: 0.75,
     });
   }
 
@@ -292,6 +305,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Add @media (prefers-reduced-motion: reduce) { ... } to disable or simplify animations for users who prefer reduced motion.",
       reference: "WCAG 2.1 SC 2.3.3 Animation from Interactions",
       suggestedFix: "Add reduced motion support: @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }",
+      confidence: 0.7,
     });
   }
 
@@ -315,6 +329,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Add <track kind='captions'> for videos, provide transcripts for audio, and ensure embedded videos have captions enabled.",
       reference: "WCAG 2.1 SC 1.2.2 Captions (Prerecorded)",
       suggestedFix: "Add captions track: <video><track kind=\"captions\" src=\"captions.vtt\" srclang=\"en\" label=\"English\" default></video>.",
+      confidence: 0.85,
     });
   }
 
@@ -335,6 +350,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       recommendation: "Use aria-describedby to link error messages to inputs, and aria-invalid='true' on invalid inputs.",
       reference: "WCAG 2.1 SC 3.3.1 Error Identification",
       suggestedFix: "Associate errors with inputs: <input id=\"email\" aria-describedby=\"email-error\" aria-invalid=\"true\"><span id=\"email-error\">Invalid email</span>.",
+      confidence: 0.75,
     });
   }
 
