@@ -324,6 +324,42 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       reference: "OWASP Brute Force — CWE-307",
     });
   }
+  // Weak Content-Security-Policy directives
+  const cspValuePattern = /Content-Security-Policy|contentSecurityPolicy|csp\s*[:=]/gi;
+  const cspPresent = cspValuePattern.test(code);
+  if (cspPresent) {
+    const cspWeakDirectives = /unsafe-inline|unsafe-eval|script-src\s+['"]?\s*\*/gi;
+    const cspWeakLines = getLineNumbers(code, cspWeakDirectives);
+    if (cspWeakLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Weak Content-Security-Policy directives",
+        description:
+          "CSP includes 'unsafe-inline', 'unsafe-eval', or wildcard script-src which significantly weakens XSS protection. These permissive directives are often added to suppress browser warnings during development.",
+        lineNumbers: cspWeakLines,
+        recommendation:
+          "Remove 'unsafe-inline' and 'unsafe-eval'. Use nonce or hash-based CSP for inline scripts (e.g. 'nonce-<random>'). Restrict script-src to explicitly trusted domains.",
+        reference: "OWASP CSP Cheat Sheet — CWE-693",
+      });
+    }
+  }
 
+  // Insecure WebSocket (ws://) connections
+  const wsInsecurePattern = /["'`]ws:\/\//gi;
+  const wsInsecureLines = getLineNumbers(code, wsInsecurePattern);
+  if (wsInsecureLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Insecure WebSocket connection (ws://)",
+      description:
+        "WebSocket connections use unencrypted ws:// protocol. Data transmitted over ws:// can be intercepted or tampered with by network adversaries.",
+      lineNumbers: wsInsecureLines,
+      recommendation:
+        "Use wss:// (WebSocket Secure) for all WebSocket connections. Ensure the server has a valid TLS certificate.",
+      reference: "CWE-319: Cleartext Transmission of Sensitive Information",
+    });
+  }
   return findings;
 }

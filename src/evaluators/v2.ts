@@ -134,6 +134,7 @@ function mapJudgeIdFromRule(ruleId: string): string | undefined {
     AGENT: "agent-instructions",
     ARCH: "software-practices",
     SUPPLY: "dependency-health",
+    AICS: "ai-code-safety",
   };
 
   return map[prefix];

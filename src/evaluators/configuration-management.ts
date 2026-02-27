@@ -183,5 +183,25 @@ export function analyzeConfigurationManagement(code: string, language: string): 
     });
   }
 
+  // Debug mode or development settings left enabled
+  const debugModePattern = /\bdebug\s*[:=]\s*(?:true|True|1|["']true["'])|app\.debug\s*=\s*True|DEBUG\s*=\s*True|app\.run\s*\([^)]*debug\s*=\s*True|logging\.level\s*=\s*DEBUG/gi;
+  const debugLines = getLineNumbers(code, debugModePattern);
+  if (debugLines.length > 0) {
+    const isTestFile = /\b(?:describe|it|test)\s*\(/i.test(code) || /\b(?:test|spec|__tests__)\b/i.test(language);
+    if (!isTestFile) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Debug mode or development settings enabled",
+        description: `Found ${debugLines.length} instance(s) of debug mode or development settings left enabled. These expose verbose error messages, internal state, and configuration details when deployed to production.`,
+        lineNumbers: debugLines,
+        recommendation:
+          "Gate debug settings behind environment variables (e.g. DEBUG=process.env.DEBUG). Default to debug=false. Never hardcode debug=true in committed source.",
+        reference:
+          "CWE-489: Active Debug Code — 12-Factor App: Config",
+      });
+    }
+  }
+
   return findings;
 }

@@ -497,7 +497,7 @@ function parsePriorityRulePrefixes(): string[] {
     return [...new Set(configured)];
   }
 
-  return ["AUTH", "CYBER", "DATA", "CFG", "COMP"];
+  return ["AUTH", "CYBER", "DATA", "CFG", "COMP", "AICS"];
 }
 
 function candidatePriorityScore(candidate: CandidateFix, priorityPrefixes: string[]): number {

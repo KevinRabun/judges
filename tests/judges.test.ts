@@ -76,8 +76,8 @@ function findingsAreWellFormed(findings: Finding[]): void {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Judge Registry", () => {
-  it("should have exactly 33 judges registered", () => {
-    assert.equal(JUDGES.length, 33);
+  it("should have exactly 34 judges registered", () => {
+    assert.equal(JUDGES.length, 34);
   });
 
   it("should allow lookup of every judge by ID", () => {
@@ -1791,5 +1791,123 @@ function deeplyNested(input: any) {
     assert.equal(verdict.mustFixGate?.enabled, true);
     assert.ok(typeof verdict.mustFixGate?.matchedCount === "number");
     assert.ok(verdict.summary.includes("Must-Fix Gate"));
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AI Code Safety Judge
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AI Code Safety Judge", () => {
+  const llmCodeWithIssues = `
+import OpenAI from "openai";
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// TODO: add authentication
+// TODO: add input validation
+
+app.post("/chat", async (req, res) => {
+  const userMessage = req.body.message;
+
+  // User input concatenated into prompt
+  const response = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [
+      { role: "system", content: "You are a helpful assistant." },
+      { role: "user", content: userMessage },
+    ],
+  });
+
+  const result = response.choices[0].message.content;
+
+  // LLM output piped to innerHTML
+  document.getElementById("output").innerHTML = result;
+
+  res.json({ answer: result });
+});
+
+app.listen(8080);
+`;
+
+  const safeLlmCode = `
+import OpenAI from "openai";
+import { z } from "zod";
+import rateLimit from "express-rate-limit";
+import DOMPurify from "dompurify";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const limiter = rateLimit({ windowMs: 60_000, max: 10 });
+const inputSchema = z.object({ message: z.string().max(2000) });
+
+app.post("/chat", limiter, async (req, res) => {
+  const { message } = inputSchema.parse(req.body);
+
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 30_000);
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [
+      { role: "system", content: "You are a helpful assistant." },
+      { role: "user", content: message },
+    ],
+  }, { signal: controller.signal });
+
+  const result = response.choices[0].message.content;
+  const sanitized = DOMPurify.sanitize(result);
+
+  res.json({ answer: sanitized });
+});
+
+app.listen(parseInt(process.env.PORT || "3000"), "127.0.0.1");
+`;
+
+  it("should detect AICS findings in risky AI-generated code", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const evaluation = evaluateWithJudge(judge!, llmCodeWithIssues, "typescript");
+    assert.ok(
+      hasRulePrefix(evaluation.findings, "AICS"),
+      "Expected AICS-* findings"
+    );
+    assert.ok(evaluation.findings.length >= 2, "Expected multiple AI code safety findings");
+  });
+
+  it("should produce fewer findings for well-guarded AI code", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const risky = evaluateWithJudge(judge!, llmCodeWithIssues, "typescript");
+    const safe = evaluateWithJudge(judge!, safeLlmCode, "typescript");
+
+    assert.ok(
+      safe.findings.length < risky.findings.length,
+      `Expected safer code to have fewer findings (safe=${safe.findings.length}, risky=${risky.findings.length})`
+    );
+  });
+
+  it("should detect placeholder security comments", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const evaluation = evaluateWithJudge(judge!, llmCodeWithIssues, "typescript");
+    const placeholder = evaluation.findings.filter((f) => f.ruleId === "AICS-003");
+    assert.ok(placeholder.length > 0, "Expected AICS-003 for TODO security comments");
+  });
+
+  it("should detect debug mode left enabled", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const debugCode = `
+const app = express();
+app.set("debug", true);
+const debug = true;
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, debugCode, "typescript");
+    const debugFindings = evaluation.findings.filter((f) => f.ruleId === "AICS-004");
+    assert.ok(debugFindings.length > 0, "Expected AICS-004 for debug mode enabled");
   });
 });

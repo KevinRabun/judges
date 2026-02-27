@@ -65,6 +65,7 @@ import { analyzeRateLimiting } from "./rate-limiting.js";
 import { analyzeCiCd } from "./ci-cd.js";
 import { analyzeCodeStructure } from "./code-structure.js";
 import { analyzeAgentInstructions } from "./agent-instructions.js";
+import { analyzeAiCodeSafety } from "./ai-code-safety.js";
 
 // ─── Evaluation Engine ──────────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ const DEFAULT_MUST_FIX_PREFIXES = [
   "DB-",
   "COMP-",
   "LOGPRIV-",
+  "AICS-",
 ];
 
 function evaluateMustFixGate(
@@ -330,6 +332,9 @@ export function evaluateWithJudge(
       break;
     case "agent-instructions":
       findings.push(...analyzeAgentInstructions(code, language));
+      break;
+    case "ai-code-safety":
+      findings.push(...analyzeAiCodeSafety(code, language));
       break;
   }
 

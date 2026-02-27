@@ -1,6 +1,6 @@
 # Judges Panel
 
-An MCP (Model Context Protocol) server that provides a panel of **33 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Includes **built-in AST analysis** powered by the TypeScript Compiler API — no separate parser server needed.
+An MCP (Model Context Protocol) server that provides a panel of **34 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Includes **built-in AST analysis** powered by the TypeScript Compiler API — no separate parser server needed.
 
 **Highlights:**
 - Includes an **App Builder Workflow (3-step)** demo for release decisions, plain-language risk summaries, and prioritized fixes — see [Try the Demo](#2-try-the-demo).
@@ -26,7 +26,7 @@ npm run build
 
 ### 2. Try the Demo
 
-Run the included demo to see all 33 judges evaluate a purposely flawed API server:
+Run the included demo to see all 34 judges evaluate a purposely flawed API server:
 
 ```bash
 npm run demo
@@ -491,7 +491,7 @@ Generated from https://github.com/microsoft/vscode on 2026-02-21T12:00:00.000Z.
 List all available judges with their domains and descriptions.
 
 ### `evaluate_code`
-Submit code to the **full judges panel**. All 33 judges evaluate independently and return a combined verdict.
+Submit code to the **full judges panel**. All 34 judges evaluate independently and return a combined verdict.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -513,7 +513,7 @@ Submit code to a **specific judge** for targeted review.
 | `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
 
 ### `evaluate_project`
-Submit multiple files for **project-level analysis**. All 33 judges evaluate each file, plus cross-file architectural analysis detects code duplication, inconsistent error handling, and dependency cycles.
+Submit multiple files for **project-level analysis**. All 34 judges evaluate each file, plus cross-file architectural analysis detects code duplication, inconsistent error handling, and dependency cycles.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -523,7 +523,7 @@ Submit multiple files for **project-level analysis**. All 33 judges evaluate eac
 | `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
 
 ### `evaluate_diff`
-Evaluate only the **changed lines** in a code diff. Runs all 33 judges on the full file but filters findings to lines you specify. Ideal for PR reviews and incremental analysis.
+Evaluate only the **changed lines** in a code diff. Runs all 34 judges on the full file but filters findings to lines you specify. Ideal for PR reviews and incremental analysis.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -545,7 +545,7 @@ Analyze a dependency manifest file for supply-chain risks, version pinning issue
 
 #### Judge IDs
 
-`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure` · `agent-instructions`
+`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure` · `agent-instructions` · `ai-code-safety`
 
 ---
 
@@ -588,7 +588,8 @@ Each judge has a corresponding prompt for LLM-powered deep analysis:
 | `judge-ci-cd` | Deep CI/CD pipeline review |
 | `judge-code-structure` | Deep AST-based structural analysis review |
 | `judge-agent-instructions` | Deep review of agent instruction markdown quality and safety |
-| `full-tribunal` | All 33 judges in a single prompt |
+| `judge-ai-code-safety` | Deep review of AI-generated code risks: prompt injection, insecure LLM output handling, debug defaults, missing validation |
+| `full-tribunal` | All 34 judges in a single prompt |
 
 ---
 
@@ -609,7 +610,7 @@ Each judge scores the code from **0 to 100**:
 - **WARNING** — Any high finding, any medium finding, or score < 80
 - **PASS** — Score ≥ 80 with no critical, high, or medium findings
 
-The **overall tribunal score** is the average of all 33 judges. The overall verdict fails if **any** judge fails.
+The **overall tribunal score** is the average of all 34 judges. The overall verdict fails if **any** judge fails.
 
 ---
 
