@@ -1,6 +1,5 @@
 import { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
-import * as LP from "../language-patterns.js";
+import { getLangFamily } from "./shared.js";
 
 export function analyzeAccessibility(code: string, language: string): Finding[] {
   const findings: Finding[] = [];

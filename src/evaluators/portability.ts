@@ -1,6 +1,5 @@
 import { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
-import * as LP from "../language-patterns.js";
+import { getLineNumbers, getLangFamily } from "./shared.js";
 
 export function analyzePortability(code: string, language: string): Finding[] {
   const findings: Finding[] = [];

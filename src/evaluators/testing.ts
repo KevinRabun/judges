@@ -1,5 +1,5 @@
 import { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeTesting(code: string, language: string): Finding[] {
