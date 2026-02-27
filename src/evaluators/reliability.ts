@@ -20,6 +20,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: emptyCatchLines,
       recommendation: "At minimum, log the error. Ideally, handle it appropriately, rethrow, or propagate to a global error handler.",
       reference: "Error Handling Best Practices",
+      suggestedFix: "Log in catch blocks: catch (err) { logger.error({ err }, 'Operation failed'); throw err; } — never leave catch blocks empty.",
     });
   }
 
@@ -42,6 +43,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: noTimeoutLines,
       recommendation: "Set explicit timeouts on all network calls. Use AbortController with setTimeout for fetch, or timeout options for HTTP clients.",
       reference: "Resilience Patterns: Timeout",
+      suggestedFix: "Add timeout: const controller = new AbortController(); setTimeout(() => controller.abort(), 5000); fetch(url, { signal: controller.signal });",
     });
   }
 
@@ -59,6 +61,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: externalCallLines.slice(0, 5),
       recommendation: "Implement retry with exponential backoff for transient failures. Use libraries like p-retry, tenacity, Polly, Resilience4j, or backoff crate.",
       reference: "Resilience Patterns: Retry with Backoff",
+      suggestedFix: "Add retry: import pRetry from 'p-retry'; const result = await pRetry(() => fetchData(), { retries: 3, minTimeout: 1000 });",
     });
   }
 
@@ -111,6 +114,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: processExitLines,
       recommendation: "Throw errors or use graceful shutdown patterns instead. Let the process exit naturally after cleanup. Reserve panics for truly unrecoverable situations.",
       reference: "Graceful Shutdown Patterns",
+      suggestedFix: "Replace process.exit() with graceful shutdown: process.on('SIGTERM', async () => { await server.close(); await db.disconnect(); });",
     });
   }
 
@@ -193,6 +197,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       lineNumbers: unhandledPromiseLines,
       recommendation: "Always handle promise rejections with .catch() or try/catch around await. Set up global unhandledRejection handler as safety net.",
       reference: "Node.js Unhandled Rejections",
+      suggestedFix: "Add rejection handling: new Promise((resolve, reject) => { ... }).catch(err => logger.error(err)); or use try/catch with await.",
     });
   }
 

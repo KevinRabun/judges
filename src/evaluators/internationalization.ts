@@ -186,5 +186,30 @@ export function analyzeInternationalization(code: string, language: string): Fin
     });
   }
 
+  // Detect raw number formatting without locale awareness
+  const rawNumberLines: number[] = [];
+  lines.forEach((line, i) => {
+    // Detect Number().toString(), String(number), or template literals with numeric variables without Intl
+    if (/(?:\.toString\(\)|String\(\w+\)|\$\{\w+\})\s*/.test(line) && /(?:price|amount|cost|total|quantity|count|balance|salary|revenue)/i.test(line) && !/Intl|toLocaleString|NumberFormat|i18n|formatNumber/i.test(line)) {
+      rawNumberLines.push(i + 1);
+    }
+    // Detect manual thousand separators or decimal formatting
+    if (/\.replace\(\s*\/\\B\(?=\(\\d\{3\}\)\+\(?!\\d\)\)\/|\.toFixed\s*\(\s*\d\s*\)\s*(?!\s*\))/.test(line) && /(?:price|amount|cost|total|balance)/i.test(line) && !/Intl|NumberFormat/i.test(line)) {
+      rawNumberLines.push(i + 1);
+    }
+  });
+  if (rawNumberLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Numeric values formatted without locale awareness",
+      description: "Monetary or numeric values are formatted without using locale-aware APIs. Thousand separators (1,000 vs 1.000) and decimal marks vary by locale.",
+      lineNumbers: [...new Set(rawNumberLines)],
+      recommendation: "Use Intl.NumberFormat for all user-facing numbers: new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount).",
+      reference: "JavaScript Intl.NumberFormat / CLDR Number Patterns",
+      suggestedFix: "Format numbers with Intl: new Intl.NumberFormat(userLocale, { style: 'currency', currency: 'USD' }).format(amount); instead of manual formatting.",
+    });
+  }
+
   return findings;
 }

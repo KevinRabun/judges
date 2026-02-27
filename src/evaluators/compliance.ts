@@ -41,6 +41,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       lineNumbers: piiFieldLines,
       recommendation: "Encrypt PII fields, mask them in logs and UI displays, and ensure they are stored with column-level encryption.",
       reference: "GDPR Article 32 / CCPA / HIPAA",
+      suggestedFix: "Encrypt PII at rest: const encrypted = crypto.createCipheriv('aes-256-gcm', key, iv).update(piiValue, 'utf8', 'hex'); store only the ciphertext.",
     });
   }
 
@@ -61,6 +62,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       lineNumbers: trackingLines,
       recommendation: "Implement a consent management system. Only load tracking scripts after obtaining explicit user consent.",
       reference: "GDPR Article 6 / ePrivacy Directive",
+      suggestedFix: "Gate tracking behind consent: if (userConsent.analytics) { loadTrackingScripts(); } — use a consent management platform.",
     });
   }
 
@@ -102,6 +104,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       lineNumbers: logSensitiveLines,
       recommendation: "Never log sensitive data. Use redaction/masking utilities to sanitize log output. Audit all log statements.",
       reference: "OWASP Logging Cheat Sheet / PCI DSS Requirement 3",
+      suggestedFix: "Redact sensitive fields before logging: logger.info({ ...data, password: undefined, ssn: '***' }); use a log-redaction middleware.",
     });
   }
 
@@ -152,6 +155,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       lineNumbers: [...new Set(cardNumberLines)],
       recommendation: "Use a PCI-compliant payment processor (Stripe, Braintree). Never store, log, or transmit raw card numbers. Tokenize immediately.",
       reference: "PCI DSS Requirement 3: Protect Stored Cardholder Data",
+      suggestedFix: "Replace raw card handling with tokenization: const { id } = await stripe.tokens.create({ card }); store only the token, never the card number.",
     });
   }
 
@@ -171,6 +175,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       lineNumbers: healthDataLines,
       recommendation: "Encrypt PHI at rest and in transit. Implement access controls, audit logging, and ensure BAA with cloud providers.",
       reference: "HIPAA Security Rule / 45 CFR Part 164",
+      suggestedFix: "Encrypt PHI with AES-256-GCM and add access control: if (!user.roles.includes('healthcare_provider')) throw new ForbiddenError();",
     });
   }
 
@@ -244,6 +249,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       lineNumbers: regulatedOpLines.slice(0, 5),
       recommendation: "Implement immutable audit logging for all regulated operations. Log who, what, when, and the outcome.",
       reference: "SOX Compliance / SOC2 Trust Criteria",
+      suggestedFix: "Add audit logging: auditLog.append({ actor: req.user.id, action: 'approve', resource, timestamp: new Date(), outcome: 'success' });",
     });
   }
 

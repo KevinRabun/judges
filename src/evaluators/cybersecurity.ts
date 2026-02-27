@@ -35,6 +35,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: innerHTMLLines,
       recommendation: "Use textContent for plain text, or use a sanitization library (DOMPurify) before inserting HTML. In React, avoid dangerouslySetInnerHTML unless content is sanitized.",
       reference: "OWASP XSS Prevention — CWE-79",
+      suggestedFix: "Sanitize with DOMPurify: el.innerHTML = DOMPurify.sanitize(untrustedHtml); or use textContent for plain text.",
     });
   }
 
@@ -64,6 +65,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: filteredCmdLines,
       recommendation: "Use execFile() with an argument array instead of exec(). Never concatenate user input into shell commands. Validate and sanitize all inputs.",
       reference: "OWASP Command Injection — CWE-78",
+      suggestedFix: "Replace exec(cmd) with execFile('program', [arg1, arg2]) to prevent shell interpretation of user input.",
     });
   }
 
@@ -78,6 +80,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: tlsLines,
       recommendation: "Never disable TLS certificate validation in production. Use proper CA certificates. If using self-signed certs in development, use a CA bundle instead.",
       reference: "CWE-295: Improper Certificate Validation",
+      suggestedFix: "Remove rejectUnauthorized: false and NODE_TLS_REJECT_UNAUTHORIZED='0'. Use valid CA certificates instead.",
     });
   }
 
@@ -138,6 +141,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
         lineNumbers: xxeLines,
         recommendation: "Disable external entity resolution and DTD processing in your XML parser. Use defusedxml in Python. Set FEATURE_SECURE_PROCESSING in Java.",
         reference: "OWASP XXE — CWE-611",
+        suggestedFix: "Disable DTDs: factory.setFeature('http://apache.org/xml/features/disallow-doctype-decl', true); or use defusedxml in Python.",
       });
     }
   }
@@ -172,6 +176,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: ssrfLines,
       recommendation: "Validate and whitelist allowed URLs/domains. Block access to internal IP ranges (10.x, 172.16-31.x, 192.168.x, 169.254.169.254). Use a URL parser to verify the host.",
       reference: "OWASP SSRF — CWE-918",
+      suggestedFix: "Validate URLs against an allowlist: const url = new URL(input); if (!ALLOWED_HOSTS.includes(url.hostname)) throw new Error('blocked');",
     });
   }
 
@@ -230,6 +235,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: filteredTemplateLines,
       recommendation: "Never pass user input as template source. Use templates only from trusted files with parameterized data. Enable sandboxing if available.",
       reference: "OWASP SSTI — CWE-1336",
+      suggestedFix: "Use precompiled templates from files: nunjucks.render('template.njk', { data }) instead of renderString(userInput).",
     });
   }
 
@@ -276,6 +282,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
         lineNumbers: sessionLines,
         recommendation: "Configure sessions with secure: true, httpOnly: true, sameSite: 'strict', and a reasonable maxAge. Use a server-side session store.",
         reference: "OWASP Session Management — CWE-614",
+        suggestedFix: "Set secure cookie flags: session({ cookie: { secure: true, httpOnly: true, sameSite: 'strict', maxAge: 3600000 } })",
       });
     }
   }
@@ -307,6 +314,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: backdoorLines,
       recommendation: "Remove hardcoded credentials. Use environment-based configuration and initial setup scripts for admin accounts.",
       reference: "CWE-798: Use of Hard-coded Credentials",
+      suggestedFix: "Move credentials to environment variables: const adminPass = process.env.ADMIN_PASSWORD; and provision via secrets manager.",
     });
   }
 
@@ -374,6 +382,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: nosqlDirectLines,
       recommendation: "Never pass req.body or req.query directly to database queries. Validate and sanitize input fields individually. Use a schema validator (Joi, Zod) or ORM methods that parameterize queries.",
       reference: "OWASP NoSQL Injection — CWE-943",
+      suggestedFix: "Validate input with a schema: const { email } = schema.parse(req.body); db.collection.find({ email });",
     });
   }
 
@@ -391,6 +400,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
         lineNumbers: massAssignLines,
         recommendation: "Destructure only allowed fields from req.body: const { name, email } = req.body. Use DTOs, Zod schemas, or pick() utilities to whitelist fields before database operations.",
         reference: "OWASP Mass Assignment — CWE-915",
+        suggestedFix: "Destructure allowed fields: const { name, email } = req.body; await Model.create({ name, email });",
       });
     }
   }
@@ -407,6 +417,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: cloudMetaLines,
       recommendation: "Remove hardcoded metadata URLs. Use cloud SDK methods to retrieve credentials and metadata. Enable IMDSv2 (AWS) to require session tokens for metadata access.",
       reference: "CWE-918: Server-Side Request Forgery (SSRF)",
+      suggestedFix: "Block metadata IPs in SSRF guards: if (resolvedHost === '169.254.169.254') throw new Error('metadata endpoint blocked');",
     });
   }
 
@@ -422,6 +433,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: ecbLines,
       recommendation: "Use AES-GCM (authenticated encryption) or AES-CBC with HMAC. GCM is preferred as it provides both confidentiality and integrity. Always use a unique IV/nonce per encryption.",
       reference: "CWE-327: Use of Broken Crypto Algorithm",
+      suggestedFix: "Replace ECB with AES-GCM: crypto.createCipheriv('aes-256-gcm', key, crypto.randomBytes(12)) with a unique IV per encryption.",
     });
   }
 

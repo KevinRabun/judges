@@ -20,6 +20,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logAuthLines,
       recommendation: "Never log authentication tokens, Authorization headers, or session IDs. If request logging is needed, redact sensitive headers before logging.",
       reference: "OWASP Logging Cheat Sheet / CWE-532",
+      suggestedFix: "Redact auth headers: const safeHeaders = { ...req.headers, authorization: '[REDACTED]' }; logger.info({ headers: safeHeaders });",
     });
   }
 
@@ -35,6 +36,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logPasswordLines,
       recommendation: "Never log passwords, credentials, or secrets. Implement a log sanitizer that redacts sensitive fields automatically.",
       reference: "OWASP Logging Cheat Sheet / GDPR Art. 5(1)(f)",
+      suggestedFix: "Remove password from log output: const { password, ...safeData } = userData; logger.info({ user: safeData });",
     });
   }
 
@@ -50,6 +52,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logPiiLines,
       recommendation: "Redact PII before logging. Use anonymized identifiers. Implement a log redaction filter that automatically masks sensitive fields.",
       reference: "GDPR Article 5: Data Minimization / OWASP Logging Cheat Sheet",
+      suggestedFix: "Mask PII in logs: logger.info({ email: maskEmail(user.email), id: user.id }); function maskEmail(e) { return e[0] + '***@' + e.split('@')[1]; }",
     });
   }
 
@@ -80,6 +83,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logFinanceLines,
       recommendation: "Never log financial data. Mask card numbers (show only last 4 digits). PCI DSS prohibits storing CVV data in any form.",
       reference: "PCI DSS Requirement 3: Protect Stored Data",
+      suggestedFix: "Mask card numbers: const masked = cardNumber.replace(/.(?=.{4})/g, '*'); logger.info({ card: masked }); never log CVV.",
     });
   }
 
@@ -154,6 +158,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: stackExposedLines,
       recommendation: "Never send stack traces in production API responses. Log them server-side for debugging. Return a generic error ID that correlates to internal logs.",
       reference: "OWASP: Improper Error Handling / CWE-209",
+      suggestedFix: "Return safe errors: const errorId = crypto.randomUUID(); logger.error({ errorId, stack: err.stack }); res.status(500).json({ error: 'Internal error', errorId });",
     });
   }
 

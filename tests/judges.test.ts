@@ -2374,3 +2374,267 @@ async function deleteUser(id: string) {
     assert.ok(piiFindings.length > 0, "Expected finding for PII without geo partitioning");
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Compliance Judge Dedicated Tests
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Compliance Judge Dedicated Tests", () => {
+  it("should detect PII fields without protection", () => {
+    const judge = getJudge("compliance");
+    assert.ok(judge, "compliance judge should exist");
+
+    const riskyCode = `
+const user = { ssn: req.body.ssn, passport: req.body.passport, taxId: req.body.taxId };
+await db.insert(user);
+`;
+    const evaluation = evaluateWithJudge(judge!, riskyCode, "typescript");
+    const piiFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("COMP-") && f.severity === "critical");
+    assert.ok(piiFindings.length > 0, "Expected critical PII findings from compliance judge");
+  });
+
+  it("should detect tracking without consent", () => {
+    const judge = getJudge("compliance");
+    assert.ok(judge, "compliance judge should exist");
+
+    const trackingCode = `
+import analytics from 'analytics';
+analytics.track('page_view', { userId: user.id });
+gtag('event', 'purchase', { value: 100 });
+`;
+    const evaluation = evaluateWithJudge(judge!, trackingCode, "typescript");
+    const trackingFindings = evaluation.findings.filter((f) => f.title.includes("consent") || f.title.includes("Tracking"));
+    assert.ok(trackingFindings.length > 0, "Expected tracking without consent finding");
+  });
+
+  it("should detect sensitive data in logs", () => {
+    const judge = getJudge("compliance");
+    assert.ok(judge, "compliance judge should exist");
+
+    const logCode = `
+console.log("User auth:", password, token, secret);
+logger.info("Processing SSN:", ssn);
+`;
+    const evaluation = evaluateWithJudge(judge!, logCode, "typescript");
+    const sensitiveLogFindings = evaluation.findings.filter((f) => f.title.includes("Sensitive data in log"));
+    assert.ok(sensitiveLogFindings.length > 0, "Expected sensitive data in logs finding");
+  });
+
+  it("should include suggestedFix on critical compliance findings", () => {
+    const judge = getJudge("compliance");
+    assert.ok(judge, "compliance judge should exist");
+
+    const riskyCode = `
+const user = { ssn: req.body.ssn, passport: req.body.passport };
+await db.insert(user);
+console.log("Auth:", password, token);
+`;
+    const evaluation = evaluateWithJudge(judge!, riskyCode, "typescript");
+    const compFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("COMP-") && f.suggestedFix);
+    assert.ok(compFindings.length > 0, "Expected at least one COMP finding with suggestedFix");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Logging Privacy Judge Dedicated Tests
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Logging Privacy Judge Dedicated Tests", () => {
+  it("should detect auth tokens logged", () => {
+    const judge = getJudge("logging-privacy");
+    assert.ok(judge, "logging-privacy judge should exist");
+
+    const logCode = `
+console.log("Auth header:", req.headers.authorization);
+console.log("Token:", bearerToken);
+`;
+    const evaluation = evaluateWithJudge(judge!, logCode, "typescript");
+    const authLogFindings = evaluation.findings.filter((f) => f.ruleId === "LOGPRIV-001");
+    assert.ok(authLogFindings.length > 0, "Expected LOGPRIV-001 for logged auth tokens");
+    assert.ok(authLogFindings[0].suggestedFix, "LOGPRIV-001 should have suggestedFix");
+  });
+
+  it("should detect passwords logged", () => {
+    const judge = getJudge("logging-privacy");
+    assert.ok(judge, "logging-privacy judge should exist");
+
+    const logCode = `
+console.log("User password:", password);
+console.debug("secret value:", secret);
+`;
+    const evaluation = evaluateWithJudge(judge!, logCode, "typescript");
+    const pwdFindings = evaluation.findings.filter((f) => f.title.includes("Password") || f.title.includes("secret"));
+    assert.ok(pwdFindings.length > 0, "Expected password/secret logging finding");
+    assert.ok(pwdFindings[0].suggestedFix, "Password logging finding should have suggestedFix");
+  });
+
+  it("should detect stack traces in API responses", () => {
+    const judge = getJudge("logging-privacy");
+    assert.ok(judge, "logging-privacy judge should exist");
+
+    const stackCode = `
+app.use((err, req, res, next) => {
+  res.status(500).json({ error: err.message, stack: err.stack });
+  res.send(error.stackTrace);
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, stackCode, "typescript");
+    const stackFindings = evaluation.findings.filter((f) => f.title.includes("Stack trace"));
+    assert.ok(stackFindings.length > 0, "Expected stack trace exposure finding");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Rate Limiting Judge Dedicated Tests
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Rate Limiting Judge Dedicated Tests", () => {
+  it("should detect missing rate limiting on server apps", () => {
+    const judge = getJudge("rate-limiting");
+    assert.ok(judge, "rate-limiting judge should exist");
+
+    const serverCode = `
+const app = express();
+app.use(express.json());
+app.post("/api/login", async (req, res) => {
+  const user = await authenticate(req.body);
+  res.json({ token: user.token });
+});
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, serverCode, "typescript");
+    const rateFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("RATE-"));
+    assert.ok(rateFindings.length > 0, "Expected RATE findings for unprotected server");
+  });
+
+  it("should detect auth endpoints without rate limiting", () => {
+    const judge = getJudge("rate-limiting");
+    assert.ok(judge, "rate-limiting judge should exist");
+
+    const authCode = `
+const app = express();
+app.post("/login", loginHandler);
+app.post("/signin", signinHandler);
+app.post("/authenticate", authHandler);
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, authCode, "typescript");
+    const authRateFindings = evaluation.findings.filter((f) => f.title.includes("auth") || f.title.includes("Auth"));
+    assert.ok(authRateFindings.length > 0, "Expected auth rate limiting finding");
+  });
+
+  it("should include suggestedFix on RATE findings", () => {
+    const judge = getJudge("rate-limiting");
+    assert.ok(judge, "rate-limiting judge should exist");
+
+    const serverCode = `
+const app = express();
+app.use(express.json());
+app.post("/login", loginHandler);
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, serverCode, "typescript");
+    const fixFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("RATE-") && f.suggestedFix);
+    assert.ok(fixFindings.length > 0, "Expected at least one RATE finding with suggestedFix");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Database Judge Dedicated Tests
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Database Judge Dedicated Tests", () => {
+  it("should detect SQL injection via string concatenation", () => {
+    const judge = getJudge("database");
+    assert.ok(judge, "database judge should exist");
+
+    const sqlCode = `
+const userId = req.params.id;
+const result = await db.query(\`SELECT * FROM users WHERE id = \${req.params.id}\`);
+`;
+    const evaluation = evaluateWithJudge(judge!, sqlCode, "typescript");
+    const sqlInjection = evaluation.findings.filter((f) => f.title.includes("SQL injection"));
+    assert.ok(sqlInjection.length > 0, "Expected SQL injection finding");
+    assert.ok(sqlInjection[0].suggestedFix, "SQL injection finding should have suggestedFix");
+  });
+
+  it("should detect hardcoded connection strings", () => {
+    const judge = getJudge("database");
+    assert.ok(judge, "database judge should exist");
+
+    const connCode = `
+const db = new Client("postgres://admin:password123@prod-server:5432/mydb");
+const mongo = mongoose.connect("mongodb://root:secret@db-host:27017/app");
+`;
+    const evaluation = evaluateWithJudge(judge!, connCode, "typescript");
+    const connFindings = evaluation.findings.filter((f) => f.title.includes("connection string") || f.title.includes("credentials"));
+    assert.ok(connFindings.length > 0, "Expected hardcoded connection string finding");
+  });
+
+  it("should detect destructive DDL in application code", () => {
+    const judge = getJudge("database");
+    assert.ok(judge, "database judge should exist");
+
+    const ddlCode = `
+async function cleanup() {
+  await db.query("DROP TABLE users");
+  await db.query("TRUNCATE TABLE sessions");
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, ddlCode, "typescript");
+    const ddlFindings = evaluation.findings.filter((f) => f.title.includes("Destructive") || f.title.includes("DROP"));
+    assert.ok(ddlFindings.length > 0, "Expected destructive DDL finding");
+    assert.ok(ddlFindings[0].suggestedFix, "DB-008 should have suggestedFix");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Reliability Judge Dedicated Tests
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Reliability Judge Dedicated Tests", () => {
+  it("should detect empty catch blocks", () => {
+    const judge = getJudge("reliability");
+    assert.ok(judge, "reliability judge should exist");
+
+    const catchCode = `
+try { await fetchData(); } catch (err) { }
+try { processItem(); } catch (e) { }
+const data = await fetch("https://api.example.com/data");
+const resp = await axios.get("https://api.example.com/users");
+`;
+    const evaluation = evaluateWithJudge(judge!, catchCode, "typescript");
+    const relFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("REL-"));
+    assert.ok(relFindings.length > 0, "Expected REL findings from reliability judge");
+    const fixFindings = relFindings.filter((f) => f.suggestedFix);
+    assert.ok(fixFindings.length > 0, "Expected at least one REL finding with suggestedFix");
+  });
+
+  it("should detect network calls without timeout", () => {
+    const judge = getJudge("reliability");
+    assert.ok(judge, "reliability judge should exist");
+
+    const fetchCode = `
+const response = await fetch("https://api.example.com/data");
+const data = await axios.get("https://api.example.com/users");
+`;
+    const evaluation = evaluateWithJudge(judge!, fetchCode, "typescript");
+    const noTimeout = evaluation.findings.filter((f) => f.title.includes("timeout") || f.title.includes("Timeout"));
+    assert.ok(noTimeout.length > 0, "Expected network timeout finding");
+  });
+
+  it("should detect process.exit usage", () => {
+    const judge = getJudge("reliability");
+    assert.ok(judge, "reliability judge should exist");
+
+    const exitCode = `
+if (config.invalid) {
+  process.exit(1);
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, exitCode, "typescript");
+    const exitFindings = evaluation.findings.filter((f) => f.title.includes("process") || f.title.includes("termination"));
+    assert.ok(exitFindings.length > 0, "Expected process exit finding");
+    assert.ok(exitFindings[0].suggestedFix, "REL-006 should have suggestedFix");
+  });
+});

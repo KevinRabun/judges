@@ -20,6 +20,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       lineNumbers: sqlInjectionLines,
       recommendation: "Use parameterized queries (placeholders) or prepared statements. ORMs handle this automatically. Never concatenate user input into SQL strings.",
       reference: "OWASP SQL Injection Prevention Cheat Sheet / CWE-89",
+      suggestedFix: "Use parameterized queries: db.query('SELECT * FROM users WHERE id = $1', [userId]); never concatenate user input into SQL.",
     });
   }
 
@@ -71,6 +72,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       lineNumbers: n1Lines,
       recommendation: "Use batch queries (WHERE id IN (...)), JOINs, or ORM eager loading (include/populate) to fetch related data in a single query.",
       reference: "N+1 Query Problem / ORM Performance Patterns",
+      suggestedFix: "Batch queries: const items = await db.query('SELECT * FROM items WHERE parent_id = ANY($1)', [parentIds]); instead of querying in a loop.",
     });
   }
 
@@ -129,6 +131,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       lineNumbers: connStringLines,
       recommendation: "Use environment variables for connection strings. Store credentials in a secrets manager. Use different connection strings per environment.",
       reference: "12-Factor App: Config / OWASP Secrets Management",
+      suggestedFix: "Use env vars: const connectionString = process.env.DATABASE_URL; never hardcode credentials in source code.",
     });
   }
 
@@ -144,6 +147,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       lineNumbers: destructiveDbLines,
       recommendation: "Never run destructive DDL from application code. Use migration tools (Prisma, Flyway, Alembic) with review and rollback support. Require elevated permissions for DDL.",
       reference: "Database Migration Best Practices / Least Privilege",
+      suggestedFix: "Move DDL to migration files: npx prisma migrate dev --name drop_legacy_table; never embed DROP TABLE in application code.",
     });
   }
 
@@ -187,6 +191,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       lineNumbers: credInConnLines,
       recommendation: "Use separate credential parameters or environment variables. Consider IAM/managed identity for passwordless database connections in cloud environments.",
       reference: "OWASP: Credential Management / Azure Managed Identity",
+      suggestedFix: "Use env vars: const client = new Client({ host: process.env.DB_HOST, user: process.env.DB_USER, password: process.env.DB_PASSWORD });",
     });
   }
 

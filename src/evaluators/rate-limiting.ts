@@ -19,6 +19,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       description: "API server has no rate limiting. Any client can make unlimited requests, enabling DDoS attacks, brute-force login attempts, scraping, and resource exhaustion.",
       recommendation: "Add rate limiting middleware (express-rate-limit, koa-ratelimit). Apply per-IP and per-user limits. Set stricter limits on auth endpoints.",
       reference: "OWASP API Security Top 10: API4 — Unrestricted Resource Consumption",
+      suggestedFix: "Add rate limiting: app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 })); from 'express-rate-limit'.",
     });
   }
 
@@ -33,6 +34,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       description: "Body parser middleware is used without a size limit. Attackers can send arbitrarily large payloads to exhaust server memory.",
       recommendation: "Configure body parser with a size limit: express.json({ limit: '1mb' }). Set limits appropriate for your use case.",
       reference: "Express Security Best Practices / OWASP",
+      suggestedFix: "Set body size limit: app.use(express.json({ limit: '1mb' })); app.use(express.urlencoded({ limit: '1mb', extended: true }));",
     });
   }
 
@@ -107,6 +109,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       lineNumbers: authRouteLines,
       recommendation: "Apply strict rate limits to auth endpoints (e.g., 5-10 requests/minute per IP). Use progressive delays or CAPTCHA after failed attempts. Consider using 'express-rate-limit' or 'rate-limiter-flexible'.",
       reference: "OWASP: Brute Force Protection / NIST 800-63B",
+      suggestedFix: "Add auth rate limit: app.use('/auth', rateLimit({ windowMs: 60000, max: 5 })); from 'express-rate-limit'.",
     });
   }
 
@@ -123,6 +126,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       lineNumbers: uploadLines,
       recommendation: "Set explicit file size limits (e.g., multer({ limits: { fileSize: 5 * 1024 * 1024 } })). Limit the number of files per request. Validate file types.",
       reference: "OWASP: Unrestricted File Upload / Multer Limits",
+      suggestedFix: "Set upload limits: const upload = multer({ limits: { fileSize: 5 * 1024 * 1024, files: 5 }, fileFilter: allowedTypes });",
     });
   }
 
@@ -153,6 +157,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       lineNumbers: wsLines,
       recommendation: "Set maxPayload to limit message sizes. Limit concurrent connections per client. Implement message rate limiting per connection. Set idle timeouts.",
       reference: "ws Package: Connection Limits / WebSocket Security",
+      suggestedFix: "Set WebSocket limits: new WebSocket.Server({ maxPayload: 1024 * 1024, perMessageDeflate: false }); add per-connection message rate tracking.",
     });
   }
 
@@ -169,6 +174,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       lineNumbers: retryLines,
       recommendation: "Use exponential backoff with jitter: delay = baseDelay * Math.pow(2, attempt) + randomJitter. Set a maximum retry count. Use libraries like 'p-retry' or 'axios-retry'.",
       reference: "AWS Architecture Blog: Exponential Backoff and Jitter",
+      suggestedFix: "Add backoff: import pRetry from 'p-retry'; await pRetry(() => fetchData(), { retries: 3, minTimeout: 1000, factor: 2 });",
     });
   }
 
