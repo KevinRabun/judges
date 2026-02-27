@@ -20,6 +20,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: emptyCatchLines,
       recommendation: "Log the error with context, re-throw it, or handle it meaningfully. If intentionally ignoring, add a comment explaining why.",
       reference: "ESLint no-empty / Error Handling Best Practices",
+      suggestedFix: "Add error handling: catch (error) { logger.error('Operation failed', { error }); throw error; };",
     });
   }
 
@@ -35,6 +36,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: catchNoParamLines,
       recommendation: "Capture the error parameter: catch(error) { ... } and use it for logging, error classification, or re-throwing.",
       reference: "Error Handling Best Practices",
+      suggestedFix: "Add error parameter: catch (error) { ... } instead of catch () { ... }.",
     });
   }
 
@@ -113,6 +115,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: throwStringLines,
       recommendation: "Always throw Error objects: throw new Error('message') or custom error classes that extend Error.",
       reference: "ESLint no-throw-literal / JavaScript Error Handling",
+      suggestedFix: "Replace throw 'message' with throw new Error('message').",
     });
   }
 
@@ -216,6 +219,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: thenWithoutCatch,
       recommendation: "Always add .catch() at the end of Promise chains, or refactor to async/await with try/catch. Enable the 'no-floating-promises' ESLint rule.",
       reference: "Node.js Unhandled Rejections / CWE-755",
+      suggestedFix: "Append .catch(error => { logger.error(error); }) to the Promise chain, or refactor to async/await with try/catch.",
     });
   }
 

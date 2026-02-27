@@ -78,6 +78,7 @@ export function analyzeAiCodeSafety(
           "Treat all LLM output as untrusted user input. Sanitise HTML with DOMPurify before rendering, parameterise SQL queries, and never pass LLM output to eval() or shell commands. Validate output structure against an expected schema.",
         reference:
           "OWASP LLM Top 10 — LLM02: Insecure Output Handling — CWE-79 / CWE-89",
+        suggestedFix: "Sanitize LLM output before use: DOMPurify.sanitize(output) for HTML, parameterized queries for SQL, and never pass to eval() or shell commands.",
       });
     } else {
       ruleNum++;
@@ -134,6 +135,7 @@ export function analyzeAiCodeSafety(
       recommendation:
         "Set debug=false / NODE_ENV='production' for production builds. Gate verbose logging behind environment checks. Ensure debug settings are externalized to environment variables.",
       reference: "CWE-489: Active Debug Code — OWASP Security Misconfiguration",
+      suggestedFix: "Replace hardcoded debug=true with environment-gated: debug: process.env.NODE_ENV !== 'production' or DEBUG=process.env.DEBUG === 'true'.",
     });
   } else {
     ruleNum++;
@@ -430,6 +432,32 @@ export function analyzeAiCodeSafety(
     } else {
       ruleNum++;
     }
+  } else {
+    ruleNum++;
+  }
+
+  // ── AICS-016  Tool-call results used without validation ────────────────────
+  const toolResultPattern =
+    /tool[_.]?(?:result|output|response|call)|function[_.]?(?:result|output|response|call)|action[_.]?result|tool_use|tool_calls/gi;
+  const toolResultLines = getLineNumbers(code, toolResultPattern);
+  const hasResultValidation =
+    /(?:validate|sanitize|parse|check|verify|filter|schema|zod|joi|yup|JSON\.parse|try\s*\{[^}]*JSON)/gi.test(code);
+
+  if (toolResultLines.length > 0 && !hasResultValidation) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Tool-call results used without validation",
+      description:
+        "Results from external tool calls (MCP tools, function calls, agent actions) are used without visible validation or sanitization. Tool outputs are untrusted — they can contain injected content, unexpected formats, or malicious payloads that compromise the calling agent or downstream consumers.",
+      lineNumbers: toolResultLines.slice(0, 5),
+      recommendation:
+        "Validate all tool-call results against an expected schema before use. Sanitize string outputs before injecting into prompts or rendering to users. Implement timeout and error handling for tool calls. Consider content filtering on tool outputs.",
+      reference:
+        "OWASP LLM Top 10 — LLM02: Insecure Output Handling / Tool Use Safety",
+      suggestedFix:
+        "Validate tool results: const parsed = schema.parse(toolResult); and sanitize string content before injecting into prompts or rendering.",
+    });
   } else {
     ruleNum++;
   }

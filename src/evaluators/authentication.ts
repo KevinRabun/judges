@@ -159,6 +159,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       lineNumbers: credentialLines,
       recommendation: "Use environment variables or a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault). Never commit credentials to version control.",
       reference: "OWASP: Credential Management / CWE-798",
+      suggestedFix: "Replace hardcoded credentials with environment variables: process.env.SECRET_NAME (Node.js), os.environ['SECRET_NAME'] (Python), or inject from a secrets manager.",
     });
   }
 
@@ -188,6 +189,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       lineNumbers: tokenQueryLines,
       recommendation: "Pass tokens in the Authorization header (Bearer scheme) or in httpOnly cookies. Never use query parameters for sensitive credentials.",
       reference: "OWASP: Transport Layer Security / RFC 6750",
+      suggestedFix: "Read tokens from the Authorization header instead: const token = req.headers.authorization?.replace('Bearer ', '');",
     });
   }
 
@@ -202,6 +204,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       lineNumbers: weakHashLines,
       recommendation: "Use bcrypt, scrypt, or Argon2 for password hashing. These algorithms are intentionally slow and include salt by default.",
       reference: "OWASP Password Storage Cheat Sheet / NIST 800-63b",
+      suggestedFix: "Replace with bcrypt: const hash = await bcrypt.hash(password, 12); and const valid = await bcrypt.compare(password, hash);",
     });
   }
 
@@ -245,6 +248,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       lineNumbers: tlsLines,
       recommendation: "Never disable TLS verification in production. Fix certificate issues properly. Use CA bundles for self-signed certs in development only.",
       reference: "CWE-295: Improper Certificate Validation",
+      suggestedFix: "Remove rejectUnauthorized: false and NODE_TLS_REJECT_UNAUTHORIZED=0. If using self-signed certs, set the CA: { ca: fs.readFileSync('ca.pem') }.",
     });
   }
 
@@ -303,6 +307,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       lineNumbers: cookieLines,
       recommendation: "Set cookies with { secure: true, httpOnly: true, sameSite: 'strict' }. Use Secure for all auth cookies. HttpOnly prevents JavaScript access.",
       reference: "OWASP Secure Cookie Best Practices / CWE-614",
+      suggestedFix: "Add security flags: res.cookie('session', token, { httpOnly: true, secure: true, sameSite: 'strict' });",
     });
   }
 

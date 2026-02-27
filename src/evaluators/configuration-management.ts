@@ -47,6 +47,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       lineNumbers: secretLines,
       recommendation: "Store secrets in a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault). Inject via environment variables at runtime. Never commit secrets.",
       reference: "OWASP: Secrets Management / 12-Factor App: Config",
+      suggestedFix: "Replace with environment variable: process.env.SECRET_NAME || throw new Error('Missing SECRET_NAME');",
     });
   }
 
@@ -62,6 +63,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       lineNumbers: hardcodedConfigLines,
       recommendation: "Read configuration from environment variables (process.env.PORT). Use a config library (convict, dotenv, django-environ) to validate and provide defaults.",
       reference: "12-Factor App: Config (Factor III)",
+      suggestedFix: "Replace hardcoded values with process.env reads: const PORT = parseInt(process.env.PORT || '3000', 10);",
     });
   }
 

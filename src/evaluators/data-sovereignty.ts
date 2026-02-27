@@ -120,6 +120,91 @@ export function analyzeDataSovereignty(code: string, language: string): Finding[
     });
   }
 
+  // CDN or third-party asset loading from external origins
+  const cdnLines: number[] = [];
+  lines.forEach((line, index) => {
+    if (
+      /(?:cdn\.|cloudflare|unpkg|jsdelivr|cdnjs|googleapis|bootstrapcdn|cloudfront|akamai|maxcdn|stackpath)/i.test(line) &&
+      !/integrity\s*=|crossorigin|nonce|hash/i.test(line)
+    ) {
+      cdnLines.push(index + 1);
+    }
+  });
+
+  if (cdnLines.length > 0 && !hasRegionPolicy) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "External CDN/third-party assets loaded without integrity checks",
+      description:
+        "Code loads assets from external CDN origins without Subresource Integrity (SRI) hashes or approved-origin policies. These assets are served from globally distributed infrastructure whose data processing locations may not comply with sovereignty requirements.",
+      lineNumbers: cdnLines.slice(0, 10),
+      recommendation:
+        "Add SRI integrity attributes for CDN-loaded scripts/styles. Maintain an approved CDN origin allowlist. Consider self-hosting critical assets within sovereign infrastructure.",
+      reference: "Subresource Integrity (SRI) / Data Sovereignty Asset Controls",
+    });
+  }
+
+  // Telemetry / analytics to external services
+  const telemetryLines: number[] = [];
+  lines.forEach((line, index) => {
+    if (
+      /(?:google.?analytics|gtag|mixpanel|segment|amplitude|hotjar|heap|fullstory|posthog|sentry|datadog|newrelic|appinsights|applicationinsights|bugsnag|rollbar|logrocket)/i.test(line) &&
+      !/dsn.*localhost|endpoint.*localhost|self.?hosted|on.?premises?/i.test(line)
+    ) {
+      telemetryLines.push(index + 1);
+    }
+  });
+
+  if (telemetryLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Telemetry/analytics data sent to external service",
+      description:
+        "Code integrates with external telemetry or analytics services that may process and store user behavior data, IP addresses, or session information in jurisdictions outside sovereignty boundaries.",
+      lineNumbers: telemetryLines.slice(0, 10),
+      recommendation:
+        "Verify the analytics provider's data residency options and configure region-specific endpoints. Consider self-hosted alternatives (Plausible, Matomo, self-hosted PostHog) for sovereign environments. Ensure DPAs cover data processing locations.",
+      reference: "GDPR Articles 44-49 / Telemetry Data Sovereignty",
+    });
+  }
+
+  // PII stored without geographic partitioning
+  const hasPiiFields = /(?:email|phone|ssn|social.?security|date.?of.?birth|address|first.?name|last.?name|national.?id|passport|driver.?license)/i.test(code);
+  const hasGeoPartitioning = /(?:partition|shard|region.*key|tenant.*region|geo.*route|data.*boundary|residency.*tag|region.*id)/i.test(code);
+  const hasDbOps = /(?:create|insert|save|store|persist|write|update|upsert|put)/i.test(code);
+
+  if (hasPiiFields && hasDbOps && !hasGeoPartitioning && code.split("\n").length > 20) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "PII stored without geographic partitioning indicator",
+      description:
+        "Code stores PII fields (email, phone, national ID, etc.) with database operations but has no visible geographic partitioning, tenant-region routing, or data boundary tagging. Without explicit geo-aware storage, PII may be co-mingled across jurisdictions.",
+      recommendation:
+        "Tag PII records with a region/jurisdiction identifier. Use tenant-scoped region routing for multi-tenant systems. Implement database-level partitioning by geography for regulated data.",
+      reference: "Data Residency Partitioning / Multi-Tenant Sovereignty",
+    });
+  }
+
+  // Region configuration without server-side enforcement
+  const hasClientRegionConfig = /(?:region|location|zone)\s*[:=]\s*["'`][^"'`]+["'`]/i.test(code);
+  const hasServerValidation = /(?:validateRegion|checkRegion|regionGuard|verifyJurisdiction|enforceResidency|assertRegion|regionPolicy)/i.test(code);
+
+  if (hasClientRegionConfig && !hasServerValidation && !hasPolicyEnforcement && code.split("\n").length > 15) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Region configuration without server-side enforcement",
+      description:
+        "A region or location is configured as a string value but no server-side validation or enforcement function is visible. Client-side region settings can be bypassed — sovereignty controls must be enforced server-side.",
+      recommendation:
+        "Implement server-side region validation that rejects requests targeting unauthorized regions. Use infrastructure-level guardrails (Azure Policy, AWS SCP, GCP Organization Policy) to enforce region boundaries.",
+      reference: "Policy-as-Code / Server-Side Sovereignty Enforcement",
+    });
+  }
+
   if (findings.length === 0 && code.length > 0) {
     const hasDataHandling = /(user|customer|personal|profile|account|email|phone|pii|data)/i.test(code);
     if (hasDataHandling) {

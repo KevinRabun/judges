@@ -26,16 +26,16 @@ const POLICY_ESCALATIONS: Record<PolicyProfile, PolicyEscalationRule[]> = {
     { prefixes: ["PERF", "REL"], minimumSeverity: "medium" },
   ],
   regulated: [
-    { prefixes: ["COMP", "DATA", "CYBER", "SOV", "LOGPRIV"], minimumSeverity: "high" },
+    { prefixes: ["COMP", "DATA", "CYBER", "SOV", "LOGPRIV", "AICS"], minimumSeverity: "high" },
   ],
   healthcare: [
-    { prefixes: ["COMP", "DATA", "LOGPRIV", "AUTH"], minimumSeverity: "high" },
+    { prefixes: ["COMP", "DATA", "LOGPRIV", "AUTH", "AICS"], minimumSeverity: "high" },
   ],
   fintech: [
-    { prefixes: ["AUTH", "CYBER", "COMP", "DB", "RATE"], minimumSeverity: "high" },
+    { prefixes: ["AUTH", "CYBER", "COMP", "DB", "RATE", "AICS"], minimumSeverity: "high" },
   ],
   "public-sector": [
-    { prefixes: ["SOV", "COMP", "CYBER", "CFG"], minimumSeverity: "high" },
+    { prefixes: ["SOV", "COMP", "CYBER", "CFG", "AICS"], minimumSeverity: "high" },
   ],
 };
 
@@ -91,6 +91,7 @@ function mapSpecialty(ruleId: string): string {
     AGENT: "Agent Instructions",
     ARCH: "Architecture",
     SUPPLY: "Dependency Supply Chain",
+    AICS: "AI Code Safety",
   };
 
   return map[prefix] ?? "General";

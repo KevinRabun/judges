@@ -172,6 +172,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         lineNumbers: lines,
         recommendation: `Move the ${sp.name} to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control.`,
         reference: "OWASP: Hardcoded Credentials — CWE-798",
+        suggestedFix: `Replace hardcoded ${sp.name} with an environment variable: process.env.SECRET_NAME or inject from a secrets manager at runtime.`,
       });
     }
   }
@@ -188,6 +189,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       lineNumbers: logLines,
       recommendation: "Remove sensitive data from log statements. Use structured logging with redaction filters to automatically mask sensitive fields.",
       reference: "OWASP Logging Cheat Sheet — CWE-532",
+      suggestedFix: "Remove sensitive fields from log calls or redact them: logger.info('User login', { userId: user.id }) instead of logging passwords/tokens.",
     });
   }
 

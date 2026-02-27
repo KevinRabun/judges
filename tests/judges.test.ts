@@ -2154,3 +2154,223 @@ async function fetchWithRetry(url: string, maxRetries = 3) {
     assert.ok(retryBackoff.length > 0, "Expected retry-without-backoff finding");
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Agent Instructions — New Rules (AGENT-008, 009, 010)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Agent Instructions — Expanded Rules", () => {
+  it("should detect agent capabilities without sandboxing guidance", () => {
+    const judge = getJudge("agent-instructions");
+    assert.ok(judge, "agent-instructions judge should exist");
+
+    const unsandboxedInstructions = `
+# Agent Rules
+
+You may execute shell commands to install packages.
+Use exec to run build scripts when needed.
+Access the filesystem to read and write project files.
+Make network requests to fetch missing dependencies.
+`;
+    const evaluation = evaluateWithJudge(judge!, unsandboxedInstructions, "markdown");
+    const sandboxFindings = evaluation.findings.filter((f) => f.title.includes("sandboxing"));
+    assert.ok(sandboxFindings.length > 0, "Expected finding for capabilities without sandboxing");
+  });
+
+  it("should NOT detect sandboxing issue when sandbox guidance is present", () => {
+    const judge = getJudge("agent-instructions");
+    assert.ok(judge, "agent-instructions judge should exist");
+
+    const sandboxedInstructions = `
+# Agent Rules
+
+You may execute shell commands only within the Docker container sandbox.
+Use restricted exec with permission allowlists.
+Access the filesystem only within the isolation boundary.
+`;
+    const evaluation = evaluateWithJudge(judge!, sandboxedInstructions, "markdown");
+    const sandboxFindings = evaluation.findings.filter((f) => f.title.includes("sandboxing"));
+    assert.strictEqual(sandboxFindings.length, 0, "Expected no sandboxing finding when sandbox guidance is present");
+  });
+
+  it("should detect tool definitions without parameter constraints", () => {
+    const judge = getJudge("agent-instructions");
+    assert.ok(judge, "agent-instructions judge should exist");
+
+    const noConstraintTools = `
+# Agent Tools
+
+## Available Tools
+- tool: file_search — search for files in workspace
+- action: run_command — run a terminal command
+- function: read_url — fetch a web page
+- command: edit_file — modify a file
+
+Use these tools to complete user tasks.
+Do not ask for confirmation before using tools.
+Follow the user instructions carefully.
+Always check outputs before proceeding.
+Be concise in your responses to the user.
+Do not explain what you are doing unless asked.
+Report errors clearly with context.
+`;
+    const evaluation = evaluateWithJudge(judge!, noConstraintTools, "markdown");
+    const toolFindings = evaluation.findings.filter((f) => f.title.includes("parameter constraints"));
+    assert.ok(toolFindings.length > 0, "Expected finding for tool definitions without constraints");
+  });
+
+  it("should detect agent loop without termination condition", () => {
+    const judge = getJudge("agent-instructions");
+    assert.ok(judge, "agent-instructions judge should exist");
+
+    const loopInstructions = `
+# Agent Rules
+
+When tests fail, iterate over the failing tests and fix each one.
+Continue to retry until all tests pass.
+Loop through each module and repeat the analysis.
+`;
+    const evaluation = evaluateWithJudge(judge!, loopInstructions, "markdown");
+    const loopFindings = evaluation.findings.filter((f) => f.title.includes("loop") || f.title.includes("termination"));
+    assert.ok(loopFindings.length > 0, "Expected finding for loop without termination condition");
+  });
+
+  it("should NOT detect loop issue when termination conditions exist", () => {
+    const judge = getJudge("agent-instructions");
+    assert.ok(judge, "agent-instructions judge should exist");
+
+    const boundedLoop = `
+# Agent Rules
+
+When tests fail, iterate with a maximum of 3 retries (max_iterations: 3).
+Set a timeout of 60 seconds for iterative repair.
+Stop if the budget is exceeded.
+`;
+    const evaluation = evaluateWithJudge(judge!, boundedLoop, "markdown");
+    const loopFindings = evaluation.findings.filter((f) => f.title.includes("loop") && f.title.includes("termination"));
+    assert.strictEqual(loopFindings.length, 0, "Expected no loop termination finding when conditions present");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-016 — Tool-call results without validation
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-016 Tool-Call Result Validation", () => {
+  it("should detect tool_result used without validation", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const unsafeToolUse = `
+async function handleToolCall(response) {
+  const tool_result = response.tool_calls[0].result;
+  const output = tool_result.content;
+  document.getElementById("display").innerHTML = output;
+  return output;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, unsafeToolUse, "typescript");
+    const toolFindings = evaluation.findings.filter((f) => f.ruleId === "AICS-016");
+    assert.ok(toolFindings.length > 0, "Expected AICS-016 for tool results without validation");
+  });
+
+  it("should NOT fire AICS-016 when tool results are validated", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const safeToolUse = `
+import { z } from "zod";
+const resultSchema = z.object({ content: z.string() });
+
+async function handleToolCall(response) {
+  const tool_result = response.tool_calls[0].result;
+  const parsed = resultSchema.parse(tool_result);
+  const sanitized = DOMPurify.sanitize(parsed.content);
+  return sanitized;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, safeToolUse, "typescript");
+    const toolFindings = evaluation.findings.filter((f) => f.ruleId === "AICS-016");
+    assert.strictEqual(toolFindings.length, 0, "Expected no AICS-016 when tool results are validated");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Data Sovereignty — Expanded Rules (SOV-007..010)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Data Sovereignty — Expanded Rules", () => {
+  it("should detect external CDN assets without integrity checks", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const cdnCode = `
+const styles = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css";
+const script = "https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js";
+
+function loadAssets() {
+  const link = document.createElement("link");
+  link.href = styles;
+  document.head.appendChild(link);
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, cdnCode, "typescript");
+    const cdnFindings = evaluation.findings.filter((f) => f.title.includes("CDN") || f.title.includes("third-party"));
+    assert.ok(cdnFindings.length > 0, "Expected finding for CDN assets without integrity checks");
+  });
+
+  it("should detect telemetry sent to external analytics services", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const telemetryCode = `
+import mixpanel from "mixpanel-browser";
+import * as Sentry from "@sentry/node";
+
+mixpanel.init("project-token-123");
+Sentry.init({ dsn: "https://abc@sentry.io/123" });
+
+function trackEvent(name: string, data: Record<string, unknown>) {
+  mixpanel.track(name, data);
+  Sentry.captureMessage(name);
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, telemetryCode, "typescript");
+    const telemetryFindings = evaluation.findings.filter((f) => f.title.includes("Telemetry") || f.title.includes("analytics"));
+    assert.ok(telemetryFindings.length > 0, "Expected finding for telemetry to external services");
+  });
+
+  it("should detect PII storage without geographic partitioning", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const piiCode = `
+interface UserProfile {
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  firstName: string;
+  lastName: string;
+  address: string;
+  nationalId: string;
+}
+
+async function createUser(profile: UserProfile) {
+  await db.collection("users").insert(profile);
+  await UserModel.create(profile);
+  return { success: true };
+}
+
+async function updateUser(id: string, data: Partial<UserProfile>) {
+  await db.collection("users").update({ _id: id }, data);
+}
+
+async function deleteUser(id: string) {
+  await db.collection("users").remove({ _id: id });
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, piiCode, "typescript");
+    const piiFindings = evaluation.findings.filter((f) => f.title.includes("PII") || f.title.includes("geographic"));
+    assert.ok(piiFindings.length > 0, "Expected finding for PII without geo partitioning");
+  });
+});

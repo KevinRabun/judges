@@ -127,5 +127,53 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
     });
   }
 
+  // Agent with powerful capabilities without sandboxing
+  const hasPowerfulCapabilities = /(?:exec|execute|run|spawn|shell|child_process|subprocess|os\.system|file.*write|fs\.write|delete.*file|rm\s|remove.*file|network|http|fetch|download|curl|wget)/i.test(code);
+  const hasSandboxing = /sandbox|container|docker|isolation|restrict|permission|allow.?list|deny.?list|firewall|seccomp|chroot|namespace|limit/i.test(code);
+  if (hasPowerfulCapabilities && !hasSandboxing) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Agent capabilities without sandboxing guidance",
+      description:
+        "Instructions reference powerful capabilities (exec, filesystem, network) without specifying sandboxing or isolation boundaries. An agent with unrestricted capabilities can cause damage through unintended actions.",
+      recommendation:
+        "Define explicit sandboxing requirements: which directories are writable, which commands are allowed, network access restrictions, and resource limits.",
+      reference: "Agent Capability Isolation / Principle of Least Privilege",
+    });
+  }
+
+  // Agent tool definitions without input constraints
+  const hasToolDefs = /tool|function|action|command|capability|plugin|extension/i.test(code);
+  const hasInputConstraints = /(?:parameter|param|input|argument).*(?:type|format|range|min|max|pattern|regex|enum|valid|constraint|required|optional)/i.test(code);
+  if (hasToolDefs && !hasInputConstraints && code.split("\n").length > 15) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Tool/action definitions without input parameter constraints",
+      description:
+        "Agent instructions define tools or actions but do not specify input parameter constraints (types, ranges, validation rules). Without constraints, the agent may pass invalid or dangerous inputs to tools.",
+      recommendation:
+        "For each tool/action, define parameter types, allowed values/ranges, required vs optional fields, and any validation rules that must be applied before execution.",
+      reference: "MCP Tool Schema Best Practices / Input Validation",
+    });
+  }
+
+  // Agent loop without termination condition
+  const hasLoopConcept = /(?:loop|iterate|repeat|recursive|retry|continue|re-?run|cycle|round|step|phase)/i.test(code);
+  const hasTermination = /(?:terminat|stop|halt|exit|break|max.*(?:iteration|step|round|attempt|loop|cycle)|limit|timeout|budget|deadline|guard|circuit.?break)/i.test(code);
+  if (hasLoopConcept && !hasTermination) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Agent loop without termination condition",
+      description:
+        "Instructions describe iterative or looping behavior without specifying termination conditions. Without limits, agents can enter infinite loops, consuming resources and generating costs indefinitely.",
+      recommendation:
+        "Define explicit termination conditions: maximum iterations, time budget, token/cost limits, success criteria, and a fallback action when limits are reached.",
+      reference: "Agentic Loop Safety / Resource Governance",
+    });
+  }
+
   return findings;
 }
