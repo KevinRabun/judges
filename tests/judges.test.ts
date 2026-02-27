@@ -2296,6 +2296,313 @@ async function handleToolCall(response) {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-017 — Weak cryptographic hashing (MD5/SHA-1)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-017 Weak Cryptographic Hashing", () => {
+  it("should detect MD5 usage in TypeScript", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import crypto from "crypto";
+function hashPassword(password: string): string {
+  return crypto.createHash("md5").update(password).digest("hex");
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-017");
+    assert.ok(findings.length > 0, "Expected AICS-017 for MD5 usage");
+  });
+
+  it("should detect SHA-1 usage in Python", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import hashlib
+def hash_token(token):
+    return hashlib.sha1(token.encode()).hexdigest()
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "python");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-017");
+    assert.ok(findings.length > 0, "Expected AICS-017 for SHA-1 usage");
+  });
+
+  it("should NOT fire AICS-017 for SHA-256", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import crypto from "crypto";
+function hashData(data: string): string {
+  return crypto.createHash("sha256").update(data).digest("hex");
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-017");
+    assert.strictEqual(findings.length, 0, "Expected no AICS-017 for SHA-256");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-018 — Empty catch blocks
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-018 Empty Catch Blocks", () => {
+  it("should detect empty catch block in TypeScript", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+async function fetchData(url: string) {
+  try {
+    const response = await fetch(url);
+    return await response.json();
+  } catch (err) { }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-018");
+    assert.ok(findings.length > 0, "Expected AICS-018 for empty catch block");
+  });
+
+  it("should detect empty except block in Python", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+def load_config():
+    try:
+        with open("config.json") as f:
+            return json.load(f)
+    except Exception: pass
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "python");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-018");
+    assert.ok(findings.length > 0, "Expected AICS-018 for empty except/pass block");
+  });
+
+  it("should NOT fire AICS-018 when error is logged", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+async function fetchData(url: string) {
+  try {
+    const response = await fetch(url);
+    return await response.json();
+  } catch (err) {
+    logger.error("Fetch failed", { error: err, url });
+    throw err;
+  }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-018");
+    assert.strictEqual(findings.length, 0, "Expected no AICS-018 when error is logged");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-019 — Placeholder/dummy credentials
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-019 Placeholder Credentials", () => {
+  it("should detect 'changeme' credential", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+const config = {
+  database: {
+    host: "localhost",
+    password: "changeme",
+    port: 5432,
+  }
+};
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-019");
+    assert.ok(findings.length > 0, "Expected AICS-019 for 'changeme' credential");
+  });
+
+  it("should detect 'your_api_key_here'", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+const API_KEY = "your_api_key_here";
+async function callService() {
+  return fetch("/api/data", { headers: { Authorization: API_KEY } });
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-019");
+    assert.ok(findings.length > 0, "Expected AICS-019 for 'your_api_key_here'");
+  });
+
+  it("should detect 'password123'", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+DB_PASSWORD = "password123"
+connection = psycopg2.connect(host="localhost", password=DB_PASSWORD)
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "python");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-019");
+    assert.ok(findings.length > 0, "Expected AICS-019 for 'password123'");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-020 — TLS certificate verification disabled
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-020 TLS Verification Disabled", () => {
+  it("should detect rejectUnauthorized: false in TypeScript", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import https from "https";
+const agent = new https.Agent({
+  rejectUnauthorized: false,
+});
+const response = await fetch("https://api.example.com", { agent });
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-020");
+    assert.ok(findings.length > 0, "Expected AICS-020 for rejectUnauthorized: false");
+  });
+
+  it("should detect verify=False in Python", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import requests
+response = requests.get("https://api.example.com", verify=False)
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "python");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-020");
+    assert.ok(findings.length > 0, "Expected AICS-020 for verify=False");
+  });
+
+  it("should detect InsecureSkipVerify in Go", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+package main
+import "crypto/tls"
+func createClient() *http.Client {
+    tr := &http.Transport{
+        TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+    }
+    return &http.Client{Transport: tr}
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "go");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-020");
+    assert.ok(findings.length > 0, "Expected AICS-020 for InsecureSkipVerify: true");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-021 — Overly permissive CORS
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-021 Overly Permissive CORS", () => {
+  it("should detect wildcard CORS origin in Express", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import express from "express";
+import cors from "cors";
+const app = express();
+app.use(cors('*'));
+app.get("/api/data", (req, res) => { res.json({ ok: true }); });
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-021");
+    assert.ok(findings.length > 0, "Expected AICS-021 for wildcard CORS origin");
+  });
+
+  it("should NOT fire AICS-021 for specific CORS origin", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import express from "express";
+import cors from "cors";
+const app = express();
+app.use(cors({ origin: "https://myapp.example.com", credentials: true }));
+app.get("/api/data", (req, res) => { res.json({ ok: true }); });
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "typescript");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-021");
+    assert.strictEqual(findings.length, 0, "Expected no AICS-021 for specific CORS origin");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: AICS-022 — Unsafe deserialization
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("AICS-022 Unsafe Deserialization", () => {
+  it("should detect pickle.loads in Python", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import pickle
+def load_user_data(raw_bytes):
+    return pickle.loads(raw_bytes)
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "python");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-022");
+    assert.ok(findings.length > 0, "Expected AICS-022 for pickle.loads");
+  });
+
+  it("should detect yaml.load without SafeLoader in Python", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import yaml
+def parse_config(raw):
+    return yaml.load(raw)
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "python");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-022");
+    assert.ok(findings.length > 0, "Expected AICS-022 for yaml.load without SafeLoader");
+  });
+
+  it("should detect ObjectInputStream.readObject in Java", () => {
+    const judge = getJudge("ai-code-safety");
+    assert.ok(judge, "ai-code-safety judge should exist");
+
+    const code = `
+import java.io.*;
+public class Deserializer {
+    public Object deserialize(byte[] data) throws Exception {
+        ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(data));
+        return ois.readUnshared();
+    }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, code, "java");
+    const findings = evaluation.findings.filter((f) => f.ruleId === "AICS-022");
+    assert.ok(findings.length > 0, "Expected AICS-022 for unsafe deserialization via readUnshared");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 // Test: Data Sovereignty — Expanded Rules (SOV-007..010)
 // ═════════════════════════════════════════════════════════════════════════════
 

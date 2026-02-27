@@ -475,5 +475,125 @@ export function analyzeAiCodeSafety(
     ruleNum++;
   }
 
+  // ── AICS-017  Weak or broken cryptographic hashing ─────────────────────────
+  const weakHashLines = getLangLineNumbers(code, language, LP.WEAK_HASH);
+  if (weakHashLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Weak cryptographic hash (MD5/SHA-1)",
+      description:
+        "AI-generated code frequently uses MD5 or SHA-1 for hashing. Both algorithms have known collision vulnerabilities and are unsuitable for password hashing, integrity verification, or digital signatures.",
+      lineNumbers: weakHashLines,
+      recommendation:
+        "Replace MD5/SHA-1 with SHA-256+ for integrity checks, or bcrypt/scrypt/argon2 for password hashing. Use crypto.subtle.digest('SHA-256', data) in web contexts.",
+      reference: "CWE-328: Use of Weak Hash — NIST SP 800-131A",
+      suggestedFix:
+        "Replace weak hashes: crypto.createHash('sha256') instead of md5/sha1. For passwords, use bcrypt: await bcrypt.hash(password, 12).",
+    });
+  } else {
+    ruleNum++;
+  }
+
+  // ── AICS-018  Empty or swallowed catch blocks ──────────────────────────────
+  const emptyCatchLines = getLangLineNumbers(code, language, LP.EMPTY_CATCH);
+  if (emptyCatchLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Empty catch block swallows errors silently",
+      description: `Found ${emptyCatchLines.length} empty catch block(s) that silently discard errors. AI-generated code commonly produces catch blocks that suppress exceptions, hiding bugs, security failures, and data corruption. This pattern is especially dangerous in authentication, data persistence, and payment flows.`,
+      lineNumbers: emptyCatchLines,
+      recommendation:
+        "At minimum, log the error. In security-critical paths, re-throw or return an error response. Never silently swallow exceptions in production code.",
+      reference: "CWE-390: Detection of Error Condition Without Action",
+      suggestedFix:
+        "Replace empty catch: catch (err) { logger.error('Operation failed', { error: err, context }); throw err; } or return an error response.",
+    });
+  } else {
+    ruleNum++;
+  }
+
+  // ── AICS-019  Dummy/placeholder credentials in code ────────────────────────
+  const dummyCredPattern =
+    /["'`](?:changeme|password123|admin123|secret123|test123|your[_-]?(?:api[_-]?key|token|secret|password)[_-]?here|replace[_-]?me|TODO[_-]?change|CHANGE[_-]?ME|xxxx+|sk-[.]{3,}|pk_test_|sk_test_|example[_-]?(?:key|token|secret))["'`]/gi;
+  const dummyCredLines = getLineNumbers(code, dummyCredPattern);
+  if (dummyCredLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "critical",
+      title: "Placeholder or dummy credentials in code",
+      description: `Found ${dummyCredLines.length} placeholder credential(s) (e.g. "changeme", "your_api_key_here", "password123"). AI-generated code frequently includes dummy credentials as examples that are easily forgotten and shipped to production, creating trivially exploitable vulnerabilities.`,
+      lineNumbers: dummyCredLines,
+      recommendation:
+        "Remove all placeholder credentials. Load secrets from environment variables or a secrets manager (AWS Secrets Manager, Azure Key Vault, HashiCorp Vault). Never commit credentials to source control.",
+      reference: "CWE-798: Use of Hard-coded Credentials — OWASP A07:2021",
+      suggestedFix:
+        "Replace placeholder credentials with environment variable reads: const apiKey = process.env.API_KEY ?? throwMissing('API_KEY'); and store values in .env (gitignored) or a secrets manager.",
+    });
+  } else {
+    ruleNum++;
+  }
+
+  // ── AICS-020  TLS/certificate verification disabled ────────────────────────
+  const tlsDisabledLines = getLangLineNumbers(code, language, LP.TLS_DISABLED);
+  if (tlsDisabledLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "critical",
+      title: "TLS certificate verification disabled",
+      description:
+        "SSL/TLS certificate verification has been disabled (e.g. rejectUnauthorized: false, verify=False, InsecureSkipVerify: true). AI-generated code often disables certificate checks to bypass development SSL errors, leaving the code vulnerable to man-in-the-middle attacks in production.",
+      lineNumbers: tlsDisabledLines,
+      recommendation:
+        "Never disable TLS verification in production. Use properly signed certificates (Let's Encrypt is free). If self-signed certificates are required for internal services, configure the specific CA certificate rather than disabling all verification.",
+      reference: "CWE-295: Improper Certificate Validation — OWASP A07:2021",
+      suggestedFix:
+        "Remove rejectUnauthorized: false. Use proper TLS certificates or configure a custom CA: const agent = new https.Agent({ ca: fs.readFileSync('internal-ca.pem') }).",
+    });
+  } else {
+    ruleNum++;
+  }
+
+  // ── AICS-021  Overly permissive CORS configuration ─────────────────────────
+  const corsWildcardLines = getLangLineNumbers(code, language, LP.CORS_WILDCARD);
+  if (corsWildcardLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Overly permissive CORS — wildcard origin",
+      description:
+        "CORS is configured with a wildcard (*) origin, allowing any website to make cross-origin requests to this API. AI-generated code almost always uses wildcard CORS as the quickest way to bypass cross-origin errors. This can enable CSRF-like attacks and data exfiltration from authenticated endpoints.",
+      lineNumbers: corsWildcardLines,
+      recommendation:
+        "Restrict CORS to specific trusted origins: cors({ origin: ['https://app.example.com'] }). For APIs with authentication, never use wildcard origins — browsers will not send cookies/credentials with wildcard CORS.",
+      reference: "CWE-942: Overly Permissive Cross-domain Whitelist — OWASP A05:2021",
+      suggestedFix:
+        "Replace wildcard CORS with an allow-list: cors({ origin: [process.env.ALLOWED_ORIGIN ?? 'https://app.example.com'], credentials: true }).",
+    });
+  } else {
+    ruleNum++;
+  }
+
+  // ── AICS-022  Unsafe deserialization of untrusted data ─────────────────────
+  const unsafeDeserLines = getLangLineNumbers(code, language, LP.UNSAFE_DESERIALIZATION);
+  if (unsafeDeserLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "critical",
+      title: "Unsafe deserialization of untrusted data",
+      description:
+        "Code uses deserialization functions that can execute arbitrary code when processing untrusted input (e.g. pickle.loads, yaml.load without SafeLoader, eval-based JSON parsing). AI-generated code frequently uses the simplest deserialization method without considering security implications.",
+      lineNumbers: unsafeDeserLines,
+      recommendation:
+        "Use safe deserialization: yaml.safe_load() instead of yaml.load(), avoid pickle for untrusted data (use JSON), use JSON.parse() instead of eval(). Validate deserialized data against a schema.",
+      reference: "CWE-502: Deserialization of Untrusted Data — OWASP A08:2021",
+      suggestedFix:
+        "Replace unsafe deserialization: yaml.safe_load(data) instead of yaml.load(data). For Python, use json.loads() instead of pickle.loads() for untrusted data. Always validate output against a schema.",
+    });
+  } else {
+    ruleNum++;
+  }
+
   return findings;
 }

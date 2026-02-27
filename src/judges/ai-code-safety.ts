@@ -24,6 +24,13 @@ YOUR EVALUATION CRITERIA:
 12. **Data Leakage to AI Services**: Is PII, financial, or health data sent to external AI services without anonymisation?
 13. **Missing Rate Limiting on AI Endpoints**: Are endpoints that trigger expensive LLM calls exposed without rate limiting?
 14. **Network Binding**: Does the server bind to 0.0.0.0 (all interfaces) without explicit intent or firewall protection?
+15. **Tool-Call Result Validation**: Are results from external tool calls (MCP tools, function calls, agent actions) consumed without schema validation or sanitisation?
+16. **Weak Cryptographic Hashing**: Does the code use MD5 or SHA-1 for hashing? AI-generated code frequently defaults to weak hash algorithms.
+17. **Empty Catch Blocks**: Are exceptions silently swallowed in catch blocks with no logging, re-throw, or error response?
+18. **Placeholder Credentials**: Does the code contain dummy credentials like "changeme", "password123", "your_api_key_here" that AI assistants generate as examples?
+19. **Disabled TLS Verification**: Is SSL/TLS certificate verification disabled (rejectUnauthorized: false, verify=False, InsecureSkipVerify: true)?
+20. **Overly Permissive CORS**: Is CORS configured with a wildcard (*) origin, allowing any website to make cross-origin requests?
+21. **Unsafe Deserialization**: Does the code use deserialization functions that can execute arbitrary code on untrusted input (pickle.loads, yaml.load, eval-based parsing)?
 
 RULES FOR YOUR EVALUATION:
 - Assign rule IDs with prefix "AICS-" (e.g. AICS-001).
