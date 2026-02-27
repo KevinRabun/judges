@@ -95,6 +95,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: corsLines,
       recommendation: "Restrict CORS to specific trusted origins. If credentials are used, '*' is not allowed by browsers anyway — be explicit about allowed origins.",
       reference: "OWASP CORS Misconfiguration — CWE-942",
+      suggestedFix: "Restrict CORS origins: app.use(cors({ origin: ['https://app.example.com'], credentials: true })); never use origin: '*' with credentials.",
     });
   }
 
@@ -110,6 +111,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: protoLines,
       recommendation: "Use Object.create(null) for map-like objects, validate keys against a whitelist, and use Map instead of plain objects for dynamic keys.",
       reference: "CWE-1321: Improperly Controlled Modification of Object Prototype Attributes",
+      suggestedFix: "Prevent prototype pollution: use Map for dynamic keys, or validate: if (key === '__proto__' || key === 'constructor') throw new Error('invalid key');",
     });
   }
 
@@ -124,6 +126,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: disableLines,
       recommendation: "Review each suppression directive to ensure it's justified. Add a comment explaining why the suppression is necessary. Remove any that were added simply to silence warnings.",
       reference: "Secure Coding Best Practices",
+      suggestedFix: "Add justification comments: // eslint-disable-next-line no-explicit-any -- legacy API returns untyped response, tracked in JIRA-1234.",
     });
   }
 
@@ -160,6 +163,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
         lineNumbers: ldapLines,
         recommendation: "Escape special LDAP characters in user input. Use parameterized LDAP queries or the ldap_escape function.",
         reference: "OWASP LDAP Injection — CWE-90",
+        suggestedFix: "Escape LDAP input: const safe = input.replace(/[\\*()\\\\\x00]/g, c => '\\\\' + c.charCodeAt(0).toString(16)); use ldap_escape or parameterized filters.",
       });
     }
   }
@@ -192,6 +196,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: redirectLines,
       recommendation: "Validate redirect URLs against a whitelist of allowed domains. Use relative paths or map redirect targets to predefined safe URLs.",
       reference: "OWASP Open Redirect — CWE-601",
+      suggestedFix: "Validate redirect target: const url = new URL(target, req.baseUrl); if (!ALLOWED_HOSTS.includes(url.hostname)) return res.redirect('/'); res.redirect(url.toString());",
     });
   }
 
@@ -207,6 +212,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: regexLines,
       recommendation: "Never use user input in RegExp without escaping. Use safe-regex or re2 for untrusted patterns. Set timeouts on regex operations.",
       reference: "CWE-1333: Inefficient Regular Expression Complexity",
+      suggestedFix: "Escape user input for regex: const escaped = input.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'); or use the re2 library for safe regex execution.",
     });
   }
 
@@ -251,6 +257,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: crlfLines,
       recommendation: "Strip \\r\\n characters from any user input used in headers. Validate and encode header values.",
       reference: "CWE-113: Improper Neutralization of CRLF Sequences",
+      suggestedFix: "Sanitize header values: const safe = value.replace(/[\\r\\n]/g, ''); res.setHeader('X-Custom', safe);",
     });
   }
 
@@ -265,6 +272,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       description: "HTTP server code does not configure security headers (CSP, X-Frame-Options, HSTS, etc.), leaving it vulnerable to clickjacking, XSS, and other attacks.",
       recommendation: "Use helmet (Express), django-security middleware, or manually set: Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security.",
       reference: "OWASP Security Headers — CWE-693",
+      suggestedFix: "Add helmet middleware: import helmet from 'helmet'; app.use(helmet()); — sets CSP, HSTS, X-Frame-Options, and other security headers automatically.",
     });
   }
 
@@ -299,6 +307,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       description: "Authentication endpoints handle passwords but no password complexity rules (minimum length, character requirements) are visible.",
       recommendation: "Enforce minimum 8-character passwords with complexity requirements. Use NIST SP 800-63B guidelines. Check against breached password databases (Have I Been Pwned).",
       reference: "NIST SP 800-63B — CWE-521",
+      suggestedFix: "Add password validation: if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) throw new Error('Password too weak'); check HaveIBeenPwned API.",
     });
   }
 
@@ -330,6 +339,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       lineNumbers: authEndpoints.slice(0, 5),
       recommendation: "Implement rate limiting on login/auth endpoints. Use progressive delays, account lockouts, or CAPTCHA after failed attempts.",
       reference: "OWASP Brute Force — CWE-307",
+      suggestedFix: "Add auth rate limiting: app.use('/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 5 })); lock account after 10 failures.",
     });
   }
   // Weak Content-Security-Policy directives
@@ -349,6 +359,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
         recommendation:
           "Remove 'unsafe-inline' and 'unsafe-eval'. Use nonce or hash-based CSP for inline scripts (e.g. 'nonce-<random>'). Restrict script-src to explicitly trusted domains.",
         reference: "OWASP CSP Cheat Sheet — CWE-693",
+        suggestedFix: "Strengthen CSP: Content-Security-Policy: default-src 'self'; script-src 'nonce-{random}'; style-src 'self'; img-src 'self' data:; — remove unsafe-inline/unsafe-eval.",
       });
     }
   }
@@ -367,6 +378,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       recommendation:
         "Use wss:// (WebSocket Secure) for all WebSocket connections. Ensure the server has a valid TLS certificate.",
       reference: "CWE-319: Cleartext Transmission of Sensitive Information",
+      suggestedFix: "Replace ws:// with wss://: const socket = new WebSocket('wss://api.example.com/ws'); ensure your server has TLS configured.",
     });
   }
 

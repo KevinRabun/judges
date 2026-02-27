@@ -85,6 +85,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       lineNumbers: storeForeverLines,
       recommendation: "Define and implement data retention policies. Set TTLs, schedule purge jobs, or implement right-to-deletion workflows.",
       reference: "GDPR Article 5(1)(e) Storage Limitation",
+      suggestedFix: "Add TTL to stored data: await db.collection('users').createIndex({ createdAt: 1 }, { expireAfterSeconds: 365 * 24 * 3600 }); or schedule retention purge jobs.",
     });
   }
 
@@ -127,6 +128,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       lineNumbers: dataModelLines,
       recommendation: "Add data classification comments or decorators (e.g., @PII, @Confidential) to help enforce appropriate handling.",
       reference: "Data Classification Best Practices",
+      suggestedFix: "Add classification markers: interface User { /** @classification PII */ email: string; /** @classification Public */ displayName: string; }",
     });
   }
 
@@ -190,6 +192,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       description: "User data is stored but no deletion mechanism exists. GDPR and CCPA require the ability to delete personal data on request.",
       recommendation: "Implement a user data deletion endpoint that cascades across all storage systems (DB, cache, backups, third parties).",
       reference: "GDPR Article 17: Right to Erasure / CCPA Right to Delete",
+      suggestedFix: "Add deletion endpoint: app.delete('/api/users/:id/data', auth, async (req, res) => { await deleteUserData(req.params.id); res.status(204).end(); });",
     });
   }
 
@@ -209,6 +212,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       lineNumbers: cookieLines,
       recommendation: "Set Secure, HttpOnly, and SameSite=Strict on sensitive cookies. Review cookie consent requirements per jurisdiction.",
       reference: "OWASP Cookie Security / ePrivacy Directive",
+      suggestedFix: "Set secure cookie flags: res.cookie('session', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600000 });",
     });
   }
 
@@ -229,6 +233,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       lineNumbers: ageRelatedLines.slice(0, 5),
       recommendation: "Implement age verification and parental consent flows for users under the applicable age threshold.",
       reference: "COPPA / GDPR Article 8 / Age Appropriate Design Code",
+      suggestedFix: "Add age verification: if (calculateAge(user.dob) < 13) { requireParentalConsent(user.id); restrictDataCollection(); }",
     });
   }
 

@@ -50,6 +50,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       lineNumbers: unboundedLines,
       recommendation: "Always enforce a maximum result limit: db.find({}).limit(100). Implement pagination and enforce maximum page sizes.",
       reference: "API Rate Limiting / Database Query Safety",
+      suggestedFix: "Add query limits: db.find({}).limit(100).skip(page * 100); enforce max page size: const limit = Math.min(req.query.limit || 20, 100);",
     });
   }
 
@@ -62,6 +63,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       description: "API responses don't include standard rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After).",
       recommendation: "Return rate limit headers on responses so clients can self-throttle. Include Retry-After on 429 responses.",
       reference: "IETF Rate Limit Headers / RFC 6585",
+      suggestedFix: "Add rate limit headers: res.set({ 'X-RateLimit-Limit': limit, 'X-RateLimit-Remaining': remaining, 'X-RateLimit-Reset': resetTime, 'Retry-After': retrySeconds });",
     });
   }
 
@@ -78,6 +80,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       lineNumbers: externalCallLines.slice(0, 3),
       recommendation: "Implement exponential backoff with jitter for external API calls. Respect Retry-After headers. Use libraries like p-retry or cockatiel.",
       reference: "Exponential Backoff / Rate Limiting Best Practices",
+      suggestedFix: "Add retry with backoff: import pRetry from 'p-retry'; const data = await pRetry(() => fetch(url), { retries: 3, minTimeout: 1000 }); respect Retry-After headers.",
     });
   }
 
@@ -93,6 +96,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       lineNumbers: setIntervalLines,
       recommendation: "Use setTimeout with re-scheduling instead of setInterval to prevent overlap. Add guards to skip execution if the previous run hasn't completed.",
       reference: "JavaScript Timer Best Practices",
+      suggestedFix: "Replace setInterval with controlled scheduling: async function poll() { await doWork(); setTimeout(poll, interval); } poll(); — prevents overlapping executions.",
     });
   }
 
@@ -141,6 +145,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       description: "API endpoints found but no 429 status code or rate limiting middleware detected. Without rate limiting responses, clients have no feedback mechanism to back off.",
       recommendation: "Return 429 status with Retry-After header when rate limits are exceeded. Include rate limit headers (X-RateLimit-Remaining, X-RateLimit-Reset) in all responses.",
       reference: "RFC 6585: 429 Too Many Requests / IETF Rate Limiting Headers",
+      suggestedFix: "Return 429 responses: if (isRateLimited) { res.status(429).set('Retry-After', '60').json({ error: 'Too many requests', retryAfter: 60 }); }",
     });
   }
 

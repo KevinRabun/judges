@@ -174,6 +174,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "API endpoints are defined without any visible authentication middleware. Any client can access these endpoints without proving their identity.",
       recommendation: "Apply authentication middleware to routes that require it. Use app.use(authMiddleware) for global protection or per-route middleware for selective protection.",
       reference: "OWASP API Security Top 10: API2 — Broken Authentication",
+      suggestedFix: "Add auth middleware globally or per-route: app.use(authenticateJWT); or app.get('/api/data', authenticateJWT, handler).",
     });
   }
 
@@ -218,6 +219,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "No role or permission checks found. Without authorization, any authenticated user could access any resource, including admin functions.",
       recommendation: "Implement role-based access control (RBAC) or attribute-based access control (ABAC). Check permissions at each endpoint or resource access.",
       reference: "OWASP API Security Top 10: API5 — Broken Function Level Authorization",
+      suggestedFix: "Add role-based middleware: const requireRole = (role) => (req, res, next) => { if (req.user.role !== role) return res.status(403).json({ error: 'Forbidden' }); next(); };",
     });
   }
 
@@ -233,6 +235,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "JWT tokens are being created but no verification logic is visible. Tokens could be tampered with or forged without the server detecting it.",
       recommendation: "Always verify JWT tokens on every request: check signature, expiration (exp), issuer (iss), and audience (aud).",
       reference: "RFC 7519: JWT / OWASP JWT Cheat Sheet",
+      suggestedFix: "Add JWT verification: const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'], issuer: 'myapp', audience: 'myapp' });",
     });
   }
 
@@ -263,6 +266,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "Session middleware is used without visible expiration settings. Sessions that never expire allow stolen session tokens to be used indefinitely.",
       recommendation: "Set session maxAge (e.g., 30 minutes for sensitive apps). Implement idle timeout. Invalidate sessions on password change or logout.",
       reference: "OWASP Session Management Cheat Sheet",
+      suggestedFix: "Set session expiry: app.use(session({ cookie: { maxAge: 30 * 60 * 1000 }, rolling: true })); and invalidate sessions on password change.",
     });
   }
 
@@ -277,6 +281,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "User registration logic without visible password policy. Users can set weak passwords like '123456' or 'password', which are trivially guessable.",
       recommendation: "Enforce minimum password length (12+ chars), check against known breached passwords (HaveIBeenPwned API), and use a strength estimator like zxcvbn.",
       reference: "NIST 800-63b / OWASP Password Guidelines",
+      suggestedFix: "Enforce password policy: if (password.length < 12) throw new Error('Min 12 chars'); and check against breached passwords via the HaveIBeenPwned API.",
     });
   }
 
@@ -291,6 +296,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "Login logic without account lockout or rate limiting. Attackers can brute-force passwords by trying unlimited login attempts.",
       recommendation: "Implement progressive delays or temporary lockout after 5-10 failed attempts. Use rate limiting on login endpoints. Consider CAPTCHA for repeated failures.",
       reference: "OWASP Brute Force Prevention / CWE-307",
+      suggestedFix: "Add rate limiting and lockout: after 5 failed attempts, lock the account for 15 minutes. Use express-rate-limit on the login endpoint.",
     });
   }
 
@@ -322,6 +328,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "POST endpoints with session-based auth but no CSRF tokens. Attackers can craft pages that submit forms on behalf of authenticated users.",
       recommendation: "Use CSRF tokens (csurf middleware, Django CSRF, Rails authenticity_token). Set SameSite=Strict on cookies. Use custom headers for API calls.",
       reference: "OWASP CSRF Prevention Cheat Sheet / CWE-352",
+      suggestedFix: "Add CSRF middleware: app.use(csrf({ cookie: { sameSite: 'strict' } })); and include the token in forms: <input type='hidden' name='_csrf' value='{{csrfToken}}'>.",
     });
   }
 
@@ -337,6 +344,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "Login handler uses sessions but does not regenerate the session ID after successful authentication. This enables session fixation attacks where an attacker pre-sets the session ID.",
       recommendation: "Call req.session.regenerate() (Express), session.cycle() (Phoenix), or equivalent immediately after successful login. This invalidates the pre-authentication session ID.",
       reference: "OWASP Session Fixation — CWE-384",
+      suggestedFix: "Regenerate session after login: req.session.regenerate((err) => { req.session.userId = user.id; res.redirect('/dashboard'); });",
     });
   }
 
@@ -352,6 +360,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       description: "Authentication or sensitive operation flow with no references to multi-factor authentication. Password-only auth is insufficient for protecting high-value operations.",
       recommendation: "Implement or integrate MFA (TOTP, WebAuthn, SMS). At minimum, support optional MFA for users and require it for admin/sensitive operations. Consider FIDO2/WebAuthn for phishing-resistant auth.",
       reference: "NIST 800-63B / OWASP MFA Cheat Sheet",
+      suggestedFix: "Integrate TOTP-based MFA: const verified = speakeasy.totp.verify({ secret: user.mfaSecret, token: req.body.totpCode }); and require MFA for admin and sensitive operations.",
     });
   }
 

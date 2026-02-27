@@ -38,6 +38,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       recommendation:
         "Remove override phrases and explicitly preserve policy hierarchy (system > developer > user > project/task).",
       reference: "Prompt Injection & Instruction Hierarchy Safety",
+      suggestedFix: "Remove phrases like 'ignore previous instructions' and add an explicit hierarchy header: ## Instruction Priority\n1. System policy (immutable)\n2. Developer rules\n3. User instructions\n4. Task context.",
     });
   }
 
@@ -53,6 +54,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       recommendation:
         "Add a dedicated hierarchy section describing precedence and conflict-resolution order.",
       reference: "Instruction Priority Design Best Practices",
+      suggestedFix: "Add a '## Precedence' section listing rule layers in descending priority (system > developer > user > project) with a conflict-resolution policy.",
     });
   }
 
@@ -68,6 +70,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       recommendation:
         "Define a single rule: ask only when missing information blocks safe execution; otherwise proceed with documented defaults.",
       reference: "Deterministic Agent Behavior Guidance",
+      suggestedFix: "Replace contradictory ask/never-ask directives with a single rule: 'Ask for clarification only when missing information blocks safe execution; otherwise proceed using documented defaults.'",
     });
   }
 
@@ -82,6 +85,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       recommendation:
         "Add a validation section defining when to run tests/build, and how to report failures or blockers.",
       reference: "Agent Reliability and QA Guardrails",
+      suggestedFix: "Add a '## Validation' section: 'After every code change run `npm test` and `npm run build`. Report failures before proceeding.'",
     });
   }
 
@@ -96,6 +100,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       recommendation:
         "Add explicit scope constraints to reduce unintended edits and feature creep.",
       reference: "Change Scope Governance",
+      suggestedFix: "Add a '## Scope' section listing allowed directories, file patterns, and out-of-scope areas (e.g., 'Do not modify CI configs or package.json without approval').",
     });
   }
 
@@ -110,6 +115,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       recommendation:
         "Add explicit refusal and safety-handling guidance for harmful or policy-violating requests.",
       reference: "AI Safety Policy Design",
+      suggestedFix: "Add a '## Safety' section: 'Refuse harmful, hateful, or privacy-violating requests. Never generate credentials or PII. Respond with a safe refusal message when policy is violated.'",
     });
   }
 
@@ -124,6 +130,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       recommendation:
         "Use headings and short sections (scope, hierarchy, validation, safety, ambiguity handling).",
       reference: "Documentation Structure Best Practices",
+      suggestedFix: "Structure the document with markdown headings: ## Scope, ## Hierarchy, ## Validation, ## Safety, ## Ambiguity Handling — each containing concise, actionable rules.",
     });
   }
 
@@ -140,6 +147,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       recommendation:
         "Define explicit sandboxing requirements: which directories are writable, which commands are allowed, network access restrictions, and resource limits.",
       reference: "Agent Capability Isolation / Principle of Least Privilege",
+      suggestedFix: "Add sandboxing requirements: specify writable directories, allowlisted commands, network access restrictions, and resource limits (CPU, memory, time).",
     });
   }
 
@@ -156,6 +164,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       recommendation:
         "For each tool/action, define parameter types, allowed values/ranges, required vs optional fields, and any validation rules that must be applied before execution.",
       reference: "MCP Tool Schema Best Practices / Input Validation",
+      suggestedFix: "For each tool definition, add parameter schemas with types, allowed values/ranges, required vs optional flags, and validation rules (e.g., 'filePath: string, must be relative, no ../ traversal').",
     });
   }
 
@@ -172,6 +181,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       recommendation:
         "Define explicit termination conditions: maximum iterations, time budget, token/cost limits, success criteria, and a fallback action when limits are reached.",
       reference: "Agentic Loop Safety / Resource Governance",
+      suggestedFix: "Add termination guards: 'Maximum 10 iterations per task. Stop after 5 minutes or 50k tokens. On limit: summarize progress, save state, and yield to user.'",
     });
   }
 

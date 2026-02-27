@@ -54,6 +54,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       description: "Server code without a global error handler. Unhandled errors will crash the process or return raw stack traces to clients.",
       recommendation: "Add Express error middleware (app.use((err, req, res, next) => { ... })), process.on('uncaughtException'), and process.on('unhandledRejection') handlers.",
       reference: "Express Error Handling / Node.js Best Practices",
+      suggestedFix: "Add global error middleware: app.use((err, req, res, next) => { logger.error(err); res.status(500).json({ error: 'Internal error' }); }); and process.on('unhandledRejection', handler).",
     });
   }
 
@@ -69,6 +70,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: genericErrorLines,
       recommendation: "Return structured error responses with error codes, human-readable messages, and suggested actions. Use a consistent error response schema.",
       reference: "RFC 7807 (Problem Details for HTTP APIs)",
+      suggestedFix: "Return structured errors: res.status(400).json({ type: 'validation_error', title: 'Invalid input', detail: 'Field email is required', instance: req.path }).",
     });
   }
 
@@ -85,6 +87,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       description: `Found ${asyncMatches} async function(s) but no try/catch blocks. Unhandled promise rejections can crash the process in Node.js.`,
       recommendation: "Wrap async operations in try/catch or use .catch() on promises. Consider a global unhandledRejection handler as a safety net.",
       reference: "Node.js Unhandled Rejections / Async Error Handling",
+      suggestedFix: "Wrap async handlers: async function handler(req, res) { try { ... } catch (error) { next(error); } } or use an asyncHandler wrapper middleware.",
     });
   }
 
@@ -100,6 +103,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       description: "Code uses callbacks but doesn't appear to check for errors. In Node.js, the error-first callback pattern requires checking the error parameter.",
       recommendation: "Always check the error parameter first in callbacks: if (err) { return handleError(err); }",
       reference: "Node.js Error-First Callbacks",
+      suggestedFix: "Add error-first check: function callback(err, result) { if (err) { return handleError(err); } // proceed with result }.",
     });
   }
 
@@ -131,6 +135,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: processExitLines,
       recommendation: "Use proper error propagation instead of process.exit(). In HTTP servers, return error responses. Let the process shutdown gracefully.",
       reference: "Node.js Graceful Shutdown Best Practices",
+      suggestedFix: "Replace process.exit() with graceful shutdown: server.close(() => { db.disconnect().then(() => process.exit(0)); }); and propagate errors via throw or return.",
     });
   }
 
@@ -146,6 +151,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: catchRethrowLines,
       recommendation: "Either add context when rethrowing (new Error('context', { cause: err })) or remove the try/catch entirely and let the error propagate naturally.",
       reference: "Error Handling Best Practices / Error Wrapping",
+      suggestedFix: "Add context when rethrowing: throw new Error('Failed to process order', { cause: err }); or remove the redundant try/catch entirely.",
     });
   }
 
@@ -161,6 +167,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: swallowedLines,
       recommendation: "After logging, rethrow the error, return an error response, or propagate the failure to the caller. Silent failures are as dangerous as empty catch blocks.",
       reference: "Error Handling Patterns / Don't Swallow Errors",
+      suggestedFix: "After logging, propagate the failure: catch (error) { logger.error(error); throw error; } or return an error response to the caller.",
     });
   }
 
@@ -177,6 +184,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: errorRespLines.slice(0, 5),
       recommendation: "Include a machine-readable error code in responses: { code: 'VALIDATION_ERROR', message: '...' }. Use RFC 7807 Problem Details format.",
       reference: "RFC 7807: Problem Details for HTTP APIs",
+      suggestedFix: "Add machine-readable error codes: res.status(422).json({ code: 'VALIDATION_FAILED', message: '...', details: [...] }).",
     });
   }
 
@@ -192,6 +200,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       description: `Found ${consoleErrorLines.length} console.error call(s) with no error reporting service. Console output is transient — errors won't be tracked, aggregated, or alerted on.`,
       recommendation: "Integrate an error reporting service (Sentry, Bugsnag, Application Insights). These provide aggregation, alerting, and stack trace analysis.",
       reference: "Error Monitoring Best Practices",
+      suggestedFix: "Integrate an error reporting service: Sentry.captureException(error) or appInsights.trackException({ exception: error }) for aggregation and alerting.",
     });
   }
 
@@ -235,6 +244,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       lineNumbers: stackExposureLines,
       recommendation: "Never send raw error objects to clients. Return a generic error message with a correlation ID. Log the full error server-side. Use environment checks to show details only in development.",
       reference: "CWE-209: Information Exposure Through Error Messages",
+      suggestedFix: "Return a generic message with correlation ID: res.status(500).json({ error: 'Internal error', correlationId: req.id }); and log the full error server-side.",
     });
   }
 

@@ -68,6 +68,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logBodyLines,
       recommendation: "Log only necessary metadata (method, URL, status, duration). If body logging is needed, implement a whitelist of safe fields and redact everything else.",
       reference: "Log Sanitization Best Practices",
+      suggestedFix: "Log safe fields only: const safeBody = pick(req.body, ['action', 'timestamp']); logger.info({ method: req.method, url: req.url, body: safeBody });",
     });
   }
 
@@ -98,6 +99,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       description: `Found ${consoleLogCount} console.log statements. Console.log has no built-in redaction, log level filtering, or structured output — making it impossible to automatically strip sensitive data.`,
       recommendation: "Use a structured logging library (pino, winston) that supports field-level redaction, log level filtering, and structured output for automated sensitivity scanning.",
       reference: "Structured Logging / Log Redaction Patterns",
+      suggestedFix: "Use pino with redaction: import pino from 'pino'; const logger = pino({ redact: ['req.headers.authorization', '*.password', '*.ssn'] });",
     });
   }
 
@@ -113,6 +115,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logConcatLines.slice(0, 5),
       recommendation: "Use structured logging with named fields: logger.info({ userId, action }, 'User action performed'). This allows automated redaction of specific fields.",
       reference: "Structured Logging Best Practices",
+      suggestedFix: "Replace concatenation with structured fields: instead of console.log('User ' + id + ' did ' + action), use logger.info({ userId: id, action }, 'User action performed');",
     });
   }
 
@@ -128,6 +131,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logIpLines,
       recommendation: "Anonymize IP addresses in logs (truncate last octet for IPv4, mask prefix for IPv6). If full IP is needed for security, ensure log retention complies with privacy policy.",
       reference: "GDPR Recital 30: IP Addresses as Personal Data",
+      suggestedFix: "Anonymize IPs: function anonymizeIp(ip) { return ip.replace(/\\d+$/, '0'); } logger.info({ ip: anonymizeIp(req.ip) });",
     });
   }
 
@@ -143,6 +147,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
       lineNumbers: logQueryLines,
       recommendation: "Log query templates without parameter values. Use parameterized query logging that replaces bind values with placeholders. Redact sensitive column values.",
       reference: "Database Logging Privacy / OWASP Logging Cheat Sheet",
+      suggestedFix: "Log queries safely: logger.info({ query: 'SELECT * FROM users WHERE id = $1', paramCount: params.length }); // never log actual parameter values.",
     });
   }
 

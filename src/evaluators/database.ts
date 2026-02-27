@@ -36,6 +36,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       lineNumbers: selectStarLines,
       recommendation: "Select only the columns you need: SELECT id, name, email FROM users. This reduces network transfer, memory usage, and improves query plan optimization.",
       reference: "SQL Performance Best Practices",
+      suggestedFix: "Replace SELECT * with explicit columns: SELECT id, name, email FROM users WHERE active = true; — reduces data transfer and enables index-only scans.",
     });
   }
 
@@ -87,6 +88,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       description: "Database connection created without visible connection pooling. Creating a new connection per request is expensive and unsustainable under load.",
       recommendation: "Use connection pooling (e.g., pg.Pool, mysql2.createPool, mongoose connection pooling). Configure pool size based on expected concurrent connections.",
       reference: "Database Connection Pooling Best Practices",
+      suggestedFix: "Use connection pool: const pool = new Pool({ max: 20, idleTimeoutMillis: 30000 }); const client = await pool.connect(); try { ... } finally { client.release(); }",
     });
   }
 
@@ -102,6 +104,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       lineNumbers: rawSqlLines.slice(0, 5),
       recommendation: "Consider using a query builder (Knex, Prisma, Drizzle, SQLAlchemy) or ORM for type safety, parameterization, and database portability.",
       reference: "ORM vs Raw SQL Best Practices",
+      suggestedFix: "Use a query builder: const users = await knex('users').select('id', 'name').where({ active: true }); — provides parameterization and type safety.",
     });
   }
 
@@ -116,6 +119,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       description: "Data is modified (INSERT/UPDATE/DELETE) without transaction wrappers. If an error occurs mid-operation, data could be left in an inconsistent state.",
       recommendation: "Wrap multi-step data mutations in transactions. Use BEGIN/COMMIT/ROLLBACK or ORM transaction APIs to ensure atomicity.",
       reference: "ACID Properties / Database Transaction Best Practices",
+      suggestedFix: "Wrap mutations in transaction: await db.transaction(async (trx) => { await trx('orders').insert(order); await trx('inventory').decrement('qty', 1); });",
     });
   }
 
@@ -162,6 +166,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       description: "DDL statements (CREATE TABLE, ALTER TABLE) found without migration tooling. Manual schema changes are unreproducible and error-prone across environments.",
       recommendation: "Use a database migration tool (Prisma, Knex, Flyway, Alembic) to version schema changes. Migrations should be idempotent and reversible.",
       reference: "Database Migration Best Practices / Evolutionary Database Design",
+      suggestedFix: "Use migration tool: npx prisma migrate dev --name add_users_table; or knex migrate:make create_users — version-controlled, reversible schema changes.",
     });
   }
 
@@ -176,6 +181,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       description: "SQL queries filter on columns but no index creation is visible. Without indexes, queries perform full table scans which degrade exponentially with data volume.",
       recommendation: "Create indexes on columns used in WHERE, JOIN, and ORDER BY clauses. Monitor slow query logs. Use EXPLAIN to verify query plans.",
       reference: "SQL Indexing Best Practices / Use The Index, Luke!",
+      suggestedFix: "Add indexes: CREATE INDEX idx_users_email ON users(email); CREATE INDEX idx_orders_user_date ON orders(user_id, created_at); use EXPLAIN to verify.",
     });
   }
 
