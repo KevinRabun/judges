@@ -192,5 +192,47 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
     });
   }
 
+  // Promise .then() chains without .catch()
+  const thenWithoutCatch: number[] = [];
+  const cLines = code.split("\n");
+  cLines.forEach((line, i) => {
+    if (/\.then\s*\(/i.test(line) && thenWithoutCatch.length < 10) {
+      const context = cLines.slice(i, Math.min(cLines.length, i + 6)).join("\n");
+      if (!/\.catch\s*\(|\.finally\s*\(/.test(context)) {
+        // Also check preceding lines for await (which handles rejection differently)
+        const precedingContext = cLines.slice(Math.max(0, i - 2), i + 1).join("\n");
+        if (!/\bawait\b/.test(precedingContext)) {
+          thenWithoutCatch.push(i + 1);
+        }
+      }
+    }
+  });
+  if (thenWithoutCatch.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Promise .then() chain without .catch()",
+      description: `Found ${thenWithoutCatch.length} Promise .then() chain(s) without a .catch() handler. Unhandled promise rejections crash Node.js processes and cause silent failures in browsers.`,
+      lineNumbers: thenWithoutCatch,
+      recommendation: "Always add .catch() at the end of Promise chains, or refactor to async/await with try/catch. Enable the 'no-floating-promises' ESLint rule.",
+      reference: "Node.js Unhandled Rejections / CWE-755",
+    });
+  }
+
+  // Stack trace or full error object sent to client
+  const stackExposurePattern = /(?:res\.(?:json|send|status)\s*\(.*(?:\.stack|err\b|error\b)\s*\)|\.json\s*\(\s*(?:err|error)\s*\)|\.send\s*\(\s*(?:err|error)\s*\))/gi;
+  const stackExposureLines = getLineNumbers(code, stackExposurePattern);
+  if (stackExposureLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Stack trace or error internals exposed to client",
+      description: `Found ${stackExposureLines.length} location(s) where error objects or stack traces may be sent directly in HTTP responses. This leaks internal file paths, library versions, and system details to attackers.`,
+      lineNumbers: stackExposureLines,
+      recommendation: "Never send raw error objects to clients. Return a generic error message with a correlation ID. Log the full error server-side. Use environment checks to show details only in development.",
+      reference: "CWE-209: Information Exposure Through Error Messages",
+    });
+  }
+
   return findings;
 }

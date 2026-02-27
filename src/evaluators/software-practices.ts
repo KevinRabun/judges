@@ -321,5 +321,20 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
     });
   }
 
+  // Retry logic without exponential backoff
+  const hasRetry = /retry|retries|maxRetries|retryCount|attempts|maxAttempts/gi.test(code);
+  const hasFixedDelay = /(?:setTimeout|sleep|delay|wait)\s*\(\s*(?:\w+,\s*)?\d{3,5}\s*\)/gi.test(code);
+  const hasBackoff = /(?:exponential|backoff|jitter|Math\.pow.*(?:retry|attempt)|Math\.random\s*\(\s*\).*delay|\*\s*2\s*\*|\*\*\s*(?:attempt|retry|count)|<<\s*\w*retry)/gi.test(code);
+  if (hasRetry && hasFixedDelay && !hasBackoff) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Retry logic without exponential backoff",
+      description: "Retry logic uses fixed delays between attempts. Under load, all retries fire simultaneously (thundering herd), overwhelming the downstream service and causing cascading failures.",
+      recommendation: "Use exponential backoff with jitter: delay = baseDelay * 2^attempt + random(0, baseDelay). Libraries like p-retry, retry, or Polly handle this automatically.",
+      reference: "Exponential Backoff / AWS Best Practices for Retry",
+    });
+  }
+
   return findings;
 }

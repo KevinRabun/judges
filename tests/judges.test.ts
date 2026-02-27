@@ -1911,3 +1911,246 @@ app.listen(3000);
     assert.ok(debugFindings.length > 0, "Expected AICS-004 for debug mode enabled");
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Cybersecurity Enhanced Rules (NoSQL injection, mass assignment, etc.)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Cybersecurity Enhanced Rules", () => {
+  it("should detect NoSQL injection via direct req.body passthrough", () => {
+    const judge = getJudge("cybersecurity");
+    assert.ok(judge, "cybersecurity judge should exist");
+
+    const nosqlCode = `
+app.post("/users", async (req, res) => {
+  const user = await User.findOne(req.body);
+  const docs = await db.collection("users").find(req.query).toArray();
+  res.json(user);
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, nosqlCode, "typescript");
+    const nosql = evaluation.findings.filter((f) => f.title.includes("NoSQL injection"));
+    assert.ok(nosql.length > 0, "Expected NoSQL injection finding for direct req.body passthrough");
+  });
+
+  it("should detect mass assignment via raw req.body to ORM", () => {
+    const judge = getJudge("cybersecurity");
+    assert.ok(judge, "cybersecurity judge should exist");
+
+    const massAssignCode = `
+app.post("/users", async (req, res) => {
+  const user = await User.create(req.body);
+  await Profile.findByIdAndUpdate(profileId, req.body);
+  res.status(201).json(user);
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, massAssignCode, "typescript");
+    const massAssign = evaluation.findings.filter((f) => f.title.includes("Mass assignment"));
+    assert.ok(massAssign.length > 0, "Expected mass assignment finding for raw req.body to ORM");
+  });
+
+  it("should detect cloud metadata endpoint references", () => {
+    const judge = getJudge("cybersecurity");
+    assert.ok(judge, "cybersecurity judge should exist");
+
+    const metadataCode = `
+async function getInstanceRole() {
+  const response = await fetch("http://169.254.169.254/latest/meta-data/iam/security-credentials/");
+  return response.json();
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, metadataCode, "typescript");
+    const metadata = evaluation.findings.filter((f) => f.title.includes("Cloud metadata"));
+    assert.ok(metadata.length > 0, "Expected cloud metadata endpoint reference finding");
+  });
+
+  it("should detect insecure ECB encryption mode", () => {
+    const judge = getJudge("cybersecurity");
+    assert.ok(judge, "cybersecurity judge should exist");
+
+    const ecbCode = `
+const crypto = require("crypto");
+const cipher = crypto.createCipheriv("aes-256-ecb", key, null);
+const encrypted = cipher.update(data, "utf8", "hex") + cipher.final("hex");
+`;
+    const evaluation = evaluateWithJudge(judge!, ecbCode, "typescript");
+    const ecb = evaluation.findings.filter((f) => f.title.includes("ECB"));
+    assert.ok(ecb.length > 0, "Expected insecure ECB encryption mode finding");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Error Handling Enhanced Rules
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Error Handling Enhanced Rules", () => {
+  it("should detect .then() without .catch()", () => {
+    const judge = getJudge("error-handling");
+    assert.ok(judge, "error-handling judge should exist");
+
+    const thenCode = `
+function loadData() {
+  fetch("/api/users")
+    .then((res) => res.json())
+    .then((data) => renderUsers(data));
+}
+
+function loadMore() {
+  fetch("/api/items")
+    .then((res) => res.json())
+    .then((items) => renderItems(items));
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, thenCode, "typescript");
+    const thenNoCatch = evaluation.findings.filter((f) => f.title.includes(".then()") && f.title.includes(".catch()"));
+    assert.ok(thenNoCatch.length > 0, "Expected .then() without .catch() finding");
+  });
+
+  it("should detect stack trace exposure to clients", () => {
+    const judge = getJudge("error-handling");
+    assert.ok(judge, "error-handling judge should exist");
+
+    const stackCode = `
+app.get("/api/data", async (req, res) => {
+  try {
+    const data = await fetchData();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json(err);
+  }
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, stackCode, "typescript");
+    const stackExposure = evaluation.findings.filter((f) => f.title.includes("Stack trace") || f.title.includes("error internals"));
+    assert.ok(stackExposure.length > 0, "Expected stack trace exposure finding");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Data Security Enhanced Rules
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Data Security Enhanced Rules", () => {
+  it("should detect secrets in URL query parameters", () => {
+    const judge = getJudge("data-security");
+    assert.ok(judge, "data-security judge should exist");
+
+    const secretUrlCode = `
+const apiUrl = "https://api.stripe.com/v1/charges?api_key=sk_live_abc123def456";
+const response = await fetch(apiUrl);
+`;
+    const evaluation = evaluateWithJudge(judge!, secretUrlCode, "typescript");
+    const secretUrl = evaluation.findings.filter((f) => f.title.includes("Secret") && f.title.includes("URL"));
+    assert.ok(secretUrl.length > 0, "Expected secret-in-URL finding");
+  });
+
+  it("should detect sensitive data in error messages", () => {
+    const judge = getJudge("data-security");
+    assert.ok(judge, "data-security judge should exist");
+
+    const sensitiveErrorCode = `
+function authenticate(email: string, password: string) {
+  const user = findUser(email);
+  if (!user || user.password !== hash(password)) {
+    throw new Error("Invalid password for user " + email + " with token " + user?.token);
+  }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, sensitiveErrorCode, "typescript");
+    const sensitiveErr = evaluation.findings.filter((f) => f.title.includes("Sensitive data") && f.title.includes("error"));
+    assert.ok(sensitiveErr.length > 0, "Expected sensitive-data-in-error finding");
+  });
+
+  it("should detect logging raw request bodies", () => {
+    const judge = getJudge("data-security");
+    assert.ok(judge, "data-security judge should exist");
+
+    const logCode = `
+app.post("/register", (req, res) => {
+  console.log("Registration request:", req.body);
+  logger.info("Incoming data:", req.body);
+  const user = createUser(req.body);
+  res.json(user);
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, logCode, "typescript");
+    const logBody = evaluation.findings.filter((f) => f.title.includes("Logging raw"));
+    assert.ok(logBody.length > 0, "Expected logging-raw-body finding");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Authentication Enhanced Rules
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Authentication Enhanced Rules", () => {
+  it("should detect missing session regeneration after login", () => {
+    const judge = getJudge("authentication");
+    assert.ok(judge, "authentication judge should exist");
+
+    const sessionFixCode = `
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  const user = await User.findOne({ email });
+  const valid = await bcrypt.compare(password, user.password);
+  if (valid) {
+    req.session.user = user;
+    req.session.isAuthenticated = true;
+    res.redirect("/dashboard");
+  } else {
+    res.status(401).send("Invalid credentials");
+  }
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, sessionFixCode, "typescript");
+    const sessionFix = evaluation.findings.filter((f) => f.title.includes("session regeneration"));
+    assert.ok(sessionFix.length > 0, "Expected session fixation finding for missing session.regenerate()");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Dependency Health Enhanced Rules
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Dependency Health Enhanced Rules", () => {
+  it("should detect potential typosquatting package imports", () => {
+    const judge = getJudge("dependency-health");
+    assert.ok(judge, "dependency-health judge should exist");
+
+    const typosquatCode = `
+import axois from "axois";
+import { debounce } from "lod-ash";
+const expresss = require("expresss");
+`;
+    const evaluation = evaluateWithJudge(judge!, typosquatCode, "typescript");
+    const typosquat = evaluation.findings.filter((f) => f.title.includes("typosquatting"));
+    assert.ok(typosquat.length > 0, "Expected typosquatting package finding");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Software Practices Enhanced Rules
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Software Practices Enhanced Rules", () => {
+  it("should detect retry without exponential backoff", () => {
+    const judge = getJudge("software-practices");
+    assert.ok(judge, "software-practices judge should exist");
+
+    const retryCode = `
+async function fetchWithRetry(url: string, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fetch(url);
+    } catch (err) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, retryCode, "typescript");
+    const retryBackoff = evaluation.findings.filter((f) => f.title.includes("Retry") && f.title.includes("backoff"));
+    assert.ok(retryBackoff.length > 0, "Expected retry-without-backoff finding");
+  });
+});

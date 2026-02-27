@@ -208,5 +208,46 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
     });
   }
 
+  // Potential typosquatting — misspelled popular package names
+  const typosquatTargets: Record<string, string[]> = {
+    lodash: ["lod-ash", "lodashs", "lodahs", "1odash", "lodash-utils"],
+    axios: ["axois", "axio", "axxios", "axioss", "axious"],
+    express: ["expresss", "expres", "xpress", "exress"],
+    react: ["reacrt", "raect", "reactt", "reakt"],
+    mongoose: ["mongose", "mongoosse", "mongooes", "mongoos"],
+    chalk: ["chalks", "chalkk", "chalck"],
+    commander: ["comander", "commanderr", "comanderr"],
+    dotenv: ["dotnev", "dotenvs", "dotenev"],
+    webpack: ["webpackk", "weback", "webpac"],
+    "cross-env": ["crossenv", "cross-envv"],
+    "event-stream": ["event-streams", "events-stream", "eventstream"],
+    colors: ["colour", "colorsss"],
+  };
+  const typosquatLines: number[] = [];
+  const typosquatNames: string[] = [];
+  lines.forEach((line, i) => {
+    const match = line.match(/(?:require\s*\(\s*["']|from\s+["'])([^"'/]+)["']/);
+    if (match) {
+      const pkg = match[1].toLowerCase();
+      for (const [legit, squats] of Object.entries(typosquatTargets)) {
+        if (squats.includes(pkg)) {
+          typosquatLines.push(i + 1);
+          typosquatNames.push(`"${pkg}" (likely meant "${legit}")`);
+        }
+      }
+    }
+  });
+  if (typosquatLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "critical",
+      title: "Potential typosquatting package import",
+      description: `Suspicious package name(s) detected: ${typosquatNames.join(", ")}. Typosquatting attacks publish malicious packages with names similar to popular ones to steal credentials, inject backdoors, or mine cryptocurrency.`,
+      lineNumbers: typosquatLines,
+      recommendation: "Verify the package name is correct. Use 'npm info <package>' to check if it's a legitimate package. Enable npm audit and consider using Socket.dev or Snyk for supply chain monitoring.",
+      reference: "Supply Chain Attack — Typosquatting / CWE-1357",
+    });
+  }
+
   return findings;
 }

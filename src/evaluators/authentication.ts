@@ -320,5 +320,35 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
     });
   }
 
+  // Session fixation — no session regeneration after login
+  const hasLoginHandler = /(?:login|signin|sign.?in|authenticate)\s*(?:=|=>|\(|async)|(?:\.post|\.get|\.put)\s*\(\s*["'][^"']*(?:login|signin|sign.?in|auth)["']/gi.test(code);
+  const hasSessionUsage = /req\.session|session\[|session\./gi.test(code);
+  const hasSessionRegen = /session\.regenerate|regenerateSession|session\.cycle|rotate.*session|new.*session|session\.create/gi.test(code);
+  if (hasLoginHandler && hasSessionUsage && !hasSessionRegen && code.split("\n").length > 10) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "No session regeneration after authentication",
+      description: "Login handler uses sessions but does not regenerate the session ID after successful authentication. This enables session fixation attacks where an attacker pre-sets the session ID.",
+      recommendation: "Call req.session.regenerate() (Express), session.cycle() (Phoenix), or equivalent immediately after successful login. This invalidates the pre-authentication session ID.",
+      reference: "OWASP Session Fixation — CWE-384",
+    });
+  }
+
+  // No MFA/2FA consideration in authentication flows
+  const hasAuthFlow = /(?:login|signin|sign.?in|authenticate|password.*reset|change.*password)\s*(?:\(|=>|=|async)|(?:\.post|\.get|\.put)\s*\(\s*["'][^"']*(?:login|signin|sign.?in|auth|password)["']/gi.test(code);
+  const hasProtectedOps = /(?:transfer|payment|withdraw|approve|delete.*account|change.*email|wire|payout)/gi.test(code);
+  const hasMfa = /(?:mfa|2fa|two.?factor|totp|otp|authenticator|verification.?code|sms.?code|security.?code|second.?factor)/gi.test(code);
+  if ((hasAuthFlow || hasProtectedOps) && !hasMfa && code.split("\n").length > 40) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "No MFA/2FA consideration in authentication flow",
+      description: "Authentication or sensitive operation flow with no references to multi-factor authentication. Password-only auth is insufficient for protecting high-value operations.",
+      recommendation: "Implement or integrate MFA (TOTP, WebAuthn, SMS). At minimum, support optional MFA for users and require it for admin/sensitive operations. Consider FIDO2/WebAuthn for phishing-resistant auth.",
+      reference: "NIST 800-63B / OWASP MFA Cheat Sheet",
+    });
+  }
+
   return findings;
 }

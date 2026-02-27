@@ -361,5 +361,69 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       reference: "CWE-319: Cleartext Transmission of Sensitive Information",
     });
   }
+
+  // NoSQL injection via direct user input in database queries
+  const nosqlDirectPattern = /(?:\.find|\.findOne|\.deleteOne|\.deleteMany|\.updateOne|\.updateMany|\.aggregate|\.countDocuments)\s*\(\s*(?:req\.body|req\.query|request\.body|request\.json|request\.data)/gi;
+  const nosqlDirectLines = getLineNumbers(code, nosqlDirectPattern);
+  if (nosqlDirectLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "critical",
+      title: "NoSQL injection via unsanitized user input",
+      description: "Database query methods receive raw request body/query parameters directly. Attackers can inject MongoDB operators ($gt, $ne, $regex) to bypass authentication or exfiltrate data.",
+      lineNumbers: nosqlDirectLines,
+      recommendation: "Never pass req.body or req.query directly to database queries. Validate and sanitize input fields individually. Use a schema validator (Joi, Zod) or ORM methods that parameterize queries.",
+      reference: "OWASP NoSQL Injection — CWE-943",
+    });
+  }
+
+  // Mass assignment / over-posting — passing raw request body to ORM create/update
+  const massAssignPattern = /(?:\.create|\.update|\.findOneAndUpdate|\.findByIdAndUpdate|\.insertOne|Object\.assign)\s*\(\s*(?:.*,\s*)?(?:req\.body|request\.body|request\.data|request\.json)/gi;
+  const massAssignLines = getLineNumbers(code, massAssignPattern);
+  if (massAssignLines.length > 0) {
+    const hasFieldWhitelist = /(?:pick|allowedFields|whitelist|permit|only|pluck|select)\s*\(|\{\s*\w+\s*:\s*req\.body\.\w+/gi.test(code);
+    if (!hasFieldWhitelist) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Mass assignment via raw request body",
+        description: "Raw request body is passed directly to ORM create/update methods without field whitelisting. Attackers can set unintended fields (e.g., isAdmin, role) by including extra properties in the request.",
+        lineNumbers: massAssignLines,
+        recommendation: "Destructure only allowed fields from req.body: const { name, email } = req.body. Use DTOs, Zod schemas, or pick() utilities to whitelist fields before database operations.",
+        reference: "OWASP Mass Assignment — CWE-915",
+      });
+    }
+  }
+
+  // Cloud metadata endpoints and hardcoded internal IPs
+  const cloudMetaPattern = /169\.254\.169\.254|metadata\.google\.internal|100\.100\.100\.200/gi;
+  const cloudMetaLines = getLineNumbers(code, cloudMetaPattern);
+  if (cloudMetaLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "critical",
+      title: "Cloud metadata endpoint reference",
+      description: "Code references cloud provider metadata endpoints (169.254.169.254, metadata.google.internal). These are primary SSRF exploitation targets that can leak instance credentials and secrets.",
+      lineNumbers: cloudMetaLines,
+      recommendation: "Remove hardcoded metadata URLs. Use cloud SDK methods to retrieve credentials and metadata. Enable IMDSv2 (AWS) to require session tokens for metadata access.",
+      reference: "CWE-918: Server-Side Request Forgery (SSRF)",
+    });
+  }
+
+  // Insecure cryptographic mode (ECB)
+  const ecbPattern = /aes[_-]?\d*[_-]?ecb|AES\.MODE_ECB|CipherMode\.ECB|Cipher\.getInstance\s*\(\s*["']AES\/ECB|\.Mode\s*=\s*CipherMode\.ECB|modes\.ECB/gi;
+  const ecbLines = getLineNumbers(code, ecbPattern);
+  if (ecbLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Insecure encryption mode (ECB)",
+      description: "ECB (Electronic Codebook) mode preserves patterns in plaintext — identical blocks produce identical ciphertext, making it unsuitable for secure encryption.",
+      lineNumbers: ecbLines,
+      recommendation: "Use AES-GCM (authenticated encryption) or AES-CBC with HMAC. GCM is preferred as it provides both confidentiality and integrity. Always use a unique IV/nonce per encryption.",
+      reference: "CWE-327: Use of Broken Crypto Algorithm",
+    });
+  }
+
   return findings;
 }

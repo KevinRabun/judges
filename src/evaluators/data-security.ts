@@ -435,5 +435,72 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
     }
   }
 
+  // Secrets or tokens embedded in URL strings
+  const secretInUrlPattern = /["'`]https?:\/\/[^"'`\s]*[?&](?:api[_-]?key|token|secret|password|auth|access[_-]?token|client[_-]?secret|api[_-]?secret)=[^&"'`\s]+/gi;
+  const secretInUrlLines = getLineNumbers(code, secretInUrlPattern);
+  if (secretInUrlLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "critical",
+      title: "Secret or token embedded in URL string",
+      description: "API keys, tokens, or passwords are included as query parameters in URL strings. These appear in server logs, browser history, referer headers, and proxy logs.",
+      lineNumbers: secretInUrlLines,
+      recommendation: "Pass secrets via Authorization headers, request body, or environment variables — never as URL query parameters. Use SDK client libraries that handle auth properly.",
+      reference: "CWE-598: Use of GET Request Method With Sensitive Query Strings",
+    });
+  }
+
+  // Credentials in connection strings
+  const credInConnPattern = /["'`](?:mongodb|postgres|postgresql|mysql|redis|amqp|mssql|sqlserver):\/\/[^:]+:[^@"'`]+@/gi;
+  const credInConnLines = getLineNumbers(code, credInConnPattern);
+  if (credInConnLines.length > 0) {
+    // Filter out obvious placeholders
+    const realCredLines = credInConnLines.filter((lineNum) => {
+      const line = code.split("\n")[lineNum - 1] || "";
+      return !/(?:password|user|username|changeme|placeholder|example|your_)/i.test(line);
+    });
+    if (realCredLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Credentials embedded in database connection string",
+        description: "Database connection strings contain inline credentials. These are committed to version control and visible to anyone with repository access.",
+        lineNumbers: realCredLines,
+        recommendation: "Use environment variables for connection strings. Use cloud-managed identity (Azure Managed Identity, AWS IAM) for passwordless authentication where possible.",
+        reference: "CWE-798: Use of Hard-coded Credentials",
+      });
+    }
+  }
+
+  // Sensitive data leaked in error messages
+  const sensitiveInErrorPattern = /(?:throw\s+new\s+\w*Error|raise\s+\w*Error|new\s+\w*Exception)\s*\([^)]*(?:password|token|secret|ssn|credit.?card|api.?key|connection.?string|private.?key)/gi;
+  const sensitiveInErrorLines = getLineNumbers(code, sensitiveInErrorPattern);
+  if (sensitiveInErrorLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Sensitive data referenced in error messages",
+      description: "Error messages include references to passwords, tokens, API keys, or other sensitive data. These can leak to logs, error monitoring services, and client responses.",
+      lineNumbers: sensitiveInErrorLines,
+      recommendation: "Use generic error messages for security failures: 'Authentication failed' instead of 'Invalid password for user@email.com'. Log sensitive context server-side only at debug level.",
+      reference: "CWE-209: Information Exposure Through Error Messages",
+    });
+  }
+
+  // Logging raw request/response bodies
+  const logRawBodyPattern = /(?:console\.\w+|logger?\.\w+|log\.\w+|logging\.\w+)\s*\(.*(?:req\.body|request\.body|request\.data|request\.json|response\.data|res\.body)/gi;
+  const logRawBodyLines = getLineNumbers(code, logRawBodyPattern);
+  if (logRawBodyLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Logging raw request/response bodies",
+      description: `Found ${logRawBodyLines.length} location(s) logging entire HTTP request or response bodies. These may contain passwords, tokens, PII, credit card numbers, or health data that will be exposed in log aggregators.`,
+      lineNumbers: logRawBodyLines,
+      recommendation: "Log only specific, non-sensitive fields. Use structured logging with field-level redaction. Never log full request bodies — redact password, token, ssn, and creditCard fields.",
+      reference: "CWE-532: Information Exposure Through Log Files",
+    });
+  }
+
   return findings;
 }
