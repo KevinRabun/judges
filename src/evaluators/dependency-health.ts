@@ -145,23 +145,22 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
     }
   }
 
-  // Detect importing specific vs barrel imports
+  // Detect importing specific vs barrel imports (multi-language wildcard detection)
   const barrelImportLines: number[] = [];
+  const wildcardImportLines = getLangLineNumbers(code, language, LP.WILDCARD_IMPORT);
   lines.forEach((line, i) => {
     if (/import\s+\{[^}]{100,}\}\s+from/i.test(line)) {
       barrelImportLines.push(i + 1);
     }
-    if (/import\s+\*\s+as\s+\w+\s+from\s+["'](?!.*node_modules)/i.test(line)) {
-      barrelImportLines.push(i + 1);
-    }
   });
-  if (barrelImportLines.length > 0) {
+  const allBarrelLines = [...new Set([...barrelImportLines, ...wildcardImportLines])].sort((a, b) => a - b);
+  if (allBarrelLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
-      title: "Barrel imports may prevent tree-shaking",
-      description: "Importing everything from a barrel file or using 'import *' can prevent tree-shaking and increase bundle size.",
-      lineNumbers: barrelImportLines,
+      title: "Barrel or wildcard imports may prevent tree-shaking",
+      description: "Importing everything from a barrel file or using wildcard imports (import *, from x import *, using static *) can prevent tree-shaking and increase bundle size.",
+      lineNumbers: allBarrelLines,
       recommendation: "Import directly from specific module files instead of barrel/index files for better tree-shaking.",
       reference: "Tree Shaking / Module Bundling",
     });

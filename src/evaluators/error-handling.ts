@@ -8,19 +8,18 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   const prefix = "ERR";
   const lang = getLangFamily(language);
 
-  // Empty catch blocks
-  const emptyCatchPattern = /catch\s*\([^)]*\)\s*\{\s*\}/g;
-  const emptyCatchLines = getLineNumbers(code, emptyCatchPattern);
+  // Empty catch blocks (multi-language)
+  const emptyCatchLines = getLangLineNumbers(code, language, LP.EMPTY_CATCH);
   if (emptyCatchLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
-      title: "Empty catch block swallows errors",
-      description: `Found ${emptyCatchLines.length} empty catch block(s). Silently swallowing errors hides bugs, makes debugging impossible, and can leave the application in an inconsistent state.`,
+      title: "Empty catch/error block swallows errors",
+      description: `Found ${emptyCatchLines.length} empty error-handling block(s). Silently swallowing errors hides bugs, makes debugging impossible, and can leave the application in an inconsistent state.`,
       lineNumbers: emptyCatchLines,
       recommendation: "Log the error with context, re-throw it, or handle it meaningfully. If intentionally ignoring, add a comment explaining why.",
       reference: "ESLint no-empty / Error Handling Best Practices",
-      suggestedFix: "Add error handling: catch (error) { logger.error('Operation failed', { error }); throw error; };",
+      suggestedFix: "Add error handling: catch (error) { logger.error('Operation failed', { error }); throw error; } (JS/TS), except Exception as e: logger.error(e); raise (Python), .map_err(|e| { log::error!(\"{e}\"); e }) (Rust).",
     });
   }
 
@@ -74,20 +73,18 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
     });
   }
 
-  // Async function without try/catch or .catch
-  const asyncFuncPattern = /async\s+(?:function\s+\w+|\([^)]*\)\s*=>|\w+\s*=\s*async)/g;
-  const hasTryCatch = /try\s*\{/g;
-  const asyncMatches = code.match(asyncFuncPattern)?.length || 0;
-  const tryCatchMatches = code.match(hasTryCatch)?.length || 0;
-  if (asyncMatches > 0 && tryCatchMatches === 0) {
+  // Async function without try/catch or .catch (multi-language)
+  const asyncFuncLines = getLangLineNumbers(code, language, LP.ASYNC_FUNCTION);
+  const tryCatchLines = getLangLineNumbers(code, language, LP.TRY_CATCH);
+  if (asyncFuncLines.length > 0 && tryCatchLines.length === 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Async functions without error handling",
-      description: `Found ${asyncMatches} async function(s) but no try/catch blocks. Unhandled promise rejections can crash the process in Node.js.`,
-      recommendation: "Wrap async operations in try/catch or use .catch() on promises. Consider a global unhandledRejection handler as a safety net.",
-      reference: "Node.js Unhandled Rejections / Async Error Handling",
-      suggestedFix: "Wrap async handlers: async function handler(req, res) { try { ... } catch (error) { next(error); } } or use an asyncHandler wrapper middleware.",
+      description: `Found ${asyncFuncLines.length} async function(s) but no error-handling blocks. Unhandled async errors can crash the process or cause silent failures.`,
+      recommendation: "Wrap async operations in try/catch (JS/TS/C#/Java), try/except (Python), or check errors explicitly (Go/Rust).",
+      reference: "Async Error Handling Best Practices",
+      suggestedFix: "Wrap async handlers: try { await operation(); } catch (error) { logger.error(error); } (JS/TS), try: await operation() except Exception as e: ... (Python), if err != nil { ... } (Go).",
     });
   }
 
@@ -123,19 +120,18 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
     });
   }
 
-  // process.exit() without error handling
-  const processExitPattern = /process\.exit\s*\(/g;
-  const processExitLines = getLineNumbers(code, processExitPattern);
-  if (processExitLines.length > 0) {
+  // Abrupt process termination (multi-language: process.exit, sys.exit, panic, unwrap, etc.)
+  const panicExitLines = getLangLineNumbers(code, language, LP.PANIC_UNWRAP);
+  if (panicExitLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
-      title: "process.exit() used instead of proper error handling",
-      description: "process.exit() immediately terminates the process, skipping cleanup handlers, dropping in-flight requests, and potentially corrupting data.",
-      lineNumbers: processExitLines,
-      recommendation: "Use proper error propagation instead of process.exit(). In HTTP servers, return error responses. Let the process shutdown gracefully.",
-      reference: "Node.js Graceful Shutdown Best Practices",
-      suggestedFix: "Replace process.exit() with graceful shutdown: server.close(() => { db.disconnect().then(() => process.exit(0)); }); and propagate errors via throw or return.",
+      title: "Abrupt process termination instead of proper error handling",
+      description: `Found ${panicExitLines.length} abrupt termination call(s) (process.exit, sys.exit, panic, .unwrap). These skip cleanup handlers, drop in-flight requests, and can corrupt data.`,
+      lineNumbers: panicExitLines,
+      recommendation: "Use proper error propagation instead of abrupt termination. Return error responses in HTTP servers. Let the process shutdown gracefully.",
+      reference: "Graceful Shutdown Best Practices / CWE-705",
+      suggestedFix: "Replace abrupt exits with graceful shutdown: server.close(() => cleanup()) (JS), raise SystemExit (Python), return Err(...) instead of .unwrap() (Rust), os.Exit only in main() (Go).",
     });
   }
 

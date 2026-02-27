@@ -8,9 +8,25 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
   const prefix = "LOGPRIV";
   const lang = getLangFamily(language);
 
-  // Logging authorization/token headers
-  const logAuthPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:authorization|bearer|token|auth)/gi;
-  const logAuthLines = getLineNumbers(code, logAuthPattern);
+  // Helper: find log statement lines that contain sensitive data (multi-language)
+  const logLineSet = new Set([
+    ...getLangLineNumbers(code, language, LP.CONSOLE_LOG),
+    ...getLangLineNumbers(code, language, LP.STRUCTURED_LOG),
+  ]);
+  const codeLines = code.split("\n");
+  function getLogLinesMatching(sensitivePattern: RegExp): number[] {
+    const flagged: number[] = [];
+    for (const lineNum of logLineSet) {
+      const line = codeLines[lineNum - 1];
+      if (line && sensitivePattern.test(line)) {
+        flagged.push(lineNum);
+      }
+    }
+    return flagged;
+  }
+
+  // Logging authorization/token headers (multi-language)
+  const logAuthLines = getLogLinesMatching(/(?:authorization|bearer|token|auth)/i);
   if (logAuthLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -24,9 +40,8 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
     });
   }
 
-  // Logging passwords
-  const logPasswordPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:password|passwd|pwd|secret|credential)/gi;
-  const logPasswordLines = getLineNumbers(code, logPasswordPattern);
+  // Logging passwords (multi-language)
+  const logPasswordLines = getLogLinesMatching(/(?:password|passwd|pwd|secret|credential)/i);
   if (logPasswordLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -40,9 +55,8 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
     });
   }
 
-  // Logging PII (email, name, SSN, phone)
-  const logPiiPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:email|ssn|phone|address|name|firstName|lastName|dateOfBirth|dob|social.?security)/gi;
-  const logPiiLines = getLineNumbers(code, logPiiPattern);
+  // Logging PII (email, name, SSN, phone) (multi-language)
+  const logPiiLines = getLogLinesMatching(/(?:email|ssn|phone|address|name|firstName|lastName|dateOfBirth|dob|social.?security)/i);
   if (logPiiLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -56,9 +70,8 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
     });
   }
 
-  // Logging full request/response bodies
-  const logBodyPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:req\.body|request\.body|res\.body|response\.body|JSON\.stringify\s*\(\s*req)/gi;
-  const logBodyLines = getLineNumbers(code, logBodyPattern);
+  // Logging full request/response bodies (multi-language)
+  const logBodyLines = getLogLinesMatching(/(?:req\.body|request\.body|res\.body|response\.body|JSON\.stringify\s*\(\s*req|request\.data|request\.json)/i);
   if (logBodyLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -72,9 +85,8 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
     });
   }
 
-  // Logging financial data
-  const logFinancePattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:card.?number|credit.?card|cvv|expir|bank.?account|routing.?number|iban|swift)/gi;
-  const logFinanceLines = getLineNumbers(code, logFinancePattern);
+  // Logging financial data (multi-language)
+  const logFinanceLines = getLogLinesMatching(/(?:card.?number|credit.?card|cvv|expir|bank.?account|routing.?number|iban|swift)/i);
   if (logFinanceLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -88,24 +100,30 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
     });
   }
 
-  // Console.log used instead of proper logger (with privacy context)
-  const consoleLogCount = (code.match(/console\.(log|info|warn|error|debug)\s*\(/g) || []).length;
+  // Console.log used instead of proper logger (multi-language detection)
+  const consoleLogLines = getLangLineNumbers(code, language, LP.CONSOLE_LOG);
   const hasProperLogger = /winston|pino|bunyan|log4j|serilog|NLog|structuredLog|logger\./gi.test(code);
-  if (consoleLogCount > 3 && !hasProperLogger) {
+  const structuredLogLines = getLangLineNumbers(code, language, LP.STRUCTURED_LOG);
+  if (consoleLogLines.length > 3 && !hasProperLogger && structuredLogLines.length === 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
-      title: "Console.log lacks redaction capabilities",
-      description: `Found ${consoleLogCount} console.log statements. Console.log has no built-in redaction, log level filtering, or structured output — making it impossible to automatically strip sensitive data.`,
+      title: "Unstructured logging lacks redaction capabilities",
+      description: `Found ${consoleLogLines.length} unstructured log statement(s). Console/print logging has no built-in redaction, log level filtering, or structured output — making it impossible to automatically strip sensitive data.`,
       recommendation: "Use a structured logging library (pino, winston) that supports field-level redaction, log level filtering, and structured output for automated sensitivity scanning.",
       reference: "Structured Logging / Log Redaction Patterns",
       suggestedFix: "Use pino with redaction: import pino from 'pino'; const logger = pino({ redact: ['req.headers.authorization', '*.password', '*.ssn'] });",
     });
   }
 
-  // String concatenation in logs (prevents redaction)
-  const logConcatPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*\+/g;
-  const logConcatLines = getLineNumbers(code, logConcatPattern);
+  // String concatenation in logs
+  const logConcatLines: number[] = [];
+  for (const lineNum of logLineSet) {
+    const line = codeLines[lineNum - 1];
+    if (line && /\+/.test(line)) {
+      logConcatLines.push(lineNum);
+    }
+  }
   if (logConcatLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -119,9 +137,8 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
     });
   }
 
-  // Logging IP addresses
-  const logIpPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:ip|ipAddress|remoteAddress|x-forwarded-for|req\.ip|req\.connection\.remoteAddress)/gi;
-  const logIpLines = getLineNumbers(code, logIpPattern);
+  // Logging IP addresses (multi-language)
+  const logIpLines = getLogLinesMatching(/(?:ip|ipAddress|remoteAddress|x-forwarded-for|req\.ip|req\.connection\.remoteAddress|REMOTE_ADDR)/i);
   if (logIpLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -135,9 +152,8 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
     });
   }
 
-  // Logging database queries with parameters
-  const logQueryPattern = /console\.(?:log|info|warn|error|debug)\s*\([^)]*(?:query|sql|SELECT|INSERT|UPDATE|DELETE)/gi;
-  const logQueryLines = getLineNumbers(code, logQueryPattern);
+  // Logging database queries with parameters (multi-language)
+  const logQueryLines = getLogLinesMatching(/(?:query|sql|SELECT|INSERT|UPDATE|DELETE)/i);
   if (logQueryLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

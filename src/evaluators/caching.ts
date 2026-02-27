@@ -23,9 +23,9 @@ export function analyzeCaching(code: string, language: string): Finding[] {
     });
   }
 
-  // No caching for expensive operations
-  const hasDbQueries = /(?:db\.|query|find|findOne|findMany|execute|select)\s*\(/gi.test(code);
-  const hasFetch = /fetch\s*\(|axios\.|http\.get|request\s*\(/gi.test(code);
+  // No caching for expensive operations (multi-language)
+  const hasDbQueries = getLangLineNumbers(code, language, LP.DB_QUERY).length > 0;
+  const hasFetch = getLangLineNumbers(code, language, LP.HTTP_CLIENT).length > 0;
   const hasCaching = /cache|Cache|redis|memcache|lru|ttl|stale|expires|ETag|If-None-Match|If-Modified-Since/gi.test(code);
   if ((hasDbQueries || hasFetch) && !hasCaching && code.split("\n").length > 40) {
     findings.push({

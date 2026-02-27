@@ -163,18 +163,19 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
     });
   }
 
-  // No auth middleware on routes
-  const hasRoutes = /app\.(get|post|put|delete|patch)\s*\(\s*["'`]/gi.test(code);
-  const hasAuthMiddleware = /(?:authenticate|authorize|requireAuth|ensureAuth|isAuthenticated|verifyToken|passport\.authenticate|jwt\.verify|auth\(\)|protect|guard|requireLogin)/gi.test(code);
+  // No auth middleware on routes (multi-language)
+  const routeLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
+  const hasRoutes = routeLines.length > 0;
+  const hasAuthMiddleware = /(?:authenticate|authorize|requireAuth|ensureAuth|isAuthenticated|verifyToken|passport\.authenticate|jwt\.verify|auth\(\)|protect|guard|requireLogin|@login_required|@requires_auth|@Authorize|@PreAuthorize|@Secured)/gi.test(code);
   if (hasRoutes && !hasAuthMiddleware && code.split("\n").length > 20) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "API routes without authentication middleware",
       description: "API endpoints are defined without any visible authentication middleware. Any client can access these endpoints without proving their identity.",
-      recommendation: "Apply authentication middleware to routes that require it. Use app.use(authMiddleware) for global protection or per-route middleware for selective protection.",
+      recommendation: "Apply authentication middleware to routes that require it. Use framework-specific auth guards: Express middleware, Python decorators (@login_required), Java annotations (@PreAuthorize), or Go middleware.",
       reference: "OWASP API Security Top 10: API2 — Broken Authentication",
-      suggestedFix: "Add auth middleware globally or per-route: app.use(authenticateJWT); or app.get('/api/data', authenticateJWT, handler).",
+      suggestedFix: "Add auth middleware: app.use(authenticateJWT) (Express), @login_required (Django/Flask), @PreAuthorize (Spring), or middleware.Auth(handler) (Go).",
     });
   }
 
@@ -194,8 +195,9 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
     });
   }
 
-  // Weak password hashing
-  const weakHashLines = getWeakCredentialHashLines(code);
+  // Weak password hashing (multi-language)
+  const weakHashByLang = getLangLineNumbers(code, language, LP.WEAK_HASH);
+  const weakHashLines = weakHashByLang.length > 0 ? weakHashByLang : getWeakCredentialHashLines(code);
   if (weakHashLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -205,7 +207,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       lineNumbers: weakHashLines,
       recommendation: "Use bcrypt, scrypt, or Argon2 for password hashing. These algorithms are intentionally slow and include salt by default.",
       reference: "OWASP Password Storage Cheat Sheet / NIST 800-63b",
-      suggestedFix: "Replace with bcrypt: const hash = await bcrypt.hash(password, 12); and const valid = await bcrypt.compare(password, hash);",
+      suggestedFix: "Replace with bcrypt/argon2: bcrypt.hash(password, 12) (JS), bcrypt.hashpw(password, bcrypt.gensalt()) (Python), Argon2::default().hash_password() (Rust), BCrypt.HashPassword() (C#).",
     });
   }
 
@@ -239,9 +241,8 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
     });
   }
 
-  // Disabled TLS / certificate validation
-  const tlsDisabledPattern = /NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*["'`]?0|rejectUnauthorized\s*:\s*false|verify\s*=\s*False|InsecureSkipVerify\s*:\s*true/gi;
-  const tlsLines = getLineNumbers(code, tlsDisabledPattern);
+  // Disabled TLS / certificate validation (multi-language)
+  const tlsLines = getLangLineNumbers(code, language, LP.TLS_DISABLED);
   if (tlsLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -251,7 +252,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       lineNumbers: tlsLines,
       recommendation: "Never disable TLS verification in production. Fix certificate issues properly. Use CA bundles for self-signed certs in development only.",
       reference: "CWE-295: Improper Certificate Validation",
-      suggestedFix: "Remove rejectUnauthorized: false and NODE_TLS_REJECT_UNAUTHORIZED=0. If using self-signed certs, set the CA: { ca: fs.readFileSync('ca.pem') }.",
+      suggestedFix: "Remove TLS bypass: delete rejectUnauthorized:false (JS), verify=False (Python), InsecureSkipVerify:true (Go), danger_accept_invalid_certs(true) (Rust), TrustAllCerts (Java).",
     });
   }
 

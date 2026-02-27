@@ -8,18 +8,17 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   const prefix = "MAINT";
   const lang = getLangFamily(language);
 
-  // any type usage
-  const anyPattern = /:\s*any\b|<any>|as\s+any\b/gi;
-  const anyLines = getLineNumbers(code, anyPattern);
+  // Weak / unsafe type usage (any, object, dynamic, interface{}, unsafe)
+  const anyLines = getLangLineNumbers(code, language, LP.WEAK_TYPE);
   if (anyLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
-      title: "Use of 'any' type undermines type safety",
-      description: `Found ${anyLines.length} occurrence(s) of the 'any' type. Using 'any' disables type checking, makes refactoring risky, and allows bugs to slip through undetected.`,
+      title: "Weak or unsafe type usage detected",
+      description: `Found ${anyLines.length} occurrence(s) of weak type usage (e.g., 'any' in TypeScript, 'dynamic'/'object' in C#, 'interface{}' in Go, unsafe blocks in Rust). Weak types bypass the type system.`,
       lineNumbers: anyLines.slice(0, 10),
-      recommendation: "Replace 'any' with specific types, interfaces, or 'unknown' with type guards. If the type is truly dynamic, use a union type or generic.",
-      reference: "TypeScript Best Practices / Clean Code",
+      recommendation: "Replace weak types with specific types: use 'unknown' with type guards (TS), generics (Java/C#), concrete types (Go), safe wrappers (Rust).",
+      reference: "Type Safety Best Practices / Clean Code",
     });
   }
 
@@ -47,9 +46,8 @@ export function analyzeMaintainability(code: string, language: string): Finding[
     });
   }
 
-  // TODO / FIXME / HACK / XXX comments
-  const todoPattern = /\/\/\s*(?:TODO|FIXME|HACK|XXX|TEMP|WORKAROUND)\b/gi;
-  const todoLines = getLineNumbers(code, todoPattern);
+  // TODO / FIXME / HACK / XXX comments (multi-language comment styles)
+  const todoLines = getLangLineNumbers(code, language, LP.TODO_FIXME);
   if (todoLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -80,12 +78,8 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   }
 
   // Very long functions (> 50 lines between function declaration and closing)
-  const funcPattern = /(?:function\s+\w+|(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?(?:function|\([^)]*\)\s*=>))/g;
-  let funcCount = 0;
-  let match;
-  while ((match = funcPattern.exec(code)) !== null) {
-    funcCount++;
-  }
+  const funcDefLines = getLangLineNumbers(code, language, LP.FUNCTION_DEF);
+  const funcCount = funcDefLines.length;
   const totalLines = lines.length;
   if (funcCount > 0 && totalLines / funcCount > 60) {
     findings.push({

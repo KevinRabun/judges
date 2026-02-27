@@ -67,8 +67,8 @@ export function analyzeConfigurationManagement(code: string, language: string): 
     });
   }
 
-  // No environment variable usage
-  const hasEnvVars = /process\.env|os\.environ|os\.Getenv|Environment\.GetEnvironmentVariable|System\.getenv|ENV\[/gi.test(code);
+  // No environment variable usage (multi-language)
+  const hasEnvVars = getLangLineNumbers(code, language, LP.ENV_ACCESS).length > 0;
   const hasConfig = /(?:port|host|database|url|key|secret|token)\s*[:=]\s*["'`0-9]/gi.test(code);
   if (!hasEnvVars && hasConfig && code.split("\n").length > 30) {
     findings.push({
@@ -110,19 +110,18 @@ export function analyzeConfigurationManagement(code: string, language: string): 
     });
   }
 
-  // Missing defaults on process.env reads
-  const envNoDefaultPattern = /process\.env\.\w+(?!\s*\|\||[^;\n]*?(?:\?\?|default|fallback))/g;
-  const envNoDefaultLines = getLineNumbers(code, envNoDefaultPattern);
-  const envWithDefaultPattern = /process\.env\.\w+\s*(?:\|\||&&|\?\?)/g;
+  // Missing defaults on env var reads (multi-language)
+  const envAccessLines = getLangLineNumbers(code, language, LP.ENV_ACCESS);
+  const envWithDefaultPattern = /process\.env\.\w+\s*(?:\|\||\?\?)|os\.environ\.get\s*\([^)]+,|os\.Getenv\b[^;\n]*(?:\|\||==\s*"")|env::var\b[^;\n]*\.unwrap_or|GetEnvironmentVariable\b[^;\n]*\?\?|getenv\b[^;\n]*,\s*["'\d]/gi;
   const envWithDefaults = (code.match(envWithDefaultPattern) || []).length;
-  const envTotal = envNoDefaultLines.length;
+  const envTotal = envAccessLines.length;
   if (envTotal > 0 && envWithDefaults === 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Environment variable reads without defaults",
-      description: `Found ${envTotal} process.env reads without fallback defaults. Missing env vars will silently be undefined at runtime, causing hard-to-debug issues.`,
-      lineNumbers: envNoDefaultLines.slice(0, 5),
+      description: `Found ${envTotal} environment variable read(s) without fallback defaults. Missing env vars will silently be undefined or empty at runtime, causing hard-to-debug issues.`,
+      lineNumbers: envAccessLines.slice(0, 5),
       recommendation: "Provide defaults: process.env.PORT || 3000, or validate at startup that required variables are present. Use a config library that enforces defaults.",
       reference: "Node.js Configuration Best Practices",
     });

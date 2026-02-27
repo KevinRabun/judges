@@ -8,18 +8,19 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
   const prefix = "RATE";
   const lang = getLangFamily(language);
 
-  // No rate limiting middleware
-  const hasRateLimit = /rate.?limit|throttle|express-rate-limit|koa-ratelimit|bottleneck|p-limit|limiter|quota/gi.test(code);
-  const hasServerCode = /app\.(listen|use|get|post|put|delete|patch)|createServer|express\(\)|new\s+Hono/gi.test(code);
+  // No rate limiting middleware (multi-language server detection)
+  const hasRateLimit = /rate.?limit|throttle|express-rate-limit|koa-ratelimit|bottleneck|p-limit|limiter|quota|@RateLimiter|RateLimitMiddleware|rate_limit/gi.test(code);
+  const routeLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
+  const hasServerCode = routeLines.length > 0 || /createServer|express\(\)|new\s+Hono/gi.test(code);
   if (hasServerCode && !hasRateLimit && code.split("\n").length > 20) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "No rate limiting on API endpoints",
       description: "API server has no rate limiting. Any client can make unlimited requests, enabling DDoS attacks, brute-force login attempts, scraping, and resource exhaustion.",
-      recommendation: "Add rate limiting middleware (express-rate-limit, koa-ratelimit). Apply per-IP and per-user limits. Set stricter limits on auth endpoints.",
+      recommendation: "Add rate limiting: express-rate-limit (Express), django-ratelimit (Django), @RateLimiter (Spring), tollbooth (Go), governor (Rust).",
       reference: "OWASP API Security Top 10: API4 — Unrestricted Resource Consumption",
-      suggestedFix: "Add rate limiting: app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 })); from 'express-rate-limit'.",
+      suggestedFix: "Add rate limiting: app.use(rateLimit({ windowMs: 15*60*1000, max: 100 })) (Express), @ratelimit (Django), RateLimiter.of() (Spring), tollbooth.NewLimiter() (Go).",
     });
   }
 
@@ -67,10 +68,9 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
     });
   }
 
-  // External API calls without backoff
-  const externalCallPattern = /fetch\s*\(\s*["'`]https?:\/\/|axios\.(?:get|post|put|delete)|http\.(?:get|post)/gi;
-  const externalCallLines = getLineNumbers(code, externalCallPattern);
-  const hasBackoff = /backoff|retry|exponential|setTimeout.*retry|p-retry|cockatiel|polly/gi.test(code);
+  // External API calls without backoff (multi-language)
+  const externalCallLines = getLangLineNumbers(code, language, LP.HTTP_CLIENT);
+  const hasBackoff = /backoff|retry|exponential|setTimeout.*retry|p-retry|cockatiel|polly|tenacity|retrying|Polly\.Handle|@Retry/gi.test(code);
   if (externalCallLines.length > 0 && !hasBackoff) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -78,9 +78,9 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       title: "External API calls without retry/backoff strategy",
       description: `Found ${externalCallLines.length} external API call(s) without visible retry/backoff logic. Failed requests won't be retried, and rapid retries could get your client rate-limited or banned.`,
       lineNumbers: externalCallLines.slice(0, 3),
-      recommendation: "Implement exponential backoff with jitter for external API calls. Respect Retry-After headers. Use libraries like p-retry or cockatiel.",
+      recommendation: "Implement exponential backoff with jitter for external API calls. Respect Retry-After headers. Use libraries like p-retry (JS), tenacity (Python), Polly (C#).",
       reference: "Exponential Backoff / Rate Limiting Best Practices",
-      suggestedFix: "Add retry with backoff: import pRetry from 'p-retry'; const data = await pRetry(() => fetch(url), { retries: 3, minTimeout: 1000 }); respect Retry-After headers.",
+      suggestedFix: "Add retry with backoff: pRetry(() => fetch(url), { retries: 3 }) (JS), @retry(stop=stop_after(3)) (Python), .AddPolicyHandler(GetRetryPolicy()) (C#).",
     });
   }
 

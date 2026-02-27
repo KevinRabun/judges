@@ -8,8 +8,9 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
   const prefix = "COMPAT";
   const lang = getLangFamily(language);
 
-  // No API versioning
-  const hasApiRoutes = /app\.(get|post|put|delete|patch)\s*\(\s*["'`]\/api\//gi.test(code);
+  // No API versioning (multi-language route detection)
+  const routeLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
+  const hasApiRoutes = routeLines.length > 0 && /\/api\//i.test(code);
   const hasVersioning = /\/api\/v\d|\/v\d\/|api-version|x-api-version|accept-version/gi.test(code);
   if (hasApiRoutes && !hasVersioning) {
     findings.push({

@@ -89,10 +89,14 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect logging of sensitive information
+  // Detect logging of sensitive information (multi-language)
   const logSensitiveLines: number[] = [];
+  const logLineSet = new Set([
+    ...getLangLineNumbers(code, language, LP.CONSOLE_LOG),
+    ...getLangLineNumbers(code, language, LP.STRUCTURED_LOG),
+  ]);
   lines.forEach((line, i) => {
-    if (/(?:console|logger|log)\.\w+\s*\(/.test(line) && /(?:password|token|secret|ssn|credit.?card|api.?key|auth)/i.test(line)) {
+    if (logLineSet.has(i + 1) && /(?:password|token|secret|ssn|credit.?card|api.?key|auth)/i.test(line)) {
       logSensitiveLines.push(i + 1);
     }
   });
@@ -109,10 +113,12 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
     });
   }
 
-  // Detect missing data classification markers
+  // Detect missing data classification markers (multi-language class/struct detection)
   const dataModelLines: number[] = [];
+  const classDefLineSet = new Set(getLangLineNumbers(code, language, LP.CLASS_DEF));
   lines.forEach((line, i) => {
-    if (/(?:interface|class|type|schema|model)\s+\w*(?:User|Customer|Patient|Employee|Person)/i.test(line)) {
+    const isClassDef = classDefLineSet.has(i + 1) || /(?:interface|class|type|schema|model)\s+\w*(?:User|Customer|Patient|Employee|Person)/i.test(line);
+    if (isClassDef && /(?:User|Customer|Patient|Employee|Person)/i.test(line)) {
       const context = lines.slice(i, Math.min(lines.length, i + 15)).join("\n");
       if (!/classification|sensitivity|pii|confidential|restricted|public/i.test(context)) {
         dataModelLines.push(i + 1);

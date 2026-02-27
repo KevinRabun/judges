@@ -8,9 +8,10 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   const prefix = "CICD";
   const lang = getLangFamily(language);
 
-  // No test script
+  // No test script (multi-language test detection)
   const hasTestScript = /["']test["']\s*:\s*["'][^"']+["']/gi.test(code) ||
-    /describe\s*\(|it\s*\(|test\s*\(|@Test|def\s+test_|unittest|pytest|jest|mocha|vitest/gi.test(code);
+    getLangLineNumbers(code, language, LP.TEST_FUNCTION).length > 0 ||
+    /jest|mocha|vitest|unittest|pytest|xunit|nunit/gi.test(code);
   const isSourceCode = /(?:function|class|const|let|var|import|export|def |public\s+class)/gi.test(code);
   if (isSourceCode && !hasTestScript && code.split("\n").length > 40) {
     findings.push({
@@ -36,24 +37,22 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
     });
   }
 
-  // process.exit in application code (not test/script)
-  const processExitPattern = /process\.exit\s*\(\s*[01]\s*\)/gi;
-  const processExitLines = getLineNumbers(code, processExitPattern);
+  // Hard process exit in application code (multi-language)
+  const processExitLines = getLangLineNumbers(code, language, LP.PANIC_UNWRAP);
   if (processExitLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
-      title: "process.exit() hinders graceful CI/CD lifecycle",
-      description: `Found ${processExitLines.length} process.exit() call(s). Hard exits prevent proper shutdown, skip cleanup hooks, and can cause deployment health checks to fail.`,
+      title: "Hard process termination hinders graceful CI/CD lifecycle",
+      description: `Found ${processExitLines.length} hard exit call(s) (e.g., process.exit, sys.exit, panic!, System.exit, os.Exit). Hard exits prevent proper shutdown, skip cleanup hooks, and can cause deployment health checks to fail.`,
       lineNumbers: processExitLines,
-      recommendation: "Use proper error propagation instead of process.exit(). In production, handle SIGTERM gracefully. Let the runtime manage process lifecycle.",
+      recommendation: "Use proper error propagation instead of hard exits. In production, handle SIGTERM gracefully. Let the runtime manage process lifecycle.",
       reference: "12-Factor App: Disposability / Kubernetes Pod Lifecycle",
     });
   }
 
-  // @ts-nocheck or type-checking disabled
-  const tsNoCheckPattern = /@ts-nocheck|@ts-ignore|eslint-disable|tslint:disable|# type: ignore|# noqa/gi;
-  const tsNoCheckLines = getLineNumbers(code, tsNoCheckPattern);
+  // Static analysis suppression comments (multi-language)
+  const tsNoCheckLines = getLangLineNumbers(code, language, LP.LINTER_DISABLE);
   if (tsNoCheckLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

@@ -8,19 +8,18 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   const prefix = "DB";
   const lang = getLangFamily(language);
 
-  // SQL injection via string concatenation
-  const sqlInjectionPattern = /(?:execute|query|raw|prepare)\s*\(\s*(?:`[^`]*(?:\$\{[^}]*\b(?:req|request|params|query|body|input|user|id|name|email)\b|\$\{[^}]*\+)|['"][^'"]*['"]\s*\+\s*(?:req\.|request\.|params\.|query\.|body\.|input|user|id|name|email)|['"][^'"]*['"]\s*\.\s*concat\s*\()/gi;
-  const sqlInjectionLines = getLineNumbers(code, sqlInjectionPattern);
+  // SQL injection via string concatenation (multi-language)
+  const sqlInjectionLines = getLangLineNumbers(code, language, LP.SQL_INJECTION);
   if (sqlInjectionLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "SQL injection via string concatenation",
-      description: `Found ${sqlInjectionLines.length} instance(s) of SQL queries built with string concatenation or template literals containing user input. This is the most common and dangerous database vulnerability.`,
+      description: `Found ${sqlInjectionLines.length} instance(s) of SQL queries built with string concatenation or interpolation containing user input. This is the most common and dangerous database vulnerability.`,
       lineNumbers: sqlInjectionLines,
       recommendation: "Use parameterized queries (placeholders) or prepared statements. ORMs handle this automatically. Never concatenate user input into SQL strings.",
       reference: "OWASP SQL Injection Prevention Cheat Sheet / CWE-89",
-      suggestedFix: "Use parameterized queries: db.query('SELECT * FROM users WHERE id = $1', [userId]); never concatenate user input into SQL.",
+      suggestedFix: "Use parameterized queries: db.query('SELECT * FROM users WHERE id = $1', [userId]) (JS), cursor.execute('...WHERE id = %s', (uid,)) (Python), db.Query('...WHERE id = $1', id) (Go).",
     });
   }
 
@@ -40,22 +39,24 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
     });
   }
 
-  // N+1 query pattern (query in a loop)
+  // N+1 query pattern (query in a loop) (multi-language)
   const lines = code.split("\n");
   const n1Lines: number[] = [];
+  const dbQueryLines = new Set(getLangLineNumbers(code, language, LP.DB_QUERY));
+  const loopLines = new Set(getLangLineNumbers(code, language, LP.FOR_LOOP));
   let inLoop = false;
   let loopDepth = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (/\b(?:for|while|forEach|\.map|\.each)\b/.test(line)) {
+    if (loopLines.has(i + 1) || /\b(?:for|while|forEach|\.map|\.each)\b/.test(line)) {
       inLoop = true;
       loopDepth++;
     }
-    if (inLoop && /(?:await\s+)?(?:db\.|query|find|findOne|findMany|execute|select|fetch)\s*\(/.test(line)) {
+    if (inLoop && (dbQueryLines.has(i + 1) || /(?:await\s+)?(?:db\.|query|find|findOne|findMany|execute|select|fetch)\s*\(/.test(line))) {
       n1Lines.push(i + 1);
     }
     if (inLoop) {
-      const opens = (line.match(/\{/g) || []).length;
+      const opens = (line.match(/\{/g) || []).length + (line.match(/:\s*$/g) || []).length;
       const closes = (line.match(/\}/g) || []).length;
       loopDepth += opens - closes;
       if (loopDepth <= 0) {
