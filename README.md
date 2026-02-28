@@ -11,7 +11,7 @@ An MCP (Model Context Protocol) server that provides a panel of **35 specialized
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![npm downloads](https://img.shields.io/npm/dw/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-711-brightgreen)](https://github.com/KevinRabun/judges/actions)
+[![Tests](https://img.shields.io/badge/tests-730-brightgreen)](https://github.com/KevinRabun/judges/actions)
 
 ---
 
@@ -54,8 +54,45 @@ judges eval --judge cybersecurity server.ts
 # SARIF output for CI
 judges eval --file app.ts --format sarif > results.sarif
 
+# HTML report with severity filters and dark/light theme
+judges eval --file app.ts --format html > report.html
+
+# Fail CI on findings (exit code 1)
+judges eval --fail-on-findings src/api.ts
+
+# Suppress known findings via baseline
+judges eval --baseline baseline.json src/api.ts
+
+# One-line summary for scripts
+judges eval --summary src/api.ts
+
 # List all 35 judges
 judges list
+```
+
+### Additional CLI Commands
+
+```bash
+# Interactive project setup wizard
+judges init
+
+# Preview auto-fix patches (dry run)
+judges fix src/app.ts
+
+# Apply patches directly
+judges fix src/app.ts --apply
+
+# Watch mode — re-evaluate on file save
+judges watch src/
+
+# Project-level report (local directory)
+judges report . --format html --output report.html
+
+# Install pre-commit hook
+judges hook install
+
+# Uninstall pre-commit hook
+judges hook uninstall
 ```
 
 ### Use in GitHub Actions
@@ -318,6 +355,78 @@ When reviewing pull requests:
 ```
 
 This helps keep Copilot feedback aligned with Judges findings.
+
+---
+
+## CLI Reference
+
+All commands support `--help` for usage details.
+
+### `judges eval`
+
+Evaluate a file with all 35 judges or a single judge.
+
+| Flag | Description |
+|------|-------------|
+| `--file <path>` / positional | File to evaluate |
+| `--judge <id>` / `-j <id>` | Single judge mode |
+| `--language <lang>` / `-l <lang>` | Language hint (auto-detected from extension) |
+| `--format <fmt>` / `-f <fmt>` | Output format: `text`, `json`, `sarif`, `markdown`, `html` |
+| `--output <path>` / `-o <path>` | Write output to file |
+| `--fail-on-findings` | Exit with code 1 if verdict is FAIL |
+| `--baseline <path>` / `-b <path>` | JSON baseline file — suppress known findings |
+| `--summary` | Print a single summary line (ideal for scripts) |
+
+### `judges init`
+
+Interactive wizard that generates project configuration:
+- `.judgesrc.json` — rule customization, disabled judges, severity thresholds
+- `.github/workflows/judges.yml` — GitHub Actions CI workflow
+- `.gitlab-ci.judges.yml` — GitLab CI pipeline (optional)
+- `azure-pipelines.judges.yml` — Azure Pipelines (optional)
+
+### `judges fix`
+
+Preview or apply auto-fix patches from deterministic findings.
+
+| Flag | Description |
+|------|-------------|
+| positional | File to fix |
+| `--apply` | Write patches to disk (default: dry run) |
+| `--judge <id>` | Limit to a single judge's findings |
+
+### `judges watch`
+
+Continuously re-evaluate files on save.
+
+| Flag | Description |
+|------|-------------|
+| positional | File or directory to watch (default: `.`) |
+| `--judge <id>` | Single judge mode |
+| `--fail-on-findings` | Exit non-zero if any evaluation fails |
+
+### `judges report`
+
+Run a full project-level tribunal on a local directory.
+
+| Flag | Description |
+|------|-------------|
+| positional | Directory path (default: `.`) |
+| `--format <fmt>` | Output format: `text`, `json`, `html`, `markdown` |
+| `--output <path>` | Write report to file |
+| `--max-files <n>` | Maximum files to analyze (default: 600) |
+| `--max-file-bytes <n>` | Skip files larger than this (default: 300000) |
+
+### `judges hook`
+
+Manage a Git pre-commit hook that runs Judges on staged files.
+
+```bash
+judges hook install    # add pre-commit hook
+judges hook uninstall  # remove pre-commit hook
+```
+
+Detects Husky (`.husky/pre-commit`) and falls back to `.git/hooks/pre-commit`. Uses marker-based injection so it won't clobber existing hooks.
 
 ---
 
@@ -815,6 +924,16 @@ judges/
 │   │   ├── index.ts          # evaluateWithJudge(), evaluateWithTribunal(), evaluateProject(), etc.
 │   │   ├── shared.ts         # Scoring, verdict logic, markdown formatters
 │   │   └── *.ts              # One analyzer per judge (35 files)
+│   ├── formatters/           # Output formatters
+│   │   ├── sarif.ts              # SARIF 2.1.0 output
+│   │   └── html.ts               # Self-contained HTML report (dark/light theme, filters)
+│   ├── commands/             # CLI subcommands
+│   │   ├── init.ts               # Interactive project setup wizard
+│   │   ├── fix.ts                # Auto-fix patch preview and application
+│   │   ├── watch.ts              # Watch mode — re-evaluate on save
+│   │   ├── report.ts             # Project-level local report
+│   │   ├── hook.ts               # Pre-commit hook install/uninstall
+│   │   └── ci-templates.ts       # GitLab, Azure, Bitbucket CI templates
 │   ├── reports/
 │   │   └── public-repo-report.ts   # Public repo clone + full tribunal report generation
 │   └── judges/               # Judge definitions (id, name, domain, system prompt)
@@ -857,6 +976,11 @@ judges/
 | `npm run automation:daily-popular` | Analyze up to 10 rotating popular repos/day and open up to 5 remediation PRs per repo |
 | `npm start` | Start the MCP server |
 | `npm run clean` | Remove `dist/` |
+| `judges init` | Interactive project setup wizard |
+| `judges fix <file>` | Preview auto-fix patches (add `--apply` to write) |
+| `judges watch <dir>` | Watch mode — re-evaluate on file save |
+| `judges report <dir>` | Full tribunal report on a local directory |
+| `judges hook install` | Install a Git pre-commit hook |
 
 ---
 

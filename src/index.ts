@@ -21,13 +21,18 @@
 // ─── CLI Detection ──────────────────────────────────────────────────────────
 // If the user passed a subcommand or flag, run as CLI instead of MCP server.
 
-const cliCommands = new Set(["eval", "list", "evaluate"]);
+const cliCommands = new Set(["eval", "list", "evaluate", "init", "fix", "watch", "report", "hook"]);
 const cliFlags = new Set(["--help", "-h", "--file", "-f", "--version", "-v"]);
 const firstArg = process.argv[2];
 
 if (firstArg && (cliCommands.has(firstArg) || cliFlags.has(firstArg))) {
   // Dynamic import to avoid loading MCP SDK when running as CLI
-  import("./cli.js").then(({ runCli }) => runCli(process.argv));
+  import("./cli.js")
+    .then(({ runCli }) => runCli(process.argv))
+    .catch((err) => {
+      console.error("CLI error:", err);
+      process.exit(1);
+    });
 } else {
   // ─── MCP Server Mode ────────────────────────────────────────────────────
 
@@ -39,7 +44,7 @@ if (firstArg && (cliCommands.has(firstArg) || cliFlags.has(firstArg))) {
 
       const server = new McpServer({
         name: "judges",
-        version: "3.3.0",
+        version: "3.4.0",
       });
 
       registerTools(server);

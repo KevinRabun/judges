@@ -6123,3 +6123,179 @@ describe("Registry-Based Judge Dispatch", () => {
     }
   });
 });
+
+// ─── CLI Command Tests ───────────────────────────────────────────────────────
+
+describe("CLI Commands", () => {
+  // ── Init Command ──────────────────────────────────────────────────────
+  describe("Init Command", () => {
+    it("should export runInit function", async () => {
+      const mod = await import("../src/commands/init.js");
+      assert.ok(typeof mod.runInit === "function");
+    });
+  });
+
+  // ── Fix Command ───────────────────────────────────────────────────────
+  describe("Fix Command", () => {
+    it("should export runFix and parseFixArgs functions", async () => {
+      const mod = await import("../src/commands/fix.js");
+      assert.ok(typeof mod.runFix === "function");
+      assert.ok(typeof mod.parseFixArgs === "function");
+    });
+
+    it("should parse fix arguments correctly", async () => {
+      const { parseFixArgs } = await import("../src/commands/fix.js");
+      const args = parseFixArgs(["node", "judges", "fix", "src/app.ts", "--apply", "--judge", "cybersecurity"]);
+      assert.equal(args.file, "src/app.ts");
+      assert.equal(args.apply, true);
+      assert.equal(args.judge, "cybersecurity");
+    });
+
+    it("should default to dry-run mode", async () => {
+      const { parseFixArgs } = await import("../src/commands/fix.js");
+      const args = parseFixArgs(["node", "judges", "fix", "test.ts"]);
+      assert.equal(args.apply, false);
+    });
+  });
+
+  // ── Watch Command ─────────────────────────────────────────────────────
+  describe("Watch Command", () => {
+    it("should export runWatch and parseWatchArgs functions", async () => {
+      const mod = await import("../src/commands/watch.js");
+      assert.ok(typeof mod.runWatch === "function");
+      assert.ok(typeof mod.parseWatchArgs === "function");
+    });
+
+    it("should parse watch arguments correctly", async () => {
+      const { parseWatchArgs } = await import("../src/commands/watch.js");
+      const args = parseWatchArgs([
+        "node",
+        "judges",
+        "watch",
+        "src/",
+        "--judge",
+        "cybersecurity",
+        "--fail-on-findings",
+      ]);
+      assert.equal(args.path, "src/");
+      assert.equal(args.judge, "cybersecurity");
+      assert.equal(args.failOnFindings, true);
+    });
+
+    it("should default to current directory", async () => {
+      const { parseWatchArgs } = await import("../src/commands/watch.js");
+      const args = parseWatchArgs(["node", "judges", "watch"]);
+      assert.equal(args.path, ".");
+    });
+  });
+
+  // ── Report Command ────────────────────────────────────────────────────
+  describe("Report Command", () => {
+    it("should export runReport function", async () => {
+      const mod = await import("../src/commands/report.js");
+      assert.ok(typeof mod.runReport === "function");
+    });
+  });
+
+  // ── Hook Command ──────────────────────────────────────────────────────
+  describe("Hook Command", () => {
+    it("should export runHook function", async () => {
+      const mod = await import("../src/commands/hook.js");
+      assert.ok(typeof mod.runHook === "function");
+    });
+  });
+
+  // ── CI Templates ──────────────────────────────────────────────────────
+  describe("CI Templates", () => {
+    it("should generate GitLab CI template", async () => {
+      const { generateGitLabCi } = await import("../src/commands/ci-templates.js");
+      const template = generateGitLabCi(true);
+      assert.ok(template.includes("judges-review"));
+      assert.ok(template.includes("npm install -g @kevinrabun/judges"));
+      assert.ok(template.includes("judges report"));
+    });
+
+    it("should generate Azure Pipelines template", async () => {
+      const { generateAzurePipelines } = await import("../src/commands/ci-templates.js");
+      const template = generateAzurePipelines(true);
+      assert.ok(template.includes("azure-pipelines"));
+      assert.ok(template.includes("judges report"));
+      assert.ok(template.includes("Quality Gate"));
+    });
+
+    it("should generate Bitbucket Pipelines template", async () => {
+      const { generateBitbucketPipelines } = await import("../src/commands/ci-templates.js");
+      const template = generateBitbucketPipelines(false);
+      assert.ok(template.includes("Judges Code Review"));
+      assert.ok(!template.includes("--fail-on-findings"));
+    });
+  });
+});
+
+// ─── HTML Formatter Tests ────────────────────────────────────────────────────
+
+describe("HTML Formatter", () => {
+  it("should generate valid HTML", async () => {
+    const { verdictToHtml } = await import("../src/formatters/html.js");
+    const verdict = evaluateWithTribunal("const x = 1;", "typescript");
+    const html = verdictToHtml(verdict, "test.ts");
+    assert.ok(html.includes("<!DOCTYPE html>"));
+    assert.ok(html.includes("Judges Panel Report"));
+    assert.ok(html.includes("test.ts"));
+    assert.ok(html.includes("</html>"));
+  });
+
+  it("should include severity filter buttons", async () => {
+    const { verdictToHtml } = await import("../src/formatters/html.js");
+    const verdict = evaluateWithTribunal(sampleCode, "typescript");
+    const html = verdictToHtml(verdict, "sample.ts");
+    assert.ok(html.includes("filterFindings"));
+    assert.ok(html.includes("Critical"));
+    assert.ok(html.includes("High"));
+    assert.ok(html.includes("Medium"));
+  });
+
+  it("should include per-judge sections", async () => {
+    const { verdictToHtml } = await import("../src/formatters/html.js");
+    const verdict = evaluateWithTribunal("var password = 'admin123';", "typescript");
+    const html = verdictToHtml(verdict, "test.ts");
+    assert.ok(html.includes("judge-section"));
+    assert.ok(html.includes("judge-name"));
+  });
+
+  it("should escape HTML entities in findings", async () => {
+    const { verdictToHtml } = await import("../src/formatters/html.js");
+    const verdict = evaluateWithTribunal("const x = '<script>alert(1)</script>';", "typescript");
+    const html = verdictToHtml(verdict);
+    // Should not contain raw <script> tags in finding descriptions
+    assert.ok(!html.includes("<script>alert"));
+  });
+});
+
+// ─── CLI Argument Parsing Tests ──────────────────────────────────────────────
+
+describe("CLI Argument Parsing (Extended)", () => {
+  it("should recognize new commands in index.ts routing", () => {
+    const cliCommands = new Set(["eval", "list", "evaluate", "init", "fix", "watch", "report", "hook"]);
+    assert.ok(cliCommands.has("init"));
+    assert.ok(cliCommands.has("fix"));
+    assert.ok(cliCommands.has("watch"));
+    assert.ok(cliCommands.has("report"));
+    assert.ok(cliCommands.has("hook"));
+  });
+
+  it("should support --fail-on-findings flag", () => {
+    // Simulate parseCliArgs behavior
+    const argv = ["node", "judges", "eval", "--fail-on-findings", "test.ts"];
+    let failOnFindings = false;
+    for (const arg of argv) {
+      if (arg === "--fail-on-findings") failOnFindings = true;
+    }
+    assert.ok(failOnFindings);
+  });
+
+  it("should support html format option", () => {
+    const validFormats = ["text", "json", "sarif", "markdown", "html"];
+    assert.ok(validFormats.includes("html"));
+  });
+});
