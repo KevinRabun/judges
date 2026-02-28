@@ -30,7 +30,14 @@ jobs:
         run: npm run build
 
       - name: Publish package to npm
-        run: npm publish --provenance --access public
+        run: |
+          npm publish --provenance --access public || {
+            if npm view "@kevinrabun/judges@$(node -p 'require("./package.json").version')" version > /dev/null 2>&1; then
+              echo "Version already published to npm — skipping"
+            else
+              exit 1
+            fi
+          }
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
