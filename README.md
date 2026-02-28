@@ -271,7 +271,7 @@ This helps keep Copilot feedback aligned with Judges findings.
 | **Code Structure** | Structural Analysis (AST) | `STRUCT-` | Cyclomatic complexity, nesting depth, function length, dead code, type safety |
 | **Agent Instructions** | Agent Instruction Markdown Quality & Safety | `AGENT-` | Instruction hierarchy, conflict detection, unsafe overrides, scope, validation, policy guidance |
 | **AI Code Safety** | AI-Generated Code Safety | `AICS-` | Prompt injection, insecure LLM output handling, debug defaults, missing validation, unsafe deserialization of AI responses |
-| **Framework Safety** | Framework-Specific Safety | `FWSAFE-` | React hooks ordering, Express middleware chains, Next.js SSR/SSG pitfalls, Angular/Vue lifecycle patterns, framework-specific anti-patterns |
+| **Framework Safety** | Framework-Specific Safety | `FW-` | React hooks ordering, Express middleware chains, Next.js SSR/SSG pitfalls, Angular/Vue lifecycle patterns, framework-specific anti-patterns |
 
 ---
 
