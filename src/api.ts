@@ -75,7 +75,8 @@ export { LRUCache, contentHash } from "./cache.js";
 export { clearProjectCache } from "./evaluators/project.js";
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
-export { findingsToSarif, evaluationToSarif, verdictToSarif } from "./formatters/sarif.js";
+export { findingsToSarif, evaluationToSarif, verdictToSarif, validateSarifLog } from "./formatters/sarif.js";
+export type { SarifValidationError } from "./formatters/sarif.js";
 
 // ─── Convenience Aliases ─────────────────────────────────────────────────────
 

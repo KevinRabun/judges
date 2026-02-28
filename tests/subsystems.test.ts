@@ -1163,3 +1163,174 @@ describe("clearEvaluationCaches", () => {
     assert.doesNotThrow(() => clearEvaluationCaches());
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 24. SARIF Schema Validation
+// ─────────────────────────────────────────────────────────────────────────────
+import { findingsToSarif, evaluationToSarif, verdictToSarif, validateSarifLog } from "../src/formatters/sarif.js";
+import { evaluateWithJudge, evaluateWithTribunal } from "../src/evaluators/index.js";
+import { getJudge } from "../src/judges/index.js";
+
+describe("validateSarifLog", () => {
+  it("should validate output from findingsToSarif with multiple findings", () => {
+    const findings: Finding[] = [
+      {
+        ruleId: "SEC-001",
+        severity: "critical",
+        title: "SQL Injection",
+        description: "Unsanitized query",
+        lineNumbers: [10],
+        recommendation: "Use parameterized queries",
+      },
+      {
+        ruleId: "PERF-002",
+        severity: "medium",
+        title: "Slow loop",
+        description: "O(n^2)",
+        lineNumbers: [25],
+        recommendation: "Use a Map",
+      },
+      {
+        ruleId: "INFO-003",
+        severity: "info",
+        title: "Debug log",
+        description: "Console.log",
+        recommendation: "Remove",
+      },
+    ];
+    const sarif = findingsToSarif(findings, "src/app.ts");
+    const errors = validateSarifLog(sarif);
+    assert.deepEqual(errors, [], `Validation errors: ${JSON.stringify(errors)}`);
+  });
+
+  it("should validate output from findingsToSarif with empty findings", () => {
+    const sarif = findingsToSarif([]);
+    const errors = validateSarifLog(sarif);
+    assert.deepEqual(errors, []);
+  });
+
+  it("should validate output from evaluationToSarif", () => {
+    const judge = getJudge("cybersecurity")!;
+    const evaluation = evaluateWithJudge(judge, "const x = eval(input);", "typescript");
+    const sarif = evaluationToSarif(evaluation, "test.ts");
+    const errors = validateSarifLog(sarif);
+    assert.deepEqual(errors, [], `Validation errors: ${JSON.stringify(errors)}`);
+  });
+
+  it("should validate output from verdictToSarif", () => {
+    const verdict = evaluateWithTribunal("var password = '123456';", "javascript");
+    const sarif = verdictToSarif(verdict, "test.js");
+    const errors = validateSarifLog(sarif);
+    assert.deepEqual(errors, [], `Validation errors: ${JSON.stringify(errors)}`);
+  });
+
+  it("should validate SARIF after JSON round-trip", () => {
+    const findings: Finding[] = [
+      {
+        ruleId: "X-001",
+        severity: "high",
+        title: "Test",
+        description: "Desc",
+        lineNumbers: [5],
+        recommendation: "Fix it",
+      },
+    ];
+    const sarif = findingsToSarif(findings, "file.py", "3.0.3");
+    const roundTripped = JSON.parse(JSON.stringify(sarif));
+    const errors = validateSarifLog(roundTripped);
+    assert.deepEqual(errors, []);
+  });
+
+  // ── Negative validation tests ──────────────────────────────────────────────
+
+  it("should reject non-object root", () => {
+    const errors = validateSarifLog("not an object");
+    assert.ok(errors.length > 0);
+    assert.ok(errors[0].path === "$");
+  });
+
+  it("should reject wrong version", () => {
+    const errors = validateSarifLog({
+      $schema: "https://example.com/sarif.json",
+      version: "1.0.0",
+      runs: [{ tool: { driver: { name: "test", rules: [] } }, results: [] }],
+    });
+    assert.ok(errors.some((e) => e.path === "$.version"));
+  });
+
+  it("should reject missing $schema", () => {
+    const errors = validateSarifLog({
+      version: "2.1.0",
+      runs: [{ tool: { driver: { name: "t", rules: [] } }, results: [] }],
+    });
+    assert.ok(errors.some((e) => e.path === "$.$schema"));
+  });
+
+  it("should reject missing runs", () => {
+    const errors = validateSarifLog({ $schema: "x", version: "2.1.0" });
+    assert.ok(errors.some((e) => e.path === "$.runs"));
+  });
+
+  it("should reject empty runs array", () => {
+    const errors = validateSarifLog({ $schema: "x", version: "2.1.0", runs: [] });
+    assert.ok(errors.some((e) => e.path === "$.runs" && e.message.includes("at least one")));
+  });
+
+  it("should reject missing tool.driver", () => {
+    const errors = validateSarifLog({
+      $schema: "x",
+      version: "2.1.0",
+      runs: [{ results: [] }],
+    });
+    assert.ok(errors.some((e) => e.path.includes("tool")));
+  });
+
+  it("should reject invalid result level", () => {
+    const errors = validateSarifLog({
+      $schema: "x",
+      version: "2.1.0",
+      runs: [
+        {
+          tool: { driver: { name: "test", rules: [] } },
+          results: [{ ruleId: "X", level: "fatal", message: { text: "msg" } }],
+        },
+      ],
+    });
+    assert.ok(errors.some((e) => e.path.includes("level") && e.message.includes("fatal")));
+  });
+
+  it("should reject result with missing message.text", () => {
+    const errors = validateSarifLog({
+      $schema: "x",
+      version: "2.1.0",
+      runs: [
+        {
+          tool: { driver: { name: "test", rules: [] } },
+          results: [{ ruleId: "X", level: "error", message: {} }],
+        },
+      ],
+    });
+    assert.ok(errors.some((e) => e.path.includes("message.text")));
+  });
+
+  it("should reject negative startLine in region", () => {
+    const errors = validateSarifLog({
+      $schema: "x",
+      version: "2.1.0",
+      runs: [
+        {
+          tool: { driver: { name: "test", rules: [] } },
+          results: [
+            {
+              ruleId: "X",
+              level: "error",
+              message: { text: "msg" },
+              locations: [{ physicalLocation: { artifactLocation: { uri: "f.ts" }, region: { startLine: -1 } } }],
+            },
+          ],
+        },
+      ],
+    });
+    assert.ok(errors.some((e) => e.path.includes("startLine")));
+  });
+});

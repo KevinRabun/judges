@@ -145,3 +145,178 @@ export function verdictToSarif(verdict: TribunalVerdict, filePath?: string, vers
   const allFindings = verdict.evaluations.flatMap((e) => e.findings);
   return findingsToSarif(allFindings, filePath, version);
 }
+
+// ─── SARIF 2.1.0 Structural Validator ────────────────────────────────────────
+
+/**
+ * Validation error returned by validateSarifLog.
+ */
+export interface SarifValidationError {
+  path: string;
+  message: string;
+}
+
+const VALID_SARIF_LEVELS = new Set(["error", "warning", "note", "none"]);
+
+/**
+ * Validate that a JSON object structurally conforms to the SARIF 2.1.0 schema.
+ * This is a lightweight check of all mandatory properties and value constraints
+ * without requiring the full JSON Schema or ajv dependency.
+ *
+ * @returns Array of validation errors (empty = valid)
+ */
+export function validateSarifLog(log: unknown): SarifValidationError[] {
+  const errors: SarifValidationError[] = [];
+
+  if (typeof log !== "object" || log === null || Array.isArray(log)) {
+    errors.push({ path: "$", message: "Root must be a non-null object" });
+    return errors;
+  }
+
+  const obj = log as Record<string, unknown>;
+
+  // Top-level required properties
+  if (obj.version !== "2.1.0") {
+    errors.push({ path: "$.version", message: `Must be "2.1.0", got ${JSON.stringify(obj.version)}` });
+  }
+
+  if (typeof obj.$schema !== "string" || !obj.$schema) {
+    errors.push({ path: "$.$schema", message: "Must be a non-empty string URI" });
+  }
+
+  if (!Array.isArray(obj.runs)) {
+    errors.push({ path: "$.runs", message: "Must be an array" });
+    return errors;
+  }
+
+  if (obj.runs.length === 0) {
+    errors.push({ path: "$.runs", message: "Must contain at least one run" });
+    return errors;
+  }
+
+  // Validate each run
+  for (let ri = 0; ri < obj.runs.length; ri++) {
+    const run = obj.runs[ri] as Record<string, unknown>;
+    const rp = `$.runs[${ri}]`;
+
+    if (typeof run !== "object" || run === null) {
+      errors.push({ path: rp, message: "Run must be a non-null object" });
+      continue;
+    }
+
+    // tool.driver is required
+    const tool = run.tool as Record<string, unknown> | undefined;
+    if (typeof tool !== "object" || tool === null) {
+      errors.push({ path: `${rp}.tool`, message: "Required object" });
+      continue;
+    }
+
+    const driver = tool.driver as Record<string, unknown> | undefined;
+    if (typeof driver !== "object" || driver === null) {
+      errors.push({ path: `${rp}.tool.driver`, message: "Required object" });
+      continue;
+    }
+
+    if (typeof driver.name !== "string" || !driver.name) {
+      errors.push({ path: `${rp}.tool.driver.name`, message: "Required non-empty string" });
+    }
+
+    // rules array (optional per spec, but we always emit it)
+    if (driver.rules !== undefined) {
+      if (!Array.isArray(driver.rules)) {
+        errors.push({ path: `${rp}.tool.driver.rules`, message: "Must be an array if present" });
+      } else {
+        for (let rri = 0; rri < driver.rules.length; rri++) {
+          const rule = driver.rules[rri] as Record<string, unknown>;
+          const rrp = `${rp}.tool.driver.rules[${rri}]`;
+
+          if (typeof rule.id !== "string" || !rule.id) {
+            errors.push({ path: `${rrp}.id`, message: "Required non-empty string" });
+          }
+
+          if (rule.shortDescription !== undefined) {
+            const sd = rule.shortDescription as Record<string, unknown>;
+            if (typeof sd !== "object" || typeof sd.text !== "string") {
+              errors.push({ path: `${rrp}.shortDescription.text`, message: "Must be a string" });
+            }
+          }
+
+          if (rule.defaultConfiguration !== undefined) {
+            const dc = rule.defaultConfiguration as Record<string, unknown>;
+            if (typeof dc === "object" && dc !== null && dc.level !== undefined) {
+              if (!VALID_SARIF_LEVELS.has(dc.level as string)) {
+                errors.push({
+                  path: `${rrp}.defaultConfiguration.level`,
+                  message: `Must be one of: error, warning, note, none. Got ${JSON.stringify(dc.level)}`,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // results array
+    if (!Array.isArray(run.results)) {
+      errors.push({ path: `${rp}.results`, message: "Required array" });
+      continue;
+    }
+
+    for (let si = 0; si < run.results.length; si++) {
+      const result = run.results[si] as Record<string, unknown>;
+      const sp = `${rp}.results[${si}]`;
+
+      if (typeof result.ruleId !== "string") {
+        errors.push({ path: `${sp}.ruleId`, message: "Must be a string" });
+      }
+
+      if (result.level !== undefined && !VALID_SARIF_LEVELS.has(result.level as string)) {
+        errors.push({
+          path: `${sp}.level`,
+          message: `Must be one of: error, warning, note, none. Got ${JSON.stringify(result.level)}`,
+        });
+      }
+
+      // message.text is required
+      const msg = result.message as Record<string, unknown> | undefined;
+      if (typeof msg !== "object" || msg === null || typeof msg.text !== "string") {
+        errors.push({ path: `${sp}.message.text`, message: "Required string" });
+      }
+
+      // locations array (optional per spec but we always emit)
+      if (result.locations !== undefined) {
+        if (!Array.isArray(result.locations)) {
+          errors.push({ path: `${sp}.locations`, message: "Must be an array if present" });
+        } else {
+          for (let li = 0; li < result.locations.length; li++) {
+            const loc = result.locations[li] as Record<string, unknown>;
+            const lp = `${sp}.locations[${li}]`;
+            const phys = loc?.physicalLocation as Record<string, unknown> | undefined;
+
+            if (typeof phys !== "object" || phys === null) {
+              errors.push({ path: `${lp}.physicalLocation`, message: "Required object" });
+              continue;
+            }
+
+            const art = phys.artifactLocation as Record<string, unknown> | undefined;
+            if (typeof art !== "object" || typeof art?.uri !== "string") {
+              errors.push({ path: `${lp}.physicalLocation.artifactLocation.uri`, message: "Required string" });
+            }
+
+            const reg = phys.region as Record<string, unknown> | undefined;
+            if (reg !== undefined) {
+              if (typeof reg.startLine !== "number" || reg.startLine < 1) {
+                errors.push({
+                  path: `${lp}.physicalLocation.region.startLine`,
+                  message: "Must be a positive integer",
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return errors;
+}
