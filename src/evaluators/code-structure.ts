@@ -4,9 +4,9 @@ import { analyzeStructure } from "../ast/index.js";
 /**
  * AST / Structure-based evaluator.
  *
- * Unlike the regex-based evaluators this judge uses real AST parsing for
- * JS/TS (via the TypeScript compiler API) and a scope-tracking structural
- * parser for Python, Rust, Go, Java, and C#.
+ * Unlike the regex-based evaluators this judge uses real AST parsing via
+ * tree-sitter WASM grammars for TypeScript, JavaScript, Python, Rust, Go,
+ * Java, C#, and C++, with a scope-tracking structural parser as fallback.
  *
  * Rules produced:
  *   STRUCT-001  High cyclomatic complexity (>10 per function)

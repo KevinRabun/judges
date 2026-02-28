@@ -11,7 +11,7 @@ An MCP (Model Context Protocol) server that provides a panel of **35 specialized
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![npm downloads](https://img.shields.io/npm/dw/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-702-brightgreen)](https://github.com/KevinRabun/judges/actions)
+[![Tests](https://img.shields.io/badge/tests-711-brightgreen)](https://github.com/KevinRabun/judges/actions)
 
 ---
 
@@ -369,7 +369,7 @@ The tribunal operates in three layers:
 
 1. **Pattern-Based Analysis** — All tools (`evaluate_code`, `evaluate_code_single_judge`, `evaluate_project`, `evaluate_diff`) perform heuristic analysis using regex pattern matching to catch common anti-patterns. This layer is instant, deterministic, and runs entirely offline with zero external API calls.
 
-2. **AST-Based Structural Analysis** — The Code Structure judge (`STRUCT-*` rules) uses real Abstract Syntax Tree parsing to measure cyclomatic complexity, nesting depth, function length, parameter count, dead code, and type safety with precision that regex cannot achieve. JavaScript/TypeScript files are parsed via the TypeScript Compiler API. Python, Rust, Go, Java, and C# are parsed via **tree-sitter WASM grammars** — real syntax trees compiled to WebAssembly that run in-process with zero native dependencies. A scope-tracking structural parser is kept as a fallback when WASM grammars are unavailable. No external AST server required.
+2. **AST-Based Structural Analysis** — The Code Structure judge (`STRUCT-*` rules) uses real Abstract Syntax Tree parsing to measure cyclomatic complexity, nesting depth, function length, parameter count, dead code, and type safety with precision that regex cannot achieve. All supported languages — **TypeScript, JavaScript, Python, Rust, Go, Java, C#, and C++** — are parsed via **tree-sitter WASM grammars** (real syntax trees compiled to WebAssembly, in-process, zero native dependencies). A scope-tracking structural parser is kept as a fallback when WASM grammars are unavailable. No external AST server required.
 
 3. **LLM-Powered Deep Analysis (Prompts)** — The server exposes MCP prompts (e.g., `judge-data-security`, `full-tribunal`) that provide each judge's expert persona as a system prompt. When used by an LLM-based client (Copilot, Claude, Cursor, etc.), the host LLM performs deeper, context-aware probabilistic analysis beyond what static patterns can detect. This is where the `systemPrompt` on each judge comes alive — Judges itself makes no LLM calls, but it provides the expert criteria so your AI assistant can act as 35 specialized reviewers.
 
@@ -379,12 +379,11 @@ The tribunal operates in three layers:
 
 Judges Panel is a **dual-layer** review system: instant **deterministic tools** (offline, no API keys) for pattern and AST analysis, plus **35 expert-persona MCP prompts** that unlock LLM-powered deep analysis when connected to an AI client. It does not try to be a CVE scanner or a linter. Those capabilities belong in dedicated MCP servers that an AI agent can orchestrate alongside Judges.
 
-### Built-in AST Analysis (v2.0.0)
+### Built-in AST Analysis (v2.0.0+)
 
 Unlike earlier versions that recommended a separate AST MCP server, Judges Panel now includes **real AST-based structural analysis** out of the box:
 
-- **JavaScript / TypeScript** — Parsed with the TypeScript Compiler API (`ts.createSourceFile`) for full-fidelity AST
-- **Python, Rust, Go, Java, C#** — Parsed with **tree-sitter WASM grammars** for full syntax-tree analysis (functions, complexity, nesting, dead code, type safety). Falls back to a scope-tracking structural parser when WASM grammars are unavailable
+- **TypeScript, JavaScript, Python, Rust, Go, Java, C#, C++** — All parsed with a **unified tree-sitter WASM engine** for full syntax-tree analysis (functions, complexity, nesting, dead code, type safety). Falls back to a scope-tracking structural parser when WASM grammars are unavailable
 
 The Code Structure judge (`STRUCT-*`) uses these parsers to accurately measure:
 
@@ -810,8 +809,7 @@ judges/
 │   ├── ast/                  # AST analysis engine (built-in, no external deps)
 │   │   ├── index.ts          # analyzeStructure() — routes to correct parser
 │   │   ├── types.ts          # FunctionInfo, CodeStructure interfaces
-│   │   ├── typescript-ast.ts # TypeScript Compiler API parser (JS/TS)
-│   │   ├── tree-sitter-ast.ts    # Tree-sitter WASM parser (Python/Rust/Go/Java/C#)
+│   │   ├── tree-sitter-ast.ts    # Tree-sitter WASM parser (all 8 languages)
 │   │   └── structural-parser.ts  # Fallback scope-tracking parser
 │   ├── evaluators/           # Analysis engine for each judge
 │   │   ├── index.ts          # evaluateWithJudge(), evaluateWithTribunal(), evaluateProject(), etc.
@@ -831,6 +829,8 @@ judges/
 ├── tests/
 │   └── judges.test.ts            # Run: npm test
 ├── grammars/                 # Tree-sitter WASM grammar files
+│   ├── tree-sitter-typescript.wasm
+│   ├── tree-sitter-cpp.wasm
 │   ├── tree-sitter-python.wasm
 │   ├── tree-sitter-go.wasm
 │   ├── tree-sitter-rust.wasm

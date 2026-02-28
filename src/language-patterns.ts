@@ -28,6 +28,13 @@ const LANG_ALIAS_MAP: Record<string, LangFamily> = {
   java: "java",
   go: "go",
   golang: "go",
+  cpp: "cpp",
+  "c++": "cpp",
+  cc: "cpp",
+  cxx: "cpp",
+  c: "cpp",
+  h: "cpp",
+  hpp: "cpp",
 };
 
 /**
@@ -410,6 +417,7 @@ export const MANIFEST_FILES: Record<LangFamily, string[]> = {
   csharp: ["*.csproj", "packages.config", "Directory.Packages.props"],
   java: ["pom.xml", "build.gradle", "build.gradle.kts"],
   go: ["go.mod"],
+  cpp: ["CMakeLists.txt", "Makefile", "conanfile.txt", "vcpkg.json"],
   unknown: [],
 };
 

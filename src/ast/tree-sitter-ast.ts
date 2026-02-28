@@ -1,13 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Tree-sitter AST — Real syntax-tree analysis for Python, Go, Rust, Java, C#
+// Tree-sitter AST — Unified real syntax-tree analysis for all languages
 // ─────────────────────────────────────────────────────────────────────────────
 // Uses web-tree-sitter (WASM-based, zero native deps) to parse source code
 // into a full syntax tree, then walks the tree to extract function metrics,
 // dead code, deep nesting, type-safety issues, and imports.
 //
-// This replaces the lightweight structural parser for Tier 2 languages,
-// elevating them from regex-based heuristics to real AST analysis — the
-// same depth the TypeScript Compiler API provides for JS/TS.
+// Supports: TypeScript, JavaScript, Python, Go, Rust, Java, C#, C++
 //
 // Graceful degradation: if tree-sitter WASM grammars aren't available at
 // runtime, the caller can fall back to the structural parser.
@@ -68,11 +66,14 @@ interface SyntaxNode {
 
 // Grammar file name mapping
 const GRAMMAR_FILES: Record<string, string> = {
+  typescript: "tree-sitter-typescript.wasm",
+  javascript: "tree-sitter-typescript.wasm", // TS grammar is a superset of JS
   python: "tree-sitter-python.wasm",
   go: "tree-sitter-go.wasm",
   rust: "tree-sitter-rust.wasm",
   java: "tree-sitter-java.wasm",
   csharp: "tree-sitter-c_sharp.wasm",
+  cpp: "tree-sitter-cpp.wasm",
 };
 
 // Cached language instances
@@ -207,11 +208,28 @@ function parseAndAnalyze(code: string, language: string, grammar: TreeSitterLang
 
 /** Node types that represent function/method definitions per language */
 const FUNCTION_NODE_TYPES: Record<string, string[]> = {
+  typescript: [
+    "function_declaration",
+    "method_definition",
+    "arrow_function",
+    "function_expression",
+    "generator_function_declaration",
+    "generator_function",
+  ],
+  javascript: [
+    "function_declaration",
+    "method_definition",
+    "arrow_function",
+    "function_expression",
+    "generator_function_declaration",
+    "generator_function",
+  ],
   python: ["function_definition"],
   go: ["function_declaration", "method_declaration"],
   rust: ["function_item"],
   java: ["method_declaration", "constructor_declaration"],
   csharp: ["method_declaration", "constructor_declaration", "local_function_statement"],
+  cpp: ["function_definition"],
 };
 
 function extractFunctions(root: SyntaxNode, language: string): FunctionInfo[] {
@@ -259,6 +277,30 @@ function analyzeFunctionNode(node: SyntaxNode, language: string, classRanges: Cl
   // Get function name
   const nameNode = node.childForFieldName("name");
   let name = nameNode?.text || "<anonymous>";
+
+  // C++: name is inside the declarator chain
+  // function_definition → declarator (function_declarator) → declarator (identifier / qualified_identifier)
+  if (language === "cpp" && name === "<anonymous>") {
+    const decl = node.childForFieldName("declarator");
+    if (decl) {
+      const nameDecl = decl.childForFieldName("declarator");
+      if (nameDecl) {
+        name = nameDecl.text;
+      }
+    }
+  }
+
+  // TypeScript/JavaScript: arrow functions and function expressions get their
+  // name from the parent variable_declarator or property assignment
+  if ((language === "typescript" || language === "javascript") && name === "<anonymous>" && node.parent) {
+    if (node.parent.type === "variable_declarator") {
+      const nameChild = node.parent.childForFieldName("name");
+      if (nameChild) name = nameChild.text;
+    } else if (node.parent.type === "pair" || node.parent.type === "property_assignment") {
+      const key = node.parent.childForFieldName("key");
+      if (key) name = key.text;
+    }
+  }
 
   // For Go method_declaration, extract receiver type
   if (language === "go" && node.type === "method_declaration") {
@@ -319,6 +361,14 @@ function countParameters(funcNode: SyntaxNode, language: string): number {
   let paramsNode: SyntaxNode | null = null;
 
   switch (language) {
+    case "typescript":
+    case "javascript":
+      paramsNode = funcNode.childForFieldName("parameters");
+      if (!paramsNode) return 0;
+      return paramsNode.namedChildren.filter(
+        (c) => c.type === "required_parameter" || c.type === "optional_parameter" || c.type === "rest_parameter",
+      ).length;
+
     case "python":
       paramsNode = funcNode.childForFieldName("parameters");
       if (!paramsNode) return 0;
@@ -365,6 +415,17 @@ function countParameters(funcNode: SyntaxNode, language: string): number {
       if (!paramsNode) return 0;
       return paramsNode.namedChildren.filter((c) => c.type === "parameter").length;
 
+    case "cpp": {
+      // C++: parameters sit inside function_definition → declarator (function_declarator) → parameters
+      const declarator = funcNode.childForFieldName("declarator");
+      if (!declarator) return 0;
+      paramsNode = declarator.childForFieldName("parameters");
+      if (!paramsNode) return 0;
+      return paramsNode.namedChildren.filter(
+        (c) => c.type === "parameter_declaration" || c.type === "variadic_parameter_declaration",
+      ).length;
+    }
+
     default:
       return 0;
   }
@@ -374,6 +435,26 @@ function countParameters(funcNode: SyntaxNode, language: string): number {
 // CC = 1 + number of decision points
 
 const DECISION_NODE_TYPES: Record<string, Set<string>> = {
+  typescript: new Set([
+    "if_statement",
+    "for_statement",
+    "for_in_statement",
+    "while_statement",
+    "do_statement",
+    "switch_case",
+    "catch_clause",
+    "ternary_expression",
+  ]),
+  javascript: new Set([
+    "if_statement",
+    "for_statement",
+    "for_in_statement",
+    "while_statement",
+    "do_statement",
+    "switch_case",
+    "catch_clause",
+    "ternary_expression",
+  ]),
   python: new Set([
     "if_statement",
     "elif_clause",
@@ -407,6 +488,16 @@ const DECISION_NODE_TYPES: Record<string, Set<string>> = {
     "switch_section",
     "conditional_expression",
   ]),
+  cpp: new Set([
+    "if_statement",
+    "for_statement",
+    "for_range_loop",
+    "while_statement",
+    "do_statement",
+    "case_statement",
+    "catch_clause",
+    "conditional_expression",
+  ]),
 };
 
 // Binary operators that add to complexity (&&, ||)
@@ -433,6 +524,28 @@ function computeCyclomaticComplexity(funcNode: SyntaxNode, language: string): nu
 // ─── Nesting Depth ──────────────────────────────────────────────────────────
 
 const NESTING_NODE_TYPES: Record<string, Set<string>> = {
+  typescript: new Set([
+    "if_statement",
+    "for_statement",
+    "for_in_statement",
+    "while_statement",
+    "do_statement",
+    "switch_statement",
+    "try_statement",
+    "arrow_function",
+    "function_expression",
+  ]),
+  javascript: new Set([
+    "if_statement",
+    "for_statement",
+    "for_in_statement",
+    "while_statement",
+    "do_statement",
+    "switch_statement",
+    "try_statement",
+    "arrow_function",
+    "function_expression",
+  ]),
   python: new Set([
     "if_statement",
     "for_statement",
@@ -480,6 +593,16 @@ const NESTING_NODE_TYPES: Record<string, Set<string>> = {
     "switch_statement",
     "lambda_expression",
   ]),
+  cpp: new Set([
+    "if_statement",
+    "for_statement",
+    "for_range_loop",
+    "while_statement",
+    "do_statement",
+    "try_statement",
+    "switch_statement",
+    "lambda_expression",
+  ]),
 };
 
 function computeMaxNesting(node: SyntaxNode, language: string, currentDepth: number): number {
@@ -503,20 +626,26 @@ function computeMaxNesting(node: SyntaxNode, language: string, currentDepth: num
 
 /** Node types that represent terminal statements (control flow never continues past them) */
 const TERMINAL_TYPES: Record<string, Set<string>> = {
+  typescript: new Set(["return_statement", "throw_statement", "break_statement", "continue_statement"]),
+  javascript: new Set(["return_statement", "throw_statement", "break_statement", "continue_statement"]),
   python: new Set(["return_statement", "raise_statement", "break_statement", "continue_statement"]),
   go: new Set(["return_statement", "break_statement", "continue_statement"]),
   rust: new Set(["return_expression", "break_expression", "continue_expression"]),
   java: new Set(["return_statement", "throw_statement", "break_statement", "continue_statement"]),
   csharp: new Set(["return_statement", "throw_statement", "break_statement", "continue_statement"]),
+  cpp: new Set(["return_statement", "throw_statement", "break_statement", "continue_statement"]),
 };
 
 /** Node types that represent blocks containing sequential statements */
 const BLOCK_TYPES: Record<string, Set<string>> = {
+  typescript: new Set(["statement_block"]),
+  javascript: new Set(["statement_block"]),
   python: new Set(["block"]),
   go: new Set(["block"]),
   rust: new Set(["block"]),
   java: new Set(["block"]),
   csharp: new Set(["block"]),
+  cpp: new Set(["compound_statement"]),
 };
 
 function detectDeadCode(root: SyntaxNode, language: string): number[] {
@@ -585,6 +714,13 @@ function detectDeepNesting(root: SyntaxNode, language: string): number[] {
 // ─── Weak Type Detection ────────────────────────────────────────────────────
 
 const WEAK_TYPE_PATTERNS: Record<string, (node: SyntaxNode) => boolean> = {
+  typescript: (node) => {
+    // 'any' keyword in type annotations
+    if (node.type === "predefined_type" && node.text === "any") return true;
+    if (node.type === "type_identifier" && node.text === "any") return true;
+    return false;
+  },
+  javascript: () => false, // JS has no static type annotations
   python: (node) => {
     // typing.Any or just Any in type annotations
     if (node.type === "type" || node.type === "annotation") {
@@ -602,8 +738,10 @@ const WEAK_TYPE_PATTERNS: Record<string, (node: SyntaxNode) => boolean> = {
     return false;
   },
   rust: (node) => {
-    // unsafe blocks and raw pointer casts
+    // unsafe blocks and unsafe function declarations
     if (node.type === "unsafe_block") return true;
+    // unsafe fn ... — the function_item's text starts with "unsafe"
+    if (node.type === "function_item" && node.text.trimStart().startsWith("unsafe ")) return true;
     if (node.type === "type_cast_expression") {
       return node.text.includes("*const") || node.text.includes("*mut");
     }
@@ -621,6 +759,15 @@ const WEAK_TYPE_PATTERNS: Record<string, (node: SyntaxNode) => boolean> = {
       return true;
     }
     if (node.type === "identifier" && node.text === "dynamic") return true;
+    return false;
+  },
+  cpp: (node) => {
+    // void* pointers (unsafe), auto keyword (type-erased)
+    if (node.type === "pointer_declarator") {
+      const parent = node.parent;
+      if (parent && parent.text.includes("void")) return true;
+    }
+    if (node.type === "auto" || (node.type === "primitive_type" && node.text === "auto")) return true;
     return false;
   },
 };
@@ -642,11 +789,14 @@ function detectWeakTypes(root: SyntaxNode, language: string): number[] {
 // ─── Import Extraction ──────────────────────────────────────────────────────
 
 const IMPORT_NODE_TYPES: Record<string, string[]> = {
+  typescript: ["import_statement"],
+  javascript: ["import_statement"],
   python: ["import_statement", "import_from_statement"],
   go: ["import_declaration"],
   rust: ["use_declaration"],
   java: ["import_declaration"],
   csharp: ["using_directive"],
+  cpp: ["preproc_include"],
 };
 
 function extractImports(root: SyntaxNode, language: string): string[] {
@@ -657,6 +807,17 @@ function extractImports(root: SyntaxNode, language: string): string[] {
     if (!importTypes.includes(node.type)) return;
 
     switch (language) {
+      case "typescript":
+      case "javascript":
+        // import { foo } from "module"; import "module"; import * as x from "module"
+        {
+          const source = node.childForFieldName("source");
+          if (source) {
+            imports.push(source.text.replace(/['"]/g, ""));
+          }
+        }
+        break;
+
       case "python":
         if (node.type === "import_statement") {
           // import os, import os.path
@@ -719,8 +880,35 @@ function extractImports(root: SyntaxNode, language: string): string[] {
           if (nameNode) imports.push(nameNode.text);
         }
         break;
+
+      case "cpp":
+        // #include <header> or #include "header"
+        {
+          const pathNode = node.namedChildren.find(
+            (c) => c.type === "string_literal" || c.type === "system_lib_string",
+          );
+          if (pathNode) {
+            imports.push(pathNode.text.replace(/[<>"]/g, ""));
+          }
+        }
+        break;
     }
   });
+
+  // TypeScript/JavaScript: also detect require("module") calls
+  if (language === "typescript" || language === "javascript") {
+    walkTree(root, (node) => {
+      if (node.type !== "call_expression") return;
+      const fn = node.childForFieldName("function");
+      if (!fn || fn.text !== "require") return;
+      const args = node.childForFieldName("arguments");
+      if (!args) return;
+      const firstArg = args.namedChildren[0];
+      if (firstArg && (firstArg.type === "string" || firstArg.type === "template_string")) {
+        imports.push(firstArg.text.replace(/['"]/g, ""));
+      }
+    });
+  }
 
   return imports;
 }
@@ -728,11 +916,14 @@ function extractImports(root: SyntaxNode, language: string): string[] {
 // ─── Class Extraction ───────────────────────────────────────────────────────
 
 const CLASS_NODE_TYPES: Record<string, string[]> = {
+  typescript: ["class_declaration"],
+  javascript: ["class_declaration"],
   python: ["class_definition"],
   go: ["type_declaration"],
   rust: ["struct_item", "enum_item"],
   java: ["class_declaration", "interface_declaration", "enum_declaration"],
   csharp: ["class_declaration", "struct_declaration", "interface_declaration", "enum_declaration"],
+  cpp: ["class_specifier", "struct_specifier"],
 };
 
 function extractClasses(root: SyntaxNode, language: string): string[] {
@@ -768,6 +959,18 @@ function extractDecorators(funcNode: SyntaxNode, language: string): string[] {
   const decorators: string[] = [];
 
   switch (language) {
+    case "typescript": {
+      // TypeScript decorators are similar to Python
+      const parent = funcNode.parent;
+      if (parent) {
+        for (const child of parent.namedChildren) {
+          if (child.type === "decorator" && child.endPosition.row < funcNode.startPosition.row) {
+            decorators.push(child.text.replace(/^@/, "").split("(")[0]);
+          }
+        }
+      }
+      break;
+    }
     case "python": {
       // Decorators are siblings before the function_definition, but in the
       // tree-sitter grammar they're children of a decorated_definition parent.
@@ -816,6 +1019,11 @@ function extractDecorators(funcNode: SyntaxNode, language: string): string[] {
 
 function checkIsAsync(funcNode: SyntaxNode, language: string): boolean {
   switch (language) {
+    case "typescript":
+    case "javascript":
+      // async keyword is a direct child of the function node
+      return funcNode.children.some((c) => c.type === "async");
+
     case "python":
       // In Python tree-sitter, async functions have type "function_definition"
       // but the parent is a "decorated_definition" or the text starts with "async"

@@ -41,6 +41,22 @@ import type {
   Finding,
   Verdict,
 } from "../src/types.js";
+import { analyzeStructure, isTreeSitterAvailable } from "../src/ast/index.js";
+import { analyzeCodeStructure } from "../src/evaluators/code-structure.js";
+
+// ─── Tree-sitter warm-up ────────────────────────────────────────────────────
+// Must happen BEFORE any describe/it blocks so that tree-sitter grammars are
+// fully loaded before synchronous analyzeStructure calls in evaluators.
+await Promise.all([
+  isTreeSitterAvailable("typescript"),
+  isTreeSitterAvailable("javascript"),
+  isTreeSitterAvailable("python"),
+  isTreeSitterAvailable("go"),
+  isTreeSitterAvailable("rust"),
+  isTreeSitterAvailable("java"),
+  isTreeSitterAvailable("csharp"),
+  isTreeSitterAvailable("cpp"),
+]);
 
 // ─── Load sample code once ───────────────────────────────────────────────────
 
@@ -1215,9 +1231,6 @@ describe("suggestedFix Support", () => {
 // Test: AST / Structural Analysis
 // ═════════════════════════════════════════════════════════════════════════════
 
-import { analyzeStructure } from "../src/ast/index.js";
-import { analyzeCodeStructure } from "../src/evaluators/code-structure.js";
-
 describe("AST Analysis — TypeScript", () => {
   const tsCode = `
 function simple(a: number, b: number): number {
@@ -1532,6 +1545,107 @@ public class Example {
   it("should detect dynamic type usage in C#", () => {
     const structure = analyzeStructure(csharpCode, "csharp");
     assert.ok(structure.typeAnyLines.length > 0, "Should detect dynamic type usage");
+  });
+});
+
+describe("AST Analysis — C++", () => {
+  const cppCode = `
+#include <iostream>
+#include <vector>
+#include <string>
+
+int simple(int a, int b) {
+    return a + b;
+}
+
+std::string complex(int x) {
+    if (x > 0) {
+        if (x > 10) {
+            if (x > 100) {
+                if (x > 1000) {
+                    if (x > 10000) {
+                        return "huge";
+                    }
+                    return "very large";
+                }
+                return "large";
+            }
+            return "medium";
+        }
+        return "small";
+    }
+    return "zero or negative";
+}
+
+void tooManyParams(int a, int b, int c, int d, int e, int f, int g, int h, int i) {
+    std::cout << a << std::endl;
+}
+
+class MyClass {
+public:
+    void method() {
+        auto val = 42;
+    }
+    void* getDangerous() {
+        return nullptr;
+    }
+};
+`;
+
+  it("should parse C++ code into a CodeStructure", () => {
+    const structure = analyzeStructure(cppCode, "cpp");
+    assert.ok(structure);
+    assert.equal(structure.language, "cpp");
+    assert.ok(structure.functions.length >= 3, `Expected >=3 functions, got ${structure.functions.length}`);
+  });
+
+  it("should compute cyclomatic complexity for C++", () => {
+    const structure = analyzeStructure(cppCode, "cpp");
+    const complexFn = structure.functions.find((f) => f.name === "complex");
+    assert.ok(complexFn, "Should find the 'complex' function");
+    assert.ok(complexFn!.cyclomaticComplexity >= 5, `Expected CC >= 5, got ${complexFn!.cyclomaticComplexity}`);
+  });
+
+  it("should compute nesting depth for C++", () => {
+    const structure = analyzeStructure(cppCode, "cpp");
+    const complexFn = structure.functions.find((f) => f.name === "complex");
+    assert.ok(complexFn, "Should find the 'complex' function");
+    assert.ok(complexFn!.maxNestingDepth >= 4, `Expected nesting >= 4, got ${complexFn!.maxNestingDepth}`);
+  });
+
+  it("should count parameters for C++", () => {
+    const structure = analyzeStructure(cppCode, "cpp");
+    const manyParams = structure.functions.find((f) => f.name === "tooManyParams");
+    assert.ok(manyParams, "Should find the 'tooManyParams' function");
+    assert.equal(manyParams!.parameterCount, 9);
+  });
+
+  it("should detect void* and auto as weak types in C++", () => {
+    const structure = analyzeStructure(cppCode, "cpp");
+    assert.ok(structure.typeAnyLines.length > 0, "Should detect void* or auto as weak types");
+  });
+
+  it("should detect #include imports in C++", () => {
+    const structure = analyzeStructure(cppCode, "cpp");
+    assert.ok(structure.imports.length >= 3, `Expected >=3 imports, got ${structure.imports.length}`);
+  });
+
+  it("should detect classes/structs in C++", () => {
+    const structure = analyzeStructure(cppCode, "cpp");
+    assert.ok(structure.classes !== undefined);
+    assert.ok(structure.classes!.length >= 1, `Expected >=1 class, got ${structure.classes!.length}`);
+  });
+
+  it("should detect deeply nested code via evaluator for C++", () => {
+    const findings = analyzeCodeStructure(cppCode, "cpp");
+    const deepNest = findings.filter((f) => f.ruleId === "STRUCT-002");
+    assert.ok(deepNest.length > 0, "Should flag deeply nested code");
+  });
+
+  it("should detect too many parameters via evaluator for C++", () => {
+    const findings = analyzeCodeStructure(cppCode, "cpp");
+    const params = findings.filter((f) => f.ruleId === "STRUCT-004" || f.ruleId === "STRUCT-009");
+    assert.ok(params.length > 0, "Should flag excessive parameters");
   });
 });
 

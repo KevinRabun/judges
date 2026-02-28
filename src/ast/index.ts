@@ -1,13 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // AST Analysis — Unified Entry Point
 // ─────────────────────────────────────────────────────────────────────────────
-// Routes to the TypeScript compiler-based parser for JS/TS, the tree-sitter
-// real-AST parser for Python, Rust, Go, Java, and C# (when WASM grammars are
-// available), or the lightweight structural parser as a fallback.
+// Routes to the tree-sitter real-AST parser (WASM) for TypeScript, JavaScript,
+// Python, Rust, Go, Java, C#, and C++ when grammars are available, or the
+// lightweight structural parser as a fallback.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { normalizeLanguage } from "../language-patterns.js";
-import { analyzeTypeScript } from "./typescript-ast.js";
 import { analyzeStructurally } from "./structural-parser.js";
 import {
   isTreeSitterAvailable,
@@ -34,7 +33,7 @@ export type { CrossFileTaintFlow } from "./cross-file-taint.js";
 // Pre-initialize tree-sitter on module load so it's ready when needed.
 // This is fire-and-forget; if it fails, analyzeStructure falls back silently.
 
-const TREE_SITTER_LANGS = ["python", "rust", "go", "java", "csharp"] as const;
+const TREE_SITTER_LANGS = ["typescript", "javascript", "python", "rust", "go", "java", "csharp", "cpp"] as const;
 const treeSitterReady = new Map<string, Promise<boolean>>();
 
 for (const lang of TREE_SITTER_LANGS) {
@@ -42,10 +41,9 @@ for (const lang of TREE_SITTER_LANGS) {
 }
 
 /**
- * Analyse source code structurally. For JavaScript/TypeScript this uses the
- * TypeScript compiler API (full AST). For Python, Rust, Go, Java, and C# it
- * uses tree-sitter (real AST via WASM) when available, falling back to the
- * lightweight scope-tracking parser.
+ * Analyse source code structurally. Uses tree-sitter (real AST via WASM) for
+ * TypeScript, JavaScript, Python, Rust, Go, Java, C#, and C++ when available,
+ * falling back to the lightweight scope-tracking structural parser.
  *
  * Returns function metrics (complexity, nesting, length, params), dead code
  * locations, deep-nesting locations, and type-safety issues.
@@ -54,15 +52,14 @@ export function analyzeStructure(code: string, language: string): CodeStructure 
   const lang = normalizeLanguage(language);
 
   switch (lang) {
-    case "javascript":
     case "typescript":
-      return analyzeTypeScript(code, lang);
-
+    case "javascript":
     case "python":
     case "rust":
     case "go":
     case "java":
     case "csharp":
+    case "cpp":
       // Use tree-sitter (real AST) if WASM runtime + grammar already loaded,
       // otherwise fall back to the lightweight structural parser.
       // parser.parse() is synchronous in web-tree-sitter once initialized.
@@ -92,26 +89,25 @@ export function analyzeStructure(code: string, language: string): CodeStructure 
 }
 
 /**
- * Async version of analyzeStructure that uses tree-sitter (real AST) for
- * Python, Rust, Go, Java, and C# when WASM grammars are available.
+ * Async version of analyzeStructure that uses tree-sitter (real AST) for all
+ * supported languages when WASM grammars are available.
  * Falls back to the structural parser if tree-sitter is not available.
  *
- * Prefer this over analyzeStructure() for Tier 2 languages — it provides
- * the same depth of analysis that the TS Compiler API gives JS/TS.
+ * Prefer this over analyzeStructure() when async is acceptable — it ensures
+ * tree-sitter grammars are fully loaded before analysis.
  */
 export async function analyzeStructureAsync(code: string, language: string): Promise<CodeStructure> {
   const lang = normalizeLanguage(language);
 
   switch (lang) {
-    case "javascript":
     case "typescript":
-      return analyzeTypeScript(code, lang);
-
+    case "javascript":
     case "python":
     case "rust":
     case "go":
     case "java":
-    case "csharp": {
+    case "csharp":
+    case "cpp": {
       // Try tree-sitter first (real AST), fall back to structural parser
       const available = await (treeSitterReady.get(lang) ?? Promise.resolve(false));
       if (available) {
