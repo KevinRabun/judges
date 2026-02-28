@@ -32,6 +32,9 @@ import {
 } from "./evaluators/index.js";
 import { getJudge, getJudgeSummaries } from "./judges/index.js";
 import { verdictToSarif } from "./formatters/sarif.js";
+import { verdictToHtml } from "./formatters/html.js";
+import { runReport } from "./commands/report.js";
+import { runHook } from "./commands/hook.js";
 
 // ─── Language Detection from Extension ──────────────────────────────────────
 
@@ -395,14 +398,12 @@ export async function runCli(argv: string[]): Promise<void> {
 
   // ─── Report Command ───────────────────────────────────────────────────
   if (args.command === "report") {
-    const { runReport } = await import("./commands/report.js");
     runReport(argv);
     return;
   }
 
   // ─── Hook Command ────────────────────────────────────────────────────
   if (args.command === "hook") {
-    const { runHook } = await import("./commands/hook.js");
     runHook(argv);
     return;
   }
@@ -447,7 +448,6 @@ export async function runCli(argv: string[]): Promise<void> {
       } else if (args.format === "markdown") {
         console.log(formatEvaluationAsMarkdown(evaluation));
       } else if (args.format === "html") {
-        const { verdictToHtml } = await import("./formatters/html.js");
         // Wrap single evaluation as a tribunal-like verdict for HTML
         const wrappedVerdict = {
           overallVerdict: evaluation.verdict,
@@ -484,7 +484,6 @@ export async function runCli(argv: string[]): Promise<void> {
         const totalFindings = verdict.evaluations.reduce((s, e) => s + e.findings.length, 0);
         printSummaryLine(verdict.overallVerdict, verdict.overallScore, totalFindings);
       } else if (args.format === "html") {
-        const { verdictToHtml } = await import("./formatters/html.js");
         console.log(verdictToHtml(verdict, resolvedPath || args.file));
       } else {
         console.log(formatTribunalOutput(verdict, args.format, resolvedPath || args.file));

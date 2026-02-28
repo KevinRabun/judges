@@ -8,7 +8,7 @@
  *   judges watch src/ --fail-on-findings  # Exit 1 on first failure
  */
 
-import { existsSync, readFileSync, statSync, watch as fsWatch, readdirSync } from "fs";
+import { existsSync, readFileSync, statSync, watch as fsWatch } from "fs";
 import { resolve, extname, join, relative } from "path";
 
 import { evaluateWithTribunal, evaluateWithJudge } from "../evaluators/index.js";
