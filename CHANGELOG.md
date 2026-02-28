@@ -2,6 +2,17 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.1.1] — 2026-02-28
+
+### Added
+- **GitHub Action** (`action.yml`) — composite action for CI/CD with SARIF upload, fail-on-findings, and job summary.
+- **Dockerfile** — multi-stage Node 20 Alpine build with non-root user for containerized usage.
+- **GitHub Pages dashboard** (`docs/index.html`) — dark-themed dashboard showing project analysis results and judge directory.
+- **Real-world evidence document** (`docs/real-world-evidence.md`) — Express.js, Flask, FastAPI analysis + before/after showcase.
+- **Pages deployment workflow** (`.github/workflows/pages.yml`).
+
+---
+
 ## [3.1.0] — 2026-02-28
 
 ### Added
@@ -16,10 +27,6 @@ All notable changes to **@kevinrabun/judges** are documented here.
 - **Absence-based finding demotion** — findings flagging *missing* patterns are demoted from critical/high to medium to reduce false positives.
 - **28 negative tests** for false positive prevention.
 - **169 subsystem unit tests** (scoring, dedup, config, patches, suppression, SARIF, Python parser).
-- **GitHub Action** for automated PR reviews and CI integration (`action.yml`).
-- **Dockerfile** for non-Node environments (multi-stage, Node 20 Alpine, non-root).
-- **GitHub Pages dashboard** (`docs/index.html`) with project analysis results, judge directory, and quick start.
-- **Real-world evidence showcase** (`docs/real-world-evidence.md`) with Express.js, Flask, and FastAPI analysis.
 - **Quickstart example** (`examples/quickstart.ts`) using the package API.
 - **CHANGELOG.md** with full version history.
 
