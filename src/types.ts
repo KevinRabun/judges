@@ -31,6 +31,19 @@ export interface Finding {
   /** Optional confidence score in range 0-1 indicating analyzer certainty */
   confidence?: number;
   /**
+   * Whether this finding is absence-based — it checks for something missing
+   * (e.g. "no rate limiting") rather than something present. Absence-based
+   * findings are inherently lower confidence in single-file mode because the
+   * missing capability may exist in another file.
+   */
+  isAbsenceBased?: boolean;
+  /**
+   * Provenance hint describing the evidence basis for this finding.
+   * Examples: "regex-pattern-match", "ast-confirmed", "taint-flow",
+   * "absence-of-pattern", "requires-project-context".
+   */
+  provenance?: string;
+  /**
    * Machine-applicable patch for auto-fix. When present, tools can apply the
    * change automatically without human interpretation of `suggestedFix`.
    */

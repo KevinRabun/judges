@@ -287,25 +287,20 @@ export function detectPositiveSignals(code: string): number {
 }
 
 export function calculateScore(findings: Finding[], code?: string): number {
+  const basePenalty: Record<string, number> = {
+    critical: 30,
+    high: 18,
+    medium: 10,
+    low: 5,
+    info: 2,
+  };
+
   let score = 100;
   for (const f of findings) {
-    switch (f.severity) {
-      case "critical":
-        score -= 30;
-        break;
-      case "high":
-        score -= 18;
-        break;
-      case "medium":
-        score -= 10;
-        break;
-      case "low":
-        score -= 5;
-        break;
-      case "info":
-        score -= 2;
-        break;
-    }
+    const penalty = basePenalty[f.severity] ?? 0;
+    // Weight deductions by confidence — low-confidence findings have less impact
+    const confidence = f.confidence ?? 0.5;
+    score -= penalty * confidence;
   }
 
   // Add positive signals bonus if code is provided
@@ -313,14 +308,18 @@ export function calculateScore(findings: Finding[], code?: string): number {
     score += detectPositiveSignals(code);
   }
 
-  return Math.max(0, Math.min(100, score));
+  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 export function deriveVerdict(findings: Finding[], score: number): Verdict {
-  if (findings.some((f) => f.severity === "critical")) return "fail";
+  // Only fail on critical findings with sufficient confidence
+  if (findings.some((f) => f.severity === "critical" && (f.confidence ?? 0.5) >= 0.6)) return "fail";
   if (score < 60) return "fail";
-  if (findings.some((f) => f.severity === "high") || findings.some((f) => f.severity === "medium") || score < 80)
-    return "warning";
+  // High/medium findings need reasonable confidence to trigger warning
+  const significantFindings = findings.filter(
+    (f) => (f.severity === "high" || f.severity === "medium") && (f.confidence ?? 0.5) >= 0.4,
+  );
+  if (significantFindings.length > 0 || score < 80) return "warning";
   return "pass";
 }
 

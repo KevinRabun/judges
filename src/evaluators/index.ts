@@ -9,6 +9,7 @@ import type {
   ProjectVerdict,
   DiffVerdict,
   Finding,
+  Severity,
   Verdict,
   MustFixGateOptions,
   MustFixGateResult,
@@ -372,11 +373,29 @@ export function evaluateWithJudge(
     ? findings
     : findings.filter((f) => !isAbsenceBasedFinding(f));
 
+  // ── Tag & demote remaining absence-based findings ──
+  // In single-file mode, absence-based findings are inherently lower confidence
+  // because the missing capability may exist in another file. Cap their severity
+  // at 'medium' and tag them for downstream consumers.
+  const taggedFindings = gatedFindings.map((f) => {
+    if (isAbsenceBasedFinding(f)) {
+      const cappedSeverity: Record<string, string> = { critical: "medium", high: "medium" };
+      return {
+        ...f,
+        isAbsenceBased: true,
+        provenance: f.provenance ?? "absence-of-pattern",
+        severity: (cappedSeverity[f.severity] ?? f.severity) as Severity,
+        confidence: Math.min(f.confidence ?? 0.5, 0.6),
+      };
+    }
+    return f;
+  });
+
   // ── AST-aware refinements: dead code removal, scope context, import awareness, taint flows ──
   const astStructure = options?._astCache;
   const refinedFindings = astStructure
-    ? applyAstRefinements(gatedFindings, astStructure, options?._taintFlows)
-    : gatedFindings;
+    ? applyAstRefinements(taggedFindings, astStructure, options?._taintFlows)
+    : taggedFindings;
 
   // ── Inline suppression: respect // judges-ignore RULE-ID comments ──
   const unsuppressed = applyInlineSuppressions(refinedFindings, code);

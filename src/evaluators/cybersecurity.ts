@@ -125,8 +125,9 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
   }
 
   // Prototype pollution risk
-  const protoPattern =
-    /\.__proto__|Object\.assign\s*\(\s*\{\}|lodash\.merge|_\.merge|deepmerge|Object\.keys.*forEach.*\[/gi;
+  // NOTE: Object.assign({}, ...) is intentionally excluded — creating a new
+  // empty object as the target is a safe shallow-clone pattern, not pollution.
+  const protoPattern = /\.__proto__|lodash\.merge|_\.merge|deepmerge|Object\.keys[^\n]*forEach[^\n]*\[/gi;
   const protoLines = getLineNumbers(code, protoPattern);
   if (protoLines.length > 0) {
     findings.push({

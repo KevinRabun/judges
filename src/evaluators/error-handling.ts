@@ -55,7 +55,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   if (hasServerCode && !hasGlobalHandler && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
-      severity: "high",
+      severity: "medium",
       title: "No global error handler detected",
       description:
         "Server code without a global error handler. Unhandled errors will crash the process or return raw stack traces to clients.",
@@ -64,7 +64,9 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       reference: "Express Error Handling / Node.js Best Practices",
       suggestedFix:
         "Add global error middleware: app.use((err, req, res, next) => { logger.error(err); res.status(500).json({ error: 'Internal error' }); }); and process.on('unhandledRejection', handler).",
-      confidence: 0.7,
+      confidence: 0.5,
+      isAbsenceBased: true,
+      provenance: "absence-of-pattern",
     });
   }
 
@@ -103,7 +105,9 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       reference: "Async Error Handling Best Practices",
       suggestedFix:
         "Wrap async handlers: try { await operation(); } catch (error) { logger.error(error); } (JS/TS), try: await operation() except Exception as e: ... (Python), if err != nil { ... } (Go).",
-      confidence: 0.7,
+      confidence: 0.55,
+      isAbsenceBased: true,
+      provenance: "absence-of-pattern",
     });
   }
 
@@ -238,7 +242,9 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
       reference: "Error Monitoring Best Practices",
       suggestedFix:
         "Integrate an error reporting service: Sentry.captureException(error) or appInsights.trackException({ exception: error }) for aggregation and alerting.",
-      confidence: 0.7,
+      confidence: 0.5,
+      isAbsenceBased: true,
+      provenance: "absence-of-pattern",
     });
   }
 

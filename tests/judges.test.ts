@@ -179,7 +179,7 @@ const JUDGE_EXPECTATIONS: Record<string, { prefix: string; minFindings: number; 
   caching: { prefix: "CACHE", minFindings: 2 },
   "configuration-management": { prefix: "CFG", minFindings: 3, expectVerdict: "fail" },
   "backwards-compatibility": { prefix: "COMPAT", minFindings: 2 },
-  portability: { prefix: "PORTA", minFindings: 3, expectVerdict: "fail" },
+  portability: { prefix: "PORTA", minFindings: 3, expectVerdict: "warning" },
   ux: { prefix: "UX", minFindings: 2 },
   "logging-privacy": { prefix: "LOGPRIV", minFindings: 3, expectVerdict: "fail" },
   "rate-limiting": { prefix: "RATE", minFindings: 3, expectVerdict: "fail" },

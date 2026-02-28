@@ -27,7 +27,9 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       reference: "OWASP API Security Top 10: API4 — Unrestricted Resource Consumption",
       suggestedFix:
         "Add rate limiting: app.use(rateLimit({ windowMs: 15*60*1000, max: 100 })) (Express), @ratelimit (Django), RateLimiter.of() (Spring), tollbooth.NewLimiter() (Go).",
-      confidence: 0.7,
+      confidence: 0.55,
+      isAbsenceBased: true,
+      provenance: "absence-of-pattern",
     });
   }
 
@@ -84,7 +86,9 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       reference: "IETF Rate Limit Headers / RFC 6585",
       suggestedFix:
         "Add rate limit headers: res.set({ 'X-RateLimit-Limit': limit, 'X-RateLimit-Remaining': remaining, 'X-RateLimit-Reset': resetTime, 'Retry-After': retrySeconds });",
-      confidence: 0.7,
+      confidence: 0.5,
+      isAbsenceBased: true,
+      provenance: "absence-of-pattern",
     });
   }
 

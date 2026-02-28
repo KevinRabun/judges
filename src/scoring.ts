@@ -186,9 +186,15 @@ const ABSENCE_GATED_PREFIXES = [
   "CFG-",
   "SCALE-",
   "REL-",
+  "ERR-",
 ];
 
 export function isAbsenceBasedFinding(finding: Finding): boolean {
+  // Explicit flag from the evaluator takes precedence
+  if (finding.isAbsenceBased === true) {
+    return true;
+  }
+
   if (finding.lineNumbers && finding.lineNumbers.length > 0) {
     return false;
   }
