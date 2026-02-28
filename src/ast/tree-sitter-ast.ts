@@ -358,7 +358,7 @@ function analyzeFunctionNode(node: SyntaxNode, language: string, classRanges: Cl
 // ─── Parameter Counting ─────────────────────────────────────────────────────
 
 function countParameters(funcNode: SyntaxNode, language: string): number {
-  let paramsNode: SyntaxNode | null = null;
+  let paramsNode: SyntaxNode | null;
 
   switch (language) {
     case "typescript":
@@ -499,9 +499,6 @@ const DECISION_NODE_TYPES: Record<string, Set<string>> = {
     "conditional_expression",
   ]),
 };
-
-// Binary operators that add to complexity (&&, ||)
-const LOGICAL_OPS = new Set(["&&", "||", "and", "or"]);
 
 function computeCyclomaticComplexity(funcNode: SyntaxNode, language: string): number {
   let complexity = 1; // base path
@@ -1004,7 +1001,7 @@ function extractDecorators(funcNode: SyntaxNode, language: string): string[] {
       if (parent) {
         for (const child of parent.namedChildren) {
           if (child.type === "attribute_list" && child.endPosition.row < funcNode.startPosition.row) {
-            decorators.push(child.text.replace(/[\[\]]/g, "").split("(")[0]);
+            decorators.push(child.text.replace(/[[\]]/g, "").split("(")[0]);
           }
         }
       }
