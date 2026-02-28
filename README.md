@@ -85,6 +85,22 @@ jobs:
 
 **Outputs** available for downstream steps: `verdict`, `score`, `findings`, `critical`, `high`, `sarif-file`.
 
+### Use with Docker (no Node.js required)
+
+```bash
+# Build the image
+docker build -t judges .
+
+# Evaluate a local file
+docker run --rm -v $(pwd):/code judges eval --file /code/app.ts
+
+# Pipe from stdin
+cat api.py | docker run --rm -i judges eval --language python
+
+# List judges
+docker run --rm judges list
+```
+
 ### Or use as an MCP server
 
 ### 1. Install and Build

@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.github
+*.md
+!README.md
+reports
+artifacts
+tests
+examples
+scripts
+.vscode
+.husky
+coverage
+*.tgz
