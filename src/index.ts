@@ -1,52 +1,56 @@
 #!/usr/bin/env node
 
 /**
- * Judges Panel — MCP Server
+ * Judges Panel — MCP Server + CLI
  *
- * An MCP server that provides a panel of specialized judges to evaluate
- * AI-generated code. Each tool returns both automated pattern-detection
- * findings AND the judge's deep-review criteria, enabling the calling LLM
- * to perform thorough contextual analysis beyond what static patterns catch.
+ * When invoked with a subcommand (eval, list, --help), runs as a CLI tool.
+ * Otherwise, starts as an MCP stdio server.
  *
- * Tools exposed:
- *   - get_judges:                 List all available judges
- *   - evaluate_v2:                Context/evidence-aware V2 evaluation
- *   - evaluate_app_builder_flow:  3-step workflow (review, translate, tasks)
- *   - evaluate_public_repo_report: Clone public repo and generate full report
- *   - evaluate_code:              Full panel review (all judges)
- *   - evaluate_code_single_judge: Review by a specific judge
- *   - evaluate_project:           Multi-file project analysis
- *   - evaluate_diff:              Changed-line-only diff analysis
- *   - analyze_dependencies:       Supply-chain manifest analysis
+ * CLI usage:
+ *   judges eval --file src/app.ts                   # evaluate a file
+ *   judges eval --file src/app.ts --format sarif     # SARIF output
+ *   judges eval --judge cybersecurity server.ts      # single judge
+ *   cat file.ts | judges eval --language typescript  # stdin pipe
+ *   judges list                                      # list all judges
+ *   judges --help                                    # show help
+ *
+ * MCP usage:
+ *   Add to your MCP config (VS Code, Claude Desktop, etc.)
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+// ─── CLI Detection ──────────────────────────────────────────────────────────
+// If the user passed a subcommand or flag, run as CLI instead of MCP server.
 
-import { registerTools } from "./tools/register.js";
-import { registerPrompts } from "./tools/prompts.js";
+const cliCommands = new Set(["eval", "list", "evaluate"]);
+const cliFlags = new Set(["--help", "-h", "--file", "-f", "--version", "-v"]);
+const firstArg = process.argv[2];
 
-// ─── Create MCP Server ──────────────────────────────────────────────────────
+if (firstArg && (cliCommands.has(firstArg) || cliFlags.has(firstArg))) {
+  // Dynamic import to avoid loading MCP SDK when running as CLI
+  import("./cli.js").then(({ runCli }) => runCli(process.argv));
+} else {
+  // ─── MCP Server Mode ────────────────────────────────────────────────────
 
-const server = new McpServer({
-  name: "judges",
-  version: "2.0.0",
-});
+  import("@modelcontextprotocol/sdk/server/mcp.js")
+    .then(async ({ McpServer }) => {
+      const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
+      const { registerTools } = await import("./tools/register.js");
+      const { registerPrompts } = await import("./tools/prompts.js");
 
-// ─── Register Tools & Prompts ────────────────────────────────────────────────
+      const server = new McpServer({
+        name: "judges",
+        version: "3.1.0",
+      });
 
-registerTools(server);
-registerPrompts(server);
+      registerTools(server);
+      registerPrompts(server);
 
-// ─── Start Server ────────────────────────────────────────────────────────────
-
-async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Judges Panel MCP server running on stdio");
+      const transport = new StdioServerTransport();
+      await server.connect(transport);
+      console.error("Judges Panel MCP server running on stdio");
+    })
+    .catch((err) => {
+      console.error("Failed to start Judges Panel:", err);
+      process.exit(1);
+    });
 }
-
-main().catch((err) => {
-  console.error("Failed to start Judges Panel:", err);
-  process.exit(1);
-});

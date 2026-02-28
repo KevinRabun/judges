@@ -9,11 +9,56 @@ An MCP (Model Context Protocol) server that provides a panel of **35 specialized
 
 [![CI](https://github.com/KevinRabun/judges/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinRabun/judges/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
+[![npm downloads](https://img.shields.io/npm/dw/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://img.shields.io/badge/tests-899-brightgreen)](https://github.com/KevinRabun/judges/actions)
+
+---
+
+## Why Judges?
+
+AI code generators (Copilot, Cursor, Claude, ChatGPT, etc.) write code fast — but they routinely produce **insecure defaults, missing auth, hardcoded secrets, and poor error handling**. Human reviewers catch some of this, but nobody reviews 35 dimensions consistently.
+
+| | ESLint / Biome | SonarQube | Semgrep / CodeQL | **Judges** |
+|---|---|---|---|---|
+| **Scope** | Style + some bugs | Bugs + code smells | Security patterns | **35 domains**: security, cost, compliance, a11y, API design, cloud, UX, … |
+| **AI-generated code focus** | No | No | Partial | **Purpose-built** for AI output failure modes |
+| **Setup** | Config per project | Server + scanner | Cloud or local | **One command**: `npx @kevinrabun/judges eval file.ts` |
+| **Auto-fix patches** | Some | No | No | **47 deterministic patches** — no LLM needed |
+| **Non-technical output** | No | Dashboard | No | **Plain-language findings** with What/Why/Next |
+| **MCP native** | No | No | No | **Yes** — works inside Copilot, Claude, Cursor |
+| **SARIF output** | No | Yes | Yes | **Yes** — upload to GitHub Code Scanning |
+| **Cost** | Free | $$$$ | Free/paid | **Free / MIT** |
+
+**Judges doesn't replace linters** — it covers the dimensions linters don't: authentication strategy, data sovereignty, cost patterns, accessibility, framework-specific anti-patterns, and architectural issues across multiple files.
 
 ---
 
 ## Quick Start
+
+### Try it now (no clone needed)
+
+```bash
+# Install globally
+npm install -g @kevinrabun/judges
+
+# Evaluate any file
+judges eval src/app.ts
+
+# Pipe from stdin
+cat api.py | judges eval --language python
+
+# Single judge
+judges eval --judge cybersecurity server.ts
+
+# SARIF output for CI
+judges eval --file app.ts --format sarif > results.sarif
+
+# List all 35 judges
+judges list
+```
+
+### Or use as an MCP server
 
 ### 1. Install and Build
 

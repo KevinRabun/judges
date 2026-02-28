@@ -14,11 +14,9 @@ import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
-import {
-  evaluateWithTribunal,
-  runAppBuilderWorkflow,
-  formatVerdictAsMarkdown,
-} from "../src/evaluators/index.js";
+// When running from the repo (npm run demo), we import from source.
+// When installed as a package, use: import { evaluateCode, ... } from "@kevinrabun/judges/api";
+import { evaluateWithTribunal, runAppBuilderWorkflow, formatVerdictAsMarkdown } from "../src/evaluators/index.js";
 
 // ─── Load the sample code ────────────────────────────────────────────────────
 
@@ -62,18 +60,11 @@ console.log();
 console.log("  Per-Judge Breakdown:");
 console.log("  " + "─".repeat(60));
 for (const evaluation of verdict.evaluations) {
-  const icon =
-    evaluation.verdict === "pass"
-      ? "✅"
-      : evaluation.verdict === "warning"
-      ? "⚠️ "
-      : "❌";
+  const icon = evaluation.verdict === "pass" ? "✅" : evaluation.verdict === "warning" ? "⚠️ " : "❌";
   const name = evaluation.judgeName.padEnd(28);
   const score = String(evaluation.score).padStart(3);
   const findings = String(evaluation.findings.length).padStart(2);
-  console.log(
-    `  ${icon} ${name} ${score}/100   ${findings} finding(s)`
-  );
+  console.log(`  ${icon} ${name} ${score}/100   ${findings} finding(s)`);
 }
 
 console.log();
@@ -85,8 +76,7 @@ console.log();
 const workflow = runAppBuilderWorkflow({
   code: sampleCode,
   language: "typescript",
-  context:
-    "Demo API service used to illustrate production-readiness checks and remediation planning.",
+  context: "Demo API service used to illustrate production-readiness checks and remediation planning.",
   maxFindings: 5,
   maxTasks: 8,
 });
@@ -95,8 +85,8 @@ const decisionLabel =
   workflow.releaseDecision === "do-not-ship"
     ? "Do not ship"
     : workflow.releaseDecision === "ship-with-caution"
-    ? "Ship with caution"
-    : "Ship now";
+      ? "Ship with caution"
+      : "Ship now";
 
 console.log("╔══════════════════════════════════════════════════════════════╗");
 console.log("║             App Builder Workflow Demo (3-Step)             ║");
@@ -105,7 +95,7 @@ console.log();
 console.log(`  Decision       : ${decisionLabel}`);
 console.log(`  Verdict        : ${workflow.verdict.toUpperCase()} (${workflow.score}/100)`);
 console.log(
-  `  Risk Counts    : Critical ${workflow.criticalCount} | High ${workflow.highCount} | Medium ${workflow.mediumCount}`
+  `  Risk Counts    : Critical ${workflow.criticalCount} | High ${workflow.highCount} | Medium ${workflow.mediumCount}`,
 );
 console.log(`  Summary        : ${workflow.summary}`);
 console.log();
@@ -115,9 +105,7 @@ if (workflow.plainLanguageFindings.length === 0) {
   console.log("  - No critical/high/medium findings detected.");
 } else {
   for (const finding of workflow.plainLanguageFindings) {
-    console.log(
-      `  - [${finding.severity.toUpperCase()}] ${finding.ruleId}: ${finding.title}`
-    );
+    console.log(`  - [${finding.severity.toUpperCase()}] ${finding.ruleId}: ${finding.title}`);
     console.log(`      What: ${finding.whatIsWrong}`);
     console.log(`      Why : ${finding.whyItMatters}`);
     console.log(`      Next: ${finding.nextAction}`);
@@ -130,9 +118,7 @@ if (workflow.tasks.length === 0) {
   console.log("  - No tasks generated.");
 } else {
   for (const task of workflow.tasks) {
-    console.log(
-      `  - ${task.priority} | ${task.owner.toUpperCase()} | Effort ${task.effort} | ${task.ruleId}`
-    );
+    console.log(`  - ${task.priority} | ${task.owner.toUpperCase()} | Effort ${task.effort} | ${task.ruleId}`);
     console.log(`      Task: ${task.task}`);
     console.log(`      Done: ${task.doneWhen}`);
   }

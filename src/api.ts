@@ -78,6 +78,9 @@ export { clearProjectCache } from "./evaluators/project.js";
 export { findingsToSarif, evaluationToSarif, verdictToSarif, validateSarifLog } from "./formatters/sarif.js";
 export type { SarifValidationError } from "./formatters/sarif.js";
 
+// ─── CLI ─────────────────────────────────────────────────────────────────────
+export { runCli } from "./cli.js";
+
 // ─── Convenience Aliases ─────────────────────────────────────────────────────
 
 import { evaluateWithTribunal, evaluateWithJudge } from "./evaluators/index.js";
