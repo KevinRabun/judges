@@ -30,6 +30,26 @@ export interface Finding {
   suggestedFix?: string;
   /** Optional confidence score in range 0-1 indicating analyzer certainty */
   confidence?: number;
+  /**
+   * Machine-applicable patch for auto-fix. When present, tools can apply the
+   * change automatically without human interpretation of `suggestedFix`.
+   */
+  patch?: Patch;
+}
+
+/**
+ * A structured, machine-applicable patch describing an exact text replacement
+ * within a source file.
+ */
+export interface Patch {
+  /** The original text to replace (exact match) */
+  oldText: string;
+  /** The corrected replacement text */
+  newText: string;
+  /** 1-based start line of the region to patch */
+  startLine: number;
+  /** 1-based end line (inclusive) of the region to patch */
+  endLine: number;
 }
 
 // ─── Configuration ───────────────────────────────────────────────────────────
@@ -37,15 +57,7 @@ export interface Finding {
 /**
  * Supported language families for multi-language analysis.
  */
-export type LangFamily =
-  | "javascript"
-  | "typescript"
-  | "python"
-  | "rust"
-  | "csharp"
-  | "java"
-  | "go"
-  | "unknown";
+export type LangFamily = "javascript" | "typescript" | "python" | "rust" | "csharp" | "java" | "go" | "unknown";
 
 /**
  * Per-rule configuration override.
@@ -159,10 +171,7 @@ export interface DependencyVerdict {
 /**
  * High-level release recommendation for non-technical stakeholders.
  */
-export type ReleaseDecision =
-  | "ship-now"
-  | "ship-with-caution"
-  | "do-not-ship";
+export type ReleaseDecision = "ship-now" | "ship-with-caution" | "do-not-ship";
 
 /**
  * Plain-language translation of a technical finding.
@@ -235,13 +244,7 @@ export interface AppBuilderWorkflowResult {
 /**
  * Policy profile for domain-specific governance overlays.
  */
-export type PolicyProfile =
-  | "default"
-  | "startup"
-  | "regulated"
-  | "healthcare"
-  | "fintech"
-  | "public-sector";
+export type PolicyProfile = "default" | "startup" | "regulated" | "healthcare" | "fintech" | "public-sector";
 
 /**
  * Optional context used to improve semantic relevance of judge feedback.
@@ -373,7 +376,9 @@ export interface TribunalVerdict {
   summary: string;
   /** Individual judge evaluations */
   evaluations: JudgeEvaluation[];
-  /** Total number of critical/high findings */
+  /** Deduplicated cross-evaluator findings (same issue on same line merged) */
+  findings: Finding[];
+  /** Total number of critical/high findings (after cross-evaluator dedup) */
   criticalCount: number;
   highCount: number;
   /** Timestamp of evaluation */
@@ -420,6 +425,12 @@ export interface JudgeDefinition {
   description: string;
   /** The system prompt that defines this judge's persona and evaluation criteria */
   systemPrompt: string;
-  /** Rule prefixes this judge uses (e.g. "SEC", "COST") */
+  /** Rule prefixes this judge uses (e.g. "SEC", "CYBER") */
   rulePrefix: string;
+  /**
+   * The analyzer function for this judge. Each judge carries its own analysis
+   * logic, eliminating the need for a central dispatch switch. Wired up
+   * automatically in the judge registry (judges/index.ts).
+   */
+  analyze?: (code: string, language: string) => Finding[];
 }

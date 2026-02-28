@@ -2,20 +2,68 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.KevinRabun/judges",
   "title": "Judges Panel",
-  "description": "34 judges that evaluate AI-generated code for security, cost, and quality with built-in AST.",
+  "description": "35 judges that evaluate AI-generated code for security, cost, and quality with built-in AST.",
   "repository": {
     "url": "https://github.com/kevinrabun/judges",
     "source": "github"
   },
-  "version": "2.3.0",
+  "version": "3.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@kevinrabun/judges",
-      "version": "2.3.0",
+      "version": "3.0.0",
       "transport": {
         "type": "stdio"
       }
+    }
+  ],
+  "tools": [
+    {
+      "name": "evaluate_code",
+      "description": "Submit code to the full 35-judge tribunal for security, cost, and quality analysis with optional inline configuration."
+    },
+    {
+      "name": "evaluate_code_single_judge",
+      "description": "Run a single judge against code for targeted domain analysis (e.g. cybersecurity, cost-effectiveness)."
+    },
+    {
+      "name": "evaluate_project",
+      "description": "Multi-file project analysis with cross-file architectural detection (duplication, dependency cycles, inconsistent error handling)."
+    },
+    {
+      "name": "evaluate_diff",
+      "description": "Evaluate only changed lines in a diff — filters findings to affected lines for PR reviews."
+    },
+    {
+      "name": "analyze_dependencies",
+      "description": "Analyze dependency manifests (package.json, requirements.txt, Cargo.toml, etc.) for supply-chain risks and version pinning issues."
+    },
+    {
+      "name": "get_judges",
+      "description": "List all available judges with their IDs, names, and domains."
+    },
+    {
+      "name": "evaluate_v2",
+      "description": "V2 context-aware tribunal evaluation with policy profiles, confidence scoring, and structured context ingestion."
+    },
+    {
+      "name": "evaluate_app_builder_flow",
+      "description": "3-step app-builder workflow: tribunal review, plain-language risk translation, and prioritized remediation tasks."
+    },
+    {
+      "name": "evaluate_public_repo_report",
+      "description": "Clone a public repository URL, run the full judges panel, and generate a consolidated markdown report."
+    }
+  ],
+  "prompts": [
+    {
+      "name": "full-tribunal",
+      "description": "Convene all 35 judges for a comprehensive LLM-powered deep review."
+    },
+    {
+      "name": "judge-{id}",
+      "description": "Individual judge prompts (35 total) — use a specific judge's expert persona for targeted LLM-powered analysis."
     }
   ]
 }

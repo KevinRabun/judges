@@ -1,5 +1,5 @@
 import { JUDGES, getJudge } from "../judges/index.js";
-import {
+import type {
   EvidenceBundleV2,
   EvaluationContextV2,
   Finding,
@@ -22,21 +22,11 @@ type PolicyEscalationRule = {
 
 const POLICY_ESCALATIONS: Record<PolicyProfile, PolicyEscalationRule[]> = {
   default: [],
-  startup: [
-    { prefixes: ["PERF", "REL"], minimumSeverity: "medium" },
-  ],
-  regulated: [
-    { prefixes: ["COMP", "DATA", "CYBER", "SOV", "LOGPRIV", "AICS"], minimumSeverity: "high" },
-  ],
-  healthcare: [
-    { prefixes: ["COMP", "DATA", "LOGPRIV", "AUTH", "AICS"], minimumSeverity: "high" },
-  ],
-  fintech: [
-    { prefixes: ["AUTH", "CYBER", "COMP", "DB", "RATE", "AICS"], minimumSeverity: "high" },
-  ],
-  "public-sector": [
-    { prefixes: ["SOV", "COMP", "CYBER", "CFG", "AICS"], minimumSeverity: "high" },
-  ],
+  startup: [{ prefixes: ["PERF", "REL"], minimumSeverity: "medium" }],
+  regulated: [{ prefixes: ["COMP", "DATA", "CYBER", "SOV", "LOGPRIV", "AICS"], minimumSeverity: "high" }],
+  healthcare: [{ prefixes: ["COMP", "DATA", "LOGPRIV", "AUTH", "AICS"], minimumSeverity: "high" }],
+  fintech: [{ prefixes: ["AUTH", "CYBER", "COMP", "DB", "RATE", "AICS"], minimumSeverity: "high" }],
+  "public-sector": [{ prefixes: ["SOV", "COMP", "CYBER", "CFG", "AICS"], minimumSeverity: "high" }],
 };
 
 const severityRank: Record<Severity, number> = {
@@ -48,9 +38,7 @@ const severityRank: Record<Severity, number> = {
 };
 
 function elevateSeverity(severity: Severity, minimumSeverity: Severity): Severity {
-  return severityRank[severity] >= severityRank[minimumSeverity]
-    ? severity
-    : minimumSeverity;
+  return severityRank[severity] >= severityRank[minimumSeverity] ? severity : minimumSeverity;
 }
 
 function mapSpecialty(ruleId: string): string {
@@ -160,7 +148,7 @@ function applyPolicyProfile(findings: Finding[], profile: PolicyProfile): Findin
 function confidenceForFinding(
   finding: Finding,
   context?: EvaluationContextV2,
-  evidence?: EvidenceBundleV2
+  evidence?: EvidenceBundleV2,
 ): { confidence: number; evidenceBasis: string[] } {
   let confidence = 0.4;
   const evidenceBasis: string[] = [];
@@ -206,10 +194,7 @@ function confidenceForFinding(
   };
 }
 
-function buildUncertainty(
-  context?: EvaluationContextV2,
-  evidence?: EvidenceBundleV2
-): UncertaintyReportV2 {
+function buildUncertainty(context?: EvaluationContextV2, evidence?: EvidenceBundleV2): UncertaintyReportV2 {
   const assumptions: string[] = [];
   const missingEvidence: string[] = [];
   const escalationRecommendations: string[] = [];
@@ -238,14 +223,12 @@ function buildUncertainty(
 
   if (missingEvidence.length > 0) {
     escalationRecommendations.push(
-      "Provide missing artifacts and re-run V2 evaluation to improve confidence calibration."
+      "Provide missing artifacts and re-run V2 evaluation to improve confidence calibration.",
     );
   }
 
   if (!context?.dataBoundaryModel) {
-    escalationRecommendations.push(
-      "Add data-boundary model notes for stronger sovereignty/privacy judgments."
-    );
+    escalationRecommendations.push("Add data-boundary model notes for stronger sovereignty/privacy judgments.");
   }
 
   return {
@@ -260,7 +243,7 @@ function summarizeV2(
   calibratedScore: number,
   findings: SpecializedFindingV2[],
   confidence: number,
-  policyProfile: PolicyProfile
+  policyProfile: PolicyProfile,
 ): string {
   const critical = findings.filter((finding) => finding.severity === "critical").length;
   const high = findings.filter((finding) => finding.severity === "high").length;
@@ -293,9 +276,7 @@ function aggregateSpecialtyFeedback(findings: SpecializedFindingV2[]): Specialty
 
     if (judgeFindings.length === 0) continue;
 
-    const avgConfidence =
-      judgeFindings.reduce((sum, finding) => sum + finding.confidence, 0) /
-      judgeFindings.length;
+    const avgConfidence = judgeFindings.reduce((sum, finding) => sum + finding.confidence, 0) / judgeFindings.length;
 
     feedback.push({
       judgeId: judge.id,
@@ -308,8 +289,7 @@ function aggregateSpecialtyFeedback(findings: SpecializedFindingV2[]): Specialty
 
   for (const [specialty, specialtyFindings] of groupedBySpecialty.entries()) {
     const avgConfidence =
-      specialtyFindings.reduce((sum, finding) => sum + finding.confidence, 0) /
-      specialtyFindings.length;
+      specialtyFindings.reduce((sum, finding) => sum + finding.confidence, 0) / specialtyFindings.length;
     feedback.push({
       judgeId: "specialty",
       judgeName: `Specialty ${specialty}`,
@@ -325,7 +305,7 @@ function aggregateSpecialtyFeedback(findings: SpecializedFindingV2[]): Specialty
 function confidenceForNoFindings(
   context?: EvaluationContextV2,
   evidence?: EvidenceBundleV2,
-  uncertainty?: UncertaintyReportV2
+  uncertainty?: UncertaintyReportV2,
 ): number {
   let confidence = 0.55;
 
@@ -355,7 +335,7 @@ function confidenceForNoFindings(
 function enrichFindings(
   findings: Finding[],
   context?: EvaluationContextV2,
-  evidence?: EvidenceBundleV2
+  evidence?: EvidenceBundleV2,
 ): SpecializedFindingV2[] {
   return findings.map((finding) => {
     const confidenceResult = confidenceForFinding(finding, context, evidence);
@@ -388,18 +368,13 @@ export function evaluateCodeV2(params: {
   evaluationContext?: EvaluationContextV2;
   evidence?: EvidenceBundleV2;
 }): TribunalVerdictV2 {
-  const baseVerdict = evaluateWithTribunal(
-    params.code,
-    params.language,
-    params.context,
-    {
-      includeAstFindings: params.includeAstFindings,
-      minConfidence: params.minConfidence,
-    }
-  );
+  const baseVerdict = evaluateWithTribunal(params.code, params.language, params.context, {
+    includeAstFindings: params.includeAstFindings,
+    minConfidence: params.minConfidence,
+  });
 
   const profile = params.policyProfile ?? "default";
-  const baseFindings = baseVerdict.evaluations.flatMap((evaluation) => evaluation.findings);
+  const baseFindings = baseVerdict.findings;
   const policyFindings = applyPolicyProfile(baseFindings, profile);
   const findings = enrichFindings(policyFindings, params.evaluationContext, params.evidence);
   const specialtyFeedback = aggregateSpecialtyFeedback(findings);
@@ -409,12 +384,7 @@ export function evaluateCodeV2(params: {
   const confidence =
     findings.length === 0
       ? confidenceForNoFindings(params.evaluationContext, params.evidence, uncertainty)
-      : Number(
-          (
-            findings.reduce((sum, finding) => sum + finding.confidence, 0) /
-            findings.length
-          ).toFixed(2)
-        );
+      : Number((findings.reduce((sum, finding) => sum + finding.confidence, 0) / findings.length).toFixed(2));
 
   return {
     policyProfile: profile,
@@ -425,13 +395,7 @@ export function evaluateCodeV2(params: {
     specialtyFeedback,
     confidence,
     uncertainty,
-    summary: summarizeV2(
-      calibrated.verdict,
-      calibrated.score,
-      findings,
-      confidence,
-      profile
-    ),
+    summary: summarizeV2(calibrated.verdict, calibrated.score, findings, confidence, profile),
     timestamp: new Date().toISOString(),
   };
 }
@@ -465,18 +429,14 @@ export function evaluateProjectV2(params: {
   const confidence =
     findings.length === 0
       ? confidenceForNoFindings(params.evaluationContext, params.evidence, uncertainty)
-      : Number(
-          (
-            findings.reduce((sum, finding) => sum + finding.confidence, 0) /
-            findings.length
-          ).toFixed(2)
-        );
+      : Number((findings.reduce((sum, finding) => sum + finding.confidence, 0) / findings.length).toFixed(2));
 
   const baseTribunal: TribunalVerdict = {
     overallVerdict: projectVerdict.overallVerdict,
     overallScore: projectVerdict.overallScore,
     summary: projectVerdict.summary,
     evaluations: [],
+    findings: projectVerdict.findings,
     criticalCount: projectVerdict.criticalCount,
     highCount: projectVerdict.highCount,
     timestamp: projectVerdict.timestamp,
@@ -491,26 +451,13 @@ export function evaluateProjectV2(params: {
     specialtyFeedback,
     confidence,
     uncertainty,
-    summary: summarizeV2(
-      calibrated.verdict,
-      calibrated.score,
-      findings,
-      confidence,
-      profile
-    ),
+    summary: summarizeV2(calibrated.verdict, calibrated.score, findings, confidence, profile),
     timestamp: projectVerdict.timestamp,
   };
 }
 
 export function getSupportedPolicyProfiles(): PolicyProfile[] {
-  return [
-    "default",
-    "startup",
-    "regulated",
-    "healthcare",
-    "fintech",
-    "public-sector",
-  ];
+  return ["default", "startup", "regulated", "healthcare", "fintech", "public-sector"];
 }
 
 export function getJudgeByIdForV2(judgeId: string) {

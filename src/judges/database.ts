@@ -1,4 +1,4 @@
-import { JudgeDefinition } from "../types.js";
+import type { JudgeDefinition } from "../types.js";
 
 export const databaseJudge: JudgeDefinition = {
   id: "database",

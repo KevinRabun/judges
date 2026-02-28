@@ -1,4 +1,4 @@
-import { Finding } from "../types.js";
+import type { Finding } from "../types.js";
 import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -8,10 +8,7 @@ import * as LP from "../language-patterns.js";
  * hallucinated imports, debug-mode defaults, insecure WebSocket, placeholder
  * security comments, and overly permissive CSP directives.
  */
-export function analyzeAiCodeSafety(
-  code: string,
-  language: string
-): Finding[] {
+export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "AICS";
@@ -29,9 +26,7 @@ export function analyzeAiCodeSafety(
   const promptTemplateLines = getLineNumbers(code, promptTemplatePattern);
   const hasLlmCall = llmCallPattern.test(code);
 
-  const allPromptInjectionLines = [
-    ...new Set([...promptConcatLines, ...promptTemplateLines]),
-  ].sort((a, b) => a - b);
+  const allPromptInjectionLines = [...new Set([...promptConcatLines, ...promptTemplateLines])].sort((a, b) => a - b);
 
   if (allPromptInjectionLines.length > 0 && hasLlmCall) {
     findings.push({
@@ -44,7 +39,8 @@ export function analyzeAiCodeSafety(
       recommendation:
         "Never concatenate raw user input into system or few-shot prompts. Use a dedicated user-message role, apply input length limits, strip control characters, and validate inputs against an allow-list. Consider output guardrails (content filters, response validation) as a defence-in-depth layer.",
       reference: "OWASP LLM Top 10 — LLM01: Prompt Injection",
-      suggestedFix: "Move user input into a dedicated { role: 'user', content: sanitize(input) } message. Never concatenate into the system prompt. Apply input length limits and strip control characters.",
+      suggestedFix:
+        "Move user input into a dedicated { role: 'user', content: sanitize(input) } message. Never concatenate into the system prompt. Apply input length limits and strip control characters.",
       confidence: 0.85,
     });
   } else {
@@ -62,9 +58,7 @@ export function analyzeAiCodeSafety(
 
   if (hasLlmCall && llmResponseLines.length > 0 && dangerousSinkLines.length > 0) {
     const overlapLines = llmResponseLines.filter((line) => {
-      const nearby = dangerousSinkLines.some(
-        (sinkLine) => Math.abs(sinkLine - line) <= 5
-      );
+      const nearby = dangerousSinkLines.some((sinkLine) => Math.abs(sinkLine - line) <= 5);
       return nearby;
     });
 
@@ -78,9 +72,9 @@ export function analyzeAiCodeSafety(
         lineNumbers: overlapLines,
         recommendation:
           "Treat all LLM output as untrusted user input. Sanitise HTML with DOMPurify before rendering, parameterise SQL queries, and never pass LLM output to eval() or shell commands. Validate output structure against an expected schema.",
-        reference:
-          "OWASP LLM Top 10 — LLM02: Insecure Output Handling — CWE-79 / CWE-89",
-        suggestedFix: "Sanitize LLM output before use: DOMPurify.sanitize(output) for HTML, parameterized queries for SQL, and never pass to eval() or shell commands.",
+        reference: "OWASP LLM Top 10 — LLM02: Insecure Output Handling — CWE-79 / CWE-89",
+        suggestedFix:
+          "Sanitize LLM output before use: DOMPurify.sanitize(output) for HTML, parameterized queries for SQL, and never pass to eval() or shell commands.",
         confidence: 0.85,
       });
     } else {
@@ -104,7 +98,8 @@ export function analyzeAiCodeSafety(
       recommendation:
         "Implement the security controls indicated by each comment before merging. If the control is not needed, remove the comment and document why. Do not ship TODO security comments to production.",
       reference: "CWE-1188: Insecure Default Initialization of Resource",
-      suggestedFix: "Replace each TODO/FIXME security comment with a working implementation or remove the comment and document why the control is unnecessary.",
+      suggestedFix:
+        "Replace each TODO/FIXME security comment with a working implementation or remove the comment and document why the control is unnecessary.",
       confidence: 0.9,
     });
   } else {
@@ -114,12 +109,9 @@ export function analyzeAiCodeSafety(
   // ── AICS-004  Debug / development mode left enabled ────────────────────────
   const debugModePattern =
     /\bdebug\s*[:=]\s*(?:true|True|1|["']true["'])|app\.debug\s*=\s*True|DEBUG\s*=\s*True|NODE_ENV\s*(?:!==?|!=)\s*["']production["'].*(?:debug|verbose|log)|development\s*mode|debug\s*mode\s*(?:enabled|on|active)/gi;
-  const flaskDebugPattern =
-    /app\.run\s*\([^)]*debug\s*=\s*True/gi;
-  const djangoDebugPattern =
-    /^\s*DEBUG\s*=\s*True\s*$/gm;
-  const springDebugPattern =
-    /logging\.level\s*=\s*DEBUG|management\.endpoints\.web\.exposure\.include\s*=\s*\*/gi;
+  const flaskDebugPattern = /app\.run\s*\([^)]*debug\s*=\s*True/gi;
+  const djangoDebugPattern = /^\s*DEBUG\s*=\s*True\s*$/gm;
+  const springDebugPattern = /logging\.level\s*=\s*DEBUG|management\.endpoints\.web\.exposure\.include\s*=\s*\*/gi;
 
   const debugLines = [
     ...getLineNumbers(code, debugModePattern),
@@ -140,7 +132,8 @@ export function analyzeAiCodeSafety(
       recommendation:
         "Set debug=false / NODE_ENV='production' for production builds. Gate verbose logging behind environment checks. Ensure debug settings are externalized to environment variables.",
       reference: "CWE-489: Active Debug Code — OWASP Security Misconfiguration",
-      suggestedFix: "Replace hardcoded debug=true with environment-gated: debug: process.env.NODE_ENV !== 'production' or DEBUG=process.env.DEBUG === 'true'.",
+      suggestedFix:
+        "Replace hardcoded debug=true with environment-gated: debug: process.env.NODE_ENV !== 'production' or DEBUG=process.env.DEBUG === 'true'.",
       confidence: 0.9,
     });
   } else {
@@ -161,7 +154,8 @@ export function analyzeAiCodeSafety(
       recommendation:
         "Use 'wss://' (WebSocket Secure) for all WebSocket connections. Ensure TLS is properly configured on the server side.",
       reference: "CWE-319: Cleartext Transmission of Sensitive Information",
-      suggestedFix: "Replace ws:// with wss:// for all WebSocket connections and ensure TLS certificates are properly configured on the server side.",
+      suggestedFix:
+        "Replace ws:// with wss:// for all WebSocket connections and ensure TLS certificates are properly configured on the server side.",
       confidence: 0.9,
     });
   } else {
@@ -169,10 +163,8 @@ export function analyzeAiCodeSafety(
   }
 
   // ── AICS-006  Overly permissive Content-Security-Policy directives ─────────
-  const cspPattern =
-    /Content-Security-Policy|contentSecurityPolicy|csp|helmet\s*\(\s*\{/gi;
-  const cspUnsafePattern =
-    /unsafe-inline|unsafe-eval|script-src\s+['"]\s*\*\s*['"]/gi;
+  const cspPattern = /Content-Security-Policy|contentSecurityPolicy|csp|helmet\s*\(\s*\{/gi;
+  const cspUnsafePattern = /unsafe-inline|unsafe-eval|script-src\s+['"]\s*\*\s*['"]/gi;
   const cspLines = getLineNumbers(code, cspPattern);
   const cspUnsafeLines = getLineNumbers(code, cspUnsafePattern);
 
@@ -187,7 +179,8 @@ export function analyzeAiCodeSafety(
       recommendation:
         "Remove 'unsafe-inline' and 'unsafe-eval' from CSP. Use nonce-based or hash-based CSP for inline scripts. Restrict script-src to trusted domains instead of '*'.",
       reference: "OWASP CSP — CWE-693: Protection Mechanism Failure",
-      suggestedFix: "Remove 'unsafe-inline' and 'unsafe-eval' from CSP. Use nonce-based script-src: script-src 'nonce-{random}' and restrict sources to trusted domains.",
+      suggestedFix:
+        "Remove 'unsafe-inline' and 'unsafe-eval' from CSP. Use nonce-based script-src: script-src 'nonce-{random}' and restrict sources to trusted domains.",
       confidence: 0.85,
     });
   } else {
@@ -227,7 +220,8 @@ export function analyzeAiCodeSafety(
         recommendation:
           "Define proper interfaces for security-related data structures (tokens, sessions, credentials). Replace 'as any' with explicit types or runtime validation (zod, io-ts).",
         reference: "CWE-704: Incorrect Type Conversion or Cast",
-        suggestedFix: "Replace 'as any' with a proper interface: interface TokenPayload { sub: string; exp: number; roles: string[] } and validate at runtime with zod or io-ts.",
+        suggestedFix:
+          "Replace 'as any' with a proper interface: interface TokenPayload { sub: string; exp: number; roles: string[] } and validate at runtime with zod or io-ts.",
         confidence: 0.75,
       });
     } else {
@@ -240,8 +234,7 @@ export function analyzeAiCodeSafety(
   // ── AICS-008  Hardcoded URLs, endpoints, or IP addresses ──────────────────
   const hardcodedUrlPattern =
     /(?:const|let|var|=)\s*.*(?:["'`]https?:\/\/(?!localhost|127\.0\.0\.1|0\.0\.0\.0|example\.com|schema\.org|w3\.org|json-schema\.org|swagger\.io)\S{10,}["'`])/gi;
-  const hardcodedIpPattern =
-    /["'`]\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?::\d+)?["'`]/g;
+  const hardcodedIpPattern = /["'`]\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?::\d+)?["'`]/g;
 
   const urlLines = getLineNumbers(code, hardcodedUrlPattern);
   const ipLines = getLineNumbers(code, hardcodedIpPattern);
@@ -252,9 +245,7 @@ export function analyzeAiCodeSafety(
     return !/127\.0\.0\.1|0\.0\.0\.0|255\.255\.255|localhost/i.test(line);
   });
 
-  const allHardcodedEndpointLines = [
-    ...new Set([...urlLines, ...filteredIpLines]),
-  ].sort((a, b) => a - b);
+  const allHardcodedEndpointLines = [...new Set([...urlLines, ...filteredIpLines])].sort((a, b) => a - b);
 
   if (allHardcodedEndpointLines.length > 0) {
     findings.push({
@@ -266,7 +257,8 @@ export function analyzeAiCodeSafety(
       recommendation:
         "Move all endpoint URLs and IP addresses to environment variables or a configuration file. Use service discovery or DNS for internal services.",
       reference: "12-Factor App: Config (Factor III) — CWE-798",
-      suggestedFix: "Move URLs to environment variables: const apiUrl = process.env.API_URL ?? 'http://localhost:3000'; and load from .env files per environment.",
+      suggestedFix:
+        "Move URLs to environment variables: const apiUrl = process.env.API_URL ?? 'http://localhost:3000'; and load from .env files per environment.",
       confidence: 0.8,
     });
   } else {
@@ -274,8 +266,7 @@ export function analyzeAiCodeSafety(
   }
 
   // ── AICS-009  Binding to all interfaces without intent ─────────────────────
-  const bindAllPattern =
-    /(?:listen|bind|serve|Listen|Bind)\s*\(\s*(?:["'`]0\.0\.0\.0["'`]|["'`]::["'`])/gi;
+  const bindAllPattern = /(?:listen|bind|serve|Listen|Bind)\s*\(\s*(?:["'`]0\.0\.0\.0["'`]|["'`]::["'`])/gi;
   const bindAllLines = getLineNumbers(code, bindAllPattern);
   if (bindAllLines.length > 0) {
     findings.push({
@@ -288,7 +279,8 @@ export function analyzeAiCodeSafety(
       recommendation:
         "Bind to 127.0.0.1 or localhost for development. For production, use 0.0.0.0 only behind a reverse proxy or firewall. Make the bind address configurable via environment variable.",
       reference: "CWE-668: Exposure of Resource to Wrong Sphere",
-      suggestedFix: "Bind to 127.0.0.1 for development: app.listen(PORT, '127.0.0.1'). Make the bind address configurable: const host = process.env.HOST ?? '127.0.0.1'.",
+      suggestedFix:
+        "Bind to 127.0.0.1 for development: app.listen(PORT, '127.0.0.1'). Make the bind address configurable: const host = process.env.HOST ?? '127.0.0.1'.",
       confidence: 0.9,
     });
   } else {
@@ -313,9 +305,9 @@ export function analyzeAiCodeSafety(
       lineNumbers: handlerLines.slice(0, 5),
       recommendation:
         "Add schema validation for all request inputs (body, query, params). Use zod, joi, or yup (Node.js), pydantic (Python), class-validator (NestJS), or equivalent for your framework. Validate at the boundary before any business logic.",
-      reference:
-        "OWASP Input Validation — CWE-20: Improper Input Validation",
-      suggestedFix: "Add schema validation at the boundary: app.post('/api', validate(schema), handler). Use zod, joi, or express-validator to validate body, query, and params.",
+      reference: "OWASP Input Validation — CWE-20: Improper Input Validation",
+      suggestedFix:
+        "Add schema validation at the boundary: app.post('/api', validate(schema), handler). Use zod, joi, or express-validator to validate body, query, and params.",
       confidence: 0.7,
     });
   } else {
@@ -325,12 +317,10 @@ export function analyzeAiCodeSafety(
   // ── AICS-011  LLM API calls without timeout or error handling ──────────────
   if (hasLlmCall) {
     const llmCallLines = getLineNumbers(code, llmCallPattern);
-    const hasTimeout =
-      /timeout|signal|AbortController|asyncio\.wait_for|context\.WithTimeout|CancellationToken/gi.test(
-        code
-      );
-    const hasRetry =
-      /retry|retries|backoff|tenacity|polly|resilience|Circuit/gi.test(code);
+    const hasTimeout = /timeout|signal|AbortController|asyncio\.wait_for|context\.WithTimeout|CancellationToken/gi.test(
+      code,
+    );
+    const hasRetry = /retry|retries|backoff|tenacity|polly|resilience|Circuit/gi.test(code);
 
     if (!hasTimeout && !hasRetry && llmCallLines.length > 0) {
       findings.push({
@@ -343,8 +333,9 @@ export function analyzeAiCodeSafety(
         recommendation:
           "Set explicit timeouts on all LLM API calls (e.g. AbortController in JS, asyncio.wait_for in Python). Implement retry with exponential backoff for transient errors. Add circuit breaker patterns for production workloads.",
         reference: "CWE-400: Uncontrolled Resource Consumption",
-      suggestedFix: "Add timeout and retry: const ctrl = new AbortController(); setTimeout(() => ctrl.abort(), 30000); await openai.chat.completions.create({ ...opts, signal: ctrl.signal }).",
-      confidence: 0.7,
+        suggestedFix:
+          "Add timeout and retry: const ctrl = new AbortController(); setTimeout(() => ctrl.abort(), 30000); await openai.chat.completions.create({ ...opts, signal: ctrl.signal }).",
+        confidence: 0.7,
       });
     } else {
       ruleNum++;
@@ -369,9 +360,9 @@ export function analyzeAiCodeSafety(
         lineNumbers: llmResponseLines.slice(0, 5),
         recommendation:
           "Validate LLM output against an expected schema (JSON schema, zod, pydantic). Apply content moderation for user-facing output. Use structured output / function-calling features when available. Log and monitor output anomalies.",
-        reference:
-          "OWASP LLM Top 10 — LLM02: Insecure Output Handling / LLM09: Overreliance",
-        suggestedFix: "Validate LLM output: const parsed = responseSchema.parse(JSON.parse(llmOutput)); and apply content moderation before rendering to users.",
+        reference: "OWASP LLM Top 10 — LLM02: Insecure Output Handling / LLM09: Overreliance",
+        suggestedFix:
+          "Validate LLM output: const parsed = responseSchema.parse(JSON.parse(llmOutput)); and apply content moderation before rendering to users.",
         confidence: 0.7,
       });
     } else {
@@ -395,9 +386,9 @@ export function analyzeAiCodeSafety(
       lineNumbers: wildcardPermLines,
       recommendation:
         "Follow the principle of least privilege. Grant only the specific actions and resources required. Use separate roles for read vs write operations. Review IAM policies with a tool like AWS IAM Access Analyzer or Azure Policy.",
-      reference:
-        "CWE-250: Execution with Unnecessary Privileges — OWASP Excessive Permissions",
-      suggestedFix: "Replace wildcard '*' permissions with specific actions and resources: { Effect: 'Allow', Action: ['s3:GetObject'], Resource: 'arn:aws:s3:::my-bucket/*' }.",
+      reference: "CWE-250: Execution with Unnecessary Privileges — OWASP Excessive Permissions",
+      suggestedFix:
+        "Replace wildcard '*' permissions with specific actions and resources: { Effect: 'Allow', Action: ['s3:GetObject'], Resource: 'arn:aws:s3:::my-bucket/*' }.",
       confidence: 0.9,
     });
   } else {
@@ -406,8 +397,7 @@ export function analyzeAiCodeSafety(
 
   // ── AICS-014  Missing rate limiting on AI/LLM endpoints ────────────────────
   if (hasLlmCall) {
-    const rateLimitPattern =
-      /rate.?limit|throttle|limiter|token.?bucket|sliding.?window|rateLimit/gi;
+    const rateLimitPattern = /rate.?limit|throttle|limiter|token.?bucket|sliding.?window|rateLimit/gi;
     const hasRateLimit = rateLimitPattern.test(code);
     const handlerCount = getLineNumbers(code, requestHandlerPattern).length;
 
@@ -421,9 +411,9 @@ export function analyzeAiCodeSafety(
         lineNumbers: getLineNumbers(code, requestHandlerPattern).slice(0, 5),
         recommendation:
           "Add rate limiting middleware to all endpoints that trigger LLM calls. Consider per-user and per-IP limits. Implement cost tracking and budget alerts for AI API usage.",
-        reference:
-          "CWE-770: Allocation of Resources Without Limits — OWASP API8: Lack of Rate Limiting",
-        suggestedFix: "Add rate limiting middleware: app.use('/ai/', rateLimit({ windowMs: 60_000, max: 10, keyGenerator: req => req.user.id })); and track per-user AI API costs.",
+        reference: "CWE-770: Allocation of Resources Without Limits — OWASP API8: Lack of Rate Limiting",
+        suggestedFix:
+          "Add rate limiting middleware: app.use('/ai/', rateLimit({ windowMs: 60_000, max: 10, keyGenerator: req => req.user.id })); and track per-user AI API costs.",
         confidence: 0.7,
       });
     } else {
@@ -437,10 +427,7 @@ export function analyzeAiCodeSafety(
   if (hasLlmCall) {
     const sensitiveDataInPromptPattern =
       /(?:ssn|social.?security|password|credit.?card|card.?number|cvv|bank.?account|health.?record|medical|diagnosis|salary|tax.?id|passport|driver.?license)\s*(?:[+:,\]})]|\.toString|String\()/gi;
-    const sensitivePromptLines = getLineNumbers(
-      code,
-      sensitiveDataInPromptPattern
-    );
+    const sensitivePromptLines = getLineNumbers(code, sensitiveDataInPromptPattern);
 
     if (sensitivePromptLines.length > 0) {
       findings.push({
@@ -452,9 +439,9 @@ export function analyzeAiCodeSafety(
         lineNumbers: sensitivePromptLines,
         recommendation:
           "Never send raw PII, financial, or health data to external AI services. Anonymise or pseudonymise data before sending. Use on-premise or private-endpoint AI deployments for regulated data. Implement data classification and DLP policies.",
-        reference:
-          "OWASP LLM Top 10 — LLM06: Sensitive Information Disclosure — CWE-359",
-        suggestedFix: "Anonymize data before sending to AI: replace PII with tokens using a reversible tokenizer, or use on-premise/private-endpoint AI deployments for regulated data.",
+        reference: "OWASP LLM Top 10 — LLM06: Sensitive Information Disclosure — CWE-359",
+        suggestedFix:
+          "Anonymize data before sending to AI: replace PII with tokens using a reversible tokenizer, or use on-premise/private-endpoint AI deployments for regulated data.",
         confidence: 0.85,
       });
     } else {
@@ -481,8 +468,7 @@ export function analyzeAiCodeSafety(
       lineNumbers: toolResultLines.slice(0, 5),
       recommendation:
         "Validate all tool-call results against an expected schema before use. Sanitize string outputs before injecting into prompts or rendering to users. Implement timeout and error handling for tool calls. Consider content filtering on tool outputs.",
-      reference:
-        "OWASP LLM Top 10 — LLM02: Insecure Output Handling / Tool Use Safety",
+      reference: "OWASP LLM Top 10 — LLM02: Insecure Output Handling / Tool Use Safety",
       suggestedFix:
         "Validate tool results: const parsed = schema.parse(toolResult); and sanitize string content before injecting into prompts or rendering.",
       confidence: 0.7,

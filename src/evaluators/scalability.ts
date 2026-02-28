@@ -1,4 +1,4 @@
-import { Finding } from "../types.js";
+import type { Finding } from "../types.js";
 import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -15,45 +15,58 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Global mutable state detected",
-      description: "Top-level mutable variables (let/var with object/array initialization) create shared state that prevents safe horizontal scaling across multiple instances.",
+      description:
+        "Top-level mutable variables (let/var with object/array initialization) create shared state that prevents safe horizontal scaling across multiple instances.",
       lineNumbers: globalStateLines,
-      recommendation: "Externalize state to a database, cache (Redis), or message queue. Use const/final/immutable for configuration. Each instance should be stateless.",
+      recommendation:
+        "Externalize state to a database, cache (Redis), or message queue. Use const/final/immutable for configuration. Each instance should be stateless.",
       reference: "12-Factor App: Processes (Factor VI)",
-      suggestedFix: "Replace the top-level mutable variable with a call to an external store (e.g., `await redis.get(key)`) so each instance remains stateless.",
+      suggestedFix:
+        "Replace the top-level mutable variable with a call to an external store (e.g., `await redis.get(key)`) so each instance remains stateless.",
       confidence: 0.9,
     });
   }
 
   // In-memory session/store
-  const inMemPattern = /(?:Map|Set|WeakMap|Object\.create)\s*\(\s*\)|session\s*[:=].*\{\}|(?:store|cache|registry)\s*=\s*(?:new\s+Map|\{\}|\[\])|MemoryStore|express-session\s*\(\s*\)/gi;
+  const inMemPattern =
+    /(?:Map|Set|WeakMap|Object\.create)\s*\(\s*\)|session\s*[:=].*\{\}|(?:store|cache|registry)\s*=\s*(?:new\s+Map|\{\}|\[\])|MemoryStore|express-session\s*\(\s*\)/gi;
   const inMemLines = getLineNumbers(code, inMemPattern);
   if (inMemLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "In-memory data store may not scale",
-      description: "Data stored in process memory is lost on restart and not shared across instances. This breaks horizontal scaling where requests may hit different instances.",
+      description:
+        "Data stored in process memory is lost on restart and not shared across instances. This breaks horizontal scaling where requests may hit different instances.",
       lineNumbers: inMemLines,
-      recommendation: "Use a distributed store (Redis, Memcached, database) for session data, caches, and shared state.",
+      recommendation:
+        "Use a distributed store (Redis, Memcached, database) for session data, caches, and shared state.",
       reference: "Distributed Systems Best Practices",
-      suggestedFix: "Swap the in-memory `Map`/object store for a Redis-backed store (e.g., `new RedisStore(...)`) so data is shared across instances.",
+      suggestedFix:
+        "Swap the in-memory `Map`/object store for a Redis-backed store (e.g., `new RedisStore(...)`) so data is shared across instances.",
       confidence: 0.85,
     });
   }
 
   // Synchronous blocking in hot paths (multi-language)
-  const blockingPattern = /Sync\s*\(|\.sleep\s*\(|Thread\.sleep|time\.sleep|threading\.Event\(\)\.wait|Task\.Delay.*\.Wait\(\)|\.Result\b|std::thread::sleep|tokio::task::block_in_place/gi;
+  // Require a word-char before "Sync(" so we match readFileSync(), writeSync(),
+  // etc., but not unrelated identifiers that happen to contain "Sync".
+  const blockingPattern =
+    /\wSync\s*\(|\.sleep\s*\(|Thread\.sleep|time\.sleep|threading\.Event\(\)\.wait|Task\.Delay.*\.Wait\(\)|\.Result\b|std::thread::sleep|tokio::task::block_in_place/gi;
   const blockingLines = getLineNumbers(code, blockingPattern);
   if (blockingLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Synchronous blocking operation",
-      description: "Blocking/synchronous operations in the request path limit concurrency and throughput. Under load, this creates a bottleneck that prevents scaling.",
+      description:
+        "Blocking/synchronous operations in the request path limit concurrency and throughput. Under load, this creates a bottleneck that prevents scaling.",
       lineNumbers: blockingLines,
-      recommendation: "Use asynchronous alternatives (async/await, promises, non-blocking I/O). Move long-running work to background queues.",
+      recommendation:
+        "Use asynchronous alternatives (async/await, promises, non-blocking I/O). Move long-running work to background queues.",
       reference: "Reactive & Non-Blocking Architecture Patterns",
-      suggestedFix: "Replace the synchronous call with its async counterpart (e.g., `fs.readFileSync` → `await fs.promises.readFile`) to avoid blocking the event loop.",
+      suggestedFix:
+        "Replace the synchronous call with its async counterpart (e.g., `fs.readFileSync` → `await fs.promises.readFile`) to avoid blocking the event loop.",
       confidence: 0.9,
     });
   }
@@ -66,11 +79,14 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "External calls without timeout",
-      description: "HTTP/API calls without timeouts can hang indefinitely, consuming resources and cascading failures through the system when downstream services are slow.",
+      description:
+        "HTTP/API calls without timeouts can hang indefinitely, consuming resources and cascading failures through the system when downstream services are slow.",
       lineNumbers: fetchLines,
-      recommendation: "Set explicit timeouts on all external calls (e.g., 5-30 seconds). Implement circuit breakers (e.g., using libraries like cockatiel or opossum) for critical dependencies.",
+      recommendation:
+        "Set explicit timeouts on all external calls (e.g., 5-30 seconds). Implement circuit breakers (e.g., using libraries like cockatiel or opossum) for critical dependencies.",
       reference: "Release It! — Stability Patterns",
-      suggestedFix: "Add a timeout option to the HTTP call (e.g., `fetch(url, { signal: AbortSignal.timeout(5000) })`) to prevent indefinite hangs.",
+      suggestedFix:
+        "Add a timeout option to the HTTP call (e.g., `fetch(url, { signal: AbortSignal.timeout(5000) })`) to prevent indefinite hangs.",
       confidence: 0.7,
     });
   }
@@ -78,7 +94,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   // Single-threaded heavy computation
   // Detect nested loops, known CPU-intensive operations, and blocking patterns
   const heavyCompPattern = /(?:for|while)\s*\(.*(?:length|size|count).*\)[\s\S]{0,200}(?:for|while)\s*\(/gi;
-  const cpuIntensiveOps = /crypto\.pbkdf2Sync|crypto\.scryptSync|bcrypt\.hashSync|JSON\.parse\s*\(\s*JSON\.stringify|structuredClone|zlib\.[^a-z]*Sync|(?:sort|reduce|map|filter)\s*\([^)]*(?:sort|reduce|map|filter)\s*\(/gi;
+  const cpuIntensiveOps =
+    /crypto\.pbkdf2Sync|crypto\.scryptSync|bcrypt\.hashSync|JSON\.parse\s*\(\s*JSON\.stringify|structuredClone|zlib\.[^a-z]*Sync|(?:sort|reduce|map|filter)\s*\([^)]*(?:sort|reduce|map|filter)\s*\(/gi;
   const hasNestedLoops = heavyCompPattern.test(code);
   const cpuOpsLines = getLineNumbers(code, cpuIntensiveOps);
   if (hasNestedLoops || cpuOpsLines.length > 0) {
@@ -88,9 +105,11 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       title: "CPU-intensive computation may block scaling",
       description: `Detected ${hasNestedLoops ? "nested loops" : ""}${hasNestedLoops && cpuOpsLines.length > 0 ? " and " : ""}${cpuOpsLines.length > 0 ? `${cpuOpsLines.length} synchronous/heavy operation(s)` : ""}. Heavy computation on the main thread blocks the event loop (Node.js) or consumes thread pool capacity.`,
       lineNumbers: cpuOpsLines.length > 0 ? cpuOpsLines : undefined,
-      recommendation: "Offload CPU-intensive work to worker threads, a job queue (Bull, Celery), or a dedicated compute service. Use async variants of crypto operations (pbkdf2, scrypt). Consider WebAssembly for hot-path computation.",
+      recommendation:
+        "Offload CPU-intensive work to worker threads, a job queue (Bull, Celery), or a dedicated compute service. Use async variants of crypto operations (pbkdf2, scrypt). Consider WebAssembly for hot-path computation.",
       reference: "Node.js Worker Threads / Job Queue Patterns",
-      suggestedFix: "Move the heavy computation into a worker thread or use the async variant (e.g., `crypto.pbkdf2` instead of `crypto.pbkdf2Sync`) to keep the main thread free.",
+      suggestedFix:
+        "Move the heavy computation into a worker thread or use the async variant (e.g., `crypto.pbkdf2` instead of `crypto.pbkdf2Sync`) to keep the main thread free.",
       confidence: 0.8,
     });
   }
@@ -102,10 +121,13 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "info",
       title: "No rate limiting detected",
-      description: "No rate limiting or throttling mechanism is visible. Without rate limiting, the system is vulnerable to being overwhelmed by traffic spikes or abuse.",
-      recommendation: "Implement rate limiting at the API gateway or application level. Consider token bucket or sliding window algorithms. Use libraries like express-rate-limit or a cloud-native solution.",
+      description:
+        "No rate limiting or throttling mechanism is visible. Without rate limiting, the system is vulnerable to being overwhelmed by traffic spikes or abuse.",
+      recommendation:
+        "Implement rate limiting at the API gateway or application level. Consider token bucket or sliding window algorithms. Use libraries like express-rate-limit or a cloud-native solution.",
       reference: "API Security & Scalability Best Practices",
-      suggestedFix: "Add a rate-limiting middleware (e.g., `app.use(rateLimit({ windowMs: 60000, max: 100 }))`) to protect endpoints from traffic spikes.",
+      suggestedFix:
+        "Add a rate-limiting middleware (e.g., `app.use(rateLimit({ windowMs: 60000, max: 100 }))`) to protect endpoints from traffic spikes.",
       confidence: 0.7,
     });
   }
@@ -118,11 +140,14 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Local file/process locking won't work at scale",
-      description: "File-based locks and process-local mutexes only work on a single machine. In a multi-instance deployment, they cannot coordinate across instances.",
+      description:
+        "File-based locks and process-local mutexes only work on a single machine. In a multi-instance deployment, they cannot coordinate across instances.",
       lineNumbers: fileLockLines,
-      recommendation: "Use distributed locks (Redis SETNX/Redlock, ZooKeeper, etcd) or database-level locking for cross-instance coordination.",
+      recommendation:
+        "Use distributed locks (Redis SETNX/Redlock, ZooKeeper, etcd) or database-level locking for cross-instance coordination.",
       reference: "Distributed Locking Patterns",
-      suggestedFix: "Replace the local file/mutex lock with a distributed lock (e.g., Redlock via `await redlock.acquire([resource], ttl)`) for cross-instance safety.",
+      suggestedFix:
+        "Replace the local file/mutex lock with a distributed lock (e.g., Redlock via `await redlock.acquire([resource], ttl)`) for cross-instance safety.",
       confidence: 0.9,
     });
   }
@@ -136,11 +161,14 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Session storage may require sticky sessions",
-      description: "In-process session storage requires sticky sessions (session affinity), which limits load balancer flexibility and complicates rolling deployments.",
+      description:
+        "In-process session storage requires sticky sessions (session affinity), which limits load balancer flexibility and complicates rolling deployments.",
       lineNumbers: stickySessionLines,
-      recommendation: "Use an external session store (Redis, DynamoDB, database) so any instance can serve any request. This enables zero-downtime deployments.",
+      recommendation:
+        "Use an external session store (Redis, DynamoDB, database) so any instance can serve any request. This enables zero-downtime deployments.",
       reference: "Scalable Session Management",
-      suggestedFix: "Configure the session middleware to use an external store (e.g., `session({ store: new RedisStore({ client }) })`) instead of the default in-memory store.",
+      suggestedFix:
+        "Configure the session middleware to use an external store (e.g., `session({ store: new RedisStore({ client }) })`) instead of the default in-memory store.",
       confidence: 0.75,
     });
   }
@@ -153,11 +181,14 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Hardcoded thread/worker pool size",
-      description: "Hardcoded pool sizes may not be optimal across different deployment environments (dev machine vs. production container with different CPU/memory).",
+      description:
+        "Hardcoded pool sizes may not be optimal across different deployment environments (dev machine vs. production container with different CPU/memory).",
       lineNumbers: hardcodedPoolLines,
-      recommendation: "Configure pool sizes via environment variables or derive from available resources (os.cpus().length). Allow runtime tuning.",
+      recommendation:
+        "Configure pool sizes via environment variables or derive from available resources (os.cpus().length). Allow runtime tuning.",
       reference: "Resource Configuration Best Practices",
-      suggestedFix: "Replace the hardcoded pool size with a configurable value (e.g., `parseInt(process.env.POOL_SIZE) || os.cpus().length`) to adapt to each environment.",
+      suggestedFix:
+        "Replace the hardcoded pool size with a configurable value (e.g., `parseInt(process.env.POOL_SIZE) || os.cpus().length`) to adapt to each environment.",
       confidence: 0.85,
     });
   }
@@ -170,25 +201,32 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "No circuit breaker for external dependencies",
-      description: "Multiple external service calls detected without circuit breaker protection. A failing dependency can cascade and bring down the entire system.",
-      recommendation: "Implement circuit breakers (opossum, cockatiel, Resilience4j, Polly) to fail fast when dependencies are down. Configure fallbacks.",
+      description:
+        "Multiple external service calls detected without circuit breaker protection. A failing dependency can cascade and bring down the entire system.",
+      recommendation:
+        "Implement circuit breakers (opossum, cockatiel, Resilience4j, Polly) to fail fast when dependencies are down. Configure fallbacks.",
       reference: "Release It! — Circuit Breaker Pattern",
-      suggestedFix: "Wrap external service calls with a circuit breaker (e.g., `const breaker = new CircuitBreaker(callFn, { timeout: 3000 }); await breaker.fire()`).",
+      suggestedFix:
+        "Wrap external service calls with a circuit breaker (e.g., `const breaker = new CircuitBreaker(callFn, { timeout: 3000 }); await breaker.fire()`).",
       confidence: 0.7,
     });
   }
 
   // Monolithic query / large payload assembly
-  const largePayloadPattern = /JSON\.stringify\s*\(.*\bdata\b|res\.json\s*\(\s*\{[\s\S]{0,50}\.findAll|\.aggregate\s*\(\s*\[[\s\S]{200,}/gi;
+  const largePayloadPattern =
+    /JSON\.stringify\s*\(.*\bdata\b|res\.json\s*\(\s*\{[\s\S]{0,50}\.findAll|\.aggregate\s*\(\s*\[[\s\S]{200,}/gi;
   if (largePayloadPattern.test(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Potentially large response payload",
-      description: "Large response payloads increase serialization time, network transfer, and client memory usage. This limits throughput at scale.",
-      recommendation: "Implement pagination, field filtering (sparse fieldsets), or streaming for large responses. Consider GraphQL for client-driven field selection.",
+      description:
+        "Large response payloads increase serialization time, network transfer, and client memory usage. This limits throughput at scale.",
+      recommendation:
+        "Implement pagination, field filtering (sparse fieldsets), or streaming for large responses. Consider GraphQL for client-driven field selection.",
       reference: "API Scalability Patterns",
-      suggestedFix: "Add pagination parameters (e.g., `?page=1&limit=50`) and return only the requested slice instead of the full dataset.",
+      suggestedFix:
+        "Add pagination parameters (e.g., `?page=1&limit=50`) and return only the requested slice instead of the full dataset.",
       confidence: 0.8,
     });
   }
@@ -202,11 +240,14 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "WebSocket without connection limits",
-      description: "WebSocket servers without connection/payload limits are vulnerable to resource exhaustion from too many connections or oversized messages.",
+      description:
+        "WebSocket servers without connection/payload limits are vulnerable to resource exhaustion from too many connections or oversized messages.",
       lineNumbers: wsLines,
-      recommendation: "Set maxPayload size, maximum connection limits, and implement connection throttling. Use a WebSocket gateway for production scale.",
+      recommendation:
+        "Set maxPayload size, maximum connection limits, and implement connection throttling. Use a WebSocket gateway for production scale.",
       reference: "WebSocket Security & Scalability",
-      suggestedFix: "Pass connection limits when creating the WebSocket server (e.g., `new WebSocketServer({ maxPayload: 1048576, maxConnections: 1000 })`).",
+      suggestedFix:
+        "Pass connection limits when creating the WebSocket server (e.g., `new WebSocketServer({ maxPayload: 1048576, maxConnections: 1000 })`).",
       confidence: 0.75,
     });
   }

@@ -11,28 +11,20 @@ import type { FunctionInfo, CodeStructure } from "./types.js";
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-export function analyzeStructurally(
-  code: string,
-  language: string
-): CodeStructure {
+export function analyzeStructurally(code: string, language: string): CodeStructure {
   const lines = code.split("\n");
   const totalLines = lines.length;
 
   const isPython = language === "python";
-  const functions = isPython
-    ? extractPythonFunctions(lines)
-    : extractBraceFunctions(lines, language);
+  const functions = isPython ? extractPythonFunctions(lines) : extractBraceFunctions(lines, language);
 
   const deadCodeLines = detectDeadCode(lines, language);
   const deepNestLines = detectDeepNesting(lines, isPython);
   const typeAnyLines = detectWeakTypes(lines, language);
+  const imports = extractImports(lines, language);
 
-  const fileCyclomaticComplexity =
-    functions.reduce((sum, f) => sum + f.cyclomaticComplexity, 0) || 1;
-  const maxNestingDepth = functions.reduce(
-    (max, f) => Math.max(max, f.maxNestingDepth),
-    0
-  );
+  const fileCyclomaticComplexity = functions.reduce((sum, f) => sum + f.cyclomaticComplexity, 0) || 1;
+  const maxNestingDepth = functions.reduce((max, f) => Math.max(max, f.maxNestingDepth), 0);
 
   return {
     language,
@@ -43,6 +35,7 @@ export function analyzeStructurally(
     deadCodeLines,
     deepNestLines,
     typeAnyLines,
+    imports,
   };
 }
 
@@ -53,13 +46,11 @@ const FUNC_PATTERNS: Record<string, RegExp> = {
   rust: /^\s*(?:pub\s+)?(?:async\s+)?fn\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)/,
   go: /^\s*func\s+(?:\([^)]*\)\s*)?(\w+)\s*\(([^)]*)\)/,
   java: /^\s*(?:(?:public|private|protected|static|final|abstract|synchronized)\s+)*\w[\w<>,\s\[\]]*\s+(\w+)\s*\(([^)]*)\)/,
-  csharp: /^\s*(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|sealed)\s+)*\w[\w<>,\s\[\]\?]*\s+(\w+)\s*\(([^)]*)\)/,
+  csharp:
+    /^\s*(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|sealed)\s+)*\w[\w<>,\s\[\]\?]*\s+(\w+)\s*\(([^)]*)\)/,
 };
 
-function extractBraceFunctions(
-  lines: string[],
-  language: string
-): FunctionInfo[] {
+function extractBraceFunctions(lines: string[], language: string): FunctionInfo[] {
   const pattern = FUNC_PATTERNS[language];
   if (!pattern) return [];
 
@@ -124,8 +115,7 @@ function extractBraceFunctions(
 
 // ─── Python Function Extraction (indent-based) ──────────────────────────────
 
-const PYTHON_FUNC =
-  /^(\s*)(?:async\s+)?def\s+(\w+)\s*\(([^)]*(?:\([^)]*\)[^)]*)*)\)\s*(?:->.*)?:/;
+const PYTHON_FUNC = /^(\s*)(?:async\s+)?def\s+(\w+)\s*\(([^)]*(?:\([^)]*\)[^)]*)*)\)\s*(?:->.*)?:/;
 
 function extractPythonFunctions(lines: string[]): FunctionInfo[] {
   const functions: FunctionInfo[] = [];
@@ -181,22 +171,14 @@ function extractPythonFunctions(lines: string[]): FunctionInfo[] {
 // ─── Cyclomatic Complexity from Source Lines ─────────────────────────────────
 
 const DECISION_POINTS: Record<string, RegExp> = {
-  python:
-    /\b(if|elif|for|while|except|and|or|assert)\b|\bif\b.*\belse\b/g,
-  rust:
-    /\b(if|else\s+if|for|while|loop|match|=>|&&|\|\||\.unwrap_or|\.map_or)\b/g,
-  go:
-    /\b(if|else\s+if|for|switch|case|select|&&|\|\|)\b/g,
-  java:
-    /\b(if|else\s+if|for|while|do|case|catch|\?|&&|\|\|)\b/g,
-  csharp:
-    /\b(if|else\s+if|for|foreach|while|do|case|catch|\?|&&|\|\|)\b/g,
+  python: /\b(if|elif|for|while|except|and|or|assert)\b|\bif\b.*\belse\b/g,
+  rust: /\b(if|else\s+if|for|while|loop|match|=>|&&|\|\||\.unwrap_or|\.map_or)\b/g,
+  go: /\b(if|else\s+if|for|switch|case|select|&&|\|\|)\b/g,
+  java: /\b(if|else\s+if|for|while|do|case|catch|\?|&&|\|\|)\b/g,
+  csharp: /\b(if|else\s+if|for|foreach|while|do|case|catch|\?|&&|\|\|)\b/g,
 };
 
-function computeComplexityFromLines(
-  lines: string[],
-  language: string
-): number {
+function computeComplexityFromLines(lines: string[], language: string): number {
   let complexity = 1; // base path
   const pattern = DECISION_POINTS[language];
   if (!pattern) return complexity;
@@ -204,12 +186,7 @@ function computeComplexityFromLines(
   for (const line of lines) {
     // Skip comments
     const trimmed = line.trim();
-    if (
-      trimmed.startsWith("//") ||
-      trimmed.startsWith("#") ||
-      trimmed.startsWith("*") ||
-      trimmed.startsWith("/*")
-    )
+    if (trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("*") || trimmed.startsWith("/*"))
       continue;
 
     // Reset lastIndex for global regex
@@ -225,13 +202,10 @@ function computeComplexityFromLines(
 
 // ─── Nesting Depth from Source Lines ─────────────────────────────────────────
 
-function computeNestingFromLines(
-  lines: string[],
-  isPython: boolean
-): number {
+function computeNestingFromLines(lines: string[], isPython: boolean): number {
   if (isPython) {
     // Track indent levels as nesting
-    const baseIndent = (lines[0]?.search(/\S/) ?? 0);
+    const baseIndent = lines[0]?.search(/\S/) ?? 0;
     let maxDepth = 0;
     for (const line of lines) {
       if (line.trim() === "" || line.trim().startsWith("#")) continue;
@@ -335,10 +309,7 @@ function detectDeadCode(lines: string[], language: string): number[] {
 
 // ─── Deep Nesting Detection ─────────────────────────────────────────────────
 
-function detectDeepNesting(
-  lines: string[],
-  isPython: boolean
-): number[] {
+function detectDeepNesting(lines: string[], isPython: boolean): number[] {
   const deepLines: number[] = [];
 
   if (isPython) {
@@ -389,16 +360,76 @@ function detectWeakTypes(lines: string[], language: string): number[] {
 
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
-    if (
-      trimmed.startsWith("//") ||
-      trimmed.startsWith("#") ||
-      trimmed.startsWith("/*")
-    )
-      continue;
+    if (trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("/*")) continue;
     if (pattern.test(lines[i])) {
       weakLines.push(i + 1);
     }
   }
 
   return weakLines;
+}
+
+// ─── Import Extraction ───────────────────────────────────────────────────────
+
+/**
+ * Extract imported module/package names from source code.
+ * Handles import syntax for Python, Go, Java, C#, and Rust.
+ */
+function extractImports(lines: string[], language: string): string[] {
+  const imports: string[] = [];
+  const patterns: Record<string, RegExp[]> = {
+    python: [
+      /^\s*import\s+([\w.]+)/, // import os, import os.path
+      /^\s*from\s+([\w.]+)\s+import/, // from flask import Flask
+    ],
+    go: [
+      /^\s*import\s+"([^"]+)"/, // import "fmt"
+      /^\s*"([^"]+)"\s*$/, // inside import ( ... ) block
+    ],
+    java: [
+      /^\s*import\s+(?:static\s+)?([\w.]+)/, // import com.example.Foo
+    ],
+    csharp: [
+      /^\s*using\s+([\w.]+)\s*;/, // using System.IO;
+    ],
+    rust: [
+      /^\s*use\s+([\w:]+)/, // use std::io
+      /^\s*extern\s+crate\s+(\w+)/, // extern crate serde
+    ],
+  };
+
+  const langPatterns = patterns[language];
+  if (!langPatterns) return imports;
+
+  let inGoImportBlock = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Handle Go multi-line import blocks: import ( ... )
+    if (language === "go") {
+      if (/^\s*import\s*\(\s*$/.test(line)) {
+        inGoImportBlock = true;
+        continue;
+      }
+      if (inGoImportBlock) {
+        if (trimmed === ")") {
+          inGoImportBlock = false;
+          continue;
+        }
+        const m = trimmed.match(/^"([^"]+)"$/);
+        if (m) imports.push(m[1]);
+        continue;
+      }
+    }
+
+    for (const pattern of langPatterns) {
+      const match = line.match(pattern);
+      if (match) {
+        imports.push(match[1]);
+        break;
+      }
+    }
+  }
+
+  return imports;
 }

@@ -1,4 +1,4 @@
-import { Finding } from "../types.js";
+import type { Finding } from "../types.js";
 import { getLangLineNumbers, getLangFamily } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -25,7 +25,10 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   lines.forEach((line, i) => {
     if (isCommentLikeLine(line)) return;
 
-    if (/(?:ssn|social_security|tax_id|passport|national_id|driver_license)/i.test(line) && !/encrypt|hash|mask|redact/i.test(line)) {
+    if (
+      /(?:ssn|social_security|tax_id|passport|national_id|driver_license)/i.test(line) &&
+      !/encrypt|hash|mask|redact/i.test(line)
+    ) {
       const context = lines.slice(Math.max(0, i - 4), Math.min(lines.length, i + 5)).join("\n");
       if (/(?:save|store|insert|persist|write|log|send|post|request|payload|body|db\.)/i.test(context)) {
         piiFieldLines.push(i + 1);
@@ -37,11 +40,14 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "PII field handled without protection",
-      description: "Personally Identifiable Information (SSN, passport, tax ID) must be encrypted at rest and in transit, and masked in logs.",
+      description:
+        "Personally Identifiable Information (SSN, passport, tax ID) must be encrypted at rest and in transit, and masked in logs.",
       lineNumbers: piiFieldLines,
-      recommendation: "Encrypt PII fields, mask them in logs and UI displays, and ensure they are stored with column-level encryption.",
+      recommendation:
+        "Encrypt PII fields, mask them in logs and UI displays, and ensure they are stored with column-level encryption.",
       reference: "GDPR Article 32 / CCPA / HIPAA",
-      suggestedFix: "Encrypt PII at rest: const encrypted = crypto.createCipheriv('aes-256-gcm', key, iv).update(piiValue, 'utf8', 'hex'); store only the ciphertext.",
+      suggestedFix:
+        "Encrypt PII at rest: const encrypted = crypto.createCipheriv('aes-256-gcm', key, iv).update(piiValue, 'utf8', 'hex'); store only the ciphertext.",
       confidence: 0.85,
     });
   }
@@ -59,11 +65,14 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Tracking/analytics without consent check",
-      description: "Analytics and tracking scripts are loaded without checking for user consent, potentially violating GDPR and ePrivacy regulations.",
+      description:
+        "Analytics and tracking scripts are loaded without checking for user consent, potentially violating GDPR and ePrivacy regulations.",
       lineNumbers: trackingLines,
-      recommendation: "Implement a consent management system. Only load tracking scripts after obtaining explicit user consent.",
+      recommendation:
+        "Implement a consent management system. Only load tracking scripts after obtaining explicit user consent.",
       reference: "GDPR Article 6 / ePrivacy Directive",
-      suggestedFix: "Gate tracking behind consent: if (userConsent.analytics) { loadTrackingScripts(); } — use a consent management platform.",
+      suggestedFix:
+        "Gate tracking behind consent: if (userConsent.analytics) { loadTrackingScripts(); } — use a consent management platform.",
       confidence: 0.8,
     });
   }
@@ -71,7 +80,10 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   // Detect data retention issues
   const storeForeverLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/(?:save|store|insert|persist|write)\s*\(/i.test(line) && /(?:user|personal|customer|patient|email|phone)/i.test(line)) {
+    if (
+      /(?:save|store|insert|persist|write)\s*\(/i.test(line) &&
+      /(?:user|personal|customer|patient|email|phone)/i.test(line)
+    ) {
       const context = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 5)).join("\n");
       if (!/ttl|expir|retention|purge|delete.*after|archive/i.test(context)) {
         storeForeverLines.push(i + 1);
@@ -83,11 +95,14 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Personal data stored without retention policy",
-      description: "Personal data appears to be stored indefinitely without a defined retention period or cleanup mechanism.",
+      description:
+        "Personal data appears to be stored indefinitely without a defined retention period or cleanup mechanism.",
       lineNumbers: storeForeverLines,
-      recommendation: "Define and implement data retention policies. Set TTLs, schedule purge jobs, or implement right-to-deletion workflows.",
+      recommendation:
+        "Define and implement data retention policies. Set TTLs, schedule purge jobs, or implement right-to-deletion workflows.",
       reference: "GDPR Article 5(1)(e) Storage Limitation",
-      suggestedFix: "Add TTL to stored data: await db.collection('users').createIndex({ createdAt: 1 }, { expireAfterSeconds: 365 * 24 * 3600 }); or schedule retention purge jobs.",
+      suggestedFix:
+        "Add TTL to stored data: await db.collection('users').createIndex({ createdAt: 1 }, { expireAfterSeconds: 365 * 24 * 3600 }); or schedule retention purge jobs.",
       confidence: 0.8,
     });
   }
@@ -108,11 +123,14 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "Sensitive data in log statements",
-      description: "Logging sensitive information (passwords, tokens, SSNs, credit cards) creates compliance violations and security risks.",
+      description:
+        "Logging sensitive information (passwords, tokens, SSNs, credit cards) creates compliance violations and security risks.",
       lineNumbers: logSensitiveLines,
-      recommendation: "Never log sensitive data. Use redaction/masking utilities to sanitize log output. Audit all log statements.",
+      recommendation:
+        "Never log sensitive data. Use redaction/masking utilities to sanitize log output. Audit all log statements.",
       reference: "OWASP Logging Cheat Sheet / PCI DSS Requirement 3",
-      suggestedFix: "Redact sensitive fields before logging: logger.info({ ...data, password: undefined, ssn: '***' }); use a log-redaction middleware.",
+      suggestedFix:
+        "Redact sensitive fields before logging: logger.info({ ...data, password: undefined, ssn: '***' }); use a log-redaction middleware.",
       confidence: 0.9,
     });
   }
@@ -121,7 +139,9 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   const dataModelLines: number[] = [];
   const classDefLineSet = new Set(getLangLineNumbers(code, language, LP.CLASS_DEF));
   lines.forEach((line, i) => {
-    const isClassDef = classDefLineSet.has(i + 1) || /(?:interface|class|type|schema|model)\s+\w*(?:User|Customer|Patient|Employee|Person)/i.test(line);
+    const isClassDef =
+      classDefLineSet.has(i + 1) ||
+      /(?:interface|class|type|schema|model)\s+\w*(?:User|Customer|Patient|Employee|Person)/i.test(line);
     if (isClassDef && /(?:User|Customer|Patient|Employee|Person)/i.test(line)) {
       const context = lines.slice(i, Math.min(lines.length, i + 15)).join("\n");
       if (!/classification|sensitivity|pii|confidential|restricted|public/i.test(context)) {
@@ -134,11 +154,14 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Data model lacks classification markers",
-      description: "Data models containing personal information should include data classification metadata to guide handling policies.",
+      description:
+        "Data models containing personal information should include data classification metadata to guide handling policies.",
       lineNumbers: dataModelLines,
-      recommendation: "Add data classification comments or decorators (e.g., @PII, @Confidential) to help enforce appropriate handling.",
+      recommendation:
+        "Add data classification comments or decorators (e.g., @PII, @Confidential) to help enforce appropriate handling.",
       reference: "Data Classification Best Practices",
-      suggestedFix: "Add classification markers: interface User { /** @classification PII */ email: string; /** @classification Public */ displayName: string; }",
+      suggestedFix:
+        "Add classification markers: interface User { /** @classification PII */ email: string; /** @classification Public */ displayName: string; }",
       confidence: 0.75,
     });
   }
@@ -149,13 +172,25 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
     if (isCommentLikeLine(line)) return;
 
     const context = lines.slice(Math.max(0, i - 4), Math.min(lines.length, i + 5)).join("\n");
-    const hasPaymentContext = /(?:payment|billing|checkout|charge|\bcard(?:Number)?\b|\bpan\b|stripe|braintree|authorize|capture|transaction)/i.test(context);
+    const hasPaymentContext =
+      /(?:payment|billing|checkout|charge|\bcard(?:Number)?\b|\bpan\b|stripe|braintree|authorize|capture|transaction)/i.test(
+        context,
+      );
     const hasOperationalFlow = /(?:store|save|log|send|post|request|payload|body|db\.)/i.test(context);
 
-    if (/\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b/.test(line) && hasPaymentContext && hasOperationalFlow) {
+    if (
+      /\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b/.test(line) &&
+      hasPaymentContext &&
+      hasOperationalFlow
+    ) {
       cardNumberLines.push(i + 1);
     }
-    if (/credit.?card|card.?number|ccn|pan\b|cardNumber/i.test(line) && !/mask|redact|encrypt|hash|tokenize|\*{4}/i.test(line) && hasPaymentContext && hasOperationalFlow) {
+    if (
+      /credit.?card|card.?number|ccn|pan\b|cardNumber/i.test(line) &&
+      !/mask|redact|encrypt|hash|tokenize|\*{4}/i.test(line) &&
+      hasPaymentContext &&
+      hasOperationalFlow
+    ) {
       cardNumberLines.push(i + 1);
     }
   });
@@ -164,11 +199,14 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "Credit card data handling detected",
-      description: "Credit card numbers must never be stored in plain text. PCI DSS requires tokenization, encryption, or use of a payment processor.",
+      description:
+        "Credit card numbers must never be stored in plain text. PCI DSS requires tokenization, encryption, or use of a payment processor.",
       lineNumbers: [...new Set(cardNumberLines)],
-      recommendation: "Use a PCI-compliant payment processor (Stripe, Braintree). Never store, log, or transmit raw card numbers. Tokenize immediately.",
+      recommendation:
+        "Use a PCI-compliant payment processor (Stripe, Braintree). Never store, log, or transmit raw card numbers. Tokenize immediately.",
       reference: "PCI DSS Requirement 3: Protect Stored Cardholder Data",
-      suggestedFix: "Replace raw card handling with tokenization: const { id } = await stripe.tokens.create({ card }); store only the token, never the card number.",
+      suggestedFix:
+        "Replace raw card handling with tokenization: const { id } = await stripe.tokens.create({ card }); store only the token, never the card number.",
       confidence: 0.85,
     });
   }
@@ -176,7 +214,12 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   // Detect HIPAA-relevant health data
   const healthDataLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/(?:diagnosis|medical_record|health_condition|prescription|treatment|patient_id|medical_history|lab_result)/i.test(line) && !/encrypt|hipaa|protected|phi\b/i.test(line)) {
+    if (
+      /(?:diagnosis|medical_record|health_condition|prescription|treatment|patient_id|medical_history|lab_result)/i.test(
+        line,
+      ) &&
+      !/encrypt|hipaa|protected|phi\b/i.test(line)
+    ) {
       healthDataLines.push(i + 1);
     }
   });
@@ -185,27 +228,34 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "Protected Health Information without HIPAA safeguards",
-      description: "Health-related data fields detected without encryption or HIPAA compliance markers. PHI requires special handling under HIPAA.",
+      description:
+        "Health-related data fields detected without encryption or HIPAA compliance markers. PHI requires special handling under HIPAA.",
       lineNumbers: healthDataLines,
-      recommendation: "Encrypt PHI at rest and in transit. Implement access controls, audit logging, and ensure BAA with cloud providers.",
+      recommendation:
+        "Encrypt PHI at rest and in transit. Implement access controls, audit logging, and ensure BAA with cloud providers.",
       reference: "HIPAA Security Rule / 45 CFR Part 164",
-      suggestedFix: "Encrypt PHI with AES-256-GCM and add access control: if (!user.roles.includes('healthcare_provider')) throw new ForbiddenError();",
+      suggestedFix:
+        "Encrypt PHI with AES-256-GCM and add access control: if (!user.roles.includes('healthcare_provider')) throw new ForbiddenError();",
       confidence: 0.85,
     });
   }
 
   // Detect right-to-delete / data erasure gaps
-  const deleteEndpointExists = /delete.*user|erase.*data|remove.*account|right.?to.?delete|gdpr.*delete|data.?erasure/i.test(code);
+  const deleteEndpointExists =
+    /delete.*user|erase.*data|remove.*account|right.?to.?delete|gdpr.*delete|data.?erasure/i.test(code);
   const storesUserData = /(?:save|create|insert)\s*\(.*(?:user|customer|profile|account)/i.test(code);
   if (storesUserData && !deleteEndpointExists) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "No data deletion/erasure capability detected",
-      description: "User data is stored but no deletion mechanism exists. GDPR and CCPA require the ability to delete personal data on request.",
-      recommendation: "Implement a user data deletion endpoint that cascades across all storage systems (DB, cache, backups, third parties).",
+      description:
+        "User data is stored but no deletion mechanism exists. GDPR and CCPA require the ability to delete personal data on request.",
+      recommendation:
+        "Implement a user data deletion endpoint that cascades across all storage systems (DB, cache, backups, third parties).",
       reference: "GDPR Article 17: Right to Erasure / CCPA Right to Delete",
-      suggestedFix: "Add deletion endpoint: app.delete('/api/users/:id/data', auth, async (req, res) => { await deleteUserData(req.params.id); res.status(204).end(); });",
+      suggestedFix:
+        "Add deletion endpoint: app.delete('/api/users/:id/data', auth, async (req, res) => { await deleteUserData(req.params.id); res.status(204).end(); });",
       confidence: 0.7,
     });
   }
@@ -222,11 +272,14 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Cookies set without security flags",
-      description: "Cookies are set without SameSite, Secure, or HttpOnly flags, which may violate security compliance standards.",
+      description:
+        "Cookies are set without SameSite, Secure, or HttpOnly flags, which may violate security compliance standards.",
       lineNumbers: cookieLines,
-      recommendation: "Set Secure, HttpOnly, and SameSite=Strict on sensitive cookies. Review cookie consent requirements per jurisdiction.",
+      recommendation:
+        "Set Secure, HttpOnly, and SameSite=Strict on sensitive cookies. Review cookie consent requirements per jurisdiction.",
       reference: "OWASP Cookie Security / ePrivacy Directive",
-      suggestedFix: "Set secure cookie flags: res.cookie('session', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600000 });",
+      suggestedFix:
+        "Set secure cookie flags: res.cookie('session', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600000 });",
       confidence: 0.8,
     });
   }
@@ -244,11 +297,14 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Age-related data without verification mechanism",
-      description: "Code references age or date of birth but has no age verification mechanism. COPPA, GDPR (under 16), and other laws require special handling for minors.",
+      description:
+        "Code references age or date of birth but has no age verification mechanism. COPPA, GDPR (under 16), and other laws require special handling for minors.",
       lineNumbers: ageRelatedLines.slice(0, 5),
-      recommendation: "Implement age verification and parental consent flows for users under the applicable age threshold.",
+      recommendation:
+        "Implement age verification and parental consent flows for users under the applicable age threshold.",
       reference: "COPPA / GDPR Article 8 / Age Appropriate Design Code",
-      suggestedFix: "Add age verification: if (calculateAge(user.dob) < 13) { requireParentalConsent(user.id); restrictDataCollection(); }",
+      suggestedFix:
+        "Add age verification: if (calculateAge(user.dob) < 13) { requireParentalConsent(user.id); restrictDataCollection(); }",
       confidence: 0.8,
     });
   }
@@ -266,11 +322,14 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Regulated operations without audit trail",
-      description: "Financial or approval operations detected without audit logging. SOX, SOC2, and financial regulations require complete audit trails.",
+      description:
+        "Financial or approval operations detected without audit logging. SOX, SOC2, and financial regulations require complete audit trails.",
       lineNumbers: regulatedOpLines.slice(0, 5),
-      recommendation: "Implement immutable audit logging for all regulated operations. Log who, what, when, and the outcome.",
+      recommendation:
+        "Implement immutable audit logging for all regulated operations. Log who, what, when, and the outcome.",
       reference: "SOX Compliance / SOC2 Trust Criteria",
-      suggestedFix: "Add audit logging: auditLog.append({ actor: req.user.id, action: 'approve', resource, timestamp: new Date(), outcome: 'success' });",
+      suggestedFix:
+        "Add audit logging: auditLog.append({ actor: req.user.id, action: 'approve', resource, timestamp: new Date(), outcome: 'success' });",
       confidence: 0.7,
     });
   }

@@ -4,7 +4,7 @@ import { tmpdir } from "os";
 import { basename, dirname, extname, join, resolve } from "path";
 
 import { evaluateWithTribunal } from "../evaluators/index.js";
-import { Finding, JudgeEvaluation, MustFixGateOptions, Severity, Verdict } from "../types.js";
+import type { Finding, JudgeEvaluation, MustFixGateOptions, Severity, Verdict } from "../types.js";
 
 type SourceFile = {
   absolutePath: string;

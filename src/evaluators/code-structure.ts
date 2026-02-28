@@ -1,4 +1,4 @@
-import { Finding } from "../types.js";
+import type { Finding } from "../types.js";
 import { analyzeStructure } from "../ast/index.js";
 
 /**
@@ -20,19 +20,14 @@ import { analyzeStructure } from "../ast/index.js";
  *   STRUCT-009  Excessive parameter count (>8, critical)
  *   STRUCT-010  Extremely long function (>150 lines)
  */
-export function analyzeCodeStructure(
-  code: string,
-  language: string
-): Finding[] {
+export function analyzeCodeStructure(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   const prefix = "STRUCT";
 
   const structure = analyzeStructure(code, language);
 
   // ─── STRUCT-001: High cyclomatic complexity (>10) ─────────────────────────
-  const complexFunctions = structure.functions.filter(
-    (f) => f.cyclomaticComplexity > 10
-  );
+  const complexFunctions = structure.functions.filter((f) => f.cyclomaticComplexity > 10);
   if (complexFunctions.length > 0) {
     findings.push({
       ruleId: `${prefix}-001`,
@@ -46,25 +41,16 @@ export function analyzeCodeStructure(
       recommendation:
         "Refactor complex functions by extracting sub-functions, using guard clauses / early returns, replacing conditionals with polymorphism, or using lookup tables instead of long if/else chains. Aim for CC ≤ 10.",
       reference: "McCabe Cyclomatic Complexity — Software Engineering Institute",
-      suggestedFix:
-        "Break the function into smaller, focused functions with single responsibilities.",
+      suggestedFix: "Break the function into smaller, focused functions with single responsibilities.",
       confidence: 0.75,
     });
   }
 
   // ─── STRUCT-002: Deep nesting (>4 levels, AST-detected) ──────────────────
-  const deeplyNestedFunctions = structure.functions.filter(
-    (f) => f.maxNestingDepth > 4
-  );
-  if (
-    structure.deepNestLines.length > 0 ||
-    deeplyNestedFunctions.length > 0
-  ) {
+  const deeplyNestedFunctions = structure.functions.filter((f) => f.maxNestingDepth > 4);
+  if (structure.deepNestLines.length > 0 || deeplyNestedFunctions.length > 0) {
     const lineNumbers = [
-      ...new Set([
-        ...structure.deepNestLines,
-        ...deeplyNestedFunctions.map((f) => f.startLine),
-      ]),
+      ...new Set([...structure.deepNestLines, ...deeplyNestedFunctions.map((f) => f.startLine)]),
     ].sort((a, b) => a - b);
 
     findings.push({
@@ -75,10 +61,7 @@ export function analyzeCodeStructure(
         deeplyNestedFunctions.length > 0
           ? ` Functions: ${deeplyNestedFunctions
               .slice(0, 3)
-              .map(
-                (f) =>
-                  `${f.name}() depth=${f.maxNestingDepth} at line ${f.startLine}`
-              )
+              .map((f) => `${f.name}() depth=${f.maxNestingDepth} at line ${f.startLine}`)
               .join("; ")}.`
           : ""
       } Deep nesting hurts readability and cognitive load.`,
@@ -101,10 +84,7 @@ export function analyzeCodeStructure(
       title: "Long function detected (>50 lines)",
       description: `${longFunctions.length} function(s) exceed 50 lines: ${longFunctions
         .slice(0, 5)
-        .map(
-          (f) =>
-            `${f.name}() ${f.lineCount} lines at line ${f.startLine}`
-        )
+        .map((f) => `${f.name}() ${f.lineCount} lines at line ${f.startLine}`)
         .join("; ")}. Long functions are hard to understand, test, and maintain.`,
       lineNumbers: longFunctions.map((f) => f.startLine),
       recommendation:
@@ -117,9 +97,7 @@ export function analyzeCodeStructure(
   }
 
   // ─── STRUCT-004: Too many parameters (>5) ─────────────────────────────────
-  const tooManyParams = structure.functions.filter(
-    (f) => f.parameterCount > 5
-  );
+  const tooManyParams = structure.functions.filter((f) => f.parameterCount > 5);
   if (tooManyParams.length > 0) {
     findings.push({
       ruleId: `${prefix}-004`,
@@ -127,17 +105,13 @@ export function analyzeCodeStructure(
       title: "Too many parameters (>5)",
       description: `${tooManyParams.length} function(s) have more than 5 parameters: ${tooManyParams
         .slice(0, 5)
-        .map(
-          (f) =>
-            `${f.name}() ${f.parameterCount} params at line ${f.startLine}`
-        )
+        .map((f) => `${f.name}() ${f.parameterCount} params at line ${f.startLine}`)
         .join("; ")}. Many parameters make a function hard to call correctly and often signal that it does too much.`,
       lineNumbers: tooManyParams.map((f) => f.startLine),
       recommendation:
         "Group related parameters into a configuration object or struct. Consider if the function is doing too much and should be split.",
       reference: "Clean Code — Function Arguments",
-      suggestedFix:
-        "Replace multiple parameters with an options/config object: function create(opts: CreateOptions)",
+      suggestedFix: "Replace multiple parameters with an options/config object: function create(opts: CreateOptions)",
       confidence: 0.85,
     });
   }
@@ -193,9 +167,7 @@ export function analyzeCodeStructure(
   }
 
   // ─── STRUCT-008: Very high complexity single function (>20) ───────────────
-  const veryComplexFunctions = structure.functions.filter(
-    (f) => f.cyclomaticComplexity > 20
-  );
+  const veryComplexFunctions = structure.functions.filter((f) => f.cyclomaticComplexity > 20);
   if (veryComplexFunctions.length > 0) {
     findings.push({
       ruleId: `${prefix}-008`,
@@ -203,10 +175,7 @@ export function analyzeCodeStructure(
       title: "Extremely high cyclomatic complexity (>20)",
       description: `${veryComplexFunctions.length} function(s) have complexity > 20: ${veryComplexFunctions
         .slice(0, 3)
-        .map(
-          (f) =>
-            `${f.name}() CC=${f.cyclomaticComplexity} at line ${f.startLine}`
-        )
+        .map((f) => `${f.name}() CC=${f.cyclomaticComplexity} at line ${f.startLine}`)
         .join("; ")}. This level of complexity is almost untestable.`,
       lineNumbers: veryComplexFunctions.map((f) => f.startLine),
       recommendation:
@@ -219,9 +188,7 @@ export function analyzeCodeStructure(
   }
 
   // ─── STRUCT-009: Excessive parameters (>8, critical) ──────────────────────
-  const excessiveParams = structure.functions.filter(
-    (f) => f.parameterCount > 8
-  );
+  const excessiveParams = structure.functions.filter((f) => f.parameterCount > 8);
   if (excessiveParams.length > 0) {
     findings.push({
       ruleId: `${prefix}-009`,
@@ -229,10 +196,7 @@ export function analyzeCodeStructure(
       title: "Excessive parameter count (>8)",
       description: `${excessiveParams.length} function(s) have more than 8 parameters: ${excessiveParams
         .slice(0, 3)
-        .map(
-          (f) =>
-            `${f.name}() ${f.parameterCount} params at line ${f.startLine}`
-        )
+        .map((f) => `${f.name}() ${f.parameterCount} params at line ${f.startLine}`)
         .join("; ")}. This is a strong signal of poor design.`,
       lineNumbers: excessiveParams.map((f) => f.startLine),
       recommendation:
@@ -245,9 +209,7 @@ export function analyzeCodeStructure(
   }
 
   // ─── STRUCT-010: Extremely long function (>150 lines) ─────────────────────
-  const veryLongFunctions = structure.functions.filter(
-    (f) => f.lineCount > 150
-  );
+  const veryLongFunctions = structure.functions.filter((f) => f.lineCount > 150);
   if (veryLongFunctions.length > 0) {
     findings.push({
       ruleId: `${prefix}-010`,
@@ -255,10 +217,7 @@ export function analyzeCodeStructure(
       title: "Extremely long function (>150 lines)",
       description: `${veryLongFunctions.length} function(s) exceed 150 lines: ${veryLongFunctions
         .slice(0, 3)
-        .map(
-          (f) =>
-            `${f.name}() ${f.lineCount} lines at line ${f.startLine}`
-        )
+        .map((f) => `${f.name}() ${f.lineCount} lines at line ${f.startLine}`)
         .join("; ")}. Functions this long almost certainly violate the Single Responsibility Principle.`,
       lineNumbers: veryLongFunctions.map((f) => f.startLine),
       recommendation:

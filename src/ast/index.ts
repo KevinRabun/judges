@@ -12,6 +12,14 @@ import type { CodeStructure, FunctionInfo } from "./types.js";
 
 export type { CodeStructure, FunctionInfo };
 
+// Re-export taint analysis
+export { analyzeTaintFlows } from "./taint-tracker.js";
+export type { TaintFlow, TaintSourceKind, TaintSinkKind } from "./taint-tracker.js";
+
+// Re-export cross-file taint analysis
+export { analyzeCrossFileTaint } from "./cross-file-taint.js";
+export type { CrossFileTaintFlow } from "./cross-file-taint.js";
+
 /**
  * Analyse source code structurally. For JavaScript/TypeScript this uses the
  * TypeScript compiler API (full AST). For Python, Rust, Go, Java, and C# it
@@ -20,10 +28,7 @@ export type { CodeStructure, FunctionInfo };
  * Returns function metrics (complexity, nesting, length, params), dead code
  * locations, deep-nesting locations, and type-safety issues.
  */
-export function analyzeStructure(
-  code: string,
-  language: string
-): CodeStructure {
+export function analyzeStructure(code: string, language: string): CodeStructure {
   const lang = normalizeLanguage(language);
 
   switch (lang) {
@@ -49,6 +54,7 @@ export function analyzeStructure(
         deadCodeLines: [],
         deepNestLines: [],
         typeAnyLines: [],
+        imports: [],
       };
   }
 }

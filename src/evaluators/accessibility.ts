@@ -1,4 +1,4 @@
-import { Finding } from "../types.js";
+import type { Finding } from "../types.js";
 import { getLangFamily } from "./shared.js";
 
 export function analyzeAccessibility(code: string, language: string): Finding[] {
@@ -22,9 +22,11 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       title: "Image missing alt attribute",
       description: "Images must have descriptive alt text for screen readers and assistive technologies.",
       lineNumbers: imgNoAltLines,
-      recommendation: "Add meaningful alt text describing the image content. Use alt=\"\" only for purely decorative images.",
+      recommendation:
+        'Add meaningful alt text describing the image content. Use alt="" only for purely decorative images.',
       reference: "WCAG 2.1 SC 1.1.1 Non-text Content",
-      suggestedFix: "Add descriptive alt text: <img src=\"photo.jpg\" alt=\"Team photo at annual conference\"> or alt=\"\" for decorative images.",
+      suggestedFix:
+        'Add descriptive alt text: <img src="photo.jpg" alt="Team photo at annual conference"> or alt="" for decorative images.',
       confidence: 0.85,
     });
   }
@@ -41,11 +43,14 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Click handler without keyboard equivalent",
-      description: "Interactive elements with onClick must also support keyboard interaction for users who cannot use a mouse.",
+      description:
+        "Interactive elements with onClick must also support keyboard interaction for users who cannot use a mouse.",
       lineNumbers: clickNoKeyLines,
-      recommendation: "Add onKeyDown or onKeyPress handlers alongside onClick. Ensure all interactive elements are keyboard accessible.",
+      recommendation:
+        "Add onKeyDown or onKeyPress handlers alongside onClick. Ensure all interactive elements are keyboard accessible.",
       reference: "WCAG 2.1 SC 2.1.1 Keyboard",
-      suggestedFix: "Add keyboard support: <button onClick={handler} onKeyDown={(e) => e.key === 'Enter' && handler()}> or use native <button> elements which handle this automatically.",
+      suggestedFix:
+        "Add keyboard support: <button onClick={handler} onKeyDown={(e) => e.key === 'Enter' && handler()}> or use native <button> elements which handle this automatically.",
       confidence: 0.75,
     });
   }
@@ -62,11 +67,13 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Non-semantic element used with ARIA role",
-      description: "Using div with an ARIA role instead of the appropriate semantic HTML element reduces accessibility and adds unnecessary complexity.",
+      description:
+        "Using div with an ARIA role instead of the appropriate semantic HTML element reduces accessibility and adds unnecessary complexity.",
       lineNumbers: nonSemanticLines,
       recommendation: "Use semantic HTML elements (button, a, h1-h6, nav, main) instead of divs with ARIA roles.",
       reference: "WCAG 2.1 SC 4.1.2 Name, Role, Value",
-      suggestedFix: "Replace <div role=\"button\"> with <button>, <div role=\"link\"> with <a href>, <div role=\"navigation\"> with <nav>, etc.",
+      suggestedFix:
+        'Replace <div role="button"> with <button>, <div role="link"> with <a href>, <div role="navigation"> with <nav>, etc.',
       confidence: 0.85,
     });
   }
@@ -74,7 +81,11 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Detect missing form labels
   const inputNoLabelLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/<input\b/i.test(line) && !/aria-label|aria-labelledby|id\s*=/i.test(line) && !/type\s*=\s*["']hidden/i.test(line)) {
+    if (
+      /<input\b/i.test(line) &&
+      !/aria-label|aria-labelledby|id\s*=/i.test(line) &&
+      !/type\s*=\s*["']hidden/i.test(line)
+    ) {
       inputNoLabelLines.push(i + 1);
     }
   });
@@ -87,7 +98,8 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       lineNumbers: inputNoLabelLines,
       recommendation: "Associate each input with a <label> element using for/id, or use aria-label / aria-labelledby.",
       reference: "WCAG 2.1 SC 1.3.1 Info and Relationships",
-      suggestedFix: "Associate labels: <label htmlFor=\"email\">Email</label><input id=\"email\"> or use aria-label={\"Email address\"} directly on the input.",
+      suggestedFix:
+        'Associate labels: <label htmlFor="email">Email</label><input id="email"> or use aria-label={"Email address"} directly on the input.',
       confidence: 0.85,
     });
   }
@@ -104,11 +116,14 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Positive tabIndex used",
-      description: "Using positive tabIndex values disrupts the natural tab order and creates confusing navigation for keyboard users.",
+      description:
+        "Using positive tabIndex values disrupts the natural tab order and creates confusing navigation for keyboard users.",
       lineNumbers: tabIndexLines,
-      recommendation: "Use tabIndex={0} to add to natural tab order or tabIndex={-1} for programmatic focus only. Never use positive values.",
+      recommendation:
+        "Use tabIndex={0} to add to natural tab order or tabIndex={-1} for programmatic focus only. Never use positive values.",
       reference: "WCAG 2.1 SC 2.4.3 Focus Order",
-      suggestedFix: "Replace tabIndex={5} with tabIndex={0} to add to natural tab order, or tabIndex={-1} for programmatic focus only.",
+      suggestedFix:
+        "Replace tabIndex={5} with tabIndex={0} to add to natural tab order, or tabIndex={-1} for programmatic focus only.",
       confidence: 0.9,
     });
   }
@@ -116,7 +131,10 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Detect color-only status indicators
   const colorOnlyLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/color\s*[:=].*(?:red|green|#f00|#0f0|#ff0000|#00ff00)/i.test(line) && /(?:status|error|success|warning|valid|invalid)/i.test(line)) {
+    if (
+      /color\s*[:=].*(?:red|green|#f00|#0f0|#ff0000|#00ff00)/i.test(line) &&
+      /(?:status|error|success|warning|valid|invalid)/i.test(line)
+    ) {
       colorOnlyLines.push(i + 1);
     }
   });
@@ -125,11 +143,13 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Possible color-only status indication",
-      description: "Relying solely on color to convey status information excludes users with color vision deficiencies.",
+      description:
+        "Relying solely on color to convey status information excludes users with color vision deficiencies.",
       lineNumbers: colorOnlyLines,
       recommendation: "Use text labels, icons, or patterns in addition to color to convey status information.",
       reference: "WCAG 2.1 SC 1.4.1 Use of Color",
-      suggestedFix: "Add text or icon alongside color: <span className=\"error\"><ErrorIcon /> {errorMessage}</span> instead of relying on red color alone.",
+      suggestedFix:
+        'Add text or icon alongside color: <span className="error"><ErrorIcon /> {errorMessage}</span> instead of relying on red color alone.',
       confidence: 0.75,
     });
   }
@@ -146,11 +166,13 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Auto-playing media detected",
-      description: "Auto-playing audio or video can be disorienting for screen reader users and those with cognitive disabilities.",
+      description:
+        "Auto-playing audio or video can be disorienting for screen reader users and those with cognitive disabilities.",
       lineNumbers: autoplayLines,
       recommendation: "Avoid autoplay or provide a mechanism to pause/stop/mute within the first 3 seconds.",
       reference: "WCAG 2.1 SC 1.4.2 Audio Control",
-      suggestedFix: "Remove autoplay or add muted: <video muted autoPlay> and provide visible pause/stop controls within the first 3 seconds.",
+      suggestedFix:
+        "Remove autoplay or add muted: <video muted autoPlay> and provide visible pause/stop controls within the first 3 seconds.",
       confidence: 0.9,
     });
   }
@@ -167,11 +189,13 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Missing lang attribute on <html>",
-      description: "The html element must have a lang attribute so screen readers pronounce content in the correct language.",
+      description:
+        "The html element must have a lang attribute so screen readers pronounce content in the correct language.",
       lineNumbers: htmlNoLangLines,
-      recommendation: "Add lang attribute: <html lang=\"en\">. Use the appropriate BCP 47 language tag.",
+      recommendation: 'Add lang attribute: <html lang="en">. Use the appropriate BCP 47 language tag.',
       reference: "WCAG 2.1 SC 3.1.1 Language of Page",
-      suggestedFix: "Add language attribute: <html lang=\"en\"> using the appropriate BCP 47 language tag for your content.",
+      suggestedFix:
+        'Add language attribute: <html lang="en"> using the appropriate BCP 47 language tag for your content.',
       confidence: 0.85,
     });
   }
@@ -184,10 +208,12 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "No skip navigation link detected",
-      description: "Pages with navigation should include a 'Skip to main content' link so keyboard users can bypass repetitive navigation.",
+      description:
+        "Pages with navigation should include a 'Skip to main content' link so keyboard users can bypass repetitive navigation.",
       recommendation: "Add a visually hidden 'Skip to main content' link as the first focusable element on the page.",
       reference: "WCAG 2.1 SC 2.4.1 Bypass Blocks",
-      suggestedFix: "Add a skip link as the first focusable element: <a href=\"#main-content\" className=\"sr-only focus:not-sr-only\">Skip to main content</a>.",
+      suggestedFix:
+        'Add a skip link as the first focusable element: <a href="#main-content" className="sr-only focus:not-sr-only">Skip to main content</a>.',
       confidence: 0.7,
     });
   }
@@ -207,11 +233,14 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Focus indicator removed (outline: none)",
-      description: "Removing the focus outline without providing an alternative focus indicator makes the page unusable for keyboard users.",
+      description:
+        "Removing the focus outline without providing an alternative focus indicator makes the page unusable for keyboard users.",
       lineNumbers: outlineNoneLines,
-      recommendation: "If removing outline, provide a visible alternative focus indicator (box-shadow, border, custom :focus-visible styles).",
+      recommendation:
+        "If removing outline, provide a visible alternative focus indicator (box-shadow, border, custom :focus-visible styles).",
       reference: "WCAG 2.1 SC 2.4.7 Focus Visible",
-      suggestedFix: "Provide alternative focus styles: :focus-visible { outline: 2px solid #4A90D9; outline-offset: 2px; } instead of outline: none.",
+      suggestedFix:
+        "Provide alternative focus styles: :focus-visible { outline: 2px solid #4A90D9; outline-offset: 2px; } instead of outline: none.",
       confidence: 0.85,
     });
   }
@@ -219,7 +248,10 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Missing ARIA live regions for dynamic content
   const dynamicUpdateLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/(?:toast|notification|alert|snackbar|banner)\s*[=(]/i.test(line) || /setState.*(?:error|message|notification)/i.test(line)) {
+    if (
+      /(?:toast|notification|alert|snackbar|banner)\s*[=(]/i.test(line) ||
+      /setState.*(?:error|message|notification)/i.test(line)
+    ) {
       dynamicUpdateLines.push(i + 1);
     }
   });
@@ -229,11 +261,13 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Dynamic content updates without ARIA live region",
-      description: "Dynamic notifications, toasts, or alerts must use aria-live regions so screen readers announce them.",
+      description:
+        "Dynamic notifications, toasts, or alerts must use aria-live regions so screen readers announce them.",
       lineNumbers: dynamicUpdateLines.slice(0, 5),
       recommendation: "Wrap dynamic notification areas with aria-live='polite' (or role='alert' for urgent messages).",
       reference: "WCAG 2.1 SC 4.1.3 Status Messages",
-      suggestedFix: "Wrap notification areas: <div aria-live=\"polite\" role=\"status\">{statusMessage}</div> or use role=\"alert\" for urgent messages.",
+      suggestedFix:
+        'Wrap notification areas: <div aria-live="polite" role="status">{statusMessage}</div> or use role="alert" for urgent messages.',
       confidence: 0.7,
     });
   }
@@ -257,11 +291,14 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Heading level skipped",
-      description: "Heading levels should be sequential (h1->h2->h3). Skipping levels creates a confusing document hierarchy for assistive technology users.",
+      description:
+        "Heading levels should be sequential (h1->h2->h3). Skipping levels creates a confusing document hierarchy for assistive technology users.",
       lineNumbers: skippedHeadingLines,
-      recommendation: "Use headings in sequential order. Don't skip from h1 to h3. Use CSS for visual styling instead of choosing heading levels by appearance.",
+      recommendation:
+        "Use headings in sequential order. Don't skip from h1 to h3. Use CSS for visual styling instead of choosing heading levels by appearance.",
       reference: "WCAG 2.1 SC 1.3.1 Info and Relationships",
-      suggestedFix: "Fix heading hierarchy: change <h3> to <h2> if its parent heading is <h1>. Use CSS for visual sizing instead of skipping heading levels.",
+      suggestedFix:
+        "Fix heading hierarchy: change <h3> to <h2> if its parent heading is <h1>. Use CSS for visual sizing instead of skipping heading levels.",
       confidence: 0.85,
     });
   }
@@ -269,7 +306,10 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Touch target size too small
   const smallTargetLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/(?:width|height|size)\s*[:=]\s*(?:['"]?\d{1,2}(?:px)?['"]?|{\s*\d{1,2}\s*})/i.test(line) && /(?:button|btn|icon|close|toggle|checkbox|radio)/i.test(line)) {
+    if (
+      /(?:width|height|size)\s*[:=]\s*(?:['"]?\d{1,2}(?:px)?['"]?|{\s*\d{1,2}\s*})/i.test(line) &&
+      /(?:button|btn|icon|close|toggle|checkbox|radio)/i.test(line)
+    ) {
       smallTargetLines.push(i + 1);
     }
   });
@@ -278,11 +318,14 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Interactive element may have small touch target",
-      description: "Interactive elements with very small dimensions may not meet the 44x44px minimum touch target size.",
+      description:
+        "Interactive elements with very small dimensions may not meet the 44x44px minimum touch target size.",
       lineNumbers: smallTargetLines,
-      recommendation: "Ensure interactive elements have a minimum touch/click target size of 44x44 CSS pixels (WCAG) or 48x48dp (Material Design).",
+      recommendation:
+        "Ensure interactive elements have a minimum touch/click target size of 44x44 CSS pixels (WCAG) or 48x48dp (Material Design).",
       reference: "WCAG 2.1 SC 2.5.5 Target Size",
-      suggestedFix: "Ensure minimum size: .icon-button { min-width: 44px; min-height: 44px; padding: 12px; } to meet WCAG touch target requirements.",
+      suggestedFix:
+        "Ensure minimum size: .icon-button { min-width: 44px; min-height: 44px; padding: 12px; } to meet WCAG touch target requirements.",
       confidence: 0.75,
     });
   }
@@ -300,11 +343,14 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Animations without reduced-motion support",
-      description: "Animations can trigger vestibular disorders in some users. The prefers-reduced-motion media query should be respected.",
+      description:
+        "Animations can trigger vestibular disorders in some users. The prefers-reduced-motion media query should be respected.",
       lineNumbers: animationLines.slice(0, 5),
-      recommendation: "Add @media (prefers-reduced-motion: reduce) { ... } to disable or simplify animations for users who prefer reduced motion.",
+      recommendation:
+        "Add @media (prefers-reduced-motion: reduce) { ... } to disable or simplify animations for users who prefer reduced motion.",
       reference: "WCAG 2.1 SC 2.3.3 Animation from Interactions",
-      suggestedFix: "Add reduced motion support: @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }",
+      suggestedFix:
+        "Add reduced motion support: @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }",
       confidence: 0.7,
     });
   }
@@ -324,11 +370,14 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Media without captions or transcript",
-      description: "Audio and video content must have captions (for deaf users) and ideally transcripts for full accessibility.",
+      description:
+        "Audio and video content must have captions (for deaf users) and ideally transcripts for full accessibility.",
       lineNumbers: mediaLines,
-      recommendation: "Add <track kind='captions'> for videos, provide transcripts for audio, and ensure embedded videos have captions enabled.",
+      recommendation:
+        "Add <track kind='captions'> for videos, provide transcripts for audio, and ensure embedded videos have captions enabled.",
       reference: "WCAG 2.1 SC 1.2.2 Captions (Prerecorded)",
-      suggestedFix: "Add captions track: <video><track kind=\"captions\" src=\"captions.vtt\" srclang=\"en\" label=\"English\" default></video>.",
+      suggestedFix:
+        'Add captions track: <video><track kind="captions" src="captions.vtt" srclang="en" label="English" default></video>.',
       confidence: 0.85,
     });
   }
@@ -336,7 +385,10 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Form error messages not associated with inputs
   const errorMsgLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/(?:error|invalid|validation).*(?:message|msg|text)/i.test(line) && !/aria-describedby|aria-errormessage|aria-invalid/i.test(line)) {
+    if (
+      /(?:error|invalid|validation).*(?:message|msg|text)/i.test(line) &&
+      !/aria-describedby|aria-errormessage|aria-invalid/i.test(line)
+    ) {
       errorMsgLines.push(i + 1);
     }
   });
@@ -345,11 +397,14 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Form error not associated with input via ARIA",
-      description: "Error messages near form inputs should be programmatically associated so screen readers announce them.",
+      description:
+        "Error messages near form inputs should be programmatically associated so screen readers announce them.",
       lineNumbers: errorMsgLines.slice(0, 5),
-      recommendation: "Use aria-describedby to link error messages to inputs, and aria-invalid='true' on invalid inputs.",
+      recommendation:
+        "Use aria-describedby to link error messages to inputs, and aria-invalid='true' on invalid inputs.",
       reference: "WCAG 2.1 SC 3.3.1 Error Identification",
-      suggestedFix: "Associate errors with inputs: <input id=\"email\" aria-describedby=\"email-error\" aria-invalid=\"true\"><span id=\"email-error\">Invalid email</span>.",
+      suggestedFix:
+        'Associate errors with inputs: <input id="email" aria-describedby="email-error" aria-invalid="true"><span id="email-error">Invalid email</span>.',
       confidence: 0.75,
     });
   }

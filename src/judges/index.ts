@@ -1,4 +1,4 @@
-import { JudgeDefinition } from "../types.js";
+import type { JudgeDefinition } from "../types.js";
 
 import { dataSecurityJudge } from "./data-security.js";
 import { cybersecurityJudge } from "./cybersecurity.js";
@@ -34,6 +34,82 @@ import { ciCdJudge } from "./ci-cd.js";
 import { codeStructureJudge } from "./code-structure.js";
 import { agentInstructionsJudge } from "./agent-instructions.js";
 import { aiCodeSafetyJudge } from "./ai-code-safety.js";
+import { frameworkSafetyJudge } from "./framework-safety.js";
+
+// ─── Analyzer Imports ────────────────────────────────────────────────────────
+import { analyzeDataSecurity } from "../evaluators/data-security.js";
+import { analyzeCybersecurity } from "../evaluators/cybersecurity.js";
+import { analyzeCostEffectiveness } from "../evaluators/cost-effectiveness.js";
+import { analyzeScalability } from "../evaluators/scalability.js";
+import { analyzeCloudReadiness } from "../evaluators/cloud-readiness.js";
+import { analyzeSoftwarePractices } from "../evaluators/software-practices.js";
+import { analyzeAccessibility } from "../evaluators/accessibility.js";
+import { analyzeApiDesign } from "../evaluators/api-design.js";
+import { analyzeReliability } from "../evaluators/reliability.js";
+import { analyzeObservability } from "../evaluators/observability.js";
+import { analyzePerformance } from "../evaluators/performance.js";
+import { analyzeCompliance } from "../evaluators/compliance.js";
+import { analyzeDataSovereignty } from "../evaluators/data-sovereignty.js";
+import { analyzeTesting } from "../evaluators/testing.js";
+import { analyzeDocumentation } from "../evaluators/documentation.js";
+import { analyzeInternationalization } from "../evaluators/internationalization.js";
+import { analyzeDependencyHealth } from "../evaluators/dependency-health.js";
+import { analyzeConcurrency } from "../evaluators/concurrency.js";
+import { analyzeEthicsBias } from "../evaluators/ethics-bias.js";
+import { analyzeMaintainability } from "../evaluators/maintainability.js";
+import { analyzeErrorHandling } from "../evaluators/error-handling.js";
+import { analyzeAuthentication } from "../evaluators/authentication.js";
+import { analyzeDatabase } from "../evaluators/database.js";
+import { analyzeCaching } from "../evaluators/caching.js";
+import { analyzeConfigurationManagement } from "../evaluators/configuration-management.js";
+import { analyzeBackwardsCompatibility } from "../evaluators/backwards-compatibility.js";
+import { analyzePortability } from "../evaluators/portability.js";
+import { analyzeUx } from "../evaluators/ux.js";
+import { analyzeLoggingPrivacy } from "../evaluators/logging-privacy.js";
+import { analyzeRateLimiting } from "../evaluators/rate-limiting.js";
+import { analyzeCiCd } from "../evaluators/ci-cd.js";
+import { analyzeCodeStructure } from "../evaluators/code-structure.js";
+import { analyzeAgentInstructions } from "../evaluators/agent-instructions.js";
+import { analyzeAiCodeSafety } from "../evaluators/ai-code-safety.js";
+import { analyzeFrameworkSafety } from "../evaluators/framework-safety.js";
+
+// ─── Wire each judge to its analyzer ─────────────────────────────────────────
+
+dataSecurityJudge.analyze = analyzeDataSecurity;
+cybersecurityJudge.analyze = analyzeCybersecurity;
+costEffectivenessJudge.analyze = analyzeCostEffectiveness;
+scalabilityJudge.analyze = analyzeScalability;
+cloudReadinessJudge.analyze = analyzeCloudReadiness;
+softwarePracticesJudge.analyze = analyzeSoftwarePractices;
+accessibilityJudge.analyze = analyzeAccessibility;
+apiDesignJudge.analyze = analyzeApiDesign;
+reliabilityJudge.analyze = analyzeReliability;
+observabilityJudge.analyze = analyzeObservability;
+performanceJudge.analyze = analyzePerformance;
+complianceJudge.analyze = analyzeCompliance;
+dataSovereigntyJudge.analyze = analyzeDataSovereignty;
+testingJudge.analyze = analyzeTesting;
+documentationJudge.analyze = analyzeDocumentation;
+internationalizationJudge.analyze = analyzeInternationalization;
+dependencyHealthJudge.analyze = analyzeDependencyHealth;
+concurrencyJudge.analyze = analyzeConcurrency;
+ethicsBiasJudge.analyze = analyzeEthicsBias;
+maintainabilityJudge.analyze = analyzeMaintainability;
+errorHandlingJudge.analyze = analyzeErrorHandling;
+authenticationJudge.analyze = analyzeAuthentication;
+databaseJudge.analyze = analyzeDatabase;
+cachingJudge.analyze = analyzeCaching;
+configurationManagementJudge.analyze = analyzeConfigurationManagement;
+backwardsCompatibilityJudge.analyze = analyzeBackwardsCompatibility;
+portabilityJudge.analyze = analyzePortability;
+uxJudge.analyze = analyzeUx;
+loggingPrivacyJudge.analyze = analyzeLoggingPrivacy;
+rateLimitingJudge.analyze = analyzeRateLimiting;
+ciCdJudge.analyze = analyzeCiCd;
+codeStructureJudge.analyze = analyzeCodeStructure;
+agentInstructionsJudge.analyze = analyzeAgentInstructions;
+aiCodeSafetyJudge.analyze = analyzeAiCodeSafety;
+frameworkSafetyJudge.analyze = analyzeFrameworkSafety;
 
 /**
  * The panel of judges that comprise the Judges Panel.
@@ -77,6 +153,7 @@ export const JUDGES: JudgeDefinition[] = [
   codeStructureJudge,
   agentInstructionsJudge,
   aiCodeSafetyJudge,
+  frameworkSafetyJudge,
 ];
 
 /**
