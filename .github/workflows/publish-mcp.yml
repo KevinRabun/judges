@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write # Required for OIDC authentication
-      contents: read
+      contents: write # Required for creating GitHub Releases
 
     steps:
       - name: Checkout code
@@ -33,6 +33,13 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # ── Create GitHub Release ────────────────────────────────
+
+      - name: Create GitHub Release
+        run: gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ── Publish to MCP Registry ─────────────────────────────
 
