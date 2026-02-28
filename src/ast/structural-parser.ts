@@ -22,6 +22,7 @@ export function analyzeStructurally(code: string, language: string): CodeStructu
   const deepNestLines = detectDeepNesting(lines, isPython);
   const typeAnyLines = detectWeakTypes(lines, language);
   const imports = extractImports(lines, language);
+  const classes = isPython ? extractPythonClassNames(lines) : extractBraceClassNames(lines, language);
 
   const fileCyclomaticComplexity = functions.reduce((sum, f) => sum + f.cyclomaticComplexity, 0) || 1;
   const maxNestingDepth = functions.reduce((max, f) => Math.max(max, f.maxNestingDepth), 0);
@@ -36,6 +37,7 @@ export function analyzeStructurally(code: string, language: string): CodeStructu
     deepNestLines,
     typeAnyLines,
     imports,
+    classes,
   };
 }
 
@@ -119,16 +121,69 @@ function extractBraceFunctions(lines: string[], language: string): FunctionInfo[
 // The negated class excludes both open and close parens, eliminating overlap
 // between the inner and outer quantifiers.
 const PYTHON_FUNC = /^(\s*)(?:async\s+)?def\s+(\w+)\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)\s*(?:->.*)?:/;
+const PYTHON_CLASS = /^(\s*)class\s+(\w+)\s*(?:\([^()]*\))?\s*:/;
+const PYTHON_DECORATOR = /^(\s*)@(\w[\w.]*(?:\([^()]*\))?)/;
 
 function extractPythonFunctions(lines: string[]): FunctionInfo[] {
   const functions: FunctionInfo[] = [];
 
+  // First pass: identify class boundaries (indent-based)
+  const classRanges: Array<{ name: string; indent: number; startLine: number; endLine: number }> = [];
   for (let i = 0; i < lines.length; i++) {
+    const classMatch = lines[i].match(PYTHON_CLASS);
+    if (!classMatch) continue;
+
+    const baseIndent = classMatch[1].length;
+    const className = classMatch[2];
+    const startLine = i + 1;
+
+    let endIdx = i + 1;
+    while (endIdx < lines.length) {
+      const line = lines[endIdx];
+      if (line.trim() === "" || /^\s*#/.test(line)) {
+        endIdx++;
+        continue;
+      }
+      const indent = line.search(/\S/);
+      if (indent <= baseIndent) break;
+      endIdx++;
+    }
+    classRanges.push({ name: className, indent: baseIndent, startLine, endLine: endIdx });
+  }
+
+  // Second pass: extract functions and methods with decorators
+  for (let i = 0; i < lines.length; i++) {
+    // Collect decorators above this line
+    const decorators: string[] = [];
+    let decoratorStart = i;
+
+    // Look backwards from current position for consecutive decorators
+    // (we check forward from the decorator run start instead)
+    // Actually decorators precede the def, so let's check forward
     const match = lines[i].match(PYTHON_FUNC);
     if (!match) continue;
 
+    // Scan backwards for decorators
+    let k = i - 1;
+    while (k >= 0) {
+      const trimmed = lines[k].trim();
+      if (trimmed === "" || trimmed.startsWith("#")) {
+        k--;
+        continue;
+      }
+      const decMatch = lines[k].match(PYTHON_DECORATOR);
+      if (decMatch) {
+        decorators.unshift(decMatch[2]); // prepend to maintain order
+        decoratorStart = k;
+        k--;
+      } else {
+        break;
+      }
+    }
+
     const baseIndent = match[1].length;
     const name = match[2];
+    const isAsync = /async\s+def/.test(lines[i]);
     const params = match[3].trim();
     // Filter out 'self' and 'cls' from param count
     const paramList = params
@@ -136,7 +191,7 @@ function extractPythonFunctions(lines: string[]): FunctionInfo[] {
       .map((p) => p.trim())
       .filter((p) => p.length > 0 && p !== "self" && p !== "cls");
     const paramCount = paramList.length;
-    const startLine = i + 1;
+    const startLine = decoratorStart + 1;
 
     // Walk forward to find end of function body (next line at same or lesser
     // indentation that isn't blank or a comment)
@@ -157,24 +212,63 @@ function extractPythonFunctions(lines: string[]): FunctionInfo[] {
     const complexity = computeComplexityFromLines(funcLines, "python");
     const maxNesting = computeNestingFromLines(funcLines, true);
 
-    functions.push({
-      name,
+    // Check if this function is inside a class
+    const containingClass = classRanges.find((c) => i + 1 > c.startLine && i + 1 <= c.endLine && baseIndent > c.indent);
+
+    const funcInfo: FunctionInfo = {
+      name: containingClass ? `${containingClass.name}.${name}` : name,
       startLine,
       endLine,
       lineCount: endLine - startLine,
       parameterCount: paramCount,
       cyclomaticComplexity: complexity,
       maxNestingDepth: maxNesting,
-    });
+      ...(decorators.length > 0 ? { decorators } : {}),
+      ...(containingClass ? { className: containingClass.name } : {}),
+      ...(isAsync ? { isAsync: true } : {}),
+    };
+
+    functions.push(funcInfo);
   }
 
   return functions;
 }
 
+// ─── Python Class Name Extraction ────────────────────────────────────────────
+
+function extractPythonClassNames(lines: string[]): string[] {
+  const classes: string[] = [];
+  for (const line of lines) {
+    const match = line.match(PYTHON_CLASS);
+    if (match) classes.push(match[2]);
+  }
+  return classes;
+}
+
+// ─── Brace-Language Class Name Extraction ────────────────────────────────────
+
+const CLASS_PATTERNS: Record<string, RegExp> = {
+  java: /^\s*(?:(?:public|private|protected|abstract|final|static)\s+)*class\s+(\w+)/,
+  csharp: /^\s*(?:(?:public|private|protected|internal|abstract|sealed|static|partial)\s+)*class\s+(\w+)/,
+  rust: /^\s*(?:pub\s+)?struct\s+(\w+)/,
+  go: /^\s*type\s+(\w+)\s+struct\b/,
+};
+
+function extractBraceClassNames(lines: string[], language: string): string[] {
+  const pattern = CLASS_PATTERNS[language];
+  if (!pattern) return [];
+  const classes: string[] = [];
+  for (const line of lines) {
+    const match = line.match(pattern);
+    if (match) classes.push(match[1]);
+  }
+  return classes;
+}
+
 // ─── Cyclomatic Complexity from Source Lines ─────────────────────────────────
 
 const DECISION_POINTS: Record<string, RegExp> = {
-  python: /\b(if|elif|for|while|except|and|or|assert)\b|\bif\b.*\belse\b/g,
+  python: /\b(if|elif|for|while|except|and|or|assert)\b|\bif\b.*\belse\b|\bfor\b.*\bin\b.*\bif\b/g,
   rust: /\b(if|else\s+if|for|while|loop|match|=>|&&|\|\||\.unwrap_or|\.map_or)\b/g,
   go: /\b(if|else\s+if|for|switch|case|select|&&|\|\|)\b/g,
   java: /\b(if|else\s+if|for|while|do|case|catch|\?|&&|\|\|)\b/g,
@@ -405,6 +499,8 @@ function extractImports(lines: string[], language: string): string[] {
   if (!langPatterns) return imports;
 
   let inGoImportBlock = false;
+  let inPythonMultiImport = false;
+
   for (const line of lines) {
     const trimmed = line.trim();
 
@@ -420,6 +516,24 @@ function extractImports(lines: string[], language: string): string[] {
           continue;
         }
         const m = trimmed.match(/^"([^"]+)"$/);
+        if (m) imports.push(m[1]);
+        continue;
+      }
+    }
+
+    // Handle Python multi-line imports: from x import (\n  a,\n  b\n)
+    if (language === "python") {
+      if (inPythonMultiImport) {
+        if (trimmed.includes(")")) {
+          inPythonMultiImport = false;
+        }
+        continue;
+      }
+      // from x import (
+      if (/^\s*from\s+[\w.]+\s+import\s*\(/.test(line) && !trimmed.includes(")")) {
+        inPythonMultiImport = true;
+        // Still capture the module name
+        const m = line.match(/^\s*from\s+([\w.]+)\s+import/);
         if (m) imports.push(m[1]);
         continue;
       }

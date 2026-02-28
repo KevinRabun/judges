@@ -23,6 +23,12 @@ export interface FunctionInfo {
   cyclomaticComplexity: number;
   /** Maximum nesting depth within the function */
   maxNestingDepth: number;
+  /** Decorators applied to the function/method (Python, Java, C#). Empty for languages without decorators. */
+  decorators?: string[];
+  /** Class name if this is a method */
+  className?: string;
+  /** Whether this function is async */
+  isAsync?: boolean;
 }
 
 /**
@@ -47,4 +53,6 @@ export interface CodeStructure {
   typeAnyLines: number[];
   /** Imported module/package names (e.g., "express", "helmet", "DOMPurify") */
   imports: string[];
+  /** Class names discovered in the file (Python, Java, C#, etc.) */
+  classes?: string[];
 }

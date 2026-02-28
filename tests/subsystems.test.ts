@@ -1334,3 +1334,225 @@ describe("validateSarifLog", () => {
     assert.ok(errors.some((e) => e.path.includes("startLine")));
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 25. Enhanced Python Structural Parser
+// ─────────────────────────────────────────────────────────────────────────────
+import { analyzeStructure } from "../src/ast/index.js";
+
+describe("Enhanced Python Parser", () => {
+  it("should extract standalone functions", () => {
+    const code = `
+def hello(name):
+    print(f"Hello, {name}")
+
+def add(a, b):
+    return a + b
+`;
+    const result = analyzeStructure(code, "python");
+    assert.equal(result.functions.length, 2);
+    assert.equal(result.functions[0].name, "hello");
+    assert.equal(result.functions[0].parameterCount, 1);
+    assert.equal(result.functions[1].name, "add");
+    assert.equal(result.functions[1].parameterCount, 2);
+  });
+
+  it("should extract class methods with ClassName.method format", () => {
+    const code = `
+class UserService:
+    def __init__(self, db):
+        self.db = db
+
+    def get_user(self, user_id):
+        return self.db.get(user_id)
+
+    def delete_user(self, user_id):
+        self.db.delete(user_id)
+`;
+    const result = analyzeStructure(code, "python");
+    assert.ok(result.functions.length >= 3, `Expected >=3 methods, got ${result.functions.length}`);
+    const getUser = result.functions.find((f) => f.name === "UserService.get_user");
+    assert.ok(getUser, "Should find UserService.get_user method");
+    assert.equal(getUser!.className, "UserService");
+    assert.equal(getUser!.parameterCount, 1, "self should be excluded from param count");
+  });
+
+  it("should detect class names", () => {
+    const code = `
+class Foo:
+    pass
+
+class BarService(BaseService):
+    pass
+`;
+    const result = analyzeStructure(code, "python");
+    assert.ok(result.classes?.includes("Foo"));
+    assert.ok(result.classes?.includes("BarService"));
+  });
+
+  it("should detect decorators on functions", () => {
+    const code = `
+@app.route("/api/users")
+@login_required
+def get_users():
+    return users
+`;
+    const result = analyzeStructure(code, "python");
+    const fn = result.functions.find((f) => f.name === "get_users");
+    assert.ok(fn, "Should find get_users");
+    assert.ok(fn!.decorators, "Should have decorators");
+    assert.ok(
+      fn!.decorators!.some((d) => d.includes("app.route")),
+      "Should have @app.route",
+    );
+    assert.ok(fn!.decorators!.includes("login_required"), "Should have @login_required");
+  });
+
+  it("should detect async functions", () => {
+    const code = `
+async def fetch_data(url):
+    response = await httpx.get(url)
+    return response.json()
+
+def sync_func():
+    return 42
+`;
+    const result = analyzeStructure(code, "python");
+    const asyncFn = result.functions.find((f) => f.name === "fetch_data");
+    assert.ok(asyncFn, "Should find async function");
+    assert.equal(asyncFn!.isAsync, true);
+    const syncFn = result.functions.find((f) => f.name === "sync_func");
+    assert.ok(syncFn, "Should find sync function");
+    assert.ok(!syncFn!.isAsync, "Sync function should not be async");
+  });
+
+  it("should filter self and cls from parameter count", () => {
+    const code = `
+class MyClass:
+    def instance_method(self, x, y):
+        pass
+
+    @classmethod
+    def class_method(cls, z):
+        pass
+
+    @staticmethod
+    def static_method(a, b, c):
+        pass
+`;
+    const result = analyzeStructure(code, "python");
+    const instance = result.functions.find((f) => f.name.includes("instance_method"));
+    assert.equal(instance!.parameterCount, 2, "self should be excluded");
+    const clsMethod = result.functions.find((f) => f.name.includes("class_method"));
+    assert.equal(clsMethod!.parameterCount, 1, "cls should be excluded");
+    const staticMethod = result.functions.find((f) => f.name.includes("static_method"));
+    assert.equal(staticMethod!.parameterCount, 3, "static method keeps all params");
+  });
+
+  it("should handle multi-line Python imports", () => {
+    const code = `
+from flask import (
+    Flask,
+    request,
+    jsonify
+)
+import os
+from datetime import datetime
+`;
+    const result = analyzeStructure(code, "python");
+    assert.ok(result.imports.includes("flask"), "Should detect flask");
+    assert.ok(result.imports.includes("os"), "Should detect os");
+    assert.ok(result.imports.includes("datetime"), "Should detect datetime");
+  });
+
+  it("should compute cyclomatic complexity for comprehensions", () => {
+    const code = `
+def complex_func(items):
+    filtered = [x for x in items if x > 0]
+    if len(filtered) > 10:
+        for item in filtered:
+            if item % 2 == 0:
+                yield item
+            elif item % 3 == 0:
+                yield item * 2
+    return filtered
+`;
+    const result = analyzeStructure(code, "python");
+    const fn = result.functions.find((f) => f.name === "complex_func");
+    assert.ok(fn, "Should find complex_func");
+    assert.ok(fn!.cyclomaticComplexity >= 4, `Expected complexity >= 4, got ${fn!.cyclomaticComplexity}`);
+  });
+
+  it("should detect weak Python types (Any, cast)", () => {
+    const code = `
+from typing import Any, cast
+
+def process(data: Any) -> Any:
+    result = cast(int, data)
+    return result
+`;
+    const result = analyzeStructure(code, "python");
+    assert.ok(result.typeAnyLines.length >= 1, "Should detect Any/cast usage");
+  });
+
+  it("should extract classes for brace languages too", () => {
+    const javaCode = `
+public class UserController {
+    public void getUser(int id) {
+        return;
+    }
+}
+`;
+    const result = analyzeStructure(javaCode, "java");
+    assert.ok(result.classes?.includes("UserController"));
+  });
+
+  it("should handle decorators with arguments", () => {
+    const code = `
+@pytest.mark.parametrize("x", [1, 2, 3])
+def test_something(x):
+    assert x > 0
+
+@app.route("/users", methods=["GET"])
+def list_users():
+    return []
+`;
+    const result = analyzeStructure(code, "python");
+    const testFn = result.functions.find((f) => f.name === "test_something");
+    assert.ok(testFn?.decorators?.some((d) => d.includes("pytest.mark.parametrize")));
+    const listFn = result.functions.find((f) => f.name === "list_users");
+    assert.ok(listFn?.decorators?.some((d) => d.includes("app.route")));
+  });
+
+  it("should detect Go struct names as classes", () => {
+    const goCode = `
+package main
+
+type UserService struct {
+    db Database
+}
+
+func (s *UserService) GetUser(id int) User {
+    return s.db.Get(id)
+}
+`;
+    const result = analyzeStructure(goCode, "go");
+    assert.ok(result.classes?.includes("UserService"));
+  });
+
+  it("should handle nested Python classes and methods", () => {
+    const code = `
+class Outer:
+    class Inner:
+        def inner_method(self):
+            pass
+
+    def outer_method(self):
+        pass
+`;
+    const result = analyzeStructure(code, "python");
+    assert.ok(result.classes?.includes("Outer"));
+    assert.ok(result.classes?.includes("Inner"));
+    assert.ok(result.functions.length >= 2, "Should extract methods from nested classes");
+  });
+});
