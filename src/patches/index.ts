@@ -489,12 +489,157 @@ const PATCH_RULES: Array<{
   },
 ];
 
+/**
+ * Multi-line patch rules produce replacements that may span multiple source
+ * lines. Each rule receives a context window around the finding and returns
+ * a patch whose oldText/newText may contain newlines.
+ */
+interface MultiLinePatchRule {
+  /** Match against ruleId or title */
+  match: RegExp;
+  /** How many lines before/after the finding line to include in the window */
+  contextLines: number;
+  /** Given the window, produce a multi-line patch or null */
+  generate: (
+    windowLines: string[],
+    windowStartLine: number,
+    findingLine: number,
+  ) => { oldText: string; newText: string; startLine: number; endLine: number } | null;
+}
+
+const MULTI_LINE_PATCH_RULES: MultiLinePatchRule[] = [
+  // ── Multi-line empty catch block → re-throw with error parameter ──
+  {
+    match: /empty.*catch|catch.*swallow|catch.*discard/i,
+    contextLines: 6,
+    generate: (windowLines, windowStart, findingLine) => {
+      for (let i = 0; i < windowLines.length; i++) {
+        const line = windowLines[i];
+        const catchMatch = line.match(/^(\s*)(?:}\s*)?catch\s*\(([^)]*)\)\s*\{\s*$/);
+        if (!catchMatch) continue;
+        const indent = catchMatch[1];
+        const param = catchMatch[2].trim() || "error";
+        // Find matching closing brace — everything inside must be empty/comments
+        let braceDepth = 1;
+        let endIdx = -1;
+        for (let j = i + 1; j < windowLines.length; j++) {
+          const inner = windowLines[j];
+          for (const ch of inner) {
+            if (ch === "{") braceDepth++;
+            if (ch === "}") braceDepth--;
+          }
+          if (braceDepth === 0) {
+            endIdx = j;
+            break;
+          }
+          // Non-empty, non-comment line means the catch isn't truly empty
+          if (inner.trim() !== "" && !/^\s*\/\//.test(inner)) return null;
+        }
+        if (endIdx <= i) continue;
+        const oldText = windowLines.slice(i, endIdx + 1).join("\n");
+        const newText = `${indent}catch (${param}) {\n${indent}  /* TODO: handle error appropriately */ throw ${param};\n${indent}}`;
+        return { oldText, newText, startLine: windowStart + i, endLine: windowStart + endIdx };
+      }
+      return null;
+    },
+  },
+
+  // ── Bare JSON.parse → try/catch wrapped ──
+  {
+    match: /unsafe.*json|json.*parse.*unguard|deserialization(?!.*already)/i,
+    contextLines: 2,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)(const|let|var)\s+(\w+)\s*=\s*JSON\.parse\s*\(([^)]+)\)\s*;?\s*$/);
+      if (!m) return null;
+      const [, indent, , varName, arg] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}let ${varName};`,
+        `${indent}try { ${varName} = JSON.parse(${arg}); }`,
+        `${indent}catch { ${varName} = null; /* TODO: handle parse error */ }`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Server .listen() without error callback → add error handler ──
+  {
+    match: /no.*error.*callback|listen.*without.*error|server.*error.*handling/i,
+    contextLines: 2,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)((?:\w+\.)?listen\s*\(\s*(\d+|[\w.]+)\s*)\)\s*;?\s*$/);
+      if (!m) return null;
+      const [, indent, prefix, port] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}${prefix}, () => {`,
+        `${indent}  console.log(\`Server listening on port ${port}\`);`,
+        `${indent}}).on("error", (err) => {`,
+        `${indent}  console.error("Server failed to start:", err);`,
+        `${indent}  process.exitCode = 1;`,
+        `${indent}});`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Bare await without try/catch → wrap in try/catch ──
+  {
+    match: /unhandled.*reject|await.*without.*catch|async.*error.*handling/i,
+    contextLines: 3,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)((?:const|let|var)\s+\w+\s*=\s*await\s+.+?)\s*;?\s*$/);
+      if (!m) return null;
+      // Check that there is no try/catch wrapping already
+      const before = windowLines.slice(Math.max(0, idx - 3), idx).join("\n");
+      if (/\btry\s*\{/.test(before)) return null;
+      const [, indent, stmt] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}try {`,
+        `${indent}  ${stmt.trim()};`,
+        `${indent}} catch (error) {`,
+        `${indent}  /* TODO: handle async error */ throw error;`,
+        `${indent}}`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Dockerfile FROM :latest → pinned with comment ──
+  {
+    match: /latest.*tag|docker.*latest|unpinned.*base/i,
+    contextLines: 1,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)(FROM\s+)(\S+):latest(\s+AS\s+\S+)?\s*$/i);
+      if (!m) return null;
+      const [, indent, from, image, alias] = m;
+      const oldText = line;
+      const newText = `${indent}# TODO: pin to a specific version for reproducibility\n${indent}${from}${image}:lts-slim${alias || ""}`;
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+];
+
 export function enrichWithPatches(findings: Finding[], code: string): Finding[] {
   const lines = code.split("\n");
   return findings.map((f) => {
     // Skip if patch already present or no line numbers
     if (f.patch || !f.lineNumbers || f.lineNumbers.length === 0) return f;
 
+    // 1. Try single-line rules first
     for (const rule of PATCH_RULES) {
       if (!rule.match.test(f.title) && !rule.match.test(f.ruleId)) continue;
       // Try the first affected line
@@ -513,6 +658,20 @@ export function enrichWithPatches(findings: Finding[], code: string): Finding[] 
         };
       }
     }
+
+    // 2. Try multi-line rules
+    for (const rule of MULTI_LINE_PATCH_RULES) {
+      if (!rule.match.test(f.title) && !rule.match.test(f.ruleId)) continue;
+      const findingLine = f.lineNumbers[0];
+      const windowStart = Math.max(1, findingLine - rule.contextLines);
+      const windowEnd = Math.min(lines.length, findingLine + rule.contextLines);
+      const windowLines = lines.slice(windowStart - 1, windowEnd);
+      const result = rule.generate(windowLines, windowStart, findingLine);
+      if (result) {
+        return { ...f, patch: result };
+      }
+    }
+
     return f;
   });
 }

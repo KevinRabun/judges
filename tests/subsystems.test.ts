@@ -781,3 +781,124 @@ describe("Auto-Fix Patches — enrichWithPatches", () => {
     assert.equal(result[0].patch, undefined);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 18. Multi-line Patches — enrichWithPatches
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Multi-line Patches — enrichWithPatches", () => {
+  it("should patch multi-line empty catch block", () => {
+    const code = ["try {", "  doSomething();", "} catch (e) {", "  // nothing here", "}"].join("\n");
+    const findings = [makeFinding({ ruleId: "ERR-003", title: "Empty catch block swallows errors", lineNumbers: [3] })];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected multi-line patch for empty catch");
+    assert.ok(result[0].patch!.newText.includes("throw"), "Should re-throw");
+    assert.ok(result[0].patch!.newText.includes("catch (e)"), "Should preserve error parameter");
+    assert.ok(result[0].patch!.newText.includes("\n"), "Patch should be multi-line");
+  });
+
+  it("should patch multi-line empty catch with no parameter", () => {
+    const code = ["try { x(); }", "catch () {", "}"].join("\n");
+    const findings = [makeFinding({ ruleId: "ERR-003", title: "Empty catch block discards error", lineNumbers: [2] })];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch");
+    assert.ok(result[0].patch!.newText.includes("catch (error)"), "Should provide default error param");
+  });
+
+  it("should NOT patch non-empty catch block", () => {
+    const code = ["try { x(); }", "catch (e) {", "  console.error(e);", "}"].join("\n");
+    const findings = [makeFinding({ ruleId: "ERR-003", title: "Empty catch block swallows errors", lineNumbers: [2] })];
+    const result = enrichWithPatches(findings, code);
+    assert.equal(result[0].patch, undefined, "Should not patch non-empty catch");
+  });
+
+  it("should wrap bare JSON.parse in try/catch", () => {
+    const code = "const data = JSON.parse(input);";
+    const findings = [
+      makeFinding({ ruleId: "DATA-001", title: "Unsafe JSON.parse without error handling", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected multi-line patch");
+    assert.ok(result[0].patch!.newText.includes("try"), "Should include try");
+    assert.ok(result[0].patch!.newText.includes("catch"), "Should include catch");
+    assert.ok(result[0].patch!.newText.includes("let data"), "Should use let for outer var");
+  });
+
+  it("should add error handler to app.listen()", () => {
+    const code = "app.listen(3000);";
+    const findings = [
+      makeFinding({ ruleId: "ERR-010", title: "Server listen without error callback", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected multi-line patch");
+    assert.ok(result[0].patch!.newText.includes('on("error"'), "Should add error handler");
+    assert.ok(result[0].patch!.newText.includes("3000"), "Should preserve port");
+  });
+
+  it("should wrap bare await in try/catch", () => {
+    const code = ["async function fetchData() {", "  const result = await fetch(url);", "  return result;", "}"].join(
+      "\n",
+    );
+    const findings = [
+      makeFinding({ ruleId: "ERR-015", title: "Await without catch — unhandled rejection", lineNumbers: [2] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected multi-line patch");
+    assert.ok(result[0].patch!.newText.includes("try {"), "Should wrap in try");
+    assert.ok(result[0].patch!.newText.includes("catch (error)"), "Should catch error");
+  });
+
+  it("should NOT wrap await that is already in try/catch", () => {
+    const code = [
+      "async function fetchData() {",
+      "  try {",
+      "    const result = await fetch(url);",
+      "    return result;",
+      "  } catch (e) { throw e; }",
+      "}",
+    ].join("\n");
+    const findings = [
+      makeFinding({ ruleId: "ERR-015", title: "Await without catch — unhandled rejection", lineNumbers: [3] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.equal(result[0].patch, undefined, "Should not double-wrap in try/catch");
+  });
+
+  it("should pin Dockerfile FROM :latest tag", () => {
+    const code = "FROM node:latest";
+    const findings = [makeFinding({ ruleId: "CICD-005", title: "Docker latest tag is unpinned", lineNumbers: [1] })];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch");
+    assert.ok(result[0].patch!.newText.includes("lts-slim"), "Should pin version");
+    assert.ok(result[0].patch!.newText.includes("TODO"), "Should add TODO comment");
+  });
+
+  it("should pin Dockerfile FROM :latest with AS alias", () => {
+    const code = "FROM python:latest AS builder";
+    const findings = [
+      makeFinding({ ruleId: "CICD-005", title: "Unpinned base image with latest tag", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch");
+    // Single-line rule matches first — replaces only the :latest portion
+    assert.ok(result[0].patch!.newText.includes("lts-slim"), "Should pin version");
+  });
+
+  it("should prefer single-line patch over multi-line when both match", () => {
+    const code = 'const buf = new Buffer("hello");';
+    const findings = [makeFinding({ ruleId: "DEPS-001", title: "Deprecated API: new Buffer()", lineNumbers: [1] })];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch");
+    assert.ok(result[0].patch!.newText.includes("Buffer.from"), "Single-line rule should win");
+    assert.equal(result[0].patch!.startLine, result[0].patch!.endLine, "Should be single-line patch");
+  });
+
+  it("multi-line patch startLine/endLine should be correct for spanning patch", () => {
+    const code = ["try {", "  doSomething();", "} catch (err) {", "", "}"].join("\n");
+    const findings = [makeFinding({ ruleId: "ERR-003", title: "Empty catch block swallows errors", lineNumbers: [3] })];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch");
+    assert.equal(result[0].patch!.startLine, 3, "Should start at catch line");
+    assert.equal(result[0].patch!.endLine, 5, "Should end at closing brace");
+  });
+});
