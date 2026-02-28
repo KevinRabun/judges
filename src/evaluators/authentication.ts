@@ -180,22 +180,26 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   }
 
   // JWT without verification
+  // This is absence-based in single-file mode: verification middleware often
+  // lives in a separate file from the login/sign endpoint.
   const hasJwt = /jwt|jsonwebtoken|jose/gi.test(code);
   const hasJwtVerify = /jwt\.verify|jwtVerify|verifyToken|jose\.jwtVerify/gi.test(code);
   const hasJwtSign = /jwt\.sign|jwtSign|signToken/gi.test(code);
   if (hasJwt && hasJwtSign && !hasJwtVerify) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
-      severity: "critical",
-      title: "JWT tokens signed but never verified",
+      severity: "high",
+      title: "No JWT verification detected alongside signing",
       description:
-        "JWT tokens are being created but no verification logic is visible. Tokens could be tampered with or forged without the server detecting it.",
+        "JWT tokens are being created but no verification logic is visible in this file. Verification middleware may exist in another module; in project mode this finding is automatically resolved.",
       recommendation:
-        "Always verify JWT tokens on every request: check signature, expiration (exp), issuer (iss), and audience (aud).",
+        "Ensure JWT tokens are verified on every request: check signature, expiration (exp), issuer (iss), and audience (aud).",
       reference: "RFC 7519: JWT / OWASP JWT Cheat Sheet",
       suggestedFix:
         "Add JWT verification: const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'], issuer: 'myapp', audience: 'myapp' });",
-      confidence: 0.8,
+      confidence: 0.55,
+      isAbsenceBased: true,
+      provenance: "absence-of-pattern",
     });
   }
 
