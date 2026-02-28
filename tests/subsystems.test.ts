@@ -1046,3 +1046,120 @@ describe("Framework-Aware Confidence — applyFrameworkAwareness", () => {
     assert.ok(result[0].provenance?.includes("helmet-mitigated"), "Should add framework");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 21. LRUCache
+// ─────────────────────────────────────────────────────────────────────────────
+import { LRUCache, contentHash } from "../src/cache.js";
+
+describe("LRUCache", () => {
+  it("should store and retrieve values", () => {
+    const cache = new LRUCache<number>();
+    cache.set("a", 1);
+    assert.equal(cache.get("a"), 1);
+  });
+
+  it("should return undefined for missing keys", () => {
+    const cache = new LRUCache<number>();
+    assert.equal(cache.get("missing"), undefined);
+  });
+
+  it("should report correct size", () => {
+    const cache = new LRUCache<number>();
+    assert.equal(cache.size, 0);
+    cache.set("a", 1);
+    cache.set("b", 2);
+    assert.equal(cache.size, 2);
+  });
+
+  it("should evict oldest entry when maxSize exceeded", () => {
+    const cache = new LRUCache<number>(3);
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.set("c", 3);
+    cache.set("d", 4); // should evict "a"
+    assert.equal(cache.get("a"), undefined, "Oldest key should be evicted");
+    assert.equal(cache.get("d"), 4);
+    assert.equal(cache.size, 3);
+  });
+
+  it("should promote accessed entries (LRU behavior)", () => {
+    const cache = new LRUCache<number>(3);
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.set("c", 3);
+    cache.get("a"); // promote "a", so "b" is now oldest
+    cache.set("d", 4); // should evict "b" (not "a")
+    assert.equal(cache.get("a"), 1, "Promoted key should survive");
+    assert.equal(cache.get("b"), undefined, "Least-recently-used key should be evicted");
+  });
+
+  it("should update existing keys in place", () => {
+    const cache = new LRUCache<number>(3);
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.set("a", 10); // update "a"
+    assert.equal(cache.get("a"), 10);
+    assert.equal(cache.size, 2, "Size should not increase for updates");
+  });
+
+  it("should clear all entries", () => {
+    const cache = new LRUCache<number>();
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.clear();
+    assert.equal(cache.size, 0);
+    assert.equal(cache.get("a"), undefined);
+  });
+
+  it("has() should not affect LRU order", () => {
+    const cache = new LRUCache<number>(2);
+    cache.set("a", 1);
+    cache.set("b", 2);
+    assert.equal(cache.has("a"), true); // should NOT promote "a"
+    cache.set("c", 3); // should evict "a" (oldest, has() didn't promote)
+    assert.equal(cache.get("a"), undefined, "has() should not promote");
+    assert.equal(cache.get("b"), 2);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 22. contentHash
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("contentHash", () => {
+  it("should produce a 16-char hex string", () => {
+    const hash = contentHash("console.log('hi')", "typescript");
+    assert.equal(hash.length, 16);
+    assert.match(hash, /^[0-9a-f]{16}$/);
+  });
+
+  it("should produce identical hashes for identical inputs", () => {
+    const h1 = contentHash("const x = 1;", "javascript");
+    const h2 = contentHash("const x = 1;", "javascript");
+    assert.equal(h1, h2);
+  });
+
+  it("should produce different hashes for different code", () => {
+    const h1 = contentHash("const x = 1;", "javascript");
+    const h2 = contentHash("const x = 2;", "javascript");
+    assert.notEqual(h1, h2);
+  });
+
+  it("should produce different hashes for different languages", () => {
+    const h1 = contentHash("x = 1", "python");
+    const h2 = contentHash("x = 1", "javascript");
+    assert.notEqual(h1, h2);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 23. clearEvaluationCaches (smoke test)
+// ─────────────────────────────────────────────────────────────────────────────
+import { clearEvaluationCaches } from "../src/evaluators/index.js";
+
+describe("clearEvaluationCaches", () => {
+  it("should not throw when called", () => {
+    assert.doesNotThrow(() => clearEvaluationCaches());
+  });
+});

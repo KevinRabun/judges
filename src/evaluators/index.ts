@@ -20,6 +20,7 @@ import { analyzeStructure } from "../ast/index.js";
 import { analyzeTaintFlows } from "../ast/index.js";
 import type { CodeStructure, FunctionInfo } from "../ast/types.js";
 import type { TaintFlow } from "../ast/taint-tracker.js";
+import { LRUCache, contentHash } from "../cache.js";
 
 // ─── Shared Utilities ────────────────────────────────────────────────────────
 import {
@@ -69,6 +70,16 @@ export interface EvaluationOptions {
 }
 
 // ── AST-aware post-processing ───────────────────────────────────────────────
+
+// ── Module-level caches for AST/taint results ───────────────────────────────
+const astStructureCache = new LRUCache<CodeStructure>(256);
+const taintFlowCache = new LRUCache<TaintFlow[]>(256);
+
+/** Clear all internal evaluation caches. Useful in tests or after large runs. */
+export function clearEvaluationCaches(): void {
+  astStructureCache.clear();
+  taintFlowCache.clear();
+}
 
 /**
  * Known sanitization/security library names. When one is imported, related
@@ -435,11 +446,32 @@ export function evaluateWithTribunal(
   options?: EvaluationOptions,
 ): TribunalVerdict {
   // Compute AST once and share across all judges via options
+  // Use content-hash cache to avoid re-computing for identical code
   const includeAst = options?.includeAstFindings ?? true;
+  const hash = contentHash(code, language);
+
+  let astResult = options?._astCache;
+  if (!astResult && includeAst) {
+    astResult = astStructureCache.get(hash);
+    if (!astResult) {
+      astResult = analyzeStructure(code, language);
+      astStructureCache.set(hash, astResult);
+    }
+  }
+
+  let taintResult = options?._taintFlows;
+  if (!taintResult) {
+    taintResult = taintFlowCache.get(hash);
+    if (!taintResult) {
+      taintResult = analyzeTaintFlows(code, language);
+      taintFlowCache.set(hash, taintResult);
+    }
+  }
+
   const enrichedOptions: EvaluationOptions = {
     ...options,
-    ...(includeAst && !options?._astCache ? { _astCache: analyzeStructure(code, language) } : {}),
-    ...(!options?._taintFlows ? { _taintFlows: analyzeTaintFlows(code, language) } : {}),
+    ...(astResult ? { _astCache: astResult } : {}),
+    ...(taintResult ? { _taintFlows: taintResult } : {}),
   };
 
   const judges = resolveJudgeSet(enrichedOptions);

@@ -8,7 +8,16 @@
 import type { Finding, ProjectVerdict, Verdict, Severity, TribunalVerdict } from "../types.js";
 import { analyzeCrossFileTaint } from "../ast/index.js";
 import { applyConfidenceThreshold } from "../scoring.js";
+import { LRUCache, contentHash } from "../cache.js";
 import type { EvaluationOptions } from "./index.js";
+
+// ─── Module-level tribunal result cache ──────────────────────────────────────
+const tribunalResultCache = new LRUCache<TribunalVerdict>(256);
+
+/** Clear the project-level tribunal result cache. */
+export function clearProjectCache(): void {
+  tribunalResultCache.clear();
+}
 
 // ─── Tribunal Runner Interface ───────────────────────────────────────────────
 // Dependency injection to avoid circular imports between project.ts ↔ index.ts
@@ -207,9 +216,14 @@ export function evaluateProject(
   // Resolve cross-file imports to detect security mitigations from imported modules
   const crossFileMitigations = resolveProjectImports(files);
 
-  // Per-file evaluations
+  // Per-file evaluations (cached by content hash to skip unchanged files)
   const fileResults = files.map((f) => {
-    const verdict = runner.evaluateWithTribunal(f.content, f.language, context, options);
+    const hash = contentHash(f.content, f.language);
+    let verdict = tribunalResultCache.get(hash);
+    if (!verdict) {
+      verdict = runner.evaluateWithTribunal(f.content, f.language, context, options);
+      tribunalResultCache.set(hash, verdict);
+    }
     // Apply cross-file adjustments if this file imports security modules
     const mitigated = crossFileMitigations.get(f.path);
     const adjustedFindings =

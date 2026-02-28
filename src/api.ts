@@ -61,6 +61,7 @@ export {
   runAppBuilderWorkflow,
   formatVerdictAsMarkdown,
   formatEvaluationAsMarkdown,
+  clearEvaluationCaches,
 } from "./evaluators/index.js";
 
 // ─── V2 Policy-Aware API ────────────────────────────────────────────────────
@@ -68,6 +69,10 @@ export { evaluateCodeV2, evaluateProjectV2, getSupportedPolicyProfiles } from ".
 
 // ─── Cross-File Taint Analysis ───────────────────────────────────────────────
 export { analyzeCrossFileTaint } from "./ast/cross-file-taint.js";
+
+// ─── Cache Utilities ─────────────────────────────────────────────────────────
+export { LRUCache, contentHash } from "./cache.js";
+export { clearProjectCache } from "./evaluators/project.js";
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
 export { findingsToSarif, evaluationToSarif, verdictToSarif } from "./formatters/sarif.js";
