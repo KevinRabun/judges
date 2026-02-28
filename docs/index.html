@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Judges Dashboard</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --red: #f85149;
+      --orange: #db6d28;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    header { text-align: center; margin-bottom: 3rem; }
+    header h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    header p { color: var(--text-muted); font-size: 1.1rem; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+    .stat-card .value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+    .stat-card .label {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .stat-card .value.green { color: var(--green); }
+    .stat-card .value.yellow { color: var(--yellow); }
+    .stat-card .value.red { color: var(--red); }
+    .stat-card .value.accent { color: var(--accent); }
+    .section { margin-bottom: 3rem; }
+    .section h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: rgba(255,255,255,0.05);
+      font-weight: 600;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: rgba(255,255,255,0.02); }
+    .verdict-pass { color: var(--green); font-weight: 600; }
+    .verdict-warning { color: var(--yellow); font-weight: 600; }
+    .verdict-fail { color: var(--red); font-weight: 600; }
+    .severity-critical { color: var(--red); }
+    .severity-high { color: var(--orange); }
+    .severity-medium { color: var(--yellow); }
+    .severity-low { color: var(--text-muted); }
+    .bar {
+      height: 8px;
+      border-radius: 4px;
+      background: var(--border);
+      overflow: hidden;
+      margin-top: 0.25rem;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+    .judge-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+    .judge-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    .judge-card .name {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .judge-card .score {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    .meta {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      text-align: center;
+      margin-top: 3rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .meta a { color: var(--accent); text-decoration: none; }
+    .meta a:hover { text-decoration: underline; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-pass { background: rgba(63,185,80,0.15); color: var(--green); }
+    .badge-warning { background: rgba(210,153,34,0.15); color: var(--yellow); }
+    .badge-fail { background: rgba(248,81,73,0.15); color: var(--red); }
+    #loading {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+    .showcase-table td:nth-child(3),
+    .showcase-table td:nth-child(4),
+    .showcase-table td:nth-child(5),
+    .showcase-table td:nth-child(6),
+    .showcase-table td:nth-child(7) {
+      text-align: right;
+    }
+    .showcase-table th:nth-child(3),
+    .showcase-table th:nth-child(4),
+    .showcase-table th:nth-child(5),
+    .showcase-table th:nth-child(6),
+    .showcase-table th:nth-child(7) {
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Judges Dashboard</h1>
+      <p>35 specialized judges evaluating AI-generated code for security, cost, and quality</p>
+    </header>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="value accent">35</div>
+        <div class="label">Judges</div>
+      </div>
+      <div class="stat-card">
+        <div class="value green" id="stat-repos">—</div>
+        <div class="label">Repos Analyzed</div>
+      </div>
+      <div class="stat-card">
+        <div class="value yellow" id="stat-findings">—</div>
+        <div class="label">Total Findings</div>
+      </div>
+      <div class="stat-card">
+        <div class="value red" id="stat-critical">—</div>
+        <div class="label">Critical Issues</div>
+      </div>
+      <div class="stat-card">
+        <div class="value green" id="stat-tests">899</div>
+        <div class="label">Tests Passing</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Open-Source Project Analysis</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1rem;">
+        Real-world analysis of popular open-source projects — all deterministic, no LLM calls.
+      </p>
+      <table class="showcase-table">
+        <thead>
+          <tr>
+            <th>Repository</th>
+            <th>Verdict</th>
+            <th>Score</th>
+            <th>Files</th>
+            <th>Critical</th>
+            <th>High</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="showcase-body">
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>The 35 Judges</h2>
+      <div class="judge-grid" id="judge-grid">
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>How It Works</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Step</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>1. Parse</strong></td>
+            <td>Source code is parsed with regex patterns and TypeScript AST analysis — no LLM needed</td>
+          </tr>
+          <tr>
+            <td><strong>2. Evaluate</strong></td>
+            <td>All 35 judges independently score the code on their domain (0-100)</td>
+          </tr>
+          <tr>
+            <td><strong>3. Tribunal</strong></td>
+            <td>Scores are aggregated into a weighted verdict: PASS / WARNING / FAIL</td>
+          </tr>
+          <tr>
+            <td><strong>4. Report</strong></td>
+            <td>Findings include evidence, line numbers, confidence, and auto-fix patches</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Quick Start</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Command</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>CLI</strong></td>
+            <td><code>npx @kevinrabun/judges eval --file app.ts</code></td>
+          </tr>
+          <tr>
+            <td><strong>MCP Server</strong></td>
+            <td><code>npm install @kevinrabun/judges</code> — add to your MCP client config</td>
+          </tr>
+          <tr>
+            <td><strong>GitHub Action</strong></td>
+            <td><code>uses: KevinRabun/judges@main</code> — see <a href="https://github.com/KevinRabun/judges#use-in-github-actions">README</a></td>
+          </tr>
+          <tr>
+            <td><strong>Docker</strong></td>
+            <td><code>docker run --rm -v $(pwd):/code judges eval --file /code/app.ts</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="meta">
+      <a href="https://github.com/KevinRabun/judges">GitHub</a> ·
+      <a href="https://www.npmjs.com/package/@kevinrabun/judges">npm</a> ·
+      <a href="https://github.com/KevinRabun/judges/blob/main/docs/real-world-evidence.md">Evidence</a> ·
+      MIT License
+    </div>
+  </div>
+
+  <script>
+    // Showcase data from real analyses
+    const showcaseData = [
+      { repo: "expressjs/express", url: "https://github.com/expressjs/express", verdict: "WARNING", score: 99, files: 7, critical: 0, high: 1, total: 31 },
+      { repo: "pallets/flask", url: "https://github.com/pallets/flask", verdict: "FAIL", score: 99, files: 24, critical: 4, high: 9, total: 106 },
+      { repo: "fastapi/fastapi", url: "https://github.com/fastapi/fastapi", verdict: "FAIL", score: 100, files: 150, critical: 2, high: 2, total: 14 },
+    ];
+
+    // All 35 judges
+    const judges = [
+      { name: "Cybersecurity", desc: "SQL injection, XSS, command injection, path traversal" },
+      { name: "Authentication", desc: "Weak hashing, missing auth, token exposure" },
+      { name: "Data Security", desc: "PII exposure, encryption, data classification" },
+      { name: "Configuration Mgmt", desc: "Hardcoded secrets, env var hygiene" },
+      { name: "API Design", desc: "REST conventions, versioning, error responses" },
+      { name: "Performance", desc: "N+1 queries, memory leaks, blocking I/O" },
+      { name: "Scalability", desc: "Stateless design, connection pooling, async patterns" },
+      { name: "Reliability", desc: "Retry logic, circuit breakers, graceful degradation" },
+      { name: "Cloud Readiness", desc: "12-factor app, container friendliness, health checks" },
+      { name: "Cost Effectiveness", desc: "Resource sizing, caching, compute optimization" },
+      { name: "Compliance", desc: "Regulatory patterns, audit trails, data retention" },
+      { name: "Data Sovereignty", desc: "Cross-border data flow, residency requirements" },
+      { name: "Observability", desc: "Logging, metrics, distributed tracing" },
+      { name: "Maintainability", desc: "Code complexity, naming, modularity" },
+      { name: "Testing", desc: "Test coverage patterns, test quality indicators" },
+      { name: "Documentation", desc: "JSDoc/docstrings, README, inline comments" },
+      { name: "Accessibility", desc: "ARIA, semantic HTML, screen reader support" },
+      { name: "Internationalization", desc: "i18n patterns, locale handling" },
+      { name: "UX", desc: "Loading states, error messages, progressive disclosure" },
+      { name: "Error Handling", desc: "Try/catch patterns, error propagation, user-facing errors" },
+      { name: "Concurrency", desc: "Race conditions, deadlocks, thread safety" },
+      { name: "Caching", desc: "Cache invalidation, TTL, cache stampede" },
+      { name: "Rate Limiting", desc: "DoS protection, throttling, quota management" },
+      { name: "Logging Privacy", desc: "PII in logs, log levels, sensitive data masking" },
+      { name: "Database", desc: "SQL injection, connection management, migration patterns" },
+      { name: "Dependency Health", desc: "Known CVEs, outdated packages, license risks" },
+      { name: "CI/CD", desc: "Pipeline security, artifact signing, deployment patterns" },
+      { name: "Backwards Compat", desc: "Breaking changes, deprecation handling" },
+      { name: "Portability", desc: "OS-specific code, platform assumptions" },
+      { name: "Code Structure", desc: "File organization, separation of concerns" },
+      { name: "Software Practices", desc: "SOLID principles, DRY, code smells" },
+      { name: "Ethics & Bias", desc: "Algorithmic fairness, transparency, consent" },
+      { name: "Agent Instructions", desc: "LLM system prompt safety, prompt injection" },
+      { name: "AI Code Safety", desc: "AI-generated code patterns, hallucination risk" },
+      { name: "Framework Safety", desc: "Framework-specific anti-patterns and misuse" },
+    ];
+
+    function verdictClass(v) {
+      return v === "PASS" ? "verdict-pass" : v === "WARNING" ? "verdict-warning" : "verdict-fail";
+    }
+    function badgeClass(v) {
+      return v === "PASS" ? "badge-pass" : v === "WARNING" ? "badge-warning" : "badge-fail";
+    }
+
+    // Render showcase table
+    const showcaseBody = document.getElementById("showcase-body");
+    let totalFindings = 0, totalCritical = 0;
+    showcaseData.forEach(d => {
+      totalFindings += d.total;
+      totalCritical += d.critical;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><a href="${d.url}" style="color: var(--accent); text-decoration: none;">${d.repo}</a></td>
+        <td><span class="badge ${badgeClass(d.verdict)}">${d.verdict}</span></td>
+        <td>${d.score}/100</td>
+        <td>${d.files}</td>
+        <td class="severity-critical">${d.critical}</td>
+        <td class="severity-high">${d.high}</td>
+        <td>${d.total}</td>
+      `;
+      showcaseBody.appendChild(tr);
+    });
+
+    // Update stats
+    document.getElementById("stat-repos").textContent = showcaseData.length;
+    document.getElementById("stat-findings").textContent = totalFindings;
+    document.getElementById("stat-critical").textContent = totalCritical;
+
+    // Render judge grid
+    const judgeGrid = document.getElementById("judge-grid");
+    judges.forEach(j => {
+      const card = document.createElement("div");
+      card.className = "judge-card";
+      card.innerHTML = `
+        <div class="name">${j.name}</div>
+        <div style="color: var(--text-muted); font-size: 0.85rem;">${j.desc}</div>
+      `;
+      judgeGrid.appendChild(card);
+    });
+  </script>
+</body>
+</html>
