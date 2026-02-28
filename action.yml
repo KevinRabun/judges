@@ -1,5 +1,5 @@
 name: "Judges Code Review"
-description: "Run 35 specialized judges against your code for security, cost, and quality analysis. No LLM required."
+description: "Run 35 specialized judges against your code for security, cost, and quality analysis. Deterministic tools + LLM-powered expert prompts."
 author: "kevinrabun"
 
 branding:

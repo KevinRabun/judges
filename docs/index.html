@@ -198,7 +198,7 @@
     <div class="section">
       <h2>Open-Source Project Analysis</h2>
       <p style="color: var(--text-muted); margin-bottom: 1rem;">
-        Real-world analysis of popular open-source projects — all deterministic, no LLM calls.
+        Real-world analysis of popular open-source projects using the deterministic tool layer (regex + AST, zero LLM calls).
       </p>
       <table class="showcase-table">
         <thead>
@@ -235,11 +235,11 @@
         <tbody>
           <tr>
             <td><strong>1. Parse</strong></td>
-            <td>Source code is parsed with regex patterns and TypeScript AST analysis — no LLM needed</td>
+            <td>Source code is parsed with regex patterns and TypeScript AST analysis — instant and offline</td>
           </tr>
           <tr>
             <td><strong>2. Evaluate</strong></td>
-            <td>All 35 judges independently score the code on their domain (0-100)</td>
+            <td>All 35 judges independently score the code on their domain (0-100) using deterministic heuristics</td>
           </tr>
           <tr>
             <td><strong>3. Tribunal</strong></td>
@@ -248,6 +248,10 @@
           <tr>
             <td><strong>4. Report</strong></td>
             <td>Findings include evidence, line numbers, confidence, and auto-fix patches</td>
+          </tr>
+          <tr>
+            <td><strong>5. Deep Review</strong></td>
+            <td>35 expert-persona MCP prompts let your LLM client perform probabilistic analysis beyond static patterns</td>
           </tr>
         </tbody>
       </table>

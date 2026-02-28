@@ -59,7 +59,8 @@
     "tribunal",
     "ai-code-review",
     "code-quality",
-    "static-analysis"
+    "static-analysis",
+    "dual-layer-analysis"
   ],
   "repository": {
     "type": "git",

@@ -1,6 +1,6 @@
 # Judges Panel
 
-An MCP (Model Context Protocol) server that provides a panel of **35 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Includes **built-in AST analysis** powered by the TypeScript Compiler API — no separate parser server needed.
+An MCP (Model Context Protocol) server that provides a panel of **35 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Combines **deterministic pattern matching & AST analysis** (instant, offline, zero LLM calls) with **LLM-powered deep-review prompts** that let your AI assistant perform expert-persona analysis across all 35 domains.
 
 **Highlights:**
 - Includes an **App Builder Workflow (3-step)** demo for release decisions, plain-language risk summaries, and prioritized fixes — see [Try the Demo](#2-try-the-demo).
@@ -24,7 +24,7 @@ AI code generators (Copilot, Cursor, Claude, ChatGPT, etc.) write code fast — 
 | **Scope** | Style + some bugs | Bugs + code smells | Security patterns | **35 domains**: security, cost, compliance, a11y, API design, cloud, UX, … |
 | **AI-generated code focus** | No | No | Partial | **Purpose-built** for AI output failure modes |
 | **Setup** | Config per project | Server + scanner | Cloud or local | **One command**: `npx @kevinrabun/judges eval file.ts` |
-| **Auto-fix patches** | Some | No | No | **47 deterministic patches** — no LLM needed |
+| **Auto-fix patches** | Some | No | No | **47 deterministic patches** — instant, offline |
 | **Non-technical output** | No | Dashboard | No | **Plain-language findings** with What/Why/Next |
 | **MCP native** | No | No | No | **Yes** — works inside Copilot, Claude, Cursor |
 | **SARIF output** | No | Yes | Yes | **Yes** — upload to GitHub Code Scanning |
@@ -367,17 +367,17 @@ This helps keep Copilot feedback aligned with Judges findings.
 
 The tribunal operates in three layers:
 
-1. **Pattern-Based Analysis** — All tools (`evaluate_code`, `evaluate_code_single_judge`, `evaluate_project`, `evaluate_diff`) perform heuristic analysis using regex pattern matching to catch common anti-patterns. This works entirely offline with zero external API calls.
+1. **Pattern-Based Analysis** — All tools (`evaluate_code`, `evaluate_code_single_judge`, `evaluate_project`, `evaluate_diff`) perform heuristic analysis using regex pattern matching to catch common anti-patterns. This layer is instant, deterministic, and runs entirely offline with zero external API calls.
 
 2. **AST-Based Structural Analysis** — The Code Structure judge (`STRUCT-*` rules) uses real Abstract Syntax Tree parsing to measure cyclomatic complexity, nesting depth, function length, parameter count, dead code, and type safety with precision that regex cannot achieve. JavaScript/TypeScript files are parsed via the TypeScript Compiler API; Python, Rust, Go, Java, and C# use a scope-tracking structural parser. No external AST server required.
 
-3. **LLM-Powered Deep Analysis (Prompts)** — The server exposes MCP prompts (e.g., `judge-data-security`, `full-tribunal`) that provide each judge's expert persona as a system prompt. When used by an LLM-based client, this enables deeper, context-aware analysis beyond what static analysis can detect.
+3. **LLM-Powered Deep Analysis (Prompts)** — The server exposes MCP prompts (e.g., `judge-data-security`, `full-tribunal`) that provide each judge's expert persona as a system prompt. When used by an LLM-based client (Copilot, Claude, Cursor, etc.), the host LLM performs deeper, context-aware probabilistic analysis beyond what static patterns can detect. This is where the `systemPrompt` on each judge comes alive — Judges itself makes no LLM calls, but it provides the expert criteria so your AI assistant can act as 35 specialized reviewers.
 
 ---
 
 ## Composable by Design
 
-Judges Panel covers **heuristic pattern detection** and **AST structural analysis** in a single server — fast, offline, and self-contained. It does not try to be a CVE scanner or a linter. Those capabilities belong in dedicated MCP servers that an AI agent can orchestrate alongside Judges.
+Judges Panel is a **dual-layer** review system: instant **deterministic tools** (offline, no API keys) for pattern and AST analysis, plus **35 expert-persona MCP prompts** that unlock LLM-powered deep analysis when connected to an AI client. It does not try to be a CVE scanner or a linter. Those capabilities belong in dedicated MCP servers that an AI agent can orchestrate alongside Judges.
 
 ### Built-in AST Analysis (v2.0.0)
 
