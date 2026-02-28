@@ -58,6 +58,33 @@ judges eval --file app.ts --format sarif > results.sarif
 judges list
 ```
 
+### Use in GitHub Actions
+
+Add Judges to your CI pipeline with zero configuration:
+
+```yaml
+# .github/workflows/judges.yml
+name: Judges Code Review
+on: [pull_request]
+
+jobs:
+  judges:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write  # only if using upload-sarif
+    steps:
+      - uses: actions/checkout@v4
+      - uses: KevinRabun/judges@main
+        with:
+          path: src/api.ts        # file or directory
+          format: text             # text | json | sarif | markdown
+          upload-sarif: true       # upload to GitHub Code Scanning
+          fail-on-findings: true   # fail CI on critical/high findings
+```
+
+**Outputs** available for downstream steps: `verdict`, `score`, `findings`, `critical`, `high`, `sarif-file`.
+
 ### Or use as an MCP server
 
 ### 1. Install and Build

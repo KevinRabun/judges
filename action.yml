@@ -1,0 +1,190 @@
+name: "Judges Code Review"
+description: "Run 35 specialized judges against your code for security, cost, and quality analysis. No LLM required."
+author: "kevinrabun"
+
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  path:
+    description: "File or directory to analyze"
+    required: false
+    default: "."
+  language:
+    description: "Source language (auto-detected from extension if omitted)"
+    required: false
+  judge:
+    description: "Run a single judge instead of the full tribunal (e.g., cybersecurity, authentication)"
+    required: false
+  format:
+    description: "Output format: text, json, sarif, markdown"
+    required: false
+    default: "text"
+  max-files:
+    description: "Maximum number of files to analyze when path is a directory"
+    required: false
+    default: "300"
+  min-confidence:
+    description: "Minimum finding confidence to include (0-1)"
+    required: false
+    default: "0"
+  upload-sarif:
+    description: "Upload SARIF results to GitHub Code Scanning (requires security-events: write)"
+    required: false
+    default: "false"
+  fail-on-findings:
+    description: "Fail the action if critical or high findings are detected"
+    required: false
+    default: "false"
+
+outputs:
+  verdict:
+    description: "Overall verdict: PASS, WARNING, or FAIL"
+    value: ${{ steps.run.outputs.verdict }}
+  score:
+    description: "Overall score (0-100)"
+    value: ${{ steps.run.outputs.score }}
+  findings:
+    description: "Total number of findings"
+    value: ${{ steps.run.outputs.findings }}
+  critical:
+    description: "Number of critical findings"
+    value: ${{ steps.run.outputs.critical }}
+  high:
+    description: "Number of high findings"
+    value: ${{ steps.run.outputs.high }}
+  sarif-file:
+    description: "Path to the generated SARIF file (when upload-sarif is true)"
+    value: ${{ steps.run.outputs.sarif_file }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Install Judges
+      shell: bash
+      run: npm install -g @kevinrabun/judges@latest
+
+    - name: Run Judges analysis
+      id: run
+      shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_LANGUAGE: ${{ inputs.language }}
+        INPUT_JUDGE: ${{ inputs.judge }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_MAX_FILES: ${{ inputs.max-files }}
+        INPUT_MIN_CONFIDENCE: ${{ inputs.min-confidence }}
+        INPUT_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
+        INPUT_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
+      run: |
+        set -euo pipefail
+
+        ARGS=()
+
+        # Determine if path is file or directory
+        if [ -f "$INPUT_PATH" ]; then
+          ARGS+=(eval --file "$INPUT_PATH")
+        elif [ -d "$INPUT_PATH" ]; then
+          # For directories, use the report generator
+          echo "::group::Analyzing directory: $INPUT_PATH"
+
+          REPORT_ARGS=(
+            npx tsx "$(npm root -g)/@kevinrabun/judges/scripts/generate-public-repo-report.ts"
+            --repoUrl "file://$INPUT_PATH"
+            --quickStart
+            --maxFiles "$INPUT_MAX_FILES"
+            --output judges-report.md
+          )
+
+          if [ -n "$INPUT_MIN_CONFIDENCE" ] && [ "$INPUT_MIN_CONFIDENCE" != "0" ]; then
+            REPORT_ARGS+=(--minConfidence "$INPUT_MIN_CONFIDENCE")
+          fi
+
+          "${REPORT_ARGS[@]}" 2>&1 || true
+          echo "::endgroup::"
+
+          # Extract summary from report
+          if [ -f judges-report.md ]; then
+            echo "verdict=WARNING" >> "$GITHUB_OUTPUT"
+            echo "score=0" >> "$GITHUB_OUTPUT"
+            echo "findings=0" >> "$GITHUB_OUTPUT"
+            echo "critical=0" >> "$GITHUB_OUTPUT"
+            echo "high=0" >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
+        else
+          echo "::error::Path not found: $INPUT_PATH"
+          exit 1
+        fi
+
+        # Add optional arguments for file mode
+        if [ -n "$INPUT_LANGUAGE" ]; then
+          ARGS+=(--language "$INPUT_LANGUAGE")
+        fi
+
+        if [ -n "$INPUT_JUDGE" ]; then
+          ARGS+=(--judge "$INPUT_JUDGE")
+        fi
+
+        # Always get JSON output for parsing, then convert
+        judges "${ARGS[@]}" --format json > judges-results.json 2>&1 || true
+
+        # Extract scores from JSON
+        VERDICT=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log(r.verdict||'UNKNOWN')")
+        SCORE=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log(r.score||0)")
+        TOTAL=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log((r.findings||[]).length)")
+        CRITICAL=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log((r.findings||[]).filter(f=>f.severity==='critical').length)")
+        HIGH=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log((r.findings||[]).filter(f=>f.severity==='high').length)")
+
+        echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
+        echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+        echo "findings=$TOTAL" >> "$GITHUB_OUTPUT"
+        echo "critical=$CRITICAL" >> "$GITHUB_OUTPUT"
+        echo "high=$HIGH" >> "$GITHUB_OUTPUT"
+
+        # Display results in requested format
+        if [ "$INPUT_FORMAT" = "sarif" ] || [ "$INPUT_UPLOAD_SARIF" = "true" ]; then
+          judges "${ARGS[@]}" --format sarif > judges-results.sarif 2>&1 || true
+          echo "sarif_file=judges-results.sarif" >> "$GITHUB_OUTPUT"
+        fi
+
+        if [ "$INPUT_FORMAT" = "text" ]; then
+          judges "${ARGS[@]}" --format text 2>&1 || true
+        elif [ "$INPUT_FORMAT" = "markdown" ]; then
+          judges "${ARGS[@]}" --format markdown 2>&1 || true
+        elif [ "$INPUT_FORMAT" = "sarif" ]; then
+          cat judges-results.sarif
+        else
+          cat judges-results.json
+        fi
+
+        # Summary annotation
+        echo "### Judges Results" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Verdict:** $VERDICT" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Score:** $SCORE/100" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Findings:** $TOTAL (critical: $CRITICAL, high: $HIGH)" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload SARIF to GitHub Code Scanning
+      if: inputs.upload-sarif == 'true' && steps.run.outputs.sarif_file != ''
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ steps.run.outputs.sarif_file }}
+
+    - name: Fail on critical/high findings
+      if: inputs.fail-on-findings == 'true'
+      shell: bash
+      run: |
+        CRITICAL="${{ steps.run.outputs.critical }}"
+        HIGH="${{ steps.run.outputs.high }}"
+        if [ "${CRITICAL:-0}" -gt 0 ] || [ "${HIGH:-0}" -gt 0 ]; then
+          echo "::error::Judges found $CRITICAL critical and $HIGH high findings"
+          exit 1
+        fi
