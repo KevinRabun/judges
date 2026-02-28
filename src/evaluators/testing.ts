@@ -1,4 +1,4 @@
-import { Finding } from "../types.js";
+import type { Finding } from "../types.js";
 import { getLangLineNumbers, getLangFamily } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -10,14 +10,24 @@ export function analyzeTesting(code: string, language: string): Finding[] {
   const lang = getLangFamily(language);
 
   // Detect test files with no assertions (multi-language)
-  const hasTestStructure = /describe\s*\(|it\s*\(|test\s*\(|def\s+test_|@Test|#\[test\]|#\[cfg\(test\)\]|func\s+Test[A-Z]|\[Fact\]|\[Theory\]|@pytest/i.test(code);
+  const hasTestStructure =
+    /describe\s*\(|it\s*\(|test\s*\(|def\s+test_|@Test|#\[test\]|#\[cfg\(test\)\]|func\s+Test[A-Z]|\[Fact\]|\[Theory\]|@pytest/i.test(
+      code,
+    );
   if (hasTestStructure) {
     // Check for assertions (multi-language)
     const assertionLines = getLangLineNumbers(code, language, LP.ASSERTION);
 
     const testBlockLines: number[] = [];
     lines.forEach((line, i) => {
-      if (/\b(?:it|test)\s*\(\s*["'`]/i.test(line) || /def\s+test_/i.test(line) || /@Test/i.test(line) || /func\s+Test[A-Z]/i.test(line) || /#\[test\]/i.test(line) || /\[Fact\]/i.test(line)) {
+      if (
+        /\b(?:it|test)\s*\(\s*["'`]/i.test(line) ||
+        /def\s+test_/i.test(line) ||
+        /@Test/i.test(line) ||
+        /func\s+Test[A-Z]/i.test(line) ||
+        /#\[test\]/i.test(line) ||
+        /\[Fact\]/i.test(line)
+      ) {
         testBlockLines.push(i + 1);
       }
     });
@@ -27,11 +37,14 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "critical",
         title: "Test cases with no assertions",
-        description: "Tests without assertions always pass and provide no verification. They give false confidence in code correctness.",
+        description:
+          "Tests without assertions always pass and provide no verification. They give false confidence in code correctness.",
         lineNumbers: testBlockLines,
-        recommendation: "Add meaningful assertions to every test case. Each test should verify at least one expected behavior.",
+        recommendation:
+          "Add meaningful assertions to every test case. Each test should verify at least one expected behavior.",
         reference: "Unit Testing Best Practices",
-        suggestedFix: "Add at least one `expect(...)` / `assert` / `Assert.*` call in each test verifying the expected return value, state change, or thrown error.",
+        suggestedFix:
+          "Add at least one `expect(...)` / `assert` / `Assert.*` call in each test verifying the expected return value, state change, or thrown error.",
         confidence: 0.7,
       });
     }
@@ -48,11 +61,14 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "low",
         title: "Vague test names",
-        description: "Test names like 'works' or 'test 1' don't describe what behavior is being verified, making test failures harder to diagnose.",
+        description:
+          "Test names like 'works' or 'test 1' don't describe what behavior is being verified, making test failures harder to diagnose.",
         lineNumbers: vagueTestLines,
-        recommendation: "Use descriptive test names that explain the scenario and expected outcome: 'should return 404 when user not found'.",
+        recommendation:
+          "Use descriptive test names that explain the scenario and expected outcome: 'should return 404 when user not found'.",
         reference: "Test Naming Conventions",
-        suggestedFix: "Rename each test to follow the pattern `should <expected behavior> when <scenario>` (e.g., `'should throw ValidationError when email is empty'`).",
+        suggestedFix:
+          "Rename each test to follow the pattern `should <expected behavior> when <scenario>` (e.g., `'should throw ValidationError when email is empty'`).",
         confidence: 0.85,
       });
     }
@@ -71,9 +87,11 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         title: "Hardcoded dates in tests",
         description: "Hardcoded dates in tests can become stale and cause intermittent failures as time passes.",
         lineNumbers: hardcodedDateLines,
-        recommendation: "Use relative dates, time-freezing libraries (sinon.useFakeTimers, freezegun), or inject clock dependencies.",
+        recommendation:
+          "Use relative dates, time-freezing libraries (sinon.useFakeTimers, freezegun), or inject clock dependencies.",
         reference: "Testing Best Practices: Time-Dependent Tests",
-        suggestedFix: "Replace hardcoded date strings with a helper like `new Date()` offset or use `jest.useFakeTimers()` / `freezegun.freeze_time()` to control the clock in tests.",
+        suggestedFix:
+          "Replace hardcoded date strings with a helper like `new Date()` offset or use `jest.useFakeTimers()` / `freezegun.freeze_time()` to control the clock in tests.",
         confidence: 0.85,
       });
     }
@@ -81,7 +99,10 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // Detect tests with external dependencies (multi-language)
     const externalDepLines: number[] = [];
     lines.forEach((line, i) => {
-      if (/fetch\s*\(|axios\.|https?:\/\/|database|redis|mongodb|requests\.|reqwest::|HttpClient|http\.Get/i.test(line) && !/mock|stub|fake|spy|nock|msw|Mock|patch|@patch|mockito|Moq/i.test(line)) {
+      if (
+        /fetch\s*\(|axios\.|https?:\/\/|database|redis|mongodb|requests\.|reqwest::|HttpClient|http\.Get/i.test(line) &&
+        !/mock|stub|fake|spy|nock|msw|Mock|patch|@patch|mockito|Moq/i.test(line)
+      ) {
         externalDepLines.push(i + 1);
       }
     });
@@ -90,11 +111,14 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "medium",
         title: "Tests with real external dependencies",
-        description: "Tests that call real external services or databases are slow, flaky, and may fail due to network issues or service unavailability.",
+        description:
+          "Tests that call real external services or databases are slow, flaky, and may fail due to network issues or service unavailability.",
         lineNumbers: externalDepLines,
-        recommendation: "Mock external dependencies using test doubles (jest.mock, sinon, nock, msw, unittest.mock, mockito, Moq, httptest). Use in-memory databases for integration tests.",
+        recommendation:
+          "Mock external dependencies using test doubles (jest.mock, sinon, nock, msw, unittest.mock, mockito, Moq, httptest). Use in-memory databases for integration tests.",
         reference: "Test Doubles: Mocks, Stubs, and Fakes",
-        suggestedFix: "Wrap the external call behind an interface and inject a mock/stub in the test (e.g., `jest.mock('./httpClient')` or `@patch('requests.get')`).",
+        suggestedFix:
+          "Wrap the external call behind an interface and inject a mock/stub in the test (e.g., `jest.mock('./httpClient')` or `@patch('requests.get')`).",
         confidence: 0.8,
       });
     }
@@ -102,7 +126,10 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // Detect tests with shared mutable state
     const sharedStateLines: number[] = [];
     lines.forEach((line, i) => {
-      if (/(?:let|var)\s+\w+\s*=/i.test(line.trim()) && !/(?:const|it\s*\(|test\s*\(|describe\s*\()/i.test(line.trim())) {
+      if (
+        /(?:let|var)\s+\w+\s*=/i.test(line.trim()) &&
+        !/(?:const|it\s*\(|test\s*\(|describe\s*\()/i.test(line.trim())
+      ) {
         const context = lines.slice(Math.max(0, i - 5), i).join("\n");
         if (/describe\s*\(/i.test(context) && !/beforeEach|beforeAll|setUp/i.test(context)) {
           sharedStateLines.push(i + 1);
@@ -114,26 +141,33 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "medium",
         title: "Shared mutable state between tests",
-        description: "Mutable variables declared in describe blocks but not reset in beforeEach can cause test order dependencies and flaky results.",
+        description:
+          "Mutable variables declared in describe blocks but not reset in beforeEach can cause test order dependencies and flaky results.",
         lineNumbers: sharedStateLines,
-        recommendation: "Initialize mutable test state in beforeEach/setUp hooks, or use const for immutable test data.",
+        recommendation:
+          "Initialize mutable test state in beforeEach/setUp hooks, or use const for immutable test data.",
         reference: "Test Isolation Best Practices",
-        suggestedFix: "Move the `let` declaration inside a `beforeEach` (or `setUp`) block so each test starts with a fresh instance of the variable.",
+        suggestedFix:
+          "Move the `let` declaration inside a `beforeEach` (or `setUp`) block so each test starts with a fresh instance of the variable.",
         confidence: 0.75,
       });
     }
 
     // Detect tests without error case coverage
-    const happyPathOnly = /test|it\b/i.test(code) && !/error|throw|reject|fail|invalid|unauthorized|not found|exception/i.test(code);
+    const happyPathOnly =
+      /test|it\b/i.test(code) && !/error|throw|reject|fail|invalid|unauthorized|not found|exception/i.test(code);
     if (happyPathOnly && testBlockLines.length > 0) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "medium",
         title: "Tests cover only happy path",
-        description: "No error, exception, or edge case tests detected. Tests should cover both success and failure scenarios.",
-        recommendation: "Add tests for error cases, boundary conditions, invalid inputs, and edge cases. Test both what it does and what it prevents.",
+        description:
+          "No error, exception, or edge case tests detected. Tests should cover both success and failure scenarios.",
+        recommendation:
+          "Add tests for error cases, boundary conditions, invalid inputs, and edge cases. Test both what it does and what it prevents.",
         reference: "Test Coverage: Error Paths",
-        suggestedFix: "Add dedicated test cases that pass invalid/empty input and assert the expected error, rejection, or exception is thrown.",
+        suggestedFix:
+          "Add dedicated test cases that pass invalid/empty input and assert the expected error, rejection, or exception is thrown.",
         confidence: 0.7,
       });
     }
@@ -141,7 +175,11 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // Detect sleep/wait in tests (multi-language)
     const sleepLines: number[] = [];
     lines.forEach((line, i) => {
-      if (/(?:sleep|setTimeout|Thread\.sleep|time\.sleep|delay|tokio::time::sleep|std::thread::sleep|Task\.Delay)\s*\(\s*\d/i.test(line)) {
+      if (
+        /(?:sleep|setTimeout|Thread\.sleep|time\.sleep|delay|tokio::time::sleep|std::thread::sleep|Task\.Delay)\s*\(\s*\d/i.test(
+          line,
+        )
+      ) {
         sleepLines.push(i + 1);
       }
     });
@@ -150,11 +188,14 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "medium",
         title: "Arbitrary sleep/delay in tests",
-        description: "Using sleep/setTimeout in tests makes them slow and flaky — the timing may not be sufficient on slow CI machines.",
+        description:
+          "Using sleep/setTimeout in tests makes them slow and flaky — the timing may not be sufficient on slow CI machines.",
         lineNumbers: sleepLines,
-        recommendation: "Use waitFor, polling, or event-based assertions instead of arbitrary delays. Use fake timers for timer-dependent logic.",
+        recommendation:
+          "Use waitFor, polling, or event-based assertions instead of arbitrary delays. Use fake timers for timer-dependent logic.",
         reference: "Testing Library waitFor / Flaky Test Prevention",
-        suggestedFix: "Replace `sleep()`/`setTimeout()` with `await waitFor(() => expect(...))` or use `jest.useFakeTimers()` / `sinon.useFakeTimers()` to advance time deterministically.",
+        suggestedFix:
+          "Replace `sleep()`/`setTimeout()` with `await waitFor(() => expect(...))` or use `jest.useFakeTimers()` / `sinon.useFakeTimers()` to advance time deterministically.",
         confidence: 0.85,
       });
     }
@@ -166,9 +207,11 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         severity: "low",
         title: "Test file is very large",
         description: `Test file has ${lines.length} lines. Very large test files are hard to navigate and may indicate the test subject needs refactoring.`,
-        recommendation: "Split test files by feature or behavior. Consider if the production code under test should be broken into smaller modules.",
+        recommendation:
+          "Split test files by feature or behavior. Consider if the production code under test should be broken into smaller modules.",
         reference: "Test Organization Best Practices",
-        suggestedFix: "Extract related `describe` blocks into separate test files grouped by feature (e.g., `auth.test.ts`, `payments.test.ts`) to keep each file under ~300 lines.",
+        suggestedFix:
+          "Extract related `describe` blocks into separate test files grouped by feature (e.g., `auth.test.ts`, `payments.test.ts`) to keep each file under ~300 lines.",
         confidence: 0.9,
       });
     }
@@ -185,11 +228,14 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "low",
         title: "Heavy reliance on snapshot testing",
-        description: "Many snapshot assertions detected. Snapshot tests are brittle, produce large diffs, and can be blindly updated without review.",
+        description:
+          "Many snapshot assertions detected. Snapshot tests are brittle, produce large diffs, and can be blindly updated without review.",
         lineNumbers: snapshotLines.slice(0, 5),
-        recommendation: "Prefer explicit assertions for logic. Use snapshots sparingly for UI structure. Review snapshot updates carefully.",
+        recommendation:
+          "Prefer explicit assertions for logic. Use snapshots sparingly for UI structure. Review snapshot updates carefully.",
         reference: "Snapshot Testing Best Practices",
-        suggestedFix: "Replace `toMatchSnapshot()` with targeted assertions (e.g., `expect(result.status).toBe(200)`) and reserve snapshots only for large UI structure comparisons.",
+        suggestedFix:
+          "Replace `toMatchSnapshot()` with targeted assertions (e.g., `expect(result.status).toBe(200)`) and reserve snapshots only for large UI structure comparisons.",
         confidence: 0.9,
       });
     }
@@ -198,18 +244,26 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // Exclude config files, type definitions, constants, and utility barrel files
     const hasFunctions = getLangLineNumbers(code, language, LP.FUNCTION_DEF).length > 0;
     const isLargeFile = lines.length > 50;
-    const isConfigOrUtility = /(?:config|configuration|settings|constants|types|interfaces|models|schema|migration|seed|fixture|mock|stub|setup|index|barrel)\b/gi.test(code);
-    const isTypeDefinitionFile = /^(?:export\s+)?(?:type|interface|enum|declare)\s+/gim.test(code) && !(/(function|class)\s+\w+.*\{[\s\S]{10,}\}/gi.test(code));
+    const isConfigOrUtility =
+      /(?:config|configuration|settings|constants|types|interfaces|models|schema|migration|seed|fixture|mock|stub|setup|index|barrel)\b/gi.test(
+        code,
+      );
+    const isTypeDefinitionFile =
+      /^(?:export\s+)?(?:type|interface|enum|declare)\s+/gim.test(code) &&
+      !/(function|class)\s+\w+.*\{[\s\S]{10,}\}/gi.test(code);
     const hasMinimalLogic = (code.match(/(?:if|for|while|switch|match)\s*[\s(]/g) || []).length >= 3;
     if (hasFunctions && isLargeFile && hasMinimalLogic && !isConfigOrUtility && !isTypeDefinitionFile) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "medium",
         title: "No tests detected for production code",
-        description: "This file contains significant logic (multiple branches/loops) but no accompanying tests were detected.",
-        recommendation: "Write unit tests covering the main functions, edge cases, and error paths. Aim for meaningful coverage of critical paths.",
+        description:
+          "This file contains significant logic (multiple branches/loops) but no accompanying tests were detected.",
+        recommendation:
+          "Write unit tests covering the main functions, edge cases, and error paths. Aim for meaningful coverage of critical paths.",
         reference: "Test-Driven Development / Testing Pyramid",
-        suggestedFix: "Create a co-located test file (e.g., `<filename>.test.ts`) with at least one test per exported function covering a happy path, an edge case, and an error path.",
+        suggestedFix:
+          "Create a co-located test file (e.g., `<filename>.test.ts`) with at least one test per exported function covering a happy path, an edge case, and an error path.",
         confidence: 0.7,
       });
     }

@@ -60,4 +60,7 @@ tmp/
 temp/
 .tmp/
 daily-autofix-summary.json
+one-time-sanity-summary.json
 reports/
+artifacts/
+test-output.txt

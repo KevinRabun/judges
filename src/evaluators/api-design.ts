@@ -1,4 +1,4 @@
-import { Finding } from "../types.js";
+import type { Finding } from "../types.js";
 import { getLangLineNumbers, getLangFamily } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -23,9 +23,11 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       title: "Verb in REST endpoint URL",
       description: "REST endpoint URLs should use nouns, not verbs. The HTTP method should convey the action.",
       lineNumbers: verbInUrlLines,
-      recommendation: "Use noun-based URLs (e.g., POST /users instead of POST /createUser). Let HTTP methods convey the action.",
+      recommendation:
+        "Use noun-based URLs (e.g., POST /users instead of POST /createUser). Let HTTP methods convey the action.",
       reference: "REST API Design Best Practices",
-      suggestedFix: "Rename the endpoint to a noun-based path (e.g., change '/createUser' to '/users') and use the appropriate HTTP method (POST) to express the action.",
+      suggestedFix:
+        "Rename the endpoint to a noun-based path (e.g., change '/createUser' to '/users') and use the appropriate HTTP method (POST) to express the action.",
       confidence: 0.85,
     });
   }
@@ -46,11 +48,14 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Error response without proper HTTP status code",
-      description: "API error responses should use appropriate HTTP status codes (4xx for client errors, 5xx for server errors).",
+      description:
+        "API error responses should use appropriate HTTP status codes (4xx for client errors, 5xx for server errors).",
       lineNumbers: noErrorHandlingLines,
-      recommendation: "Always set appropriate HTTP status codes for error responses. Use 400 for bad requests, 404 for not found, 500 for server errors.",
+      recommendation:
+        "Always set appropriate HTTP status codes for error responses. Use 400 for bad requests, 404 for not found, 500 for server errors.",
       reference: "RFC 7231 - HTTP/1.1 Semantics and Content",
-      suggestedFix: "Add `res.status(4xx|5xx)` before `res.json()` in every error/catch path so clients receive the correct HTTP status code.",
+      suggestedFix:
+        "Add `res.status(4xx|5xx)` before `res.json()` in every error/catch path so clients receive the correct HTTP status code.",
       confidence: 0.8,
     });
   }
@@ -58,7 +63,10 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   // Detect overly broad API responses (returning everything)
   const selectAllLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/SELECT\s+\*/i.test(line) && /api|route|endpoint|handler|controller/i.test(lines.slice(Math.max(0, i - 10), i).join("\n"))) {
+    if (
+      /SELECT\s+\*/i.test(line) &&
+      /api|route|endpoint|handler|controller/i.test(lines.slice(Math.max(0, i - 10), i).join("\n"))
+    ) {
       selectAllLines.push(i + 1);
     }
   });
@@ -67,11 +75,14 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "SELECT * in API handler",
-      description: "Returning all columns from a database query in an API response may expose sensitive data and waste bandwidth.",
+      description:
+        "Returning all columns from a database query in an API response may expose sensitive data and waste bandwidth.",
       lineNumbers: selectAllLines,
-      recommendation: "Explicitly select only the fields needed for the API response. Use DTOs or view models to shape the output.",
+      recommendation:
+        "Explicitly select only the fields needed for the API response. Use DTOs or view models to shape the output.",
       reference: "API Security Best Practices",
-      suggestedFix: "Replace `SELECT *` with an explicit column list (e.g., `SELECT id, name, email`) and map the result through a DTO before returning it.",
+      suggestedFix:
+        "Replace `SELECT *` with an explicit column list (e.g., `SELECT id, name, email`) and map the result through a DTO before returning it.",
       confidence: 0.85,
     });
   }
@@ -93,9 +104,11 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       title: "List endpoint without pagination",
       description: "API endpoints that return collections should support pagination to prevent unbounded responses.",
       lineNumbers: listEndpointLines,
-      recommendation: "Implement pagination using limit/offset, cursor-based, or page-based approaches. Include total count and navigation links.",
+      recommendation:
+        "Implement pagination using limit/offset, cursor-based, or page-based approaches. Include total count and navigation links.",
       reference: "REST API Design: Pagination",
-      suggestedFix: "Accept `page` and `limit` query parameters, apply them to the database query (e.g., `.skip().limit()`), and return `{ data, total, page }` in the response.",
+      suggestedFix:
+        "Accept `page` and `limit` query parameters, apply them to the database query (e.g., `.skip().limit()`), and return `{ data, total, page }` in the response.",
       confidence: 0.8,
     });
   }
@@ -112,7 +125,8 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       lineNumbers: routeRegLines.slice(0, 3),
       recommendation: "Add API versioning via URL path (/v1/resource), header (X-API-Version), or query parameter.",
       reference: "API Versioning Best Practices",
-      suggestedFix: "Prefix all route paths with a version segment (e.g., `/v1/users`) or mount the router under a `/v1` base path.",
+      suggestedFix:
+        "Prefix all route paths with a version segment (e.g., `/v1/users`) or mount the router under a `/v1` base path.",
       confidence: 0.7,
     });
   }
@@ -136,11 +150,13 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Inconsistent API response structure",
-      description: "Some responses use a wrapper (e.g., { data: ... }) while others return raw data. This inconsistency complicates client consumption.",
+      description:
+        "Some responses use a wrapper (e.g., { data: ... }) while others return raw data. This inconsistency complicates client consumption.",
       lineNumbers: withoutData.map((f) => f.line),
       recommendation: "Adopt a consistent response envelope (e.g., { data, meta, errors }) across all endpoints.",
       reference: "JSON:API Specification / API Response Standards",
-      suggestedFix: "Wrap all successful responses in a standard envelope (e.g., `res.json({ data: result })`) and error responses in `{ error: { message, code } }`.",
+      suggestedFix:
+        "Wrap all successful responses in a standard envelope (e.g., `res.json({ data: result })`) and error responses in `{ error: { message, code } }`.",
       confidence: 0.75,
     });
   }
@@ -158,11 +174,14 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Request body used without content-type validation",
-      description: "Consuming request bodies without verifying Content-Type can lead to parsing errors or security issues.",
+      description:
+        "Consuming request bodies without verifying Content-Type can lead to parsing errors or security issues.",
       lineNumbers: bodyParsingLines.slice(0, 5),
-      recommendation: "Use body-parsing middleware (express.json()) and validate Content-Type headers. Reject requests with unexpected content types.",
+      recommendation:
+        "Use body-parsing middleware (express.json()) and validate Content-Type headers. Reject requests with unexpected content types.",
       reference: "API Security: Content-Type Validation",
-      suggestedFix: "Add `app.use(express.json())` and a middleware that returns 415 Unsupported Media Type when the Content-Type header is not `application/json`.",
+      suggestedFix:
+        "Add `app.use(express.json())` and a middleware that returns 415 Unsupported Media Type when the Content-Type header is not `application/json`.",
       confidence: 0.7,
     });
   }
@@ -182,27 +201,36 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "Sensitive data in URL/query parameters",
-      description: "Passwords, tokens, and secrets in URL paths or query strings are logged in server access logs, browser history, and proxy caches.",
+      description:
+        "Passwords, tokens, and secrets in URL paths or query strings are logged in server access logs, browser history, and proxy caches.",
       lineNumbers: sensitiveInUrlLines,
-      recommendation: "Pass sensitive data in request headers (Authorization) or request body, never in URLs or query parameters.",
+      recommendation:
+        "Pass sensitive data in request headers (Authorization) or request body, never in URLs or query parameters.",
       reference: "OWASP API Security Top 10 / CWE-598",
-      suggestedFix: "Move the sensitive value from the URL/query string into the `Authorization` header or the request body and update the route accordingly.",
+      suggestedFix:
+        "Move the sensitive value from the URL/query string into the `Authorization` header or the request body and update the route accordingly.",
       confidence: 0.95,
     });
   }
 
   // Missing rate limiting (reuse LP.HTTP_ROUTE route detection)
   const hasRoutes2 = routeRegLines.length > 0;
-  const hasRateLimit = /rate.?limit|throttle|express-rate-limit|rateLimit|slowDown|@RateLimiter|Bucket4j|x-ratelimit|golang\.org\/x\/time\/rate/i.test(code);
+  const hasRateLimit =
+    /rate.?limit|throttle|express-rate-limit|rateLimit|slowDown|@RateLimiter|Bucket4j|x-ratelimit|golang\.org\/x\/time\/rate/i.test(
+      code,
+    );
   if (hasRoutes2 && !hasRateLimit && routeRegLines.length > 3) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "No rate limiting detected on API",
-      description: "APIs without rate limiting are vulnerable to abuse, denial-of-service attacks, and excessive resource consumption.",
-      recommendation: "Add rate limiting middleware (express-rate-limit, bottleneck). Consider different limits for authenticated vs unauthenticated users.",
+      description:
+        "APIs without rate limiting are vulnerable to abuse, denial-of-service attacks, and excessive resource consumption.",
+      recommendation:
+        "Add rate limiting middleware (express-rate-limit, bottleneck). Consider different limits for authenticated vs unauthenticated users.",
       reference: "OWASP API Security: Unrestricted Resource Consumption",
-      suggestedFix: "Install `express-rate-limit` and apply `rateLimit({ windowMs: 15*60*1000, max: 100 })` as middleware on your API router.",
+      suggestedFix:
+        "Install `express-rate-limit` and apply `rateLimit({ windowMs: 15*60*1000, max: 100 })` as middleware on your API router.",
       confidence: 0.7,
     });
   }
@@ -215,10 +243,13 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "GraphQL without query depth/complexity limits",
-      description: "GraphQL APIs without depth or complexity limits are vulnerable to denial-of-service via deeply nested or expensive queries.",
-      recommendation: "Add graphql-depth-limit and graphql-query-complexity middleware. Set reasonable maxDepth (e.g., 10) and cost limits.",
+      description:
+        "GraphQL APIs without depth or complexity limits are vulnerable to denial-of-service via deeply nested or expensive queries.",
+      recommendation:
+        "Add graphql-depth-limit and graphql-query-complexity middleware. Set reasonable maxDepth (e.g., 10) and cost limits.",
       reference: "GraphQL Security: Query Complexity Analysis",
-      suggestedFix: "Add `depthLimit(10)` and `createComplexityLimitRule(1000)` as validation rules in your GraphQL server configuration.",
+      suggestedFix:
+        "Add `depthLimit(10)` and `createComplexityLimitRule(1000)` as validation rules in your GraphQL server configuration.",
       confidence: 0.7,
     });
   }
@@ -230,10 +261,13 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "No CORS configuration detected",
-      description: "APIs consumed by browsers need proper CORS configuration. Missing CORS will block cross-origin requests.",
-      recommendation: "Configure CORS with specific allowed origins (not '*' in production). Use the cors middleware in Express.",
+      description:
+        "APIs consumed by browsers need proper CORS configuration. Missing CORS will block cross-origin requests.",
+      recommendation:
+        "Configure CORS with specific allowed origins (not '*' in production). Use the cors middleware in Express.",
       reference: "MDN: Cross-Origin Resource Sharing (CORS)",
-      suggestedFix: "Install the `cors` package and add `app.use(cors({ origin: 'https://yourdomain.com' }))` with an explicit allow-list of origins.",
+      suggestedFix:
+        "Install the `cors` package and add `app.use(cors({ origin: 'https://yourdomain.com' }))` with an explicit allow-list of origins.",
       confidence: 0.7,
     });
   }
@@ -245,10 +279,13 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "No request ID in API responses",
-      description: "Returning a unique request ID in API responses helps clients reference specific requests when reporting issues.",
-      recommendation: "Generate a UUID for each request and return it in a X-Request-ID response header. Include it in all log entries.",
+      description:
+        "Returning a unique request ID in API responses helps clients reference specific requests when reporting issues.",
+      recommendation:
+        "Generate a UUID for each request and return it in a X-Request-ID response header. Include it in all log entries.",
       reference: "API Observability: Request Correlation",
-      suggestedFix: "Add a middleware that generates a UUID via `crypto.randomUUID()`, sets `res.setHeader('X-Request-ID', id)`, and attaches it to the request context for logging.",
+      suggestedFix:
+        "Add a middleware that generates a UUID via `crypto.randomUUID()`, sets `res.setHeader('X-Request-ID', id)`, and attaches it to the request context for logging.",
       confidence: 0.7,
     });
   }

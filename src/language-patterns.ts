@@ -60,7 +60,7 @@ export function isBraceLang(lang: LangFamily): boolean {
  */
 export function langPattern(
   lang: LangFamily,
-  patterns: Partial<Record<LangFamily | "jsts" | "all", string>>
+  patterns: Partial<Record<LangFamily | "jsts" | "all", string>>,
 ): RegExp | null {
   // "jsts" is a shortcut for both javascript and typescript
   let source: string | undefined;
@@ -72,7 +72,11 @@ export function langPattern(
       if (v) parts.push(v);
     }
     if (parts.length === 0) return null;
-    return new RegExp(parts.join("|"), "gi");
+    try {
+      return new RegExp(parts.join("|"), "gi");
+    } catch {
+      return null;
+    }
   }
 
   source = patterns[lang];
@@ -83,21 +87,28 @@ export function langPattern(
     source = patterns["all"];
   }
   if (!source) return null;
-  return new RegExp(source, "gi");
+  try {
+    return new RegExp(source, "gi");
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Build a single regex that matches across ALL supported languages.
  * Use this when you want to detect an issue regardless of declared language.
  */
-export function allLangPattern(
-  patterns: Partial<Record<LangFamily | "jsts", string>>
-): RegExp {
+export function allLangPattern(patterns: Partial<Record<LangFamily | "jsts", string>>): RegExp {
   const parts: string[] = [];
   for (const v of Object.values(patterns)) {
     if (v) parts.push(v);
   }
-  return new RegExp(parts.join("|"), "gi");
+  try {
+    return new RegExp(parts.join("|"), "gi");
+  } catch {
+    // Fallback: never-matching regex
+    return /(?!)/gi;
+  }
 }
 
 // ─── Common Pattern Constants ────────────────────────────────────────────────
@@ -278,10 +289,10 @@ export const WEAK_HASH = {
 export const EVAL_USAGE = {
   jsts: String.raw`\beval\s*\(|new\s+Function\s*\(`,
   python: String.raw`\beval\s*\(|\bexec\s*\(|compile\s*\(`,
-  rust: String.raw`(?!)`,  // Rust has no eval equivalent
+  rust: String.raw`(?!)`, // Rust has no eval equivalent
   csharp: String.raw`CSharpScript\.EvaluateAsync|Roslyn\.Scripting`,
   java: String.raw`ScriptEngine\.eval\s*\(|Nashorn|Groovy`,
-  go: String.raw`(?!)`,  // Go has no eval equivalent
+  go: String.raw`(?!)`, // Go has no eval equivalent
 };
 
 // ── Security: TLS / Certificate ──────────────────────────────────────────────
@@ -505,4 +516,50 @@ export const DEPRECATED_API = {
   csharp: String.raw`WebClient\b|\.GetSection\s*\(\s*["']appSettings["']\)`,
   java: String.raw`\.newInstance\s*\(\s*\)(?!\s*;.*class)|Date\s*\(\s*\)|Thread\.stop\s*\(`,
   go: String.raw`ioutil\.\w+|syscall\.StringToUTF16Ptr`,
+};
+
+// ── Framework-Specific Security Patterns ─────────────────────────────────────
+// Detect common security misconfigurations in popular web frameworks.
+
+/** Flask/Django debug mode or insecure settings */
+export const FRAMEWORK_DEBUG_MODE = {
+  python: String.raw`app\.run\s*\([^)]*debug\s*=\s*True|DEBUG\s*=\s*True|FLASK_DEBUG\s*=\s*["']?1`,
+  jsts: String.raw`app\.set\s*\(\s*['"]env['"]\s*,\s*['"]development['"]`,
+  csharp: String.raw`\.UseDeveloperExceptionPage\s*\(`,
+  java: String.raw`server\.error\.include-stacktrace\s*=\s*always`,
+};
+
+/** Missing HTTPS / security middleware in frameworks */
+export const FRAMEWORK_MISSING_SECURITY = {
+  python: String.raw`@app\.route\b(?!.*login_required|.*permission_required).*def\s+\w+`,
+  jsts: String.raw`app\.listen\s*\(\s*(?:80|3000)\b(?!.*https)`,
+  java: String.raw`\.antMatchers\s*\(\s*["']/\*\*["']\s*\)\s*\.permitAll`,
+  csharp: String.raw`\.AllowAnonymous\b.*(?:Delete|Admin|Update|Transfer)`,
+  go: String.raw`http\.ListenAndServe\s*\((?!.*tls|.*TLS)`,
+};
+
+/** Framework-specific secret key / session misconfigurations */
+export const FRAMEWORK_SECRET_KEY = {
+  python: String.raw`SECRET_KEY\s*=\s*["'][^"']{0,15}["']|app\.secret_key\s*=\s*["'][^"']{0,15}["']`,
+  jsts: String.raw`secret\s*:\s*["'][^"']{0,15}["'](?=.*(?:session|cookie|jwt))`,
+  java: String.raw`secret\.key\s*=\s*["'][^"']{0,20}["']`,
+  csharp: String.raw`\.AddJwtBearer\s*\([^)]*(?:["']secret["']|IssuerSigningKey\s*=\s*new\s+SymmetricSecurityKey\s*\(\s*Encoding\.\w+\.GetBytes\s*\(\s*["'][^"']{0,20}["'])`,
+};
+
+/** Framework-specific mass assignment / over-posting vulnerabilities */
+export const FRAMEWORK_MASS_ASSIGNMENT = {
+  python: String.raw`request\.(?:form|json|data)\s*\.to_dict\s*\(|ModelForm\s*\(\s*[^)]*exclude\s*=\s*\[\s*\]\)`,
+  jsts: String.raw`Object\.assign\s*\(\s*\w+\s*,\s*req\.body|\.create\s*\(\s*req\.body\s*\)|\.update\s*\(\s*req\.body\s*\)|spread.*req\.body`,
+  java: String.raw`@ModelAttribute\b.*(?:without|no).*(?:binding|whitelist)|setAllowedFields\s*\(\s*\)`,
+  csharp: String.raw`\[Bind\s*\(\s*\)\]|TryUpdateModelAsync\s*\(\s*\w+\s*\)|\.FromBody\].*(?:without|no).*(?:validation)`,
+};
+
+/** Go-specific: Gin/Echo/Fiber security patterns */
+export const FRAMEWORK_GO_WEB = {
+  go: String.raw`gin\.Default\s*\(\)|c\.(?:Bind|ShouldBind)\w*\s*\(\s*&\w+\s*\)(?!.*(?:Validate|Valid))`,
+};
+
+/** Rust-specific: Actix-web / Axum security patterns */
+export const FRAMEWORK_RUST_WEB = {
+  rust: String.raw`HttpServer::new\s*\([^)]*\)\.bind\s*\(\s*["']0\.0\.0\.0|\.app_data\s*\(\s*web::JsonConfig::default\s*\(\)\s*\)(?!.*limit|.*error)`,
 };

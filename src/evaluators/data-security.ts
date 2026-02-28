@@ -1,83 +1,13 @@
-import { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import type { Finding } from "../types.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  isLikelyPlaceholderCredentialValue,
+  isStrictCredentialDetectionEnabled,
+  looksLikeRealCredentialValue,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
-
-function isLikelyPlaceholderCredentialValue(value: string): boolean {
-  const normalized = value.trim().toLowerCase();
-
-  const exactPlaceholders = new Set([
-    "test",
-    "testing",
-    "mock",
-    "dummy",
-    "example",
-    "sample",
-    "fake",
-    "na",
-    "n/a",
-    "none",
-    "null",
-    "undefined",
-    "changeme",
-    "change_me",
-    "replace_me",
-    "replace-me",
-    "your_token_here",
-    "your_api_key",
-    "unused",
-    "not_used",
-    "placeholder",
-  ]);
-
-  if (exactPlaceholders.has(normalized)) {
-    return true;
-  }
-
-  if (/^(?:test|mock|dummy|sample|example|fake|placeholder|na|n\/a|unused|changeme|replace)[-_a-z0-9]*$/i.test(normalized)) {
-    return true;
-  }
-
-  return false;
-}
-
-function isStrictCredentialDetectionEnabled(): boolean {
-  return process.env.JUDGES_CREDENTIAL_MODE?.toLowerCase() === "strict";
-}
-
-function looksLikeRealCredentialValue(value: string): boolean {
-  if (isLikelyPlaceholderCredentialValue(value)) {
-    return false;
-  }
-
-  if (!isStrictCredentialDetectionEnabled()) {
-    return true;
-  }
-
-  const normalized = value.trim();
-  if (normalized.length < 12) {
-    return false;
-  }
-
-  if (/(?:test|mock|dummy|sample|example|fake|placeholder|changeme|replace[_-]?me|unused|not[_-]?used|password|secret)/i.test(normalized)) {
-    return false;
-  }
-
-  const hasLower = /[a-z]/.test(normalized);
-  const hasUpper = /[A-Z]/.test(normalized);
-  const hasDigit = /\d/.test(normalized);
-  const hasSymbol = /[^A-Za-z0-9]/.test(normalized);
-  const classCount = [hasLower, hasUpper, hasDigit, hasSymbol].filter(Boolean).length;
-
-  if (normalized.length >= 20 && classCount >= 2) {
-    return true;
-  }
-
-  if (normalized.length >= 16 && classCount >= 3) {
-    return true;
-  }
-
-  return false;
-}
 
 function lineContainsRealQuotedSecret(line: string, pattern: RegExp): boolean {
   const matches = [...line.matchAll(pattern)];
@@ -97,7 +27,8 @@ function isLikelyNonProductionContext(lines: string[], index: number): boolean {
   const contextEnd = Math.min(lines.length, index + 3);
   const context = lines.slice(contextStart, contextEnd).join("\n");
 
-  const nonProductionSignals = /\b(?:describe|it|test)\s*\(|\b(?:tests?|mock|mocks|fixture|fixtures|harness|e2e|example|sample|dummy)\b/i;
+  const nonProductionSignals =
+    /\b(?:describe|it|test)\s*\(|\b(?:tests?|mock|mocks|fixture|fixtures|harness|e2e|example|sample|dummy)\b/i;
   const productionSignals = /\b(?:prod|production|release|deploy|deployment)\b/i;
 
   return nonProductionSignals.test(context) && !productionSignals.test(context);
@@ -142,7 +73,10 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
     { pattern: /sk-[a-zA-Z0-9]{20,}/g, name: "OpenAI/Stripe secret key" },
     { pattern: /(?:SG\.)[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}/g, name: "SendGrid API key" },
     { pattern: /(?:bearer|authorization)\s*[:=]\s*["'][^"']{20,}["']/gi, name: "hardcoded auth token" },
-    { pattern: /(?:AZURE|MICROSOFT)_[A-Z_]*(?:KEY|SECRET|TOKEN|CONNECTION)\s*[:=]\s*["'][^"']+["']/gi, name: "Azure credential" },
+    {
+      pattern: /(?:AZURE|MICROSOFT)_[A-Z_]*(?:KEY|SECRET|TOKEN|CONNECTION)\s*[:=]\s*["'][^"']+["']/gi,
+      name: "Azure credential",
+    },
     { pattern: /(?:DATABASE_URL|MONGO_URI|REDIS_URL)\s*[:=]\s*["'][^"']+["']/gi, name: "database connection URL" },
   ];
 
@@ -179,18 +113,22 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   }
 
   // Console/print logging of sensitive data (multi-language)
-  const logSensitivePatterns = /(?:console\.\w+|print|println|printf|log\.\w+|logger\.\w+|logging\.\w+|System\.out|System\.err|fmt\.Print|puts|echo)\s*\(.*(?:password|secret|token|key|credential|ssn|credit.?card|cvv|pin_code)/gi;
+  const logSensitivePatterns =
+    /(?:console\.\w+|print|println|printf|log\.\w+|logger\.\w+|logging\.\w+|System\.out|System\.err|fmt\.Print|puts|echo)\s*\(.*(?:password|secret|token|key|credential|ssn|credit.?card|cvv|pin_code)/gi;
   const logLines = getLineNumbers(code, logSensitivePatterns);
   if (logLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Sensitive data may be logged",
-      description: "Log output appears to include sensitive data fields such as passwords, tokens, or PII. This can lead to credential exposure in log aggregation systems.",
+      description:
+        "Log output appears to include sensitive data fields such as passwords, tokens, or PII. This can lead to credential exposure in log aggregation systems.",
       lineNumbers: logLines,
-      recommendation: "Remove sensitive data from log statements. Use structured logging with redaction filters to automatically mask sensitive fields.",
+      recommendation:
+        "Remove sensitive data from log statements. Use structured logging with redaction filters to automatically mask sensitive fields.",
       reference: "OWASP Logging Cheat Sheet — CWE-532",
-      suggestedFix: "Remove sensitive fields from log calls or redact them: logger.info('User login', { userId: user.id }) instead of logging passwords/tokens.",
+      suggestedFix:
+        "Remove sensitive fields from log calls or redact them: logger.info('User login', { userId: user.id }) instead of logging passwords/tokens.",
       confidence: 0.85,
     });
   }
@@ -202,11 +140,13 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Weak hashing algorithm used",
-      description: "MD5 or SHA1 is used, which are cryptographically broken for security purposes. They should not be used for password hashing, data integrity verification, or any security-sensitive context.",
+      description:
+        "MD5 or SHA1 is used, which are cryptographically broken for security purposes. They should not be used for password hashing, data integrity verification, or any security-sensitive context.",
       lineNumbers: weakHashLines,
       recommendation: "Use SHA-256/SHA-512 for integrity checks, or bcrypt/scrypt/argon2 for password hashing.",
       reference: "NIST SP 800-131A — CWE-328",
-      suggestedFix: "Replace MD5/SHA1 with SHA-256 for integrity, or bcrypt/argon2 for passwords: crypto.createHash('sha256') or await bcrypt.hash(password, 12).",
+      suggestedFix:
+        "Replace MD5/SHA1 with SHA-256 for integrity, or bcrypt/argon2 for passwords: crypto.createHash('sha256') or await bcrypt.hash(password, 12).",
       confidence: 0.9,
     });
   }
@@ -218,11 +158,14 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "Potential SQL injection via string concatenation",
-      description: "SQL queries appear to be constructed using string interpolation or concatenation with user input, which can lead to SQL injection attacks and data breaches.",
+      description:
+        "SQL queries appear to be constructed using string interpolation or concatenation with user input, which can lead to SQL injection attacks and data breaches.",
       lineNumbers: sqlLines,
-      recommendation: "Use parameterized queries or prepared statements. Never concatenate user input into SQL strings directly.",
+      recommendation:
+        "Use parameterized queries or prepared statements. Never concatenate user input into SQL strings directly.",
       reference: "OWASP SQL Injection — CWE-89",
-      suggestedFix: "Use parameterized queries: db.query('SELECT * FROM users WHERE id = $1', [userId]) instead of string concatenation.",
+      suggestedFix:
+        "Use parameterized queries: db.query('SELECT * FROM users WHERE id = $1', [userId]) instead of string concatenation.",
       confidence: 0.95,
     });
   }
@@ -235,7 +178,8 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Unencrypted HTTP connection",
-      description: "Non-localhost HTTP URLs are used instead of HTTPS, meaning data is transmitted in plaintext and vulnerable to interception.",
+      description:
+        "Non-localhost HTTP URLs are used instead of HTTPS, meaning data is transmitted in plaintext and vulnerable to interception.",
       lineNumbers: httpLines,
       recommendation: "Use HTTPS for all non-local connections to ensure data in transit is encrypted with TLS.",
       reference: "OWASP Transport Layer Protection — CWE-319",
@@ -251,11 +195,14 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "Unsafe deserialization detected",
-      description: "Deserializing untrusted data (pickle, YAML, Java ObjectInputStream, PHP unserialize, .NET BinaryFormatter) can lead to remote code execution.",
+      description:
+        "Deserializing untrusted data (pickle, YAML, Java ObjectInputStream, PHP unserialize, .NET BinaryFormatter) can lead to remote code execution.",
       lineNumbers: deserLines,
-      recommendation: "Never deserialize untrusted data. Use safe alternatives: yaml.safe_load(), JSON instead of pickle, whitelist-based deserialization. Validate and sanitize all input before deserialization.",
+      recommendation:
+        "Never deserialize untrusted data. Use safe alternatives: yaml.safe_load(), JSON instead of pickle, whitelist-based deserialization. Validate and sanitize all input before deserialization.",
       reference: "OWASP Deserialization — CWE-502",
-      suggestedFix: "Replace unsafe deserialization: use yaml.safe_load() instead of yaml.load(), JSON.parse() instead of pickle/eval, or whitelist-based deserialization.",
+      suggestedFix:
+        "Replace unsafe deserialization: use yaml.safe_load() instead of yaml.load(), JSON.parse() instead of pickle/eval, or whitelist-based deserialization.",
       confidence: 0.85,
     });
   }
@@ -270,11 +217,14 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "high",
         title: "Cookie may lack security flags",
-        description: "Cookies are set without explicit Secure, HttpOnly, or SameSite flags, making them vulnerable to interception and XSS-based theft.",
+        description:
+          "Cookies are set without explicit Secure, HttpOnly, or SameSite flags, making them vulnerable to interception and XSS-based theft.",
         lineNumbers: cookieNoFlagLines,
-        recommendation: "Set Secure, HttpOnly, and SameSite=Strict (or Lax) flags on all cookies. Use __Host- prefix for sensitive cookies.",
+        recommendation:
+          "Set Secure, HttpOnly, and SameSite=Strict (or Lax) flags on all cookies. Use __Host- prefix for sensitive cookies.",
         reference: "OWASP Session Management — CWE-614",
-        suggestedFix: "Add security flags: res.cookie('name', value, { secure: true, httpOnly: true, sameSite: 'strict' });",
+        suggestedFix:
+          "Add security flags: res.cookie('name', value, { secure: true, httpOnly: true, sameSite: 'strict' });",
         confidence: 0.8,
       });
     }
@@ -288,11 +238,14 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "JWT decoded without signature verification",
-      description: "JWT tokens are decoded without verifying the signature, allowing attackers to forge tokens with arbitrary claims.",
+      description:
+        "JWT tokens are decoded without verifying the signature, allowing attackers to forge tokens with arbitrary claims.",
       lineNumbers: jwtNoVerifyLines,
-      recommendation: "Always use jwt.verify() instead of jwt.decode(). Validate the signature, issuer, audience, and expiration claims.",
+      recommendation:
+        "Always use jwt.verify() instead of jwt.decode(). Validate the signature, issuer, audience, and expiration claims.",
       reference: "OWASP JWT Security — CWE-345",
-      suggestedFix: "Replace jwt.decode() with jwt.verify(token, secret, { algorithms: ['RS256'], issuer: 'expected-issuer' });",
+      suggestedFix:
+        "Replace jwt.decode() with jwt.verify(token, secret, { algorithms: ['RS256'], issuer: 'expected-issuer' });",
       confidence: 0.9,
     });
   }
@@ -301,24 +254,29 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   const fileUploadPatterns = /multer|upload|formidable|busboy|multipart|FileUpload|MultipartFile/gi;
   const fileUploadLines = getLineNumbers(code, fileUploadPatterns);
   if (fileUploadLines.length > 0) {
-    const hasValidation = /mime|mimetype|content-type|extension|allowedTypes|fileFilter|accept|maxSize|fileSizeLimit/gi.test(code);
+    const hasValidation =
+      /mime|mimetype|content-type|extension|allowedTypes|fileFilter|accept|maxSize|fileSizeLimit/gi.test(code);
     if (!hasValidation) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "high",
         title: "File upload without type/size validation",
-        description: "File uploads are accepted without visible MIME type, extension, or size validation, allowing malicious file uploads.",
+        description:
+          "File uploads are accepted without visible MIME type, extension, or size validation, allowing malicious file uploads.",
         lineNumbers: fileUploadLines,
-        recommendation: "Validate file type (MIME + extension + magic bytes), enforce size limits, scan for malware, and store uploads outside the webroot.",
+        recommendation:
+          "Validate file type (MIME + extension + magic bytes), enforce size limits, scan for malware, and store uploads outside the webroot.",
         reference: "OWASP Unrestricted File Upload — CWE-434",
-        suggestedFix: "Add file validation: multer({ fileFilter, limits: { fileSize: 5 * 1024 * 1024 } }) with MIME type and extension checks.",
+        suggestedFix:
+          "Add file validation: multer({ fileFilter, limits: { fileSize: 5 * 1024 * 1024 } }) with MIME type and extension checks.",
         confidence: 0.8,
       });
     }
   }
 
   // Cleartext password storage
-  const cleartextPwPatterns = /password\s*[:=]\s*(?:req\.|request\.|body\.|input\.|params\.).*(?:save|insert|create|update|store|set)/gi;
+  const cleartextPwPatterns =
+    /password\s*[:=]\s*(?:req\.|request\.|body\.|input\.|params\.).*(?:save|insert|create|update|store|set)/gi;
   const cleartextLines = getLineNumbers(code, cleartextPwPatterns);
   if (cleartextLines.length > 0) {
     const hasHashing = /bcrypt|argon2|scrypt|pbkdf2|hashPassword|hash_password|PasswordHasher/gi.test(code);
@@ -327,11 +285,14 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "critical",
         title: "Password may be stored in cleartext",
-        description: "User passwords appear to be stored without hashing. If the database is compromised, all passwords are exposed.",
+        description:
+          "User passwords appear to be stored without hashing. If the database is compromised, all passwords are exposed.",
         lineNumbers: cleartextLines,
-        recommendation: "Hash passwords using bcrypt, argon2, or scrypt with a unique salt per password. Never store passwords in plaintext or with reversible encryption.",
+        recommendation:
+          "Hash passwords using bcrypt, argon2, or scrypt with a unique salt per password. Never store passwords in plaintext or with reversible encryption.",
         reference: "OWASP Password Storage — CWE-256",
-        suggestedFix: "Hash passwords before storage: const hash = await bcrypt.hash(password, 12); and verify with await bcrypt.compare(input, hash).",
+        suggestedFix:
+          "Hash passwords before storage: const hash = await bcrypt.hash(password, 12); and verify with await bcrypt.compare(input, hash).",
         confidence: 0.85,
       });
     }
@@ -345,62 +306,78 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "CORS with credentials and wildcard origin",
-      description: "Using Access-Control-Allow-Credentials with a wildcard origin allows any website to make authenticated requests to your API.",
+      description:
+        "Using Access-Control-Allow-Credentials with a wildcard origin allows any website to make authenticated requests to your API.",
       lineNumbers: corsCredLines,
       recommendation: "Never combine credentials: true with origin: '*'. Whitelist specific trusted origins.",
       reference: "OWASP CORS — CWE-942",
-      suggestedFix: "Replace origin: '*' with a specific allowlist: origin: ['https://app.example.com'] when credentials: true is used.",
+      suggestedFix:
+        "Replace origin: '*' with a specific allowlist: origin: ['https://app.example.com'] when credentials: true is used.",
       confidence: 0.9,
     });
   }
 
   // Missing CSRF protection
-  const formPostLines = getLineNumbers(code, /app\.post\s*\(|router\.post\s*\(|@PostMapping|@RequestMapping.*POST|\.post\s*\(/gi);
+  const formPostLines = getLineNumbers(
+    code,
+    /app\.post\s*\(|router\.post\s*\(|@PostMapping|@RequestMapping.*POST|\.post\s*\(/gi,
+  );
   const hasCsrf = /csrf|xsrf|_token|csrfToken|antiforgery|AntiForgery|@csrf/gi.test(code);
   if (formPostLines.length > 2 && !hasCsrf) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "No CSRF protection detected",
-      description: "POST endpoints exist but no CSRF tokens or protection middleware is visible, making the application vulnerable to cross-site request forgery.",
+      description:
+        "POST endpoints exist but no CSRF tokens or protection middleware is visible, making the application vulnerable to cross-site request forgery.",
       lineNumbers: formPostLines.slice(0, 5),
-      recommendation: "Implement CSRF protection using tokens (csurf, django.middleware.csrf, @csrf_exempt annotations) or SameSite cookies.",
+      recommendation:
+        "Implement CSRF protection using tokens (csurf, django.middleware.csrf, @csrf_exempt annotations) or SameSite cookies.",
       reference: "OWASP CSRF — CWE-352",
-      suggestedFix: "Add CSRF middleware: app.use(csurf({ cookie: { httpOnly: true, sameSite: 'strict' } })); and include token in forms.",
+      suggestedFix:
+        "Add CSRF middleware: app.use(csurf({ cookie: { httpOnly: true, sameSite: 'strict' } })); and include token in forms.",
       confidence: 0.7,
     });
   }
 
   // Exposing stack traces to clients
-  const stackTracePatterns = /(?:res\.(?:json|send)|response\.(?:json|send))\s*\(.*(?:stack|stackTrace|err\.message|error\.message)|traceback\.format_exc/gi;
+  const stackTracePatterns =
+    /(?:res\.(?:json|send)|response\.(?:json|send))\s*\(.*(?:stack|stackTrace|err\.message|error\.message)|traceback\.format_exc/gi;
   const stackLines = getLineNumbers(code, stackTracePatterns);
   if (stackLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Stack traces exposed to clients",
-      description: "Error stack traces sent in API responses reveal internal implementation details, file paths, and library versions to attackers.",
+      description:
+        "Error stack traces sent in API responses reveal internal implementation details, file paths, and library versions to attackers.",
       lineNumbers: stackLines,
-      recommendation: "Return generic error messages to clients. Log detailed errors server-side only. Use different error handlers for development vs production.",
+      recommendation:
+        "Return generic error messages to clients. Log detailed errors server-side only. Use different error handlers for development vs production.",
       reference: "OWASP Error Handling — CWE-209",
-      suggestedFix: "Return generic errors to clients: res.status(500).json({ error: 'Internal error', requestId }); and log details server-side only.",
+      suggestedFix:
+        "Return generic errors to clients: res.status(500).json({ error: 'Internal error', requestId }); and log details server-side only.",
       confidence: 0.85,
     });
   }
 
   // Hardcoded encryption keys / IVs
-  const encKeyPatterns = /(?:encryption[_-]?key|aes[_-]?key|iv|initialization[_-]?vector|nonce)\s*[:=]\s*["'][^"']+["']|(?:Buffer\.from|new\s+Uint8Array)\s*\(.*(?:key|iv)/gi;
+  const encKeyPatterns =
+    /(?:encryption[_-]?key|aes[_-]?key|iv|initialization[_-]?vector|nonce)\s*[:=]\s*["'][^"']+["']|(?:Buffer\.from|new\s+Uint8Array)\s*\(.*(?:key|iv)/gi;
   const encKeyLines = filterNonProductionLineNumbers(code, getLineNumbers(code, encKeyPatterns));
   if (encKeyLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "Hardcoded encryption key or IV",
-      description: "Encryption keys and initialization vectors are hardcoded, making encrypted data trivially decryptable by anyone with access to the code.",
+      description:
+        "Encryption keys and initialization vectors are hardcoded, making encrypted data trivially decryptable by anyone with access to the code.",
       lineNumbers: encKeyLines,
-      recommendation: "Generate encryption keys securely at runtime or load from a key management service. IVs/nonces must be random and unique per encryption operation.",
+      recommendation:
+        "Generate encryption keys securely at runtime or load from a key management service. IVs/nonces must be random and unique per encryption operation.",
       reference: "CWE-321: Use of Hard-coded Cryptographic Key",
-      suggestedFix: "Load encryption keys from a KMS or env var: const key = Buffer.from(process.env.ENCRYPTION_KEY, 'base64'); and generate IVs with crypto.randomBytes(16).",
+      suggestedFix:
+        "Load encryption keys from a KMS or env var: const key = Buffer.from(process.env.ENCRYPTION_KEY, 'base64'); and generate IVs with crypto.randomBytes(16).",
       confidence: 0.9,
     });
   }
@@ -411,7 +388,10 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   if (insecureRandLines.length > 0) {
     const nearSecurity = code.split("\n").some((line, i) => {
       if (insecureRandPatterns.test(line)) {
-        const context = code.split("\n").slice(Math.max(0, i - 3), i + 3).join("\n");
+        const context = code
+          .split("\n")
+          .slice(Math.max(0, i - 3), i + 3)
+          .join("\n");
         return /token|secret|password|key|nonce|salt|session|csrf|otp|verification/i.test(context);
       }
       return false;
@@ -421,29 +401,36 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "high",
         title: "Insecure random for security context",
-        description: "Math.random() or similar non-cryptographic PRNGs are used in a security-sensitive context (token generation, etc.). These are predictable.",
+        description:
+          "Math.random() or similar non-cryptographic PRNGs are used in a security-sensitive context (token generation, etc.). These are predictable.",
         lineNumbers: insecureRandLines,
-        recommendation: "Use crypto.randomBytes() (Node.js), secrets.token_hex() (Python), SecureRandom (Java/Ruby), or crypto.getRandomValues() (browser).",
+        recommendation:
+          "Use crypto.randomBytes() (Node.js), secrets.token_hex() (Python), SecureRandom (Java/Ruby), or crypto.getRandomValues() (browser).",
         reference: "CWE-330: Use of Insufficiently Random Values",
-        suggestedFix: "Use crypto.randomBytes(32).toString('hex') (Node.js) or crypto.getRandomValues() (browser) for security-sensitive random values.",
+        suggestedFix:
+          "Use crypto.randomBytes(32).toString('hex') (Node.js) or crypto.getRandomValues() (browser) for security-sensitive random values.",
         confidence: 0.85,
       });
     }
   }
 
   // Path traversal risk
-  const pathTraversalPatterns = /(?:readFile|writeFile|readdir|open|fopen|file_get_contents|include|require)\s*\(.*(?:req\.|request\.|params\.|query\.|body\.|input\.|args)/gi;
+  const pathTraversalPatterns =
+    /(?:readFile|writeFile|readdir|open|fopen|file_get_contents|include|require)\s*\(.*(?:req\.|request\.|params\.|query\.|body\.|input\.|args)/gi;
   const pathTravLines = getLineNumbers(code, pathTraversalPatterns);
   if (pathTravLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "Potential path traversal via user input",
-      description: "File operations use user-controlled input without apparent sanitization, allowing attackers to read/write arbitrary files using ../ sequences.",
+      description:
+        "File operations use user-controlled input without apparent sanitization, allowing attackers to read/write arbitrary files using ../ sequences.",
       lineNumbers: pathTravLines,
-      recommendation: "Validate and sanitize file paths. Use path.resolve() + startsWith() checks, or a whitelist of allowed paths. Never pass user input directly to file operations.",
+      recommendation:
+        "Validate and sanitize file paths. Use path.resolve() + startsWith() checks, or a whitelist of allowed paths. Never pass user input directly to file operations.",
       reference: "OWASP Path Traversal — CWE-22",
-      suggestedFix: "Sanitize file paths: const safePath = path.resolve(baseDir, userInput); if (!safePath.startsWith(baseDir)) throw new Error('Invalid path');",
+      suggestedFix:
+        "Sanitize file paths: const safePath = path.resolve(baseDir, userInput); if (!safePath.startsWith(baseDir)) throw new Error('Invalid path');",
       confidence: 0.85,
     });
   }
@@ -459,35 +446,43 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "high",
         title: "Sensitive data stored without encryption",
-        description: "Code stores sensitive data (medical, financial, SSN) without visible encryption-at-rest. If the database is compromised, data is exposed in plaintext.",
+        description:
+          "Code stores sensitive data (medical, financial, SSN) without visible encryption-at-rest. If the database is compromised, data is exposed in plaintext.",
         lineNumbers: dbWriteLines.slice(0, 5),
-        recommendation: "Use field-level encryption for sensitive data, database-level TDE (Transparent Data Encryption), or application-level encryption before storage.",
+        recommendation:
+          "Use field-level encryption for sensitive data, database-level TDE (Transparent Data Encryption), or application-level encryption before storage.",
         reference: "OWASP Cryptographic Storage — CWE-311",
-        suggestedFix: "Encrypt sensitive fields before storage: const encrypted = crypto.createCipheriv('aes-256-gcm', key, iv).update(data); or enable database-level TDE.",
+        suggestedFix:
+          "Encrypt sensitive fields before storage: const encrypted = crypto.createCipheriv('aes-256-gcm', key, iv).update(data); or enable database-level TDE.",
         confidence: 0.7,
       });
     }
   }
 
   // Secrets or tokens embedded in URL strings
-  const secretInUrlPattern = /["'`]https?:\/\/[^"'`\s]*[?&](?:api[_-]?key|token|secret|password|auth|access[_-]?token|client[_-]?secret|api[_-]?secret)=[^&"'`\s]+/gi;
+  const secretInUrlPattern =
+    /["'`]https?:\/\/[^"'`\s]*[?&](?:api[_-]?key|token|secret|password|auth|access[_-]?token|client[_-]?secret|api[_-]?secret)=[^&"'`\s]+/gi;
   const secretInUrlLines = getLineNumbers(code, secretInUrlPattern);
   if (secretInUrlLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "Secret or token embedded in URL string",
-      description: "API keys, tokens, or passwords are included as query parameters in URL strings. These appear in server logs, browser history, referer headers, and proxy logs.",
+      description:
+        "API keys, tokens, or passwords are included as query parameters in URL strings. These appear in server logs, browser history, referer headers, and proxy logs.",
       lineNumbers: secretInUrlLines,
-      recommendation: "Pass secrets via Authorization headers, request body, or environment variables — never as URL query parameters. Use SDK client libraries that handle auth properly.",
+      recommendation:
+        "Pass secrets via Authorization headers, request body, or environment variables — never as URL query parameters. Use SDK client libraries that handle auth properly.",
       reference: "CWE-598: Use of GET Request Method With Sensitive Query Strings",
-      suggestedFix: "Move secrets from URL query params to the Authorization header: headers: { Authorization: `Bearer ${token}` }.",
+      suggestedFix:
+        "Move secrets from URL query params to the Authorization header: headers: { Authorization: `Bearer ${token}` }.",
       confidence: 0.9,
     });
   }
 
   // Credentials in connection strings
-  const credInConnPattern = /["'`](?:mongodb|postgres|postgresql|mysql|redis|amqp|mssql|sqlserver):\/\/[^:]+:[^@"'`]+@/gi;
+  const credInConnPattern =
+    /["'`](?:mongodb|postgres|postgresql|mysql|redis|amqp|mssql|sqlserver):\/\/[^:]+:[^@"'`]+@/gi;
   const credInConnLines = getLineNumbers(code, credInConnPattern);
   if (credInConnLines.length > 0) {
     // Filter out obvious placeholders
@@ -500,35 +495,43 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "critical",
         title: "Credentials embedded in database connection string",
-        description: "Database connection strings contain inline credentials. These are committed to version control and visible to anyone with repository access.",
+        description:
+          "Database connection strings contain inline credentials. These are committed to version control and visible to anyone with repository access.",
         lineNumbers: realCredLines,
-        recommendation: "Use environment variables for connection strings. Use cloud-managed identity (Azure Managed Identity, AWS IAM) for passwordless authentication where possible.",
+        recommendation:
+          "Use environment variables for connection strings. Use cloud-managed identity (Azure Managed Identity, AWS IAM) for passwordless authentication where possible.",
         reference: "CWE-798: Use of Hard-coded Credentials",
-        suggestedFix: "Use environment variables for connection strings: const url = process.env.DATABASE_URL; or use managed identity for passwordless auth.",
+        suggestedFix:
+          "Use environment variables for connection strings: const url = process.env.DATABASE_URL; or use managed identity for passwordless auth.",
         confidence: 0.9,
       });
     }
   }
 
   // Sensitive data leaked in error messages
-  const sensitiveInErrorPattern = /(?:throw\s+new\s+\w*Error|raise\s+\w*Error|new\s+\w*Exception)\s*\([^)]*(?:password|token|secret|ssn|credit.?card|api.?key|connection.?string|private.?key)/gi;
+  const sensitiveInErrorPattern =
+    /(?:throw\s+new\s+\w*Error|raise\s+\w*Error|new\s+\w*Exception)\s*\([^)]*(?:password|token|secret|ssn|credit.?card|api.?key|connection.?string|private.?key)/gi;
   const sensitiveInErrorLines = getLineNumbers(code, sensitiveInErrorPattern);
   if (sensitiveInErrorLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Sensitive data referenced in error messages",
-      description: "Error messages include references to passwords, tokens, API keys, or other sensitive data. These can leak to logs, error monitoring services, and client responses.",
+      description:
+        "Error messages include references to passwords, tokens, API keys, or other sensitive data. These can leak to logs, error monitoring services, and client responses.",
       lineNumbers: sensitiveInErrorLines,
-      recommendation: "Use generic error messages for security failures: 'Authentication failed' instead of 'Invalid password for user@email.com'. Log sensitive context server-side only at debug level.",
+      recommendation:
+        "Use generic error messages for security failures: 'Authentication failed' instead of 'Invalid password for user@email.com'. Log sensitive context server-side only at debug level.",
       reference: "CWE-209: Information Exposure Through Error Messages",
-      suggestedFix: "Use generic error messages: throw new AppError('Authentication failed') instead of including sensitive field names or values.",
+      suggestedFix:
+        "Use generic error messages: throw new AppError('Authentication failed') instead of including sensitive field names or values.",
       confidence: 0.85,
     });
   }
 
   // Logging raw request/response bodies
-  const logRawBodyPattern = /(?:console\.\w+|logger?\.\w+|log\.\w+|logging\.\w+)\s*\(.*(?:req\.body|request\.body|request\.data|request\.json|response\.data|res\.body)/gi;
+  const logRawBodyPattern =
+    /(?:console\.\w+|logger?\.\w+|log\.\w+|logging\.\w+)\s*\(.*(?:req\.body|request\.body|request\.data|request\.json|response\.data|res\.body)/gi;
   const logRawBodyLines = getLineNumbers(code, logRawBodyPattern);
   if (logRawBodyLines.length > 0) {
     findings.push({
@@ -537,9 +540,11 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
       title: "Logging raw request/response bodies",
       description: `Found ${logRawBodyLines.length} location(s) logging entire HTTP request or response bodies. These may contain passwords, tokens, PII, credit card numbers, or health data that will be exposed in log aggregators.`,
       lineNumbers: logRawBodyLines,
-      recommendation: "Log only specific, non-sensitive fields. Use structured logging with field-level redaction. Never log full request bodies — redact password, token, ssn, and creditCard fields.",
+      recommendation:
+        "Log only specific, non-sensitive fields. Use structured logging with field-level redaction. Never log full request bodies — redact password, token, ssn, and creditCard fields.",
       reference: "CWE-532: Information Exposure Through Log Files",
-      suggestedFix: "Log only metadata: logger.info({ method: req.method, url: req.url, status: res.statusCode }); instead of full request/response bodies.",
+      suggestedFix:
+        "Log only metadata: logger.info({ method: req.method, url: req.url, status: res.statusCode }); instead of full request/response bodies.",
       confidence: 0.85,
     });
   }

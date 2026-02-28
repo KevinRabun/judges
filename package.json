@@ -1,10 +1,28 @@
 {
   "name": "@kevinrabun/judges",
-  "version": "2.3.0",
-  "description": "34 specialized judges that evaluate AI-generated code for security, cost, and quality.",
+  "version": "3.0.0",
+  "description": "35 specialized judges that evaluate AI-generated code for security, cost, and quality.",
   "mcpName": "io.github.KevinRabun/judges",
   "type": "module",
   "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/api.js",
+      "types": "./dist/api.d.ts"
+    },
+    "./api": {
+      "import": "./dist/api.js",
+      "types": "./dist/api.d.ts"
+    },
+    "./server": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./sarif": {
+      "import": "./dist/formatters/sarif.js",
+      "types": "./dist/formatters/sarif.d.ts"
+    }
+  },
   "bin": {
     "judges": "dist/index.js"
   },
@@ -20,11 +38,17 @@
     "dev": "tsc --watch",
     "clean": "rimraf dist",
     "test": "npx tsx --test tests/judges.test.ts",
+    "test:coverage": "npx c8 --reporter=text --reporter=lcov npx tsx --test tests/judges.test.ts",
+    "lint": "eslint src/ tests/",
+    "lint:fix": "eslint src/ tests/ --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "demo": "npx tsx examples/demo.ts",
     "report:public-repo": "npx tsx scripts/generate-public-repo-report.ts",
     "report:quickstart": "npx tsx scripts/generate-public-repo-report.ts --quickStart",
     "automation:daily-popular": "npx tsx scripts/daily-popular-repo-autofix.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "prepare": "husky"
   },
   "keywords": [
     "mcp",
@@ -47,13 +71,28 @@
   },
   "author": "kevinrabun",
   "license": "MIT",
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "typescript": "^5.9.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^25.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
+    "c8": "^11.0.0",
+    "eslint": "^10.0.2",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1",
     "tsx": "^4.19.4"
   }
 }

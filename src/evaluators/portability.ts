@@ -1,4 +1,4 @@
-import { Finding } from "../types.js";
+import type { Finding } from "../types.js";
 import { getLineNumbers, getLangFamily } from "./shared.js";
 
 export function analyzePortability(code: string, language: string): Finding[] {
@@ -20,9 +20,11 @@ export function analyzePortability(code: string, language: string): Finding[] {
       title: "OS-specific file paths detected",
       description: `Found ${osPathLines.length} hardcoded OS-specific path(s). These will fail on other operating systems.`,
       lineNumbers: osPathLines.slice(0, 5),
-      recommendation: "Use platform-independent path construction (path.join, os.path.join, Path.Combine). Use environment variables or config for base directories.",
+      recommendation:
+        "Use platform-independent path construction (path.join, os.path.join, Path.Combine). Use environment variables or config for base directories.",
       reference: "Cross-Platform File Path Best Practices",
-      suggestedFix: "Replace hardcoded paths like `'C:\\Users\\...'` with `path.join(os.homedir(), 'relative', 'path')` or read the base directory from an environment variable.",
+      suggestedFix:
+        "Replace hardcoded paths like `'C:\\Users\\...'` with `path.join(os.homedir(), 'relative', 'path')` or read the base directory from an environment variable.",
       confidence: 0.9,
     });
   }
@@ -42,15 +44,18 @@ export function analyzePortability(code: string, language: string): Finding[] {
       title: "Hardcoded path separators in strings",
       description: "File paths use hardcoded separators instead of platform-independent path construction.",
       lineNumbers: filteredPathSepLines.slice(0, 5),
-      recommendation: "Use path.join() (Node.js), os.path.join() (Python), or Path.Combine() (C#) instead of hardcoded separators.",
+      recommendation:
+        "Use path.join() (Node.js), os.path.join() (Python), or Path.Combine() (C#) instead of hardcoded separators.",
       reference: "Node.js path module / Cross-Platform Development",
-      suggestedFix: "Replace string-concatenated paths like `dir + '\\\\' + file` with `path.join(dir, file)` to let the runtime choose the correct separator.",
+      suggestedFix:
+        "Replace string-concatenated paths like `dir + '\\\\' + file` with `path.join(dir, file)` to let the runtime choose the correct separator.",
       confidence: 0.8,
     });
   }
 
   // Platform-specific shell commands
-  const shellCmdPattern = /(?:exec|spawn|system|popen|shell_exec)\s*\(\s*["'`](?:cmd |powershell |bash |sh |\/bin\/|\.exe|rm -rf|del \/|copy |xcopy|chmod|chown)/gi;
+  const shellCmdPattern =
+    /(?:exec|spawn|system|popen|shell_exec)\s*\(\s*["'`](?:cmd |powershell |bash |sh |\/bin\/|\.exe|rm -rf|del \/|copy |xcopy|chmod|chown)/gi;
   const shellLines = getLineNumbers(code, shellCmdPattern);
   if (shellLines.length > 0) {
     findings.push({
@@ -59,9 +64,11 @@ export function analyzePortability(code: string, language: string): Finding[] {
       title: "Platform-specific shell commands",
       description: `Found ${shellLines.length} platform-specific shell command(s). These won't work on other operating systems.`,
       lineNumbers: shellLines,
-      recommendation: "Use cross-platform APIs instead of shell commands (fs module instead of rm, path module instead of basename). If shell commands are required, use cross-platform alternatives.",
+      recommendation:
+        "Use cross-platform APIs instead of shell commands (fs module instead of rm, path module instead of basename). If shell commands are required, use cross-platform alternatives.",
       reference: "Cross-Platform Development Best Practices",
-      suggestedFix: "Replace shell calls like `exec('rm -rf dir')` with `fs.rmSync('dir', { recursive: true })` or use the `cross-spawn` package for unavoidable shell commands.",
+      suggestedFix:
+        "Replace shell calls like `exec('rm -rf dir')` with `fs.rmSync('dir', { recursive: true })` or use the `cross-spawn` package for unavoidable shell commands.",
       confidence: 0.9,
     });
   }
@@ -73,7 +80,8 @@ export function analyzePortability(code: string, language: string): Finding[] {
   const awsLines = getLineNumbers(code, awsPattern);
   const azureLines = getLineNumbers(code, azurePattern);
   const gcpLines = getLineNumbers(code, gcpPattern);
-  const hasAbstraction = /interface\s+\w*(?:Storage|Queue|Cache|Blob|Cloud)\w*/gi.test(code) ||
+  const hasAbstraction =
+    /interface\s+\w*(?:Storage|Queue|Cache|Blob|Cloud)\w*/gi.test(code) ||
     /(?:adapter|provider|strategy)Pattern/gi.test(code);
   const vendorLines = [...new Set([...awsLines, ...azureLines, ...gcpLines])];
   if (vendorLines.length > 0 && !hasAbstraction) {
@@ -81,11 +89,14 @@ export function analyzePortability(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Cloud vendor SDK used without abstraction layer",
-      description: "Cloud vendor-specific SDKs are used directly without an abstraction layer. Switching cloud providers would require extensive code changes.",
+      description:
+        "Cloud vendor-specific SDKs are used directly without an abstraction layer. Switching cloud providers would require extensive code changes.",
       lineNumbers: vendorLines.slice(0, 5),
-      recommendation: "Create an abstraction layer (interface/adapter pattern) around cloud services. This allows swapping implementations without changing business logic.",
+      recommendation:
+        "Create an abstraction layer (interface/adapter pattern) around cloud services. This allows swapping implementations without changing business logic.",
       reference: "Cloud-Agnostic Architecture / Adapter Pattern",
-      suggestedFix: "Define an interface (e.g. `IStorageProvider`) and wrap the vendor SDK in an adapter class so business logic depends only on the interface.",
+      suggestedFix:
+        "Define an interface (e.g. `IStorageProvider`) and wrap the vendor SDK in an adapter class so business logic depends only on the interface.",
       confidence: 0.7,
     });
   }
@@ -100,9 +111,11 @@ export function analyzePortability(code: string, language: string): Finding[] {
       title: "Hardcoded localhost/IP references",
       description: `Found ${hostLines.length} hardcoded localhost or IP address reference(s). These won't work in containerized, cloud, or multi-machine deployments.`,
       lineNumbers: hostLines,
-      recommendation: "Use environment variables for host configuration. In containers, use service names. In cloud, use DNS-based service discovery.",
+      recommendation:
+        "Use environment variables for host configuration. In containers, use service names. In cloud, use DNS-based service discovery.",
       reference: "12-Factor App: Port Binding (Factor VII)",
-      suggestedFix: "Replace `'localhost:3000'` with `process.env.HOST ?? 'localhost'` and `process.env.PORT ?? 3000` so the values are configurable per environment.",
+      suggestedFix:
+        "Replace `'localhost:3000'` with `process.env.HOST ?? 'localhost'` and `process.env.PORT ?? 3000` so the values are configurable per environment.",
       confidence: 0.9,
     });
   }
@@ -117,16 +130,20 @@ export function analyzePortability(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "info",
       title: "File I/O without explicit line-ending handling",
-      description: "File operations detected without explicit line-ending handling. Windows uses CRLF (\\r\\n) while Unix uses LF (\\n), which can cause issues in cross-platform environments.",
-      recommendation: "Use 'utf-8' encoding explicitly. Consider normalizing line endings when reading files. Configure .gitattributes for consistent line endings in version control.",
+      description:
+        "File operations detected without explicit line-ending handling. Windows uses CRLF (\\r\\n) while Unix uses LF (\\n), which can cause issues in cross-platform environments.",
+      recommendation:
+        "Use 'utf-8' encoding explicitly. Consider normalizing line endings when reading files. Configure .gitattributes for consistent line endings in version control.",
       reference: "Git Line Endings / Cross-Platform File I/O",
-      suggestedFix: "Normalize line endings after reading with `.replace(/\\r\\n/g, '\\n')` and add a `.gitattributes` file with `* text=auto eol=lf`.",
+      suggestedFix:
+        "Normalize line endings after reading with `.replace(/\\r\\n/g, '\\n')` and add a `.gitattributes` file with `* text=auto eol=lf`.",
       confidence: 0.7,
     });
   }
 
   // OS-specific environment variables
-  const osEnvPattern = /process\.env\.(?:APPDATA|LOCALAPPDATA|USERPROFILE|PROGRAMFILES|HOMEPATH|WINDIR|SystemRoot|COMSPEC|HOME|XDG_\w+)/g;
+  const osEnvPattern =
+    /process\.env\.(?:APPDATA|LOCALAPPDATA|USERPROFILE|PROGRAMFILES|HOMEPATH|WINDIR|SystemRoot|COMSPEC|HOME|XDG_\w+)/g;
   const osEnvLines = getLineNumbers(code, osEnvPattern);
   if (osEnvLines.length > 0) {
     findings.push({
@@ -135,17 +152,22 @@ export function analyzePortability(code: string, language: string): Finding[] {
       title: "OS-specific environment variables used directly",
       description: `Found ${osEnvLines.length} reference(s) to platform-specific environment variables (e.g., APPDATA, USERPROFILE, XDG_*). These variables only exist on specific operating systems.`,
       lineNumbers: osEnvLines,
-      recommendation: "Use cross-platform helpers like os.homedir(), os.tmpdir(), or libraries like 'env-paths' to resolve platform-appropriate directories.",
+      recommendation:
+        "Use cross-platform helpers like os.homedir(), os.tmpdir(), or libraries like 'env-paths' to resolve platform-appropriate directories.",
       reference: "Node.js os Module / Cross-Platform File Paths",
-      suggestedFix: "Replace `process.env.APPDATA` with `os.homedir()` or use the `env-paths` package to get platform-appropriate config/data directories.",
+      suggestedFix:
+        "Replace `process.env.APPDATA` with `os.homedir()` or use the `env-paths` package to get platform-appropriate config/data directories.",
       confidence: 0.9,
     });
   }
 
   // Browser-specific APIs in server/universal code
-  const browserApiPattern = /\b(?:document\.|window\.|navigator\.|localStorage\.|sessionStorage\.|alert\s*\(|confirm\s*\(|prompt\s*\()/g;
+  const browserApiPattern =
+    /\b(?:document\.|window\.|navigator\.|localStorage\.|sessionStorage\.|alert\s*\(|confirm\s*\(|prompt\s*\()/g;
   const browserApiLines = getLineNumbers(code, browserApiPattern);
-  const isLikelyServer = /require\s*\(\s*['"](?:express|http|fs|net|child_process|cluster)/gi.test(code) || /import\s+.*from\s+['"](?:express|http|fs|net|child_process|cluster)/gi.test(code);
+  const isLikelyServer =
+    /require\s*\(\s*['"](?:express|http|fs|net|child_process|cluster)/gi.test(code) ||
+    /import\s+.*from\s+['"](?:express|http|fs|net|child_process|cluster)/gi.test(code);
   if (browserApiLines.length > 0 && isLikelyServer) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -153,9 +175,11 @@ export function analyzePortability(code: string, language: string): Finding[] {
       title: "Browser-specific APIs used in server-side code",
       description: `Found ${browserApiLines.length} browser-only API call(s) (document, window, localStorage, etc.) in what appears to be server-side code. These will throw ReferenceError at runtime.`,
       lineNumbers: browserApiLines,
-      recommendation: "Guard browser API usage with typeof checks (e.g., typeof window !== 'undefined'). Use isomorphic libraries for code shared between client and server.",
+      recommendation:
+        "Guard browser API usage with typeof checks (e.g., typeof window !== 'undefined'). Use isomorphic libraries for code shared between client and server.",
       reference: "Universal JavaScript / SSR Best Practices",
-      suggestedFix: "Wrap browser API calls in a guard: `if (typeof window !== 'undefined') { window.localStorage.setItem(...) }` or move them to a client-only module.",
+      suggestedFix:
+        "Wrap browser API calls in a guard: `if (typeof window !== 'undefined') { window.localStorage.setItem(...) }` or move them to a client-only module.",
       confidence: 0.85,
     });
   }
@@ -171,15 +195,18 @@ export function analyzePortability(code: string, language: string): Finding[] {
       title: "__dirname/__filename used in ESM module",
       description: `Found ${dirnameLines.length} use(s) of __dirname or __filename, which are not available in ES modules. This will fail at runtime when using ESM.`,
       lineNumbers: dirnameLines,
-      recommendation: "Use import.meta.url with fileURLToPath() and path.dirname() for ESM-compatible directory resolution: const __dirname = path.dirname(fileURLToPath(import.meta.url))",
+      recommendation:
+        "Use import.meta.url with fileURLToPath() and path.dirname() for ESM-compatible directory resolution: const __dirname = path.dirname(fileURLToPath(import.meta.url))",
       reference: "Node.js ESM: import.meta.url",
-      suggestedFix: "Replace `__dirname` with `path.dirname(fileURLToPath(import.meta.url))` after importing `fileURLToPath` from `'node:url'`.",
+      suggestedFix:
+        "Replace `__dirname` with `path.dirname(fileURLToPath(import.meta.url))` after importing `fileURLToPath` from `'node:url'`.",
       confidence: 0.9,
     });
   }
 
   // Architecture-specific assumptions (32/64 bit)
-  const archPattern = /(?:Int32Array|Float32Array|Uint32Array|Buffer\.alloc(?:Unsafe)?\s*\(\s*\d{8,})|(?:MAX_SAFE_INTEGER|Number\.MAX_SAFE_INTEGER)/g;
+  const archPattern =
+    /(?:Int32Array|Float32Array|Uint32Array|Buffer\.alloc(?:Unsafe)?\s*\(\s*\d{8,})|(?:MAX_SAFE_INTEGER|Number\.MAX_SAFE_INTEGER)/g;
   const archLines = getLineNumbers(code, archPattern);
   if (archLines.length > 0) {
     findings.push({
@@ -188,9 +215,11 @@ export function analyzePortability(code: string, language: string): Finding[] {
       title: "Potential architecture-specific assumptions",
       description: `Found ${archLines.length} instance(s) of typed arrays, large buffer allocations, or integer limit references that may behave differently across architectures.`,
       lineNumbers: archLines,
-      recommendation: "Use BigInt for values exceeding Number.MAX_SAFE_INTEGER. Be mindful of buffer sizes on memory-constrained platforms. Test on both 32-bit and 64-bit environments.",
+      recommendation:
+        "Use BigInt for values exceeding Number.MAX_SAFE_INTEGER. Be mindful of buffer sizes on memory-constrained platforms. Test on both 32-bit and 64-bit environments.",
       reference: "MDN: BigInt / Node.js Buffer Best Practices",
-      suggestedFix: "Use `BigInt` literals (e.g. `9007199254740993n`) for values beyond `Number.MAX_SAFE_INTEGER` and validate buffer sizes against `os.freemem()` before allocating.",
+      suggestedFix:
+        "Use `BigInt` literals (e.g. `9007199254740993n`) for values beyond `Number.MAX_SAFE_INTEGER` and validate buffer sizes against `os.freemem()` before allocating.",
       confidence: 0.8,
     });
   }
@@ -205,9 +234,11 @@ export function analyzePortability(code: string, language: string): Finding[] {
       title: "Platform-specific process signals used",
       description: `Found ${signalLines.length} Unix-specific signal handler(s) (SIGUSR1, SIGHUP, etc.). These signals are not available on Windows and will cause errors.`,
       lineNumbers: signalLines,
-      recommendation: "Guard signal handlers with platform checks (process.platform !== 'win32'). Use cross-platform shutdown mechanisms. Consider using 'death' or 'signal-exit' packages.",
+      recommendation:
+        "Guard signal handlers with platform checks (process.platform !== 'win32'). Use cross-platform shutdown mechanisms. Consider using 'death' or 'signal-exit' packages.",
       reference: "Node.js Process Signals / Cross-Platform Considerations",
-      suggestedFix: "Wrap the handler in a platform check: `if (process.platform !== 'win32') { process.on('SIGUSR1', handler); }` or use the `signal-exit` package.",
+      suggestedFix:
+        "Wrap the handler in a platform check: `if (process.platform !== 'win32') { process.on('SIGUSR1', handler); }` or use the `signal-exit` package.",
       confidence: 0.9,
     });
   }

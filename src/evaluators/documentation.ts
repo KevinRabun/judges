@@ -1,4 +1,4 @@
-import { Finding } from "../types.js";
+import type { Finding } from "../types.js";
 import { getLangLineNumbers, getLangFamily } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -24,11 +24,14 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Exported functions without documentation",
-      description: "Public/exported functions lack documentation comments. Consumers cannot understand parameters, return values, or behavior without reading the implementation.",
+      description:
+        "Public/exported functions lack documentation comments. Consumers cannot understand parameters, return values, or behavior without reading the implementation.",
       lineNumbers: undocFnLines,
-      recommendation: "Add documentation comments (JSDoc/TSDoc, docstrings, /// doc comments, Javadoc, GoDoc) for all exported functions, describing purpose, parameters, return values, and thrown errors.",
+      recommendation:
+        "Add documentation comments (JSDoc/TSDoc, docstrings, /// doc comments, Javadoc, GoDoc) for all exported functions, describing purpose, parameters, return values, and thrown errors.",
       reference: "TSDoc / JSDoc / Docstring Standards",
-      suggestedFix: "Add a `/** ... */` (or language-equivalent) doc comment immediately above each exported function describing its purpose, `@param` tags for every parameter, and a `@returns` tag.",
+      suggestedFix:
+        "Add a `/** ... */` (or language-equivalent) doc comment immediately above each exported function describing its purpose, `@param` tags for every parameter, and a `@returns` tag.",
       confidence: 0.7,
     });
   }
@@ -37,7 +40,11 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   const magicNumberLines: number[] = [];
   lines.forEach((line, i) => {
     // Match numeric literals that aren't 0 or 1, not in imports, not in type definitions
-    if (/(?<![.\w])(?:[2-9]\d{2,}|\d+\.\d+)(?![.\w])/i.test(line) && !/import|require|const\s+\w+\s*=|type|interface|enum|version|port|0x/i.test(line) && !/\/\/|\/\*|\*/i.test(line)) {
+    if (
+      /(?<![.\w])(?:[2-9]\d{2,}|\d+\.\d+)(?![.\w])/i.test(line) &&
+      !/import|require|const\s+\w+\s*=|type|interface|enum|version|port|0x/i.test(line) &&
+      !/\/\/|\/\*|\*/i.test(line)
+    ) {
       magicNumberLines.push(i + 1);
     }
   });
@@ -48,9 +55,11 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       title: "Magic numbers in code",
       description: "Unexplained numeric literals make code harder to understand and maintain.",
       lineNumbers: magicNumberLines.slice(0, 5),
-      recommendation: "Extract magic numbers into named constants with descriptive names (e.g., MAX_RETRY_COUNT = 3, TIMEOUT_MS = 5000).",
+      recommendation:
+        "Extract magic numbers into named constants with descriptive names (e.g., MAX_RETRY_COUNT = 3, TIMEOUT_MS = 5000).",
       reference: "Clean Code: Meaningful Names",
-      suggestedFix: "Replace each numeric literal with a `const` (e.g., `const TIMEOUT_MS = 5000;`) and reference the constant in place of the raw number.",
+      suggestedFix:
+        "Replace each numeric literal with a `const` (e.g., `const TIMEOUT_MS = 5000;`) and reference the constant in place of the raw number.",
       confidence: 0.75,
     });
   }
@@ -67,11 +76,14 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "TODO/FIXME without issue tracking reference",
-      description: "TODO and FIXME comments without issue tracker references tend to be forgotten and accumulate as technical debt.",
+      description:
+        "TODO and FIXME comments without issue tracker references tend to be forgotten and accumulate as technical debt.",
       lineNumbers: todoLines,
-      recommendation: "Link TODOs to issue tracker tickets (e.g., TODO(#123): ...). Create tracking issues for existing unlinked TODOs.",
+      recommendation:
+        "Link TODOs to issue tracker tickets (e.g., TODO(#123): ...). Create tracking issues for existing unlinked TODOs.",
       reference: "Technical Debt Management",
-      suggestedFix: "Append an issue reference to each TODO comment (e.g., `// TODO(#1234): refactor auth flow`) and create a tracking issue if one does not exist.",
+      suggestedFix:
+        "Append an issue reference to each TODO comment (e.g., `// TODO(#1234): refactor auth flow`) and create a tracking issue if one does not exist.",
       confidence: 0.75,
     });
   }
@@ -116,9 +128,11 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       title: "Long function with insufficient comments",
       description: "Functions over 40 lines with few or no comments are difficult to understand and maintain.",
       lineNumbers: complexFnLines,
-      recommendation: "Add section comments explaining the 'why' behind complex logic. Consider refactoring long functions into smaller, well-named functions.",
+      recommendation:
+        "Add section comments explaining the 'why' behind complex logic. Consider refactoring long functions into smaller, well-named functions.",
       reference: "Clean Code: Functions",
-      suggestedFix: "Break the function into smaller helper functions with descriptive names, and add inline `//` comments before each logical section explaining its intent.",
+      suggestedFix:
+        "Break the function into smaller helper functions with descriptive names, and add inline `//` comments before each logical section explaining its intent.",
       confidence: 0.75,
     });
   }
@@ -126,15 +140,22 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   // Detect missing README or module-level documentation
   if (lines.length > 100) {
     const firstLines = lines.slice(0, 10).join("\n");
-    if (!/\/\*\*|\/\/!|#!.*\n#|"""|'''|\bmodule|@module|@fileoverview|@file|^\/\/\/|^package\s|^\s*\/\/\s+Package/im.test(firstLines)) {
+    if (
+      !/\/\*\*|\/\/!|#!.*\n#|"""|'''|\bmodule|@module|@fileoverview|@file|^\/\/\/|^package\s|^\s*\/\/\s+Package/im.test(
+        firstLines,
+      )
+    ) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "low",
         title: "File missing module-level documentation",
-        description: "Large files should have a module-level comment explaining the file's purpose, responsibilities, and key exports.",
-        recommendation: "Add a file header comment or @module/@fileoverview docblock explaining the module's purpose and public API.",
+        description:
+          "Large files should have a module-level comment explaining the file's purpose, responsibilities, and key exports.",
+        recommendation:
+          "Add a file header comment or @module/@fileoverview docblock explaining the module's purpose and public API.",
         reference: "Code Documentation Standards",
-        suggestedFix: "Add a `/** @module <name> — <one-line purpose> */` or `/** @fileoverview ... */` block at the top of the file before any imports.",
+        suggestedFix:
+          "Add a `/** @module <name> — <one-line purpose> */` or `/** @fileoverview ... */` block at the top of the file before any imports.",
         confidence: 0.7,
       });
     }
@@ -146,7 +167,11 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   httpRouteLines.forEach((ln) => {
     const idx = ln - 1;
     const prevLines = lines.slice(Math.max(0, idx - 5), idx).join("\n");
-    if (!/\/\*\*|@swagger|@api|@route|@openapi|@summary|@description|""".*@|#\s+@|@ApiOperation|@Operation|godoc/i.test(prevLines)) {
+    if (
+      !/\/\*\*|@swagger|@api|@route|@openapi|@summary|@description|""".*@|#\s+@|@ApiOperation|@Operation|godoc/i.test(
+        prevLines,
+      )
+    ) {
       routeLines.push(ln);
     }
   });
@@ -155,11 +180,14 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "API endpoints without documentation",
-      description: "HTTP route handlers lack documentation comments. API consumers need to know request/response schemas, status codes, and auth requirements.",
+      description:
+        "HTTP route handlers lack documentation comments. API consumers need to know request/response schemas, status codes, and auth requirements.",
       lineNumbers: routeLines,
-      recommendation: "Add OpenAPI/Swagger annotations or JSDoc comments documenting request body, query params, response schema, and error codes.",
+      recommendation:
+        "Add OpenAPI/Swagger annotations or JSDoc comments documenting request body, query params, response schema, and error codes.",
       reference: "OpenAPI Specification / Swagger",
-      suggestedFix: "Add a JSDoc or OpenAPI decorator above each route handler documenting the HTTP method, path, request/response schema, and possible status codes.",
+      suggestedFix:
+        "Add a JSDoc or OpenAPI decorator above each route handler documenting the HTTP method, path, request/response schema, and possible status codes.",
       confidence: 0.7,
     });
   }
@@ -181,11 +209,14 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Complex types without documentation",
-      description: "Interfaces/types with many properties lack documentation explaining their purpose and field meanings.",
+      description:
+        "Interfaces/types with many properties lack documentation explaining their purpose and field meanings.",
       lineNumbers: complexTypeLines,
-      recommendation: "Add TSDoc/JSDoc comments to interfaces and their properties, especially for shared/exported types.",
+      recommendation:
+        "Add TSDoc/JSDoc comments to interfaces and their properties, especially for shared/exported types.",
       reference: "TypeScript Documentation / TSDoc",
-      suggestedFix: "Add a `/** ... */` comment above the interface and add per-property `/** ... */` comments explaining each field's purpose and constraints.",
+      suggestedFix:
+        "Add a `/** ... */` comment above the interface and add per-property `/** ... */` comments explaining each field's purpose and constraints.",
       confidence: 0.7,
     });
   }
@@ -193,7 +224,10 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   // Detect missing error message documentation (multi-language)
   const throwLines: number[] = [];
   lines.forEach((line, i) => {
-    if (/throw\s+new\s+\w*Error\s*\(\s*["'`]?$/i.test(line.trim()) || /throw\s+new\s+\w*Error\s*\(\s*\)/i.test(line.trim())) {
+    if (
+      /throw\s+new\s+\w*Error\s*\(\s*["'`]?$/i.test(line.trim()) ||
+      /throw\s+new\s+\w*Error\s*\(\s*\)/i.test(line.trim())
+    ) {
       throwLines.push(i + 1);
     }
     if (/raise\s+\w*Error\s*\(\s*\)$/i.test(line.trim())) throwLines.push(i + 1);
@@ -206,11 +240,14 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Exceptions thrown without descriptive messages",
-      description: "Errors are thrown without messages, making it impossible to diagnose issues in production from logs alone.",
+      description:
+        "Errors are thrown without messages, making it impossible to diagnose issues in production from logs alone.",
       lineNumbers: throwLines,
-      recommendation: "Always include descriptive error messages: throw new Error('Failed to parse config: missing required field \"name\"').",
+      recommendation:
+        "Always include descriptive error messages: throw new Error('Failed to parse config: missing required field \"name\"').",
       reference: "Error Handling Best Practices",
-      suggestedFix: "Pass a descriptive message string to the Error constructor (e.g., `throw new Error('Failed to connect to DB: connection string missing')`).",
+      suggestedFix:
+        "Pass a descriptive message string to the Error constructor (e.g., `throw new Error('Failed to connect to DB: connection string missing')`).",
       confidence: 0.85,
     });
   }
@@ -230,11 +267,13 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Deprecation notice without migration guidance",
-      description: "@deprecated annotations should explain what to use instead and when the deprecated API will be removed.",
+      description:
+        "@deprecated annotations should explain what to use instead and when the deprecated API will be removed.",
       lineNumbers: deprecatedLines,
       recommendation: "Add migration path: @deprecated Since v2.0. Use newMethod() instead. Will be removed in v3.0.",
       reference: "API Deprecation Best Practices",
-      suggestedFix: "Expand the `@deprecated` tag to include a version and replacement: `@deprecated Since v2.0. Use `newMethod()` instead. Will be removed in v3.0.`",
+      suggestedFix:
+        "Expand the `@deprecated` tag to include a version and replacement: `@deprecated Since v2.0. Use `newMethod()` instead. Will be removed in v3.0.`",
       confidence: 0.75,
     });
   }
@@ -256,9 +295,11 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       title: "JSDoc present but missing @returns",
       description: "Functions have JSDoc documentation but don't document their return value.",
       lineNumbers: noReturnDocLines,
-      recommendation: "Add @returns (or @return) to document what the function returns and when it might return undefined/null.",
+      recommendation:
+        "Add @returns (or @return) to document what the function returns and when it might return undefined/null.",
       reference: "JSDoc @returns Tag",
-      suggestedFix: "Add a `@returns {Type} description` line to the existing JSDoc block describing the return value and any nullable/undefined cases.",
+      suggestedFix:
+        "Add a `@returns {Type} description` line to the existing JSDoc block describing the return value and any nullable/undefined cases.",
       confidence: 0.7,
     });
   }

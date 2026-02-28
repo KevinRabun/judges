@@ -18,7 +18,7 @@ npm test
 2. **Create a branch** from `main`: `git checkout -b feature/your-feature`
 3. **Make changes** and add tests
 4. **Build**: `npm run build`
-5. **Test**: `npm test` — all 382+ tests must pass
+5. **Test**: `npm test` — all 700+ tests must pass
 6. **Commit** with a clear message
 7. **Open a PR** against `main`
 

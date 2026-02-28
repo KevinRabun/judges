@@ -45,4 +45,6 @@ export interface CodeStructure {
   deepNestLines: number[];
   /** Line numbers with type-safety issues (e.g., `any` usage) */
   typeAnyLines: number[];
+  /** Imported module/package names (e.g., "express", "helmet", "DOMPurify") */
+  imports: string[];
 }

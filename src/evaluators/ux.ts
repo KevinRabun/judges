@@ -1,4 +1,4 @@
-import { Finding } from "../types.js";
+import type { Finding } from "../types.js";
 import { getLineNumbers, getLangFamily } from "./shared.js";
 
 export function analyzeUx(code: string, language: string): Finding[] {
@@ -17,9 +17,11 @@ export function analyzeUx(code: string, language: string): Finding[] {
       title: "Inline event handlers in HTML",
       description: `Found ${inlineHandlerLines.length} inline event handler(s). Inline handlers mix behavior with markup, break CSP policies, and are harder to maintain.`,
       lineNumbers: inlineHandlerLines,
-      recommendation: "Use addEventListener() or framework event bindings (React onClick, Vue @click). Separate behavior from markup for maintainability and CSP compliance.",
+      recommendation:
+        "Use addEventListener() or framework event bindings (React onClick, Vue @click). Separate behavior from markup for maintainability and CSP compliance.",
       reference: "MDN: Inline Event Handlers / Content Security Policy",
-      suggestedFix: "Remove the inline `on*=` attribute and attach the handler in JavaScript via `element.addEventListener('click', handler)` or the framework equivalent.",
+      suggestedFix:
+        "Remove the inline `on*=` attribute and attach the handler in JavaScript via `element.addEventListener('click', handler)` or the framework equivalent.",
       confidence: 0.85,
     });
   }
@@ -32,10 +34,13 @@ export function analyzeUx(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Form submission without loading/disabled state",
-      description: "Forms are submitted without visible loading state or button disabling. Users may click multiple times causing duplicate submissions.",
-      recommendation: "Disable the submit button during submission. Show a loading indicator. Prevent double-submission at the application layer.",
+      description:
+        "Forms are submitted without visible loading state or button disabling. Users may click multiple times causing duplicate submissions.",
+      recommendation:
+        "Disable the submit button during submission. Show a loading indicator. Prevent double-submission at the application layer.",
       reference: "Nielsen's Heuristic #1: Visibility of System Status",
-      suggestedFix: "Add an `isSubmitting` state flag that disables the submit button and shows a spinner while the form request is in flight.",
+      suggestedFix:
+        "Add an `isSubmitting` state flag that disables the submit button and shows a spinner while the form request is in flight.",
       confidence: 0.7,
     });
   }
@@ -50,9 +55,11 @@ export function analyzeUx(code: string, language: string): Finding[] {
       title: "Generic error messages shown to users",
       description: `Found ${genericUiErrorLines.length} generic error message(s). Users need specific, actionable error messages to understand what happened and what to do.`,
       lineNumbers: genericUiErrorLines,
-      recommendation: "Provide specific error messages explaining what went wrong and what the user can do ('Please check your internet connection and try again' vs 'Something went wrong').",
+      recommendation:
+        "Provide specific error messages explaining what went wrong and what the user can do ('Please check your internet connection and try again' vs 'Something went wrong').",
       reference: "Nielsen's Heuristic #9: Help Users Recognize Errors",
-      suggestedFix: "Replace the generic string with a user-friendly message derived from the error type, e.g., `error.message || 'Unable to save your changes. Please try again.'`.",
+      suggestedFix:
+        "Replace the generic string with a user-friendly message derived from the error type, e.g., `error.message || 'Unable to save your changes. Please try again.'`.",
       confidence: 0.85,
     });
   }
@@ -65,11 +72,14 @@ export function analyzeUx(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "info",
       title: "Raw data returned without formatting envelope",
-      description: "Data is returned directly without a response envelope (pagination info, total count, metadata). This makes it harder for UIs to display data properly.",
+      description:
+        "Data is returned directly without a response envelope (pagination info, total count, metadata). This makes it harder for UIs to display data properly.",
       lineNumbers: rawDumpLines,
-      recommendation: "Wrap responses in an envelope: { data: [...], meta: { total, page, limit }, links: { next, prev } }. This enables pagination UI and data status indicators.",
+      recommendation:
+        "Wrap responses in an envelope: { data: [...], meta: { total, page, limit }, links: { next, prev } }. This enables pagination UI and data status indicators.",
       reference: "JSON:API / REST API Design Guidelines",
-      suggestedFix: "Wrap the raw `res.json(data)` call in an envelope: `res.json({ data, meta: { total: data.length } })`.",
+      suggestedFix:
+        "Wrap the raw `res.json(data)` call in an envelope: `res.json({ data, meta: { total: data.length } })`.",
       confidence: 0.8,
     });
   }
@@ -83,11 +93,14 @@ export function analyzeUx(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Form inputs without labels or placeholders",
-      description: "Input elements found without associated labels or placeholders. Users won't know what to enter in these fields.",
+      description:
+        "Input elements found without associated labels or placeholders. Users won't know what to enter in these fields.",
       lineNumbers: inputLines,
-      recommendation: "Use <label for='inputId'> for every input. Add placeholder text for additional guidance. Both improve UX and accessibility.",
+      recommendation:
+        "Use <label for='inputId'> for every input. Add placeholder text for additional guidance. Both improve UX and accessibility.",
       reference: "WCAG 1.3.1: Info and Relationships",
-      suggestedFix: "Add a `<label for='fieldId'>` element before each `<input>` and set a matching `id` attribute on the input.",
+      suggestedFix:
+        "Add a `<label for='fieldId'>` element before each `<input>` and set a matching `id` attribute on the input.",
       confidence: 0.75,
     });
   }
@@ -101,10 +114,13 @@ export function analyzeUx(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Destructive actions without confirmation",
-      description: "Destructive operations (delete, remove) are handled without confirmation prompts. Users could accidentally destroy data.",
-      recommendation: "Add confirmation dialogs for destructive actions. Show what will be affected. Consider soft-delete with undo capability.",
+      description:
+        "Destructive operations (delete, remove) are handled without confirmation prompts. Users could accidentally destroy data.",
+      recommendation:
+        "Add confirmation dialogs for destructive actions. Show what will be affected. Consider soft-delete with undo capability.",
       reference: "Nielsen's Heuristic #5: Error Prevention",
-      suggestedFix: "Guard the delete handler with a confirmation prompt, e.g., `if (!confirm('Are you sure you want to delete this item?')) return;`.",
+      suggestedFix:
+        "Guard the delete handler with a confirmation prompt, e.g., `if (!confirm('Are you sure you want to delete this item?')) return;`.",
       confidence: 0.7,
     });
   }
@@ -118,42 +134,56 @@ export function analyzeUx(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "List endpoints without pagination",
-      description: "Data retrieval endpoints return all results without pagination. This causes slow responses, high memory usage, and poor UX with large datasets.",
-      recommendation: "Implement pagination (offset-based or cursor-based). Return total count and page info. Enforce maximum page sizes.",
+      description:
+        "Data retrieval endpoints return all results without pagination. This causes slow responses, high memory usage, and poor UX with large datasets.",
+      recommendation:
+        "Implement pagination (offset-based or cursor-based). Return total count and page info. Enforce maximum page sizes.",
       reference: "REST API Pagination Best Practices",
-      suggestedFix: "Accept `page` and `limit` query parameters (e.g., `const { page = 1, limit = 20 } = req.query`) and apply `.skip((page-1)*limit).limit(limit)` to the query.",
+      suggestedFix:
+        "Accept `page` and `limit` query parameters (e.g., `const { page = 1, limit = 20 } = req.query`) and apply `.skip((page-1)*limit).limit(limit)` to the query.",
       confidence: 0.7,
     });
   }
 
   // No empty state handling
-  const hasEmptyCheck = /(?:\.length\s*===?\s*0|isEmpty|no\s*(?:results|data|items)|empty.?state|emptyState|NoData|NoResults)/gi.test(code);
+  const hasEmptyCheck =
+    /(?:\.length\s*===?\s*0|isEmpty|no\s*(?:results|data|items)|empty.?state|emptyState|NoData|NoResults)/gi.test(code);
   const hasListRendering = /\.map\s*\(|\.forEach\s*\(|v-for|ngFor|\*ngFor|\.render\s*\(/gi.test(code);
   if (hasListRendering && !hasEmptyCheck && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "List rendering without empty state handling",
-      description: "Code renders lists/collections without checking for empty state. Users see a blank screen with no feedback when no data exists.",
-      recommendation: "Always handle the empty state: show a helpful message, illustration, or call-to-action. Check array.length before rendering lists.",
+      description:
+        "Code renders lists/collections without checking for empty state. Users see a blank screen with no feedback when no data exists.",
+      recommendation:
+        "Always handle the empty state: show a helpful message, illustration, or call-to-action. Check array.length before rendering lists.",
       reference: "UX Design: Empty State Patterns",
-      suggestedFix: "Add an `if (items.length === 0) return <EmptyState />` guard before the `.map()` call to render a friendly empty-state message.",
+      suggestedFix:
+        "Add an `if (items.length === 0) return <EmptyState />` guard before the `.map()` call to render a friendly empty-state message.",
       confidence: 0.7,
     });
   }
 
   // Missing success feedback
-  const hasMutation = /\.post\s*\(|\.put\s*\(|\.delete\s*\(|\.patch\s*\(|fetch\s*\([^)]*(?:POST|PUT|DELETE|PATCH)/gi.test(code);
-  const hasSuccessFeedback = /toast|snackbar|notification|alert\s*\(\s*['"].*(?:success|saved|created|updated|deleted)|showMessage|showSuccess|feedback/gi.test(code);
+  const hasMutation =
+    /\.post\s*\(|\.put\s*\(|\.delete\s*\(|\.patch\s*\(|fetch\s*\([^)]*(?:POST|PUT|DELETE|PATCH)/gi.test(code);
+  const hasSuccessFeedback =
+    /toast|snackbar|notification|alert\s*\(\s*['"].*(?:success|saved|created|updated|deleted)|showMessage|showSuccess|feedback/gi.test(
+      code,
+    );
   if (hasMutation && !hasSuccessFeedback && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "Mutations without success feedback",
-      description: "POST/PUT/DELETE operations found without visible success feedback. Users don't know if their action worked, leading to repeated submissions.",
-      recommendation: "Show success notifications (toasts, alerts) after mutations. Provide clear visual feedback. Consider optimistic UI updates with rollback on failure.",
+      description:
+        "POST/PUT/DELETE operations found without visible success feedback. Users don't know if their action worked, leading to repeated submissions.",
+      recommendation:
+        "Show success notifications (toasts, alerts) after mutations. Provide clear visual feedback. Consider optimistic UI updates with rollback on failure.",
       reference: "Nielsen's Heuristic #1: Visibility of System Status",
-      suggestedFix: "Add a `toast.success('Changes saved successfully')` call (or equivalent notification) in the `.then()` or after the `await` of the mutation request.",
+      suggestedFix:
+        "Add a `toast.success('Changes saved successfully')` call (or equivalent notification) in the `.then()` or after the `await` of the mutation request.",
       confidence: 0.7,
     });
   }
@@ -167,16 +197,20 @@ export function analyzeUx(code: string, language: string): Finding[] {
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
       title: "File/stream operations without progress indicators",
-      description: "File processing or streaming operations found without progress feedback. Users waiting on long operations without feedback may assume the app is frozen.",
-      recommendation: "Show progress bars for file operations. Use streaming progress events. Provide estimated time remaining for large operations.",
+      description:
+        "File processing or streaming operations found without progress feedback. Users waiting on long operations without feedback may assume the app is frozen.",
+      recommendation:
+        "Show progress bars for file operations. Use streaming progress events. Provide estimated time remaining for large operations.",
       reference: "UX: Progress Indicator Patterns / Nielsen's Heuristic #1",
-      suggestedFix: "Track bytes processed via the stream's `'data'` event and emit a progress percentage (e.g., `onProgress(bytesRead / totalSize * 100)`).",
+      suggestedFix:
+        "Track bytes processed via the stream's `'data'` event and emit a progress percentage (e.g., `onProgress(bytesRead / totalSize * 100)`).",
       confidence: 0.7,
     });
   }
 
   // Hardcoded UI strings (i18n issue from UX perspective)
-  const hardcodedStringPattern = /(?:innerHTML|textContent|innerText|placeholder|title|label)\s*=\s*['"][A-Z][a-z]+(?:\s+[a-z]+){2,}['"]/g;
+  const hardcodedStringPattern =
+    /(?:innerHTML|textContent|innerText|placeholder|title|label)\s*=\s*['"][A-Z][a-z]+(?:\s+[a-z]+){2,}['"]/g;
   const hardcodedStringLines = getLineNumbers(code, hardcodedStringPattern);
   if (hardcodedStringLines.length > 3) {
     findings.push({
@@ -185,9 +219,11 @@ export function analyzeUx(code: string, language: string): Finding[] {
       title: "Multiple hardcoded UI strings detected",
       description: `Found ${hardcodedStringLines.length} hardcoded UI string(s) directly assigned to DOM properties. This makes copy changes difficult and blocks localization.`,
       lineNumbers: hardcodedStringLines,
-      recommendation: "Extract UI strings to a constants file or i18n library. Use translation keys instead of hardcoded strings. This enables copy editing without code changes.",
+      recommendation:
+        "Extract UI strings to a constants file or i18n library. Use translation keys instead of hardcoded strings. This enables copy editing without code changes.",
       reference: "i18n Best Practices / Content Management",
-      suggestedFix: "Replace the hardcoded string with a translation key lookup, e.g., `element.textContent = t('welcomeMessage')`, and add the string to your locale file.",
+      suggestedFix:
+        "Replace the hardcoded string with a translation key lookup, e.g., `element.textContent = t('welcomeMessage')`, and add the string to your locale file.",
       confidence: 0.85,
     });
   }
@@ -203,9 +239,11 @@ export function analyzeUx(code: string, language: string): Finding[] {
       title: "Form submission without client-side validation",
       description: `Found ${formLines.length} form submission handler(s) without visible validation. Submitting invalid data wastes round trips and frustrates users with server-side error messages.`,
       lineNumbers: formLines,
-      recommendation: "Add client-side validation before submission. Use schema validation libraries (Zod, Yup, Joi). Show inline validation feedback. Keep server-side validation as well.",
+      recommendation:
+        "Add client-side validation before submission. Use schema validation libraries (Zod, Yup, Joi). Show inline validation feedback. Keep server-side validation as well.",
       reference: "UX: Form Validation Patterns / Nielsen's Heuristic #9: Error Recovery",
-      suggestedFix: "Add a validation check at the top of the submit handler (e.g., `const result = schema.safeParse(formData); if (!result.success) return showErrors(result.error)`) before sending the request.",
+      suggestedFix:
+        "Add a validation check at the top of the submit handler (e.g., `const result = schema.safeParse(formData); if (!result.success) return showErrors(result.error)`) before sending the request.",
       confidence: 0.75,
     });
   }

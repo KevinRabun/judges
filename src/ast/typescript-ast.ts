@@ -15,39 +15,52 @@ import type { FunctionInfo, CodeStructure } from "./types.js";
  * Parse JS/TS source code using the TypeScript compiler and extract
  * structural metrics.
  */
-export function analyzeTypeScript(
-  code: string,
-  language: "javascript" | "typescript"
-): CodeStructure {
-  const scriptKind =
-    language === "typescript" ? ts.ScriptKind.TS : ts.ScriptKind.JS;
+export function analyzeTypeScript(code: string, language: "javascript" | "typescript"): CodeStructure {
+  const scriptKind = language === "typescript" ? ts.ScriptKind.TS : ts.ScriptKind.JS;
   const sourceFile = ts.createSourceFile(
     "input." + (language === "typescript" ? "ts" : "js"),
     code,
     ts.ScriptTarget.Latest,
     /* setParentNodes */ true,
-    scriptKind
+    scriptKind,
   );
 
   const functions: FunctionInfo[] = [];
   const deadCodeLines: number[] = [];
   const deepNestLines: number[] = [];
   const typeAnyLines: number[] = [];
+  const imports: string[] = [];
   const totalLines = code.split("\n").length;
+
+  // Extract imports (import declarations + require() calls)
+  ts.forEachChild(sourceFile, (node) => {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      imports.push(node.moduleSpecifier.text);
+    }
+    // Handle const x = require("module")
+    if (ts.isVariableStatement(node)) {
+      for (const decl of node.declarationList.declarations) {
+        if (
+          decl.initializer &&
+          ts.isCallExpression(decl.initializer) &&
+          ts.isIdentifier(decl.initializer.expression) &&
+          decl.initializer.expression.text === "require" &&
+          decl.initializer.arguments.length === 1 &&
+          ts.isStringLiteral(decl.initializer.arguments[0])
+        ) {
+          imports.push(decl.initializer.arguments[0].text);
+        }
+      }
+    }
+  });
 
   // Walk the AST
   visitNode(sourceFile, 0, sourceFile, functions, deadCodeLines, deepNestLines, typeAnyLines);
 
   // Compute file-level cyclomatic complexity
-  const fileCyclomaticComplexity = functions.reduce(
-    (sum, f) => sum + f.cyclomaticComplexity,
-    0
-  ) || 1;
+  const fileCyclomaticComplexity = functions.reduce((sum, f) => sum + f.cyclomaticComplexity, 0) || 1;
 
-  const maxNestingDepth = functions.reduce(
-    (max, f) => Math.max(max, f.maxNestingDepth),
-    0
-  );
+  const maxNestingDepth = functions.reduce((max, f) => Math.max(max, f.maxNestingDepth), 0);
 
   return {
     language,
@@ -58,6 +71,7 @@ export function analyzeTypeScript(
     deadCodeLines,
     deepNestLines,
     typeAnyLines,
+    imports,
   };
 }
 
@@ -70,7 +84,7 @@ function visitNode(
   functions: FunctionInfo[],
   deadCodeLines: number[],
   deepNestLines: number[],
-  typeAnyLines: number[]
+  typeAnyLines: number[],
 ): void {
   // Track deep nesting (depth > 4 for block-level nodes)
   if (isBlockLike(node) && depth > 4) {
@@ -90,8 +104,7 @@ function visitNode(
     let unreachable = false;
     for (const stmt of stmts) {
       if (unreachable) {
-        const line =
-          sourceFile.getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
+        const line = sourceFile.getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
         deadCodeLines.push(line);
       }
       if (
@@ -109,30 +122,25 @@ function visitNode(
   if (ts.isTypeReferenceNode(node)) {
     const typeName = node.getText(sourceFile);
     if (typeName === "any") {
-      const line =
-        sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+      const line = sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1;
       typeAnyLines.push(line);
     }
   }
   if (node.kind === ts.SyntaxKind.AnyKeyword) {
-    const line =
-      sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+    const line = sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1;
     typeAnyLines.push(line);
   }
 
   // Recurse into children
   const childDepth = isBlockLike(node) ? depth + 1 : depth;
   ts.forEachChild(node, (child) =>
-    visitNode(child, childDepth, sourceFile, functions, deadCodeLines, deepNestLines, typeAnyLines)
+    visitNode(child, childDepth, sourceFile, functions, deadCodeLines, deepNestLines, typeAnyLines),
   );
 }
 
 // ─── Function Analysis ───────────────────────────────────────────────────────
 
-function analyzeFunctionNode(
-  node: ts.Node,
-  sourceFile: ts.SourceFile
-): FunctionInfo {
+function analyzeFunctionNode(node: ts.Node, sourceFile: ts.SourceFile): FunctionInfo {
   const startPos = sourceFile.getLineAndCharacterOfPosition(node.getStart());
   const endPos = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
   const startLine = startPos.line + 1;
@@ -162,10 +170,7 @@ function getFunctionName(node: ts.Node): string | undefined {
   if (ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name)) {
     return node.parent.name.text;
   }
-  if (
-    ts.isPropertyAssignment(node.parent) &&
-    ts.isIdentifier(node.parent.name)
-  ) {
+  if (ts.isPropertyAssignment(node.parent) && ts.isIdentifier(node.parent.name)) {
     return node.parent.name.text;
   }
   if (ts.isArrowFunction(node) && ts.isVariableDeclaration(node.parent)) {
@@ -209,13 +214,11 @@ function computeCyclomaticComplexity(node: ts.Node): number {
         break;
       case ts.SyntaxKind.BinaryExpression: {
         const binOp = (n as ts.BinaryExpression).operatorToken.kind;
-        if (
-          binOp === ts.SyntaxKind.AmpersandAmpersandToken ||
-          binOp === ts.SyntaxKind.BarBarToken ||
-          binOp === ts.SyntaxKind.QuestionQuestionToken
-        ) {
+        if (binOp === ts.SyntaxKind.AmpersandAmpersandToken || binOp === ts.SyntaxKind.BarBarToken) {
           complexity++;
         }
+        // Note: ?? (QuestionQuestionToken) is intentionally excluded —
+        // it's a null-safe default, not genuine branching logic.
         break;
       }
     }

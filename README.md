@@ -1,6 +1,6 @@
 # Judges Panel
 
-An MCP (Model Context Protocol) server that provides a panel of **34 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Includes **built-in AST analysis** powered by the TypeScript Compiler API — no separate parser server needed.
+An MCP (Model Context Protocol) server that provides a panel of **35 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Includes **built-in AST analysis** powered by the TypeScript Compiler API — no separate parser server needed.
 
 **Highlights:**
 - Includes an **App Builder Workflow (3-step)** demo for release decisions, plain-language risk summaries, and prioritized fixes — see [Try the Demo](#2-try-the-demo).
@@ -26,7 +26,7 @@ npm run build
 
 ### 2. Try the Demo
 
-Run the included demo to see all 34 judges evaluate a purposely flawed API server:
+Run the included demo to see all 35 judges evaluate a purposely flawed API server:
 
 ```bash
 npm run demo
@@ -270,6 +270,8 @@ This helps keep Copilot feedback aligned with Judges findings.
 | **CI/CD** | CI/CD Pipeline & Deployment Safety | `CICD-` | Test infrastructure, lint config, Docker tags, build scripts |
 | **Code Structure** | Structural Analysis (AST) | `STRUCT-` | Cyclomatic complexity, nesting depth, function length, dead code, type safety |
 | **Agent Instructions** | Agent Instruction Markdown Quality & Safety | `AGENT-` | Instruction hierarchy, conflict detection, unsafe overrides, scope, validation, policy guidance |
+| **AI Code Safety** | AI-Generated Code Safety | `AICS-` | Prompt injection, insecure LLM output handling, debug defaults, missing validation, unsafe deserialization of AI responses |
+| **Framework Safety** | Framework-Specific Safety | `FWSAFE-` | React hooks ordering, Express middleware chains, Next.js SSR/SSG pitfalls, Angular/Vue lifecycle patterns, framework-specific anti-patterns |
 
 ---
 
@@ -326,7 +328,7 @@ When your AI coding assistant connects to multiple MCP servers, each one contrib
   │   Judges     │  │  CVE / │  │ Linter │
   │   Panel      │  │  SBOM  │  │ Server │
   │ ─────────────│  └────────┘  └────────┘
-  │ 32 Heuristic │   Vuln DB     Style &
+  │ 33 Heuristic │   Vuln DB     Style &
   │   judges     │   scanning    correctness
   │ + AST judge  │
   └──────────────┘
@@ -337,7 +339,7 @@ When your AI coding assistant connects to multiple MCP servers, each one contrib
 
 | Layer | What It Does | Example Servers |
 |-------|-------------|-----------------|
-| **Judges Panel** | 33-judge quality gate — security patterns, AST analysis, cost, scalability, a11y, compliance, sovereignty, ethics, dependency health, agent instruction governance | This server |
+| **Judges Panel** | 35-judge quality gate — security patterns, AST analysis, cost, scalability, a11y, compliance, sovereignty, ethics, dependency health, agent instruction governance, AI code safety, framework safety | This server |
 | **CVE / SBOM** | Vulnerability scanning against live databases — known CVEs, license risks, supply chain | OSV, Snyk, Trivy, Grype MCP servers |
 | **Linting** | Language-specific style and correctness rules | ESLint, Ruff, Clippy MCP servers |
 | **Runtime Profiling** | Memory, CPU, latency measurement on running code | Custom profiling MCP servers |
@@ -491,7 +493,7 @@ Generated from https://github.com/microsoft/vscode on 2026-02-21T12:00:00.000Z.
 List all available judges with their domains and descriptions.
 
 ### `evaluate_code`
-Submit code to the **full judges panel**. All 34 judges evaluate independently and return a combined verdict.
+Submit code to the **full judges panel**. All 35 judges evaluate independently and return a combined verdict.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -500,6 +502,7 @@ Submit code to the **full judges panel**. All 34 judges evaluate independently a
 | `context` | string | no | Additional context about the code |
 | `includeAstFindings` | boolean | no | Include AST/code-structure findings (default: true) |
 | `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
+| `config` | object | no | Inline configuration (see [Configuration](#configuration)) |
 
 ### `evaluate_code_single_judge`
 Submit code to a **specific judge** for targeted review.
@@ -511,9 +514,10 @@ Submit code to a **specific judge** for targeted review.
 | `judgeId` | string | yes | See [judge IDs](#judge-ids) below |
 | `context` | string | no | Additional context |
 | `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
+| `config` | object | no | Inline configuration (see [Configuration](#configuration)) |
 
 ### `evaluate_project`
-Submit multiple files for **project-level analysis**. All 34 judges evaluate each file, plus cross-file architectural analysis detects code duplication, inconsistent error handling, and dependency cycles.
+Submit multiple files for **project-level analysis**. All 35 judges evaluate each file, plus cross-file architectural analysis detects code duplication, inconsistent error handling, and dependency cycles.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -521,9 +525,10 @@ Submit multiple files for **project-level analysis**. All 34 judges evaluate eac
 | `context` | string | no | Optional project context |
 | `includeAstFindings` | boolean | no | Include AST/code-structure findings (default: true) |
 | `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
+| `config` | object | no | Inline configuration (see [Configuration](#configuration)) |
 
 ### `evaluate_diff`
-Evaluate only the **changed lines** in a code diff. Runs all 34 judges on the full file but filters findings to lines you specify. Ideal for PR reviews and incremental analysis.
+Evaluate only the **changed lines** in a code diff. Runs all 35 judges on the full file but filters findings to lines you specify. Ideal for PR reviews and incremental analysis.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -533,6 +538,7 @@ Evaluate only the **changed lines** in a code diff. Runs all 34 judges on the fu
 | `context` | string | no | Optional context about the change |
 | `includeAstFindings` | boolean | no | Include AST/code-structure findings (default: true) |
 | `minConfidence` | number | no | Minimum finding confidence to include (0-1, default: 0) |
+| `config` | object | no | Inline configuration (see [Configuration](#configuration)) |
 
 ### `analyze_dependencies`
 Analyze a dependency manifest file for supply-chain risks, version pinning issues, typosquatting indicators, and dependency hygiene. Supports `package.json`, `requirements.txt`, `Cargo.toml`, `go.mod`, `pom.xml`, and `.csproj` files.
@@ -545,7 +551,7 @@ Analyze a dependency manifest file for supply-chain risks, version pinning issue
 
 #### Judge IDs
 
-`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure` · `agent-instructions` · `ai-code-safety`
+`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure` · `agent-instructions` · `ai-code-safety` · `framework-safety`
 
 ---
 
@@ -589,7 +595,97 @@ Each judge has a corresponding prompt for LLM-powered deep analysis:
 | `judge-code-structure` | Deep AST-based structural analysis review |
 | `judge-agent-instructions` | Deep review of agent instruction markdown quality and safety |
 | `judge-ai-code-safety` | Deep review of AI-generated code risks: prompt injection, insecure LLM output handling, debug defaults, missing validation |
-| `full-tribunal` | All 34 judges in a single prompt |
+| `judge-framework-safety` | Deep review of framework-specific safety: React hooks, Express middleware, Next.js SSR/SSG, Angular/Vue patterns |
+| `full-tribunal` | All 35 judges in a single prompt |
+
+---
+
+## Configuration
+
+All evaluation tools accept an optional `config` parameter for inline configuration. This is the same format as `.judgesrc` / `.judgesrc.json` project files.
+
+```json
+{
+  "config": {
+    "disabledRules": ["COST-*", "I18N-001"],
+    "disabledJudges": ["accessibility", "ethics-bias"],
+    "minSeverity": "medium",
+    "ruleOverrides": {
+      "SEC-003": { "severity": "critical" },
+      "DOC-*": { "disabled": true }
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `disabledRules` | `string[]` | Rule IDs or prefix wildcards to suppress (e.g., `"COST-*"`, `"SEC-003"`) |
+| `disabledJudges` | `string[]` | Judge IDs to skip entirely (e.g., `"cost-effectiveness"`) |
+| `minSeverity` | `string` | Minimum severity to report: `critical`, `high`, `medium`, `low`, `info` |
+| `ruleOverrides` | `object` | Per-rule overrides keyed by rule ID or wildcard — `{ disabled?: boolean, severity?: string }` |
+
+---
+
+## Advanced Features
+
+### Inline Suppressions
+
+Suppress specific findings directly in source code using comment directives:
+
+```typescript
+const x = eval(input); // judges-ignore SEC-001
+// judges-ignore-next-line CYBER-002
+const y = dangerousOperation();
+// judges-file-ignore DOC-*    ← suppress globally for this file
+```
+
+Supported comment styles: `//`, `#`, `/* */`. Supports comma-separated rule IDs and wildcards (`*`, `SEC-*`).
+
+### Auto-Fix Patches
+
+Certain findings include machine-applicable patches in the `patch` field:
+
+| Pattern | Auto-Fix |
+|---------|----------|
+| `new Buffer(x)` | → `Buffer.from(x)` |
+| `http://` URLs (non-localhost) | → `https://` |
+| `Math.random()` | → `crypto.randomUUID()` |
+
+Patches include `oldText`, `newText`, `startLine`, and `endLine` for automated application.
+
+### Cross-Evaluator Deduplication
+
+When multiple judges flag the same issue (e.g., both Data Security and Cybersecurity detect SQL injection on line 15), findings are automatically deduplicated. The highest-severity finding wins, and the description is annotated with cross-references (e.g., *"Also identified by: CYBER-003"*).
+
+### Taint Flow Analysis
+
+The engine performs inter-procedural taint tracking to trace data from user-controlled sources (e.g., `req.body`, `process.env`) through transformations to security-sensitive sinks (e.g., `eval()`, `exec()`, SQL queries). Taint flows are used to boost confidence on true-positive findings and suppress false positives where sanitization is detected.
+
+### Positive Signal Detection
+
+Code that demonstrates good practices receives score bonuses (capped at +15):
+
+| Signal | Bonus |
+|--------|-------|
+| Parameterized queries | +3 |
+| Security headers (helmet) | +3 |
+| Auth middleware (passport, etc.) | +3 |
+| Proper error handling | +2 |
+| Input validation libs (zod, joi, etc.) | +2 |
+| Rate limiting | +2 |
+| Structured logging (pino, winston) | +2 |
+| CORS configuration | +1 |
+| Strict mode / strictNullChecks | +1 |
+| Test patterns (describe/it/expect) | +1 |
+
+### Framework-Aware Rules
+
+Judges include framework-specific detection for Express, Django, Flask, FastAPI, Spring, ASP.NET, Rails, and more. Framework middleware (e.g., `helmet()`, `express-rate-limit`, `passport.authenticate()`) is recognized as mitigation, reducing false positives.
+
+### Cross-File Import Resolution
+
+In project-level analysis, imports are resolved across files. If one file imports a security middleware module from another file in the project, findings about missing security controls are automatically adjusted with reduced confidence.
 
 ---
 
@@ -610,7 +706,7 @@ Each judge scores the code from **0 to 100**:
 - **WARNING** — Any high finding, any medium finding, or score < 80
 - **PASS** — Score ≥ 80 with no critical, high, or medium findings
 
-The **overall tribunal score** is the average of all 34 judges. The overall verdict fails if **any** judge fails.
+The **overall tribunal score** is the average of all 35 judges. The overall verdict fails if **any** judge fails.
 
 ---
 
@@ -621,6 +717,8 @@ judges/
 ├── src/
 │   ├── index.ts              # MCP server entry point — tools, prompts, transport
 │   ├── types.ts              # TypeScript interfaces (Finding, JudgeEvaluation, etc.)
+│   ├── config.ts             # .judgesrc configuration parser and validation
+│   ├── language-patterns.ts  # Multi-language regex pattern constants and helpers
 │   ├── ast/                  # AST analysis engine (built-in, no external deps)
 │   │   ├── index.ts          # analyzeStructure() — routes to correct parser
 │   │   ├── types.ts          # FunctionInfo, CodeStructure interfaces
@@ -629,12 +727,12 @@ judges/
 │   ├── evaluators/           # Analysis engine for each judge
 │   │   ├── index.ts          # evaluateWithJudge(), evaluateWithTribunal(), evaluateProject(), etc.
 │   │   ├── shared.ts         # Scoring, verdict logic, markdown formatters
-│   │   └── *.ts              # One analyzer per judge (33 files)
+│   │   └── *.ts              # One analyzer per judge (35 files)
 │   ├── reports/
 │   │   └── public-repo-report.ts   # Public repo clone + full tribunal report generation
 │   └── judges/               # Judge definitions (id, name, domain, system prompt)
 │       ├── index.ts          # JUDGES array, getJudge(), getJudgeSummaries()
-│       └── *.ts              # One definition per judge (33 files)
+│       └── *.ts              # One definition per judge (35 files)
 ├── scripts/
 │   ├── generate-public-repo-report.ts  # Run: npm run report:public-repo -- --repoUrl <url>
 │   └── daily-popular-repo-autofix.ts   # Run: npm run automation:daily-popular
@@ -698,6 +796,73 @@ Required secret:
 Manual run:
 ```bash
 gh workflow run "Judges Daily Full-Run Autofix PRs" -f targetRepoUrl=https://github.com/owner/repo
+```
+
+---
+
+## Programmatic API
+
+Judges can be consumed as a library (not just via MCP). Import from `@kevinrabun/judges/api`:
+
+```typescript
+import {
+  evaluateCode,
+  evaluateProject,
+  evaluateCodeSingleJudge,
+  getJudge,
+  JUDGES,
+  findingsToSarif,
+} from "@kevinrabun/judges/api";
+
+// Full tribunal evaluation
+const verdict = evaluateCode("const x = eval(input);", "typescript");
+console.log(verdict.overallScore, verdict.overallVerdict);
+
+// Single judge
+const result = evaluateCodeSingleJudge("cybersecurity", code, "typescript");
+
+// SARIF output for CI integration
+const sarif = findingsToSarif(verdict.evaluations.flatMap(e => e.findings));
+```
+
+### Package Exports
+
+| Entry Point | Description |
+|---|---|
+| `@kevinrabun/judges/api` | Programmatic API (default) |
+| `@kevinrabun/judges/server` | MCP server entry point |
+| `@kevinrabun/judges/sarif` | SARIF 2.1.0 formatter |
+
+### SARIF Output
+
+Convert findings to [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) for GitHub Code Scanning, Azure DevOps, and other CI/CD tools:
+
+```typescript
+import { findingsToSarif, evaluationToSarif, verdictToSarif } from "@kevinrabun/judges/sarif";
+
+const sarif = verdictToSarif(verdict, "src/app.ts");
+fs.writeFileSync("results.sarif", JSON.stringify(sarif, null, 2));
+```
+
+---
+
+## Custom Error Types
+
+All thrown errors extend `JudgesError` with a machine-readable `code` property:
+
+| Error Class | Code | When |
+|---|---|---|
+| `ConfigError` | `JUDGES_CONFIG_INVALID` | Malformed `.judgesrc` or invalid inline config |
+| `EvaluationError` | `JUDGES_EVALUATION_FAILED` | Unknown judge, analyzer crash |
+| `ParseError` | `JUDGES_PARSE_FAILED` | Unparseable source code or input data |
+
+```typescript
+import { ConfigError, EvaluationError } from "@kevinrabun/judges/api";
+try {
+  evaluateCode(code, "typescript");
+} catch (e) {
+  if (e instanceof ConfigError) console.error("Config issue:", e.code);
+}
 ```
 
 ---
