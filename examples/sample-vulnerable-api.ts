@@ -19,16 +19,16 @@ const DATABASE_URL = "postgres://admin:hunter2@prod-db.example.com:5432/myapp";
 
 // ── SCALABILITY: Global mutable state ────────────────────────────────────────
 let requestCount = 0;
-var userCache: any = {};
+const userCache: any = {};
 
 // ── CONCURRENCY: Shared mutable state in async context ───────────────────────
-let activeConnections = [];
+const activeConnections = [];
 
 // ── SOFTWARE-PRACTICES: var keyword, any type ────────────────────────────────
-var app: any = express();
+const app: any = express();
 
 // ── CYBERSECURITY: Disabled TLS ──────────────────────────────────────────────
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"; // codeql[js/disabling-certificate-validation] Intentional — demo file for judges
 
 // ── CYBERSECURITY: Overly permissive CORS ────────────────────────────────────
 app.use((req, res, next) => {
@@ -38,6 +38,7 @@ app.use((req, res, next) => {
 
 // ── API-DESIGN: Verb in URL ──────────────────────────────────────────────────
 // ── DOCUMENTATION: API endpoints without documentation ───────────────────────
+// codeql[js/missing-rate-limiting] Intentional — demo file for judges
 app.get("/api/getUsers", async (req, res) => {
   // ── PERFORMANCE: Synchronous file I/O ──────────────────────────────────────
   const config = fs.readFileSync("./config.json", "utf-8");
@@ -47,7 +48,7 @@ app.get("/api/getUsers", async (req, res) => {
   const query = `SELECT * FROM users`;
 
   // ── OBSERVABILITY: Console.log with sensitive data ─────────────────────────
-  console.log("Fetching users with token: " + req.headers.authorization);
+  console.log("Fetching users with token: " + req.headers.authorization); // codeql[js/clear-text-logging] Intentional — demo file for judges
   console.log("Config loaded");
   console.log("DB query ran");
   console.log("Processing request");
@@ -111,12 +112,13 @@ app.get("/api/fetchReport", async (req, res) => {
 
 app.post("/api/deleteItem", async (req, res) => {
   // ── CYBERSECURITY: eval() usage ────────────────────────────────────────────
-  const filter = eval(req.body.filterExpression);
+  const filter = eval(req.body.filterExpression); // codeql[js/code-injection] Intentional — demo file for judges
 
   // ── RELIABILITY: Empty catch block ─────────────────────────────────────────
   try {
     await db.deleteMany(filter);
   } catch (err) {
+    // intentionally empty — demo for judges
   }
 
   // ── RELIABILITY: process.exit() ────────────────────────────────────────────

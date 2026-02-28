@@ -100,7 +100,9 @@ function resolveProjectImports(
   }
 
   // Extract relative imports from each file
-  const relativeImportPattern = /(?:import|from|require)\s*[\s(]*['"](\.\/?[^'"]+)['"]/g;
+  // Merged \s*[\s(]* into [\s(]+ to eliminate overlapping quantifiers
+  // (CodeQL js/polynomial-redos).
+  const relativeImportPattern = /(?:import|from|require)[\s(]+['"](\.\/?[^'"]+)['"]/g;
 
   const result = new Map<string, Set<string>>();
 
@@ -275,10 +277,12 @@ export function evaluateProject(
   // Check for circular-looking dependency indicators
   const importMap = new Map<string, string[]>();
   for (const f of files) {
-    const imports = f.content.match(/(?:import|from|require)\s*[\s(]['"]\.{1,2}\/([^'"]+)['"]/g) ?? [];
+    const imports = f.content.match(/(?:import|from|require)[\s(]+['"]\.{1,2}\/([^'"]+)['"]/g) ?? [];
     importMap.set(
       f.path,
-      imports.map((i) => i.replace(/.*['"]\.{1,2}\/([^'"]+)['"].*/, "$1")),
+      // Use [^'"]* instead of .* to prevent quadratic backtracking on
+      // strings with multiple quote characters (CodeQL js/polynomial-redos).
+      imports.map((i) => i.replace(/[^'"]*['"]\.{1,2}\/([^'"]+)['"].*/, "$1")),
     );
   }
 

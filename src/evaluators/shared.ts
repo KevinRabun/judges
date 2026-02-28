@@ -111,7 +111,9 @@ export function classifyFile(code: string, language: string, filePath?: string):
   if (
     /(?:\/health|\/ready|\/live|\/ping|\/status)\b/i.test(code) &&
     lineCount < 50 &&
-    /(?:res\.(?:send|json|status)|return.*(?:ok|healthy|200))/i.test(code)
+    // Use [^\n]* instead of .* to avoid quadratic backtracking across
+    // newlines when tested against multi-line code (CodeQL js/polynomial-redos).
+    /(?:res\.(?:send|json|status)|return[^\n]*(?:ok|healthy|200))/i.test(code)
   ) {
     return "utility";
   }
@@ -262,7 +264,9 @@ export function detectPositiveSignals(code: string): number {
   // Security headers imported (helmet, csp, hsts)
   if (/\bhelmet\b|content-security-policy|strict-transport-security/i.test(code)) bonus += 3;
   // Proper error handling (try/catch with actual handling, not empty catch)
-  if (/catch\s*\([^)]+\)\s*\{[^}]*(?:log|throw|return|next|reject|emit)/i.test(code)) bonus += 2;
+  // Bound [^}] to {0,500} to prevent polynomial matching on large catch
+  // blocks that lack the target keywords (CodeQL js/polynomial-redos).
+  if (/catch\s*\([^)]+\)\s*\{[^}]{0,500}(?:log|throw|return|next|reject|emit)/i.test(code)) bonus += 2;
   // Input validation present (joi, zod, yup, express-validator, class-validator)
   if (/\b(?:joi|zod|yup|ajv|class-validator|express-validator)\b/i.test(code)) bonus += 2;
   // Authentication middleware

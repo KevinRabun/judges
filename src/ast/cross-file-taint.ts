@@ -472,6 +472,8 @@ function parseImports(code: string): ImportBinding[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    // Skip abnormally long lines to prevent polynomial-time regex matching
+    if (line.length > 500) continue;
     const lineNum = i + 1;
 
     // ES named imports: import { foo, bar as baz } from "./module"

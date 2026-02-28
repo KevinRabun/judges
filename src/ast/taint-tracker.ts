@@ -139,18 +139,20 @@ function isSanitized(expression: string): boolean {
 // ─── Guard Clause Detection ─────────────────────────────────────────────────
 
 /** Patterns that indicate validation/guard clauses for a variable */
+// Quantifiers use [ \t] instead of \s and bounded counts to prevent
+// polynomial-time regex matching on adversarial input (CodeQL js/polynomial-redos).
 const GUARD_PATTERNS: RegExp[] = [
   // Type checks
-  /typeof\s+\w+\s*(?:!==?|===?)\s*['"](?:string|number|boolean|object|undefined)['"]/i,
+  /typeof[ \t]+\w+[ \t]*(?:!==?|===?)[ \t]*['"](?:string|number|boolean|object|undefined)['"]/i,
   // Truthiness / nullish checks followed by return/throw
-  /if\s*\(\s*!?\s*\w+\s*\)\s*(?:return|throw|res\.status\(4\d\d\))/i,
+  /if[ \t]*\([ \t]*!?[ \t]*\w+[ \t]*\)[ \t]*(?:return|throw|res\.status\(4\d\d\))/i,
   // Validation function calls
-  /if\s*\(\s*!?\s*(?:isValid|validate|check|verify|sanitize|assert)\w*\s*\(/i,
+  /if[ \t]*\([ \t]*!?[ \t]*(?:isValid|validate|check|verify|sanitize|assert)\w*[ \t]*\(/i,
   // Length/range checks
-  /if\s*\(\s*\w+\.length\s*(?:[<>=!]+)/i,
-  /if\s*\(\s*\w+\s*(?:<|>|<=|>=)\s*\d+/i,
+  /if[ \t]*\([ \t]*\w+\.length[ \t]*(?:[<>=!]+)/i,
+  /if[ \t]*\([ \t]*\w+[ \t]*(?:<|>|<=|>=)[ \t]*\d+/i,
   // Regex test guards
-  /if\s*\(\s*!?\s*\/[^/]+\/\.test\s*\(\s*\w+\s*\)/i,
+  /if[ \t]*\([ \t]*!?[ \t]*\/[^/]+\/\.test[ \t]*\([ \t]*\w+[ \t]*\)/i,
   // Express-validator / joi validation result check
   /validationResult|\.isValid\(\)|\.error\b/i,
 ];

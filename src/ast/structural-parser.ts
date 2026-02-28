@@ -115,7 +115,10 @@ function extractBraceFunctions(lines: string[], language: string): FunctionInfo[
 
 // ─── Python Function Extraction (indent-based) ──────────────────────────────
 
-const PYTHON_FUNC = /^(\s*)(?:async\s+)?def\s+(\w+)\s*\(([^)]*(?:\([^)]*\)[^)]*)*)\)\s*(?:->.*)?:/;
+// Use [^()]* instead of [^)]* to prevent catastrophic backtracking (ReDoS).
+// The negated class excludes both open and close parens, eliminating overlap
+// between the inner and outer quantifiers.
+const PYTHON_FUNC = /^(\s*)(?:async\s+)?def\s+(\w+)\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)\s*(?:->.*)?:/;
 
 function extractPythonFunctions(lines: string[]): FunctionInfo[] {
   const functions: FunctionInfo[] = [];

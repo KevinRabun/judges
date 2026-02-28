@@ -49,7 +49,7 @@ export function analyzeDependencies(manifest: string, manifestType: string): Dep
     for (const line of manifest.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith("#")) continue;
-      const match = trimmed.match(/^([a-zA-Z0-9_-]+)\s*(?:[>=<~!]+\s*(.+))?$/);
+      const match = trimmed.match(/^([a-zA-Z0-9_-]+)[ \t]*(?:[>=<~!]+[ \t]*(\S.*))?$/);
       if (match) {
         dependencies.push({
           name: match[1],
@@ -61,7 +61,18 @@ export function analyzeDependencies(manifest: string, manifestType: string): Dep
     }
   } else if (manifestType === "Cargo.toml") {
     // Match [dependencies] section up to the next [section] header or EOF
-    const depSection = manifest.match(/\[dependencies\]\s*\n([\s\S]*?)(?=\n\s*\[|\s*$)/)?.[1];
+    // Use indexOf-based extraction instead of a lazy [\s\S]*? regex
+    // to avoid polynomial-time backtracking (CodeQL js/polynomial-redos).
+    const depStart = manifest.indexOf("[dependencies]");
+    const depSection =
+      depStart >= 0
+        ? (() => {
+            const afterHeader = manifest.indexOf("\n", depStart);
+            if (afterHeader < 0) return undefined;
+            const nextSection = manifest.indexOf("\n[", afterHeader + 1);
+            return manifest.substring(afterHeader + 1, nextSection >= 0 ? nextSection : undefined).trimEnd();
+          })()
+        : undefined;
     if (depSection) {
       for (const line of depSection.split("\n")) {
         // Simple: name = "version"
@@ -100,16 +111,25 @@ export function analyzeDependencies(manifest: string, manifestType: string): Dep
       }
     }
   } else if (manifestType === "pom.xml") {
-    const depRegex =
-      /<dependency>[\s\S]*?<groupId>([^<]+)<\/groupId>[\s\S]*?<artifactId>([^<]+)<\/artifactId>[\s\S]*?(?:<version>([^<]*)<\/version>)?[\s\S]*?<\/dependency>/g;
-    let m;
-    while ((m = depRegex.exec(manifest)) !== null) {
-      dependencies.push({
-        name: `${m[1]}:${m[2]}`,
-        version: m[3] ?? "managed",
-        isDev: false,
-        source: manifestType,
-      });
+    // Split by <dependency> tags and parse each block individually
+    // to avoid polynomial backtracking from multiple [\s\S]*? groups
+    // (CodeQL js/polynomial-redos).
+    const depBlocks = manifest.split("<dependency>");
+    for (const block of depBlocks.slice(1)) {
+      const endIdx = block.indexOf("</dependency>");
+      if (endIdx < 0) continue;
+      const depBlock = block.substring(0, endIdx);
+      const groupId = depBlock.match(/<groupId>([^<]+)<\/groupId>/)?.[1];
+      const artifactId = depBlock.match(/<artifactId>([^<]+)<\/artifactId>/)?.[1];
+      const version = depBlock.match(/<version>([^<]*)<\/version>/)?.[1];
+      if (groupId && artifactId) {
+        dependencies.push({
+          name: `${groupId}:${artifactId}`,
+          version: version ?? "managed",
+          isDev: false,
+          source: manifestType,
+        });
+      }
     }
   } else if (manifestType === "csproj") {
     const pkgRegex = /<PackageReference\s+Include="([^"]+)"\s+Version="([^"]*)"/g;
