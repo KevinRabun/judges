@@ -39,7 +39,7 @@ if (firstArg && (cliCommands.has(firstArg) || cliFlags.has(firstArg))) {
 
       const server = new McpServer({
         name: "judges",
-        version: "3.1.1",
+        version: "3.2.0",
       });
 
       registerTools(server);

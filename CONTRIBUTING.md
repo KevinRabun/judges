@@ -26,7 +26,7 @@ npm test
 
 - **TypeScript** — strict mode, no `any` unless absolutely necessary
 - **ESM** — use `import`/`export`, not `require`
-- **No runtime dependencies** beyond `@modelcontextprotocol/sdk`, `zod`, and `typescript` (used for AST parsing)
+- **No runtime dependencies** beyond `@modelcontextprotocol/sdk`, `zod`, `web-tree-sitter`, and `typescript` (used for AST parsing)
 - **Tests** — every judge must have tests covering its evaluator and schema
 
 ## Adding a New Judge

@@ -11,7 +11,7 @@ An MCP (Model Context Protocol) server that provides a panel of **35 specialized
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![npm downloads](https://img.shields.io/npm/dw/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-899-brightgreen)](https://github.com/KevinRabun/judges/actions)
+[![Tests](https://img.shields.io/badge/tests-702-brightgreen)](https://github.com/KevinRabun/judges/actions)
 
 ---
 
@@ -369,7 +369,7 @@ The tribunal operates in three layers:
 
 1. **Pattern-Based Analysis** — All tools (`evaluate_code`, `evaluate_code_single_judge`, `evaluate_project`, `evaluate_diff`) perform heuristic analysis using regex pattern matching to catch common anti-patterns. This layer is instant, deterministic, and runs entirely offline with zero external API calls.
 
-2. **AST-Based Structural Analysis** — The Code Structure judge (`STRUCT-*` rules) uses real Abstract Syntax Tree parsing to measure cyclomatic complexity, nesting depth, function length, parameter count, dead code, and type safety with precision that regex cannot achieve. JavaScript/TypeScript files are parsed via the TypeScript Compiler API; Python, Rust, Go, Java, and C# use a scope-tracking structural parser. No external AST server required.
+2. **AST-Based Structural Analysis** — The Code Structure judge (`STRUCT-*` rules) uses real Abstract Syntax Tree parsing to measure cyclomatic complexity, nesting depth, function length, parameter count, dead code, and type safety with precision that regex cannot achieve. JavaScript/TypeScript files are parsed via the TypeScript Compiler API. Python, Rust, Go, Java, and C# are parsed via **tree-sitter WASM grammars** — real syntax trees compiled to WebAssembly that run in-process with zero native dependencies. A scope-tracking structural parser is kept as a fallback when WASM grammars are unavailable. No external AST server required.
 
 3. **LLM-Powered Deep Analysis (Prompts)** — The server exposes MCP prompts (e.g., `judge-data-security`, `full-tribunal`) that provide each judge's expert persona as a system prompt. When used by an LLM-based client (Copilot, Claude, Cursor, etc.), the host LLM performs deeper, context-aware probabilistic analysis beyond what static patterns can detect. This is where the `systemPrompt` on each judge comes alive — Judges itself makes no LLM calls, but it provides the expert criteria so your AI assistant can act as 35 specialized reviewers.
 
@@ -384,7 +384,7 @@ Judges Panel is a **dual-layer** review system: instant **deterministic tools** 
 Unlike earlier versions that recommended a separate AST MCP server, Judges Panel now includes **real AST-based structural analysis** out of the box:
 
 - **JavaScript / TypeScript** — Parsed with the TypeScript Compiler API (`ts.createSourceFile`) for full-fidelity AST
-- **Python, Rust, Go, Java, C#** — Analyzed with a scope-tracking structural parser that counts decision points and nesting levels
+- **Python, Rust, Go, Java, C#** — Parsed with **tree-sitter WASM grammars** for full syntax-tree analysis (functions, complexity, nesting, dead code, type safety). Falls back to a scope-tracking structural parser when WASM grammars are unavailable
 
 The Code Structure judge (`STRUCT-*`) uses these parsers to accurately measure:
 
@@ -811,7 +811,8 @@ judges/
 │   │   ├── index.ts          # analyzeStructure() — routes to correct parser
 │   │   ├── types.ts          # FunctionInfo, CodeStructure interfaces
 │   │   ├── typescript-ast.ts # TypeScript Compiler API parser (JS/TS)
-│   │   └── structural-parser.ts  # Scope-tracking parser (Python/Rust/Go/Java/C#)
+│   │   ├── tree-sitter-ast.ts    # Tree-sitter WASM parser (Python/Rust/Go/Java/C#)
+│   │   └── structural-parser.ts  # Fallback scope-tracking parser
 │   ├── evaluators/           # Analysis engine for each judge
 │   │   ├── index.ts          # evaluateWithJudge(), evaluateWithTribunal(), evaluateProject(), etc.
 │   │   ├── shared.ts         # Scoring, verdict logic, markdown formatters
@@ -829,6 +830,12 @@ judges/
 │   └── demo.ts                   # Run: npm run demo
 ├── tests/
 │   └── judges.test.ts            # Run: npm test
+├── grammars/                 # Tree-sitter WASM grammar files
+│   ├── tree-sitter-python.wasm
+│   ├── tree-sitter-go.wasm
+│   ├── tree-sitter-rust.wasm
+│   ├── tree-sitter-java.wasm
+│   └── tree-sitter-c_sharp.wasm
 ├── server.json               # MCP Registry manifest
 ├── package.json
 ├── tsconfig.json
