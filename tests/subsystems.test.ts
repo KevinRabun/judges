@@ -30,6 +30,8 @@ import {
   classifyFile,
   shouldRunAbsenceRules,
   applyConfig,
+  detectFrameworks,
+  applyFrameworkAwareness,
 } from "../src/evaluators/shared.js";
 import type { Finding, Severity, JudgesConfig } from "../src/types.js";
 
@@ -900,5 +902,147 @@ describe("Multi-line Patches — enrichWithPatches", () => {
     assert.ok(result[0].patch, "Expected patch");
     assert.equal(result[0].patch!.startLine, 3, "Should start at catch line");
     assert.equal(result[0].patch!.endLine, 5, "Should end at closing brace");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 19. Framework Detection — detectFrameworks
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Framework Detection — detectFrameworks", () => {
+  it("should detect Express from require()", () => {
+    const code = `const express = require('express');\nconst app = express();`;
+    assert.ok(detectFrameworks(code).includes("express"));
+  });
+
+  it("should detect Express from import", () => {
+    const code = `import express from 'express';\nconst app = express();`;
+    assert.ok(detectFrameworks(code).includes("express"));
+  });
+
+  it("should detect Next.js from imports", () => {
+    const code = `import { NextRequest } from 'next/server';\nexport function GET(req: NextRequest) {}`;
+    assert.ok(detectFrameworks(code).includes("next"));
+  });
+
+  it("should detect Hono", () => {
+    const code = `import { Hono } from 'hono';\nconst app = new Hono();`;
+    assert.ok(detectFrameworks(code).includes("hono"));
+  });
+
+  it("should detect FastAPI", () => {
+    const code = `from fastapi import FastAPI\napp = FastAPI()`;
+    assert.ok(detectFrameworks(code).includes("fastapi"));
+  });
+
+  it("should detect Django", () => {
+    const code = `from django.http import HttpResponse\ndef index(request): return HttpResponse("OK")`;
+    assert.ok(detectFrameworks(code).includes("django"));
+  });
+
+  it("should detect Flask", () => {
+    const code = `from flask import Flask\napp = Flask(__name__)`;
+    assert.ok(detectFrameworks(code).includes("flask"));
+  });
+
+  it("should detect Spring Boot", () => {
+    const code = `@SpringBootApplication\npublic class App { public static void main(String[] args) {} }`;
+    assert.ok(detectFrameworks(code).includes("spring"));
+  });
+
+  it("should detect ASP.NET", () => {
+    const code = `[ApiController]\npublic class UsersController : ControllerBase {}`;
+    assert.ok(detectFrameworks(code).includes("aspnet"));
+  });
+
+  it("should detect Gin (Go)", () => {
+    const code = `import "github.com/gin-gonic/gin"\nfunc main() { r := gin.Default() }`;
+    assert.ok(detectFrameworks(code).includes("gin"));
+  });
+
+  it("should detect Actix (Rust)", () => {
+    const code = `use actix_web::{web, App, HttpServer};\nfn main() { HttpServer::new(|| App::new()) }`;
+    assert.ok(detectFrameworks(code).includes("actix"));
+  });
+
+  it("should detect helmet middleware", () => {
+    const code = `import helmet from 'helmet';\napp.use(helmet());`;
+    assert.ok(detectFrameworks(code).includes("helmet"));
+  });
+
+  it("should detect multiple frameworks", () => {
+    const code = `import express from 'express';\nimport helmet from 'helmet';\napp.use(cors());`;
+    const fw = detectFrameworks(code);
+    assert.ok(fw.includes("express"));
+    assert.ok(fw.includes("helmet"));
+    assert.ok(fw.includes("cors-middleware"));
+  });
+
+  it("should return empty for plain code", () => {
+    const code = `function add(a, b) { return a + b; }`;
+    assert.deepEqual(detectFrameworks(code), []);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 20. Framework-Aware Confidence — applyFrameworkAwareness
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Framework-Aware Confidence — applyFrameworkAwareness", () => {
+  it("should reduce confidence for security header findings with helmet", () => {
+    const code = `import helmet from 'helmet';\napp.use(helmet());`;
+    const findings = [makeFinding({ title: "Missing security headers (CSP, HSTS)", confidence: 0.8 })];
+    const result = applyFrameworkAwareness(findings, code);
+    assert.ok(result[0].confidence! < 0.8, "Confidence should be reduced");
+    assert.ok(result[0].provenance?.includes("helmet"), "Should note mitigation");
+  });
+
+  it("should reduce confidence for rate limit findings with express-rate-limit", () => {
+    const code = `const rateLimit = require('express-rate-limit');\napp.use(rateLimit({ windowMs: 60000 }));`;
+    const findings = [makeFinding({ title: "No rate limiting detected", confidence: 0.6 })];
+    const result = applyFrameworkAwareness(findings, code);
+    assert.ok(result[0].confidence! < 0.6, "Confidence should be reduced");
+  });
+
+  it("should reduce confidence for CSRF findings with Django", () => {
+    const code = `from django.middleware.csrf import CsrfViewMiddleware\nINSTALLED_APPS = ['django.contrib.auth']`;
+    const findings = [makeFinding({ title: "No CSRF protection detected", confidence: 0.7 })];
+    const result = applyFrameworkAwareness(findings, code);
+    assert.ok(result[0].confidence! < 0.7, "Django handles CSRF");
+  });
+
+  it("should reduce confidence for input validation with FastAPI", () => {
+    const code = `from fastapi import FastAPI\napp = FastAPI()`;
+    const findings = [makeFinding({ title: "Unsanitized input without type checking", confidence: 0.7 })];
+    const result = applyFrameworkAwareness(findings, code);
+    assert.ok(result[0].confidence! < 0.7, "FastAPI validates via Pydantic");
+  });
+
+  it("should NOT reduce confidence for unrelated findings", () => {
+    const code = `import helmet from 'helmet';\napp.use(helmet());`;
+    const findings = [makeFinding({ title: "SQL injection vulnerability", confidence: 0.9 })];
+    const result = applyFrameworkAwareness(findings, code);
+    assert.equal(result[0].confidence, 0.9, "SQL injection is not mitigated by helmet");
+  });
+
+  it("should not modify findings when no framework is detected", () => {
+    const code = `function add(a, b) { return a + b; }`;
+    const findings = [makeFinding({ title: "Missing security headers", confidence: 0.8 })];
+    const result = applyFrameworkAwareness(findings, code);
+    assert.equal(result[0].confidence, 0.8, "No change expected");
+  });
+
+  it("should stack provenance when existing provenance present", () => {
+    const code = `import helmet from 'helmet';\napp.use(helmet());`;
+    const findings = [
+      makeFinding({
+        title: "Missing content security policy header",
+        confidence: 0.8,
+        provenance: "absence-of-pattern",
+      }),
+    ];
+    const result = applyFrameworkAwareness(findings, code);
+    assert.ok(result[0].provenance?.includes("absence-of-pattern"), "Should keep original");
+    assert.ok(result[0].provenance?.includes("helmet-mitigated"), "Should add framework");
   });
 });

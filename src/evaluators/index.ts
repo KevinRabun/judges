@@ -32,6 +32,7 @@ import {
   classifyFile,
   shouldRunAbsenceRules,
   applyConfig,
+  applyFrameworkAwareness,
 } from "./shared.js";
 
 // ─── Extracted Modules ───────────────────────────────────────────────────────
@@ -391,11 +392,16 @@ export function evaluateWithJudge(
     return f;
   });
 
+  // ── Framework-aware confidence reduction ──
+  // Detect frameworks/middleware from code patterns (works for all languages)
+  // and reduce confidence for findings that the framework inherently handles.
+  const frameworkAware = applyFrameworkAwareness(taggedFindings, code);
+
   // ── AST-aware refinements: dead code removal, scope context, import awareness, taint flows ──
   const astStructure = options?._astCache;
   const refinedFindings = astStructure
-    ? applyAstRefinements(taggedFindings, astStructure, options?._taintFlows)
-    : taggedFindings;
+    ? applyAstRefinements(frameworkAware, astStructure, options?._taintFlows)
+    : frameworkAware;
 
   // ── Inline suppression: respect // judges-ignore RULE-ID comments ──
   const unsuppressed = applyInlineSuppressions(refinedFindings, code);

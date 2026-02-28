@@ -146,6 +146,98 @@ export function shouldRunAbsenceRules(category: FileCategory): boolean {
   return category === "server" || category === "unknown";
 }
 
+// ─── Framework Detection ─────────────────────────────────────────────────────
+
+/** A framework or middleware detected from code patterns (no AST required). */
+export type DetectedFramework = string;
+
+const FRAMEWORK_DETECT_PATTERNS: [DetectedFramework, RegExp][] = [
+  // ── JavaScript / TypeScript ──
+  ["express", /\brequire\s*\(\s*['"]express['"]\)|from\s+['"]express['"]/],
+  ["next", /from\s+['"]next['"\/]|getServerSideProps|getStaticProps|NextRequest|NextResponse/],
+  ["hono", /from\s+['"]hono['"\/]|new\s+Hono\s*\(/],
+  ["koa", /from\s+['"]koa['"\/]|new\s+Koa\s*\(|require\s*\(\s*['"]koa['"]\)/],
+  ["fastify", /from\s+['"]fastify['"\/]|require\s*\(\s*['"]fastify['"]\)/],
+  ["helmet", /\bhelmet\s*\(|from\s+['"]helmet['"]/],
+  ["express-rate-limit", /express-rate-limit|rateLimit\s*\(\s*\{/],
+  ["cors-middleware", /\bcors\s*\(|from\s+['"]cors['"]/],
+  ["csurf", /csurf|csrf-csrf/],
+  // ── Python ──
+  ["fastapi", /from\s+fastapi\s+import|FastAPI\s*\(/],
+  ["django", /from\s+django\b|django\.\w+|INSTALLED_APPS/],
+  ["flask", /from\s+flask\s+import|Flask\s*\(__name__\)/],
+  // ── Java ──
+  ["spring", /@SpringBootApplication|@RestController|@(?:Get|Post|Put|Delete)Mapping/],
+  // ── C# ──
+  ["aspnet", /\[ApiController\]|ControllerBase|Microsoft\.AspNetCore/],
+  // ── Go ──
+  ["gin", /gin\.Default\s*\(|"github\.com\/gin-gonic\/gin"/],
+  // ── Rust ──
+  ["actix", /use\s+actix_web|HttpServer::new\s*\(/],
+];
+
+/**
+ * Finding-title patterns that each framework inherently mitigates.
+ * When a framework is detected, findings matching these patterns have their
+ * confidence reduced because the framework likely handles the concern.
+ */
+const FRAMEWORK_MITIGATIONS: Record<string, RegExp> = {
+  // Middleware that explicitly handles specific concerns
+  helmet: /security.?header|x-frame|hsts|content.security.policy|clickjack/i,
+  "express-rate-limit": /rate.?limit|throttl|brute.?force/i,
+  "cors-middleware": /cors|cross.?origin/i,
+  csurf: /csrf|cross.?site\s*request/i,
+  // Frameworks with built-in security features
+  next: /csrf|security.?header|x-frame/i,
+  django: /csrf|security.?header|xss|cross.?site\s*script/i,
+  fastapi: /input.?valid|type.?check|request.?valid|unsanitized.?input/i,
+  spring: /csrf|cross.?site\s*request/i,
+  aspnet: /csrf|cross.?site\s*request|input.?valid/i,
+  gin: /panic|recovery|unhandled/i,
+};
+
+/** Confidence reduction when a framework already handles the concern. */
+const FRAMEWORK_CONFIDENCE_REDUCTION = 0.2;
+
+/**
+ * Detect frameworks and security middleware from code patterns.
+ * Works across all languages — no AST required.
+ */
+export function detectFrameworks(code: string): DetectedFramework[] {
+  const detected: DetectedFramework[] = [];
+  for (const [name, regex] of FRAMEWORK_DETECT_PATTERNS) {
+    if (regex.test(code)) detected.push(name);
+  }
+  return detected;
+}
+
+/**
+ * Reduce confidence on findings that are mitigated by a detected framework
+ * or middleware. This is complementary to AST-based import awareness —
+ * it works for all languages and detects framework-level mitigations
+ * (e.g. Django CSRF, FastAPI validation) that import-level checks miss.
+ */
+export function applyFrameworkAwareness(findings: Finding[], code: string): Finding[] {
+  const frameworks = detectFrameworks(code);
+  if (frameworks.length === 0) return findings;
+
+  return findings.map((f) => {
+    for (const fw of frameworks) {
+      const pattern = FRAMEWORK_MITIGATIONS[fw];
+      if (pattern && pattern.test(f.title)) {
+        const currentConf = f.confidence ?? 0.5;
+        const newConf = Math.max(0, Math.min(1, currentConf - FRAMEWORK_CONFIDENCE_REDUCTION));
+        return {
+          ...f,
+          confidence: newConf,
+          provenance: f.provenance ? `${f.provenance}; ${fw}-mitigated` : `${fw}-mitigated`,
+        };
+      }
+    }
+    return f;
+  });
+}
+
 // ─── Shared Utilities ────────────────────────────────────────────────────────
 // Helper functions used by all analyzer modules and the evaluation engine.
 // ──────────────────────────────────────────────────────────────────────────────
