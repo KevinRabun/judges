@@ -28,6 +28,7 @@
   },
   "files": [
     "dist",
+    "grammars",
     "server.json",
     "README.md",
     "LICENSE"
@@ -81,6 +82,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "typescript": "^5.9.3",
+    "web-tree-sitter": "^0.25.10",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -94,6 +96,12 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
+    "tree-sitter-c-sharp": "^0.23.1",
+    "tree-sitter-cli": "^0.25.5",
+    "tree-sitter-go": "^0.23.4",
+    "tree-sitter-java": "^0.23.5",
+    "tree-sitter-python": "^0.23.6",
+    "tree-sitter-rust": "^0.23.2",
     "tsx": "^4.19.4"
   },
   "overrides": {
