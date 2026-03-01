@@ -2892,6 +2892,29 @@ function validateRegion(targetRegion) {
       "Should not flag 'normalizedRegion' as replication — 'dr' is a substring, not the acronym",
     );
   });
+
+  it("should NOT flag env var config lines containing 'export' in the name", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const envVarCode = `
+const approvedJurisdictions = ["local", "us", "eu"];
+
+function getExportRegion() {
+  const fallbackRegion = process.env.DEFAULT_EXPORT_REGION || "local";
+  return fallbackRegion;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, envVarCode, "javascript");
+    const exportFindings = evaluation.findings.filter(
+      (f) => f.title === "Data export path without sovereignty-aware controls",
+    );
+    assert.strictEqual(
+      exportFindings.length,
+      0,
+      "Should not flag process.env references as export paths — they are configuration, not data flows",
+    );
+  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

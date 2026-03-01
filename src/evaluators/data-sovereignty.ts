@@ -107,6 +107,13 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     const trimmed = line.trim();
     // Skip comment lines — doc blocks describing export policy are not real export paths
     if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
+    // Skip JS/TS export keyword declarations (export const, export function, etc.)
+    if (/^\s*export\s+(default\s+)?(const|let|var|function|class|interface|type|enum|abstract|async)\b/i.test(line))
+      return;
+    // Skip env-var / config references that merely name a region or setting
+    if (/process\.env\.|import\s|require\s*\(|getenv|os\.environ/i.test(line)) return;
+    // Skip lines where 'export' only appears as part of an identifier (e.g., getExportRegion, isExportAllowed)
+    if (/export/i.test(line) && !/(?<![a-zA-Z0-9_])export(?![a-zA-Z0-9_])/i.test(line)) return;
     if (
       /(export|download|dump|report|analytics|telemetry|support.?bundle)/i.test(line) &&
       !/redact|anonym|aggregate|jurisdiction|policy|allowed|blocked|guard|check|validate/i.test(line)
