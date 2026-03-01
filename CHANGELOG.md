@@ -2,6 +2,13 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.8.3] — 2026-03-01
+
+### Changed
+- Extension README: rewrote to lead with auto-configured MCP, added Marketplace install instructions, added missing commands to table, updated Layer 2 section to emphasize it is enabled automatically.
+- Extension `package.json` description updated to mention auto-configured MCP.
+- Root README: rewrote “Connect to Your Editor” section — VS Code extension is now the recommended zero-config path; manual MCP configs updated to use `npx` instead of absolute paths; added Cursor and generic MCP client examples.
+
 ## [3.8.2] — 2026-03-01
 
 ### Fixed

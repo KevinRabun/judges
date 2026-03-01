@@ -287,41 +287,54 @@ Runs automated tests covering all judges, AST parsers, markdown formatters, and 
 
 ### 4. Connect to Your Editor
 
-Add the Judges Panel as an MCP server so your AI coding assistant can use it automatically.
+#### VS Code (recommended — zero config)
 
-**VS Code** — create `.vscode/mcp.json` in your project:
+Install the **[Judges Panel](https://marketplace.visualstudio.com/items?itemName=kevinrabun.judges-panel)** extension from the Marketplace. It auto-configures the MCP server on activation — Copilot and other LMs can immediately use all 35 expert-persona prompts with no manual setup.
+
+```bash
+code --install-extension kevinrabun.judges-panel
+```
+
+#### VS Code — manual MCP config
+
+If you prefer explicit workspace config (or want teammates without the extension to benefit), create `.vscode/mcp.json`:
 
 ```json
 {
   "servers": {
     "judges": {
-      "command": "node",
-      "args": ["/absolute/path/to/judges/dist/index.js"]
+      "command": "npx",
+      "args": ["-y", "@kevinrabun/judges"]
     }
   }
 }
 ```
 
-**Claude Desktop** — add to `claude_desktop_config.json`:
+#### Claude Desktop
+
+Add to `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "judges": {
-      "command": "node",
-      "args": ["/absolute/path/to/judges/dist/index.js"]
+      "command": "npx",
+      "args": ["-y", "@kevinrabun/judges"]
     }
   }
 }
 ```
 
-**Or install from npm** instead of cloning:
+#### Cursor / other MCP clients
 
-```bash
-npm install -g @kevinrabun/judges
+Use the same `npx` command for any MCP-compatible client:
+
+```json
+{
+  "command": "npx",
+  "args": ["-y", "@kevinrabun/judges"]
+}
 ```
-
-Then use `judges` as the command in your MCP config (no `args` needed).
 
 ### 5. Use Judges in GitHub Copilot PR Reviews
 

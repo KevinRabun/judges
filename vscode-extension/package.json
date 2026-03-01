@@ -1,7 +1,7 @@
 {
   "name": "judges-panel",
   "displayName": "Judges Panel",
-  "description": "35 specialized judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and one-click evaluation.",
+  "description": "35 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
   "version": "0.1.0",
   "publisher": "kevinrabun",
   "license": "MIT",
