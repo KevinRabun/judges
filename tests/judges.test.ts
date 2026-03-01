@@ -3802,6 +3802,48 @@ app.get("/api/health", (req, res) => {
     assert.strictEqual(endpointDocFindings.length, 0, "Should not flag route handlers that have JSDoc comments");
   });
 
+  it("should NOT flag functions with long JSDoc blocks (e.g., large @returns types)", () => {
+    const judge = getJudge("documentation");
+    assert.ok(judge, "documentation judge should exist");
+
+    const longJsDocCode = `
+/**
+ * Builds an accessibility-friendly field error payload with linked input/error ARIA attributes.
+ * @param {string} field Field path/name associated with the validation error.
+ * @param {string} message Human-readable validation message for the field.
+ * @returns {{
+ *   field: string,
+ *   message: string,
+ *   inputId: string,
+ *   errorId: string,
+ *   ariaDescribedBy: string,
+ *   ariaInvalid: boolean,
+ *   inputProps: {
+ *     id: string,
+ *     name: string,
+ *     "aria-describedby": string,
+ *     "aria-errormessage": string,
+ *     "aria-invalid": "true"
+ *   },
+ *   errorProps: {
+ *     id: string,
+ *     role: "alert",
+ *     "aria-live": "assertive",
+ *     "aria-labelledby": string
+ *   }
+ * }}
+ */
+function buildAriaFieldError(field, message) {
+  const inputId = "input-" + field;
+  const errorId = "error-" + field;
+  return { field, message, inputId, errorId };
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, longJsDocCode, "javascript");
+    const undocFindings = evaluation.findings.filter((f) => f.title === "Exported functions without documentation");
+    assert.strictEqual(undocFindings.length, 0, "Should not flag functions with long JSDoc blocks spanning 25+ lines");
+  });
+
   it("should detect TODO/FIXME without issue tracking reference", () => {
     const judge = getJudge("documentation");
     assert.ok(judge, "documentation judge should exist");

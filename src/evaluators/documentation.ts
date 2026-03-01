@@ -14,8 +14,21 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   const fnLines = getLangLineNumbers(code, language, LP.FUNCTION_DEF);
   fnLines.forEach((ln) => {
     const idx = ln - 1;
-    const prevLines = lines.slice(Math.max(0, idx - 3), idx).join("\n");
-    if (!/\/\*\*|\/\/\/|#\s+|^\s*"""|'''|:param|@param|@returns|@description|@doc|doc\s*=/i.test(prevLines)) {
+    // Walk backwards through comment/blank/decorator lines to find doc comments
+    // This handles arbitrarily long JSDoc blocks (e.g., large @returns types)
+    let hasDoc = false;
+    for (let j = idx - 1; j >= Math.max(0, idx - 60); j--) {
+      const trimmed = lines[j].trim();
+      if (trimmed.length === 0) continue; // blank line
+      if (/\/\*\*|\/\/\/|#\s+|"""|'''|:param|@param|@returns|@description|@doc\b|doc\s*=/i.test(trimmed)) {
+        hasDoc = true;
+        break;
+      }
+      if (/^\*/.test(trimmed)) continue; // block comment body
+      if (/^@\w/.test(trimmed)) continue; // decorator / annotation
+      break; // non-comment code — stop
+    }
+    if (!hasDoc) {
       undocFnLines.push(ln);
     }
   });
