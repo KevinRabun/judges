@@ -2,6 +2,13 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.8.0] — 2026-03-01
+
+### Added
+- **MCP server auto-configuration** — VS Code extension now registers the Judges MCP server automatically via `McpServerDefinitionProvider`. Users install the extension and Layer 2 (35 expert-persona LLM prompts) is immediately available to Copilot — zero manual setup.
+- **`Judges: Configure MCP Server` command** — writes the MCP server definition to `.vscode/mcp.json` for users who prefer explicit workspace config.
+- Extension engine bumped to VS Code `^1.99.0` for MCP API support.
+
 ## [3.7.3] — 2026-03-01
 
 ### Fixed

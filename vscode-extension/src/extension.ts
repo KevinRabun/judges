@@ -8,6 +8,12 @@ export function activate(context: vscode.ExtensionContext): void {
   const diagnosticCollection = vscode.languages.createDiagnosticCollection("judges");
   diagnosticProvider = new JudgesDiagnosticProvider(diagnosticCollection);
 
+  // ─── MCP Server Auto-Configuration ───────────────────────────────────
+  // Register the Judges MCP server so Copilot / LMs can use Layer 2
+  // (expert-persona prompts) without any manual configuration.
+
+  registerMcpServer(context);
+
   // ─── Commands ─────────────────────────────────────────────────────────
 
   context.subscriptions.push(
@@ -50,6 +56,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("judges.showPanel", () => {
       vscode.window.showInformationMessage("Judges: Results panel coming soon.");
     }),
+
+    vscode.commands.registerCommand("judges.configureMcp", () => configureMcpManually()),
   );
 
   // ─── Code Action Provider ────────────────────────────────────────────
@@ -109,4 +117,70 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   // Cleanup handled by disposables
+}
+
+// ─── MCP Server Registration ──────────────────────────────────────────────
+
+/**
+ * Register the Judges MCP server via the VS Code MCP provider API.
+ * This makes the 35 expert-persona prompts (Layer 2) automatically available
+ * to Copilot and other LMs — zero manual configuration required.
+ */
+function registerMcpServer(context: vscode.ExtensionContext): void {
+  try {
+    if (!vscode.lm?.registerMcpServerDefinitionProvider) {
+      return; // API not available (older VS Code) — skip silently
+    }
+
+    context.subscriptions.push(
+      vscode.lm.registerMcpServerDefinitionProvider("judges-mcp", {
+        provideMcpServerDefinitions: () => [
+          new vscode.McpStdioServerDefinition("Judges Panel", "npx", ["-y", "@kevinrabun/judges"]),
+        ],
+      }),
+    );
+  } catch {
+    // Graceful degradation — Layer 1 still works without MCP
+  }
+}
+
+/**
+ * Manual MCP configuration command — writes the server definition to
+ * .vscode/mcp.json for users who prefer explicit workspace config or
+ * whose environment doesn't support the provider API.
+ */
+async function configureMcpManually(): Promise<void> {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders?.length) {
+    vscode.window.showWarningMessage("Judges: Open a workspace folder first.");
+    return;
+  }
+
+  const mcpJsonUri = vscode.Uri.joinPath(workspaceFolders[0].uri, ".vscode", "mcp.json");
+
+  // Check if mcp.json already exists and has the judges server
+  let existingConfig: Record<string, unknown> = {};
+  try {
+    const raw = await vscode.workspace.fs.readFile(mcpJsonUri);
+    existingConfig = JSON.parse(Buffer.from(raw).toString("utf8"));
+  } catch {
+    // File doesn't exist yet — that's fine
+  }
+
+  const servers = (existingConfig.servers ?? {}) as Record<string, unknown>;
+  if (servers["judges"]) {
+    vscode.window.showInformationMessage("Judges: MCP server is already configured in .vscode/mcp.json");
+    return;
+  }
+
+  servers["judges"] = {
+    command: "npx",
+    args: ["-y", "@kevinrabun/judges"],
+  };
+  existingConfig.servers = servers;
+
+  const content = Buffer.from(JSON.stringify(existingConfig, null, 2) + "\n", "utf8");
+  await vscode.workspace.fs.writeFile(mcpJsonUri, content);
+
+  vscode.window.showInformationMessage("Judges: MCP server configured in .vscode/mcp.json ✓");
 }

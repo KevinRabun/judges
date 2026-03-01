@@ -23,6 +23,7 @@ TypeScript, JavaScript, Python, Go, Rust, Java, C#, C++
 | `Judges: Auto-Fix Current File` | Apply all available auto-fix patches |
 | `Judges: Evaluate Workspace` | Evaluate all supported files in the workspace |
 | `Judges: Clear Diagnostics` | Remove all Judges diagnostics |
+| `Judges: Configure MCP Server` | Write MCP config to `.vscode/mcp.json` |
 
 ## Configuration
 
@@ -55,13 +56,21 @@ code --install-extension judges-panel-0.1.0.vsix
 
 ## How It Works
 
-The extension bundles `@kevinrabun/judges` and runs the deterministic evaluators (Layer 1) **locally in the extension host** — no network calls, no API keys, instant results. This includes:
+The extension provides **both layers** of the Judges evaluation system with zero configuration:
+
+### Layer 1 — Deterministic Evaluation (instant, local)
+
+Runs **locally in the extension host** — no network calls, no API keys, instant results:
 
 - **Pattern matching** against 400+ security, quality, and compliance rules
 - **AST analysis** via tree-sitter WASM for 8 languages
 - **Auto-fix patches** for 47+ common issues
 
-For Layer 2 (LLM-powered deep review), use the MCP server integration with Copilot, Claude, or Cursor.
+### Layer 2 — LLM-Powered Deep Review (auto-configured MCP)
+
+The extension **automatically registers the Judges MCP server** with VS Code. When you use Copilot or another LM, the 35 expert-persona prompts are available immediately — no manual MCP configuration needed.
+
+If you prefer explicit workspace config, run **Judges: Configure MCP Server** to write the server definition to `.vscode/mcp.json`.
 
 ## License
 

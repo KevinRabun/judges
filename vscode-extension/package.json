@@ -19,7 +19,7 @@
     "theme": "dark"
   },
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.99.0"
   },
   "categories": [
     "Linters",
@@ -68,6 +68,16 @@
       {
         "command": "judges.showPanel",
         "title": "Judges: Show Results Panel"
+      },
+      {
+        "command": "judges.configureMcp",
+        "title": "Judges: Configure MCP Server"
+      }
+    ],
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "judges-mcp",
+        "label": "Judges Panel"
       }
     ],
     "configuration": {
@@ -81,13 +91,27 @@
         "judges.preset": {
           "type": "string",
           "default": "",
-          "enum": ["", "strict", "lenient", "security-only", "startup", "compliance", "performance"],
+          "enum": [
+            "",
+            "strict",
+            "lenient",
+            "security-only",
+            "startup",
+            "compliance",
+            "performance"
+          ],
           "description": "Named preset for evaluation configuration."
         },
         "judges.minSeverity": {
           "type": "string",
           "default": "medium",
-          "enum": ["critical", "high", "medium", "low", "info"],
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info"
+          ],
           "description": "Minimum severity level to show as diagnostics."
         },
         "judges.enabledJudges": {
@@ -131,8 +155,8 @@
     "lint": "eslint src/"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
     "@types/node": "^22.0.0",
+    "@types/vscode": "^1.109.0",
     "@vscode/vsce": "^3.3.2",
     "esbuild": "^0.25.0",
     "typescript": "^5.9.3"
