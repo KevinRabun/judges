@@ -43,15 +43,46 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
     });
   }
 
-  // N+1 query patterns (loop with await inside)
-  const awaitInLoopPattern = /(?:for|while|\.forEach|\.map)\s*\([\s\S]*?await\s/gi;
-  if (awaitInLoopPattern.test(code)) {
+  // N+1 query patterns (loop with await inside) — scan actual loop bodies
+  const awaitInLoopLines: number[] = [];
+  const loopKeyword = lang === "python" ? /\b(?:for|while)\s/ : /\b(?:for|while)\s*\(|\.forEach\s*\(|\.map\s*\(/;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmedAwait = lines[i].trim();
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmedAwait)) continue;
+    if (loopKeyword.test(lines[i])) {
+      // Find opening brace on the loop line or the next 2 lines (arrow fn, etc.)
+      let braceLineIdx = -1;
+      for (let k = i; k < Math.min(lines.length, i + 3); k++) {
+        if (/\{/.test(lines[k])) {
+          braceLineIdx = k;
+          break;
+        }
+      }
+      // No brace found → single-expression (e.g. .map(x => x.name)), skip
+      if (braceLineIdx === -1) continue;
+      // Walk from brace line to find matching close, collecting body
+      let braceDepth = 0;
+      const bodyLines: string[] = [];
+      for (let j = braceLineIdx; j < Math.min(lines.length, braceLineIdx + 30); j++) {
+        const opens = (lines[j].match(/\{/g) || []).length;
+        const closes = (lines[j].match(/\}/g) || []).length;
+        braceDepth += opens - closes;
+        bodyLines.push(lines[j]);
+        if (braceDepth <= 0) break;
+      }
+      if (bodyLines.length > 0 && /\bawait\s/.test(bodyLines.join("\n"))) {
+        awaitInLoopLines.push(i + 1);
+      }
+    }
+  }
+  if (awaitInLoopLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Potential N+1 query pattern (await in loop)",
       description:
         "An await call inside a loop suggests sequential asynchronous operations that could be batched. This causes N+1 performance problems and increased latency/cost.",
+      lineNumbers: awaitInLoopLines,
       recommendation:
         "Use Promise.all() to parallelize independent operations, or batch database queries (e.g., WHERE id IN (...) instead of per-ID queries).",
       reference: "Database Performance Anti-Patterns",

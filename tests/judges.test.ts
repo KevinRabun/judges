@@ -3710,6 +3710,35 @@ export function createBodyParser(options) {
     );
     assert.strictEqual(nestedLoopFindings.length, 0, "Should not detect nested loops from 'for' in JSDoc comments");
   });
+
+  it("should NOT flag N+1 when for/map and await are in unrelated code sections", () => {
+    const judge = getJudge("cost-effectiveness");
+    assert.ok(judge, "cost-effectiveness judge should exist");
+
+    const codeWithSeparateForAndAwait = `
+import express from "express";
+
+const app = express();
+
+// Array transform — no await here
+const names = users.map(u => u.name);
+
+// Async handler — no loop here
+app.get("/data", async (req, res) => {
+  const result = await db.query("SELECT * FROM items WHERE active = true LIMIT 100");
+  res.json(result);
+});
+
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, codeWithSeparateForAndAwait, "typescript");
+    const n1Findings = evaluation.findings.filter((f) => f.title.includes("N+1") || f.title.includes("await in loop"));
+    assert.strictEqual(
+      n1Findings.length,
+      0,
+      "Should not flag N+1 when .map() and await are in completely separate code blocks",
+    );
+  });
 });
 
 // =============================================================================
