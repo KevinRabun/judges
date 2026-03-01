@@ -71,3 +71,28 @@ jobs:
 
       - name: Publish server to MCP Registry
         run: ./mcp-publisher publish
+
+      # ── Publish VS Code Extension to Marketplace ────────────
+
+      - name: Sync extension version with package version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          cd vscode-extension
+          node -e "
+            const pkg = JSON.parse(require('fs').readFileSync('package.json','utf8'));
+            pkg.version = '${VERSION}';
+            pkg.dependencies['@kevinrabun/judges'] = '^${VERSION}';
+            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Install extension dependencies
+        run: |
+          cd vscode-extension
+          npm install
+
+      - name: Publish extension to VS Code Marketplace
+        run: |
+          cd vscode-extension
+          npx @vscode/vsce publish --no-git-tag-version --skip-duplicate
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
