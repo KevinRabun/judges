@@ -218,7 +218,8 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
   // Recursive/infinite retry without backoff
   const retryPattern = /retry|retryCount|maxRetries|attempts?\s*[<>]/gi;
   const retryLines = getLineNumbers(code, retryPattern);
-  const hasBackoffStrategy = /backoff|exponential|delay\s*\*|Math\.pow|jitter/gi.test(code);
+  const hasBackoffStrategy =
+    /backoff|exponential|delay\s*\*|Math\.pow|jitter|p-retry|axios-retry|retry-axios|got\.retry|ky\.retry/gi.test(code);
   if (retryLines.length > 0 && !hasBackoffStrategy) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

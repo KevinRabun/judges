@@ -2970,6 +2970,32 @@ app.listen(3000);
     const fixFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("RATE-") && f.suggestedFix);
     assert.ok(fixFindings.length > 0, "Expected at least one RATE finding with suggestedFix");
   });
+
+  it("should NOT flag p-retry imports as retry without backoff", () => {
+    const judge = getJudge("rate-limiting");
+    assert.ok(judge, "rate-limiting judge should exist");
+
+    const codeWithPRetry = `
+import pRetry from "p-retry";
+
+export async function fetchWithRetry(url: string) {
+  return pRetry(() => fetch(url).then(r => r.json()), {
+    retries: 3,
+    minTimeout: 1000,
+    factor: 2,
+  });
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, codeWithPRetry, "typescript");
+    const retryFindings = evaluation.findings.filter((f) =>
+      f.title.includes("Retry logic without exponential backoff"),
+    );
+    assert.strictEqual(
+      retryFindings.length,
+      0,
+      "Should not flag code using p-retry (a backoff library) as missing backoff",
+    );
+  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
