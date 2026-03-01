@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Judges Playground — Interactive Code Evaluator</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --orange: #db6d28;
+      --red: #f85149;
+      --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    header h1 { font-size: 2rem; margin-bottom: 0.25rem; }
+    header p { color: var(--text-muted); }
+
+    .playground {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      min-height: 600px;
+    }
+    @media (max-width: 900px) {
+      .playground { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+    }
+    .panel-header h2 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    select, button {
+      font-family: inherit;
+      font-size: 0.85rem;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.4rem 0.75rem;
+      cursor: pointer;
+    }
+    select:focus, button:focus { outline: none; border-color: var(--accent); }
+    button:hover { background: rgba(88,166,255,0.1); border-color: var(--accent); }
+    .btn-primary {
+      background: rgba(88,166,255,0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .btn-primary:hover { background: rgba(88,166,255,0.25); }
+
+    #code-editor {
+      flex: 1;
+      resize: none;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      background: var(--bg);
+      color: var(--text);
+      border: none;
+      outline: none;
+      tab-size: 2;
+    }
+
+    .results-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .verdict-banner {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+    .verdict-pass { background: rgba(63,185,80,0.1); border: 1px solid rgba(63,185,80,0.3); color: var(--green); }
+    .verdict-warning { background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); color: var(--yellow); }
+    .verdict-fail { background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.3); color: var(--red); }
+
+    .verdict-score { font-size: 1.5rem; }
+    .verdict-label { font-size: 1.1rem; }
+    .verdict-meta { font-size: 0.85rem; color: var(--text-muted); font-weight: normal; margin-left: auto; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .stat-mini {
+      text-align: center;
+      padding: 0.5rem;
+      background: rgba(255,255,255,0.03);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .stat-mini .val { font-size: 1.2rem; font-weight: 700; }
+    .stat-mini .lbl { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .findings-list { list-style: none; }
+    .finding-item {
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .finding-item:hover { background: rgba(255,255,255,0.03); }
+    .finding-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+    .severity-badge {
+      display: inline-block;
+      padding: 0.1rem 0.4rem;
+      border-radius: 10px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .sev-critical { background: rgba(248,81,73,0.2); color: var(--red); }
+    .sev-high { background: rgba(219,109,40,0.2); color: var(--orange); }
+    .sev-medium { background: rgba(210,153,34,0.2); color: var(--yellow); }
+    .sev-low { background: rgba(139,148,158,0.15); color: var(--text-muted); }
+    .sev-info { background: rgba(88,166,255,0.15); color: var(--accent); }
+
+    .finding-rule { font-weight: 600; font-size: 0.85rem; }
+    .finding-title { color: var(--text-muted); font-size: 0.85rem; }
+    .finding-desc { color: var(--text-muted); font-size: 0.8rem; margin-top: 0.25rem; display: none; }
+    .finding-item.expanded .finding-desc { display: block; }
+    .finding-line { font-size: 0.75rem; color: var(--accent); }
+    .finding-fix { font-size: 0.8rem; color: var(--green); margin-top: 0.25rem; display: none; }
+    .finding-item.expanded .finding-fix { display: block; }
+
+    .judge-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0;
+      font-size: 0.85rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .judge-row:last-child { border-bottom: none; }
+    .judge-icon { width: 16px; text-align: center; }
+    .judge-name { flex: 1; }
+    .judge-score { font-weight: 600; width: 50px; text-align: right; }
+    .judge-count { color: var(--text-muted); width: 60px; text-align: right; font-size: 0.8rem; }
+
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      padding: 0.5rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+    }
+    .empty-state .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .empty-state p { font-size: 0.9rem; }
+
+    .copy-cmd {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+      padding: 0.75rem 1rem;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .copy-cmd code {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--accent);
+    }
+    .copy-cmd button { font-size: 0.75rem; }
+
+    .meta {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      text-align: center;
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .meta a { color: var(--accent); text-decoration: none; }
+    .meta a:hover { text-decoration: underline; }
+
+    .samples {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .sample-btn {
+      font-size: 0.75rem;
+      padding: 0.3rem 0.6rem;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+    }
+    .sample-btn:hover { background: rgba(88,166,255,0.15); }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Judges Playground</h1>
+      <p>Paste code below and evaluate it with 35 specialized judges — entirely client-side simulation</p>
+    </header>
+
+    <div class="samples">
+      <span style="color: var(--text-muted); font-size: 0.8rem; align-self: center;">Try a sample:</span>
+      <button class="sample-btn" onclick="loadSample('sql-injection')">SQL Injection</button>
+      <button class="sample-btn" onclick="loadSample('xss')">XSS</button>
+      <button class="sample-btn" onclick="loadSample('hardcoded-secret')">Hardcoded Secret</button>
+      <button class="sample-btn" onclick="loadSample('eval-usage')">eval() Usage</button>
+      <button class="sample-btn" onclick="loadSample('clean-code')">Clean Code</button>
+      <button class="sample-btn" onclick="loadSample('path-traversal')">Path Traversal</button>
+    </div>
+
+    <div class="playground">
+      <!-- Code Editor Panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Code Input</h2>
+          <div class="toolbar">
+            <select id="language">
+              <option value="typescript">TypeScript</option>
+              <option value="javascript">JavaScript</option>
+              <option value="python">Python</option>
+              <option value="go">Go</option>
+              <option value="rust">Rust</option>
+              <option value="java">Java</option>
+              <option value="csharp">C#</option>
+            </select>
+            <button class="btn-primary" onclick="evaluate()" id="eval-btn">
+              Evaluate
+            </button>
+          </div>
+        </div>
+        <textarea id="code-editor" spellcheck="false" placeholder="Paste your code here or click a sample above...">import express from "express";
+import { Pool } from "pg";
+
+const app = express();
+const pool = new Pool({ connectionString: process.env.DB_URL });
+
+// Vulnerable: SQL injection via string concatenation
+app.get("/users", async (req, res) => {
+  const name = req.query.name;
+  const result = await pool.query(`SELECT * FROM users WHERE name = '${name}'`);
+  res.json(result.rows);
+});
+
+// Vulnerable: XSS - reflecting user input
+app.get("/greet", (req, res) => {
+  res.send(`&lt;h1&gt;Hello ${req.query.name}&lt;/h1&gt;`);
+});
+
+// Vulnerable: Hardcoded secret
+const API_KEY = "sk-proj-abc123def456ghi789";
+
+app.listen(3000);</textarea>
+      </div>
+
+      <!-- Results Panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Results</h2>
+          <div class="toolbar" id="results-toolbar" style="display:none;">
+            <span style="font-size: 0.8rem; color: var(--text-muted);" id="eval-time"></span>
+          </div>
+        </div>
+        <div class="tab-bar" id="tab-bar" style="display:none;">
+          <div class="tab active" data-tab="findings" onclick="switchTab('findings')">Findings</div>
+          <div class="tab" data-tab="judges" onclick="switchTab('judges')">Judges</div>
+          <div class="tab" data-tab="cli" onclick="switchTab('cli')">CLI Command</div>
+        </div>
+        <div class="results-body" id="results-body">
+          <div class="empty-state">
+            <div class="icon">⚖️</div>
+            <p>Click <strong>Evaluate</strong> to analyze your code with 35 judges</p>
+            <p style="margin-top: 0.5rem; font-size: 0.8rem;">Covers security, performance, reliability, compliance &amp; more</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="copy-cmd">
+      <code id="cli-copy">npx @kevinrabun/judges eval --file yourfile.ts</code>
+      <button onclick="copyCmd()">Copy</button>
+    </div>
+
+    <div class="meta">
+      <a href="index.html">Dashboard</a> ·
+      <a href="https://github.com/KevinRabun/judges">GitHub</a> ·
+      <a href="https://www.npmjs.com/package/@kevinrabun/judges">npm</a> ·
+      MIT License
+    </div>
+  </div>
+
+  <script>
+    // ─── Sample Code ──────────────────────────────────────────────────────
+    const SAMPLES = {
+      "sql-injection": {
+        lang: "typescript",
+        code: `import { Pool } from "pg";
+const pool = new Pool();
+
+export async function getUser(name: string) {
+  // SQL injection: string concatenation with user input
+  const result = await pool.query(
+    "SELECT * FROM users WHERE name = '" + name + "'"
+  );
+  return result.rows;
+}
+
+export async function deleteUser(id: string) {
+  await pool.query(\`DELETE FROM users WHERE id = \${id}\`);
+}`
+      },
+      "xss": {
+        lang: "javascript",
+        code: `const express = require("express");
+const app = express();
+
+// Reflected XSS — user input in HTML
+app.get("/search", (req, res) => {
+  const q = req.query.q;
+  res.send("<h1>Results for: " + q + "</h1>");
+});
+
+// DOM-based XSS
+app.get("/profile", (req, res) => {
+  res.send(\`
+    <script>
+      document.getElementById("name").innerHTML = location.hash.slice(1);
+    <\/script>
+  \`);
+});`
+      },
+      "hardcoded-secret": {
+        lang: "typescript",
+        code: `// Hardcoded credentials — should use environment variables
+const DB_PASSWORD = "super_secret_password_123";
+const API_KEY = "sk-proj-abcdef1234567890";
+const AWS_SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+
+export function connect() {
+  return createConnection({
+    host: "prod-db.example.com",
+    password: DB_PASSWORD,
+    apiKey: API_KEY,
+  });
+}`
+      },
+      "eval-usage": {
+        lang: "javascript",
+        code: `const express = require("express");
+const app = express();
+
+// Dangerous: eval with user input
+app.post("/calculate", (req, res) => {
+  const expr = req.body.expression;
+  const result = eval(expr);
+  res.json({ result });
+});
+
+// Also dangerous: Function constructor
+app.post("/run", (req, res) => {
+  const fn = new Function("return " + req.body.code);
+  res.json({ result: fn() });
+});`
+      },
+      "clean-code": {
+        lang: "typescript",
+        code: `import { createHash } from "crypto";
+
+/** Hash a password with a random salt using SHA-256. */
+export function hashPassword(password: string, salt: string): string {
+  return createHash("sha256")
+    .update(salt + password)
+    .digest("hex");
+}
+
+/** Validate an email address format. */
+export function isValidEmail(email: string): boolean {
+  const pattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+  return pattern.test(email);
+}
+
+/** Clamp a number between min and max bounds. */
+export function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}`
+      },
+      "path-traversal": {
+        lang: "javascript",
+        code: `const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const app = express();
+
+// Path traversal: user-controlled file path
+app.get("/file", (req, res) => {
+  const filePath = path.join("/uploads", req.query.name);
+  const content = fs.readFileSync(filePath, "utf-8");
+  res.send(content);
+});
+
+// Command injection
+app.get("/ping", (req, res) => {
+  const { exec } = require("child_process");
+  exec("ping -c 1 " + req.query.host, (err, stdout) => {
+    res.send(stdout);
+  });
+});`
+      }
+    };
+
+    function loadSample(id) {
+      const sample = SAMPLES[id];
+      if (!sample) return;
+      document.getElementById("code-editor").value = sample.code;
+      document.getElementById("language").value = sample.lang;
+    }
+
+    // ─── Simulated Evaluation Engine ──────────────────────────────────────
+    // This simulates the deterministic evaluator patterns client-side.
+    // For full accuracy, use the real CLI: npx @kevinrabun/judges eval
+
+    const RULES = [
+      { id: "SEC-001", title: "SQL Injection", severity: "critical", judge: "Cybersecurity",
+        pattern: /query\s*\(\s*[`"'].*\$\{|query\s*\(\s*["'].*\+\s*\w|query\s*\(\s*`[^`]*\$\{/gi,
+        desc: "SQL query uses string interpolation/concatenation with potentially untrusted input. Use parameterized queries instead.",
+        fix: "Use parameterized queries: pool.query('SELECT * FROM users WHERE name = $1', [name])" },
+      { id: "SEC-002", title: "Cross-Site Scripting (XSS)", severity: "high", judge: "Cybersecurity",
+        pattern: /res\.send\s*\(\s*[`"'].*<.*\$\{|res\.send\s*\(\s*["'].*<.*\+|innerHTML\s*=\s*(?!["'])/gi,
+        desc: "User input is reflected in HTML output without sanitization, enabling XSS attacks.",
+        fix: "Sanitize output using a library like DOMPurify or use templating with auto-escaping." },
+      { id: "SEC-003", title: "Hardcoded Secret", severity: "critical", judge: "Configuration Management",
+        pattern: /(?:password|secret|api_?key|token|aws_secret)\s*=\s*["'][^"']{8,}/gi,
+        desc: "Credential or secret is hardcoded in source code. Use environment variables or a secrets manager.",
+        fix: "Move secrets to environment variables: process.env.API_KEY" },
+      { id: "SEC-004", title: "eval() with Dynamic Input", severity: "critical", judge: "Cybersecurity",
+        pattern: /\beval\s*\((?!\s*["'`])/gi,
+        desc: "eval() executes arbitrary code. If the input comes from users, this is a remote code execution vulnerability.",
+        fix: "Avoid eval(). Use JSON.parse() for data or a safe expression parser." },
+      { id: "SEC-005", title: "Command Injection", severity: "critical", judge: "Cybersecurity",
+        pattern: /exec\s*\(\s*["'`].*\+\s*\w|exec\s*\(\s*`[^`]*\$\{/gi,
+        desc: "OS command is built using string concatenation with user input, enabling command injection.",
+        fix: "Use execFile() with an argument array instead of exec() with string concatenation." },
+      { id: "SEC-006", title: "Path Traversal", severity: "high", judge: "Cybersecurity",
+        pattern: /readFile(?:Sync)?\s*\(\s*(?:path\.join|path\.resolve)\s*\([^)]*req\./gi,
+        desc: "File path includes user-controlled input without validation, allowing directory traversal.",
+        fix: "Validate and sanitize the path: ensure it stays within the intended directory." },
+      { id: "SEC-007", title: "Function Constructor", severity: "high", judge: "Cybersecurity",
+        pattern: /new\s+Function\s*\(/gi,
+        desc: "The Function constructor can execute arbitrary code, similar to eval().",
+        fix: "Avoid new Function(). Use a safe expression evaluator or predefined operations." },
+      { id: "AUTH-001", title: "Weak Hash Algorithm", severity: "high", judge: "Authentication",
+        pattern: /createHash\s*\(\s*["'](?:md5|sha1|sha256)["']\)/gi,
+        desc: "Using a fast hash for passwords. Use bcrypt, scrypt, or Argon2 instead.",
+        fix: "Use bcrypt: await bcrypt.hash(password, 12)" },
+      { id: "CONF-001", title: "Hardcoded Connection String", severity: "medium", judge: "Configuration Management",
+        pattern: /(?:host|server|endpoint)\s*:\s*["'][^"']*(?:\.com|\.net|\.io|localhost)/gi,
+        desc: "Connection string or hostname is hardcoded. Use configuration files or environment variables.",
+        fix: "Use environment variables: process.env.DB_HOST" },
+      { id: "ERR-001", title: "Missing Error Handling", severity: "medium", judge: "Error Handling",
+        pattern: /\.catch\s*\(\s*\(\s*\)\s*=>\s*\{\s*\}\s*\)|catch\s*\(\s*\w+\s*\)\s*\{\s*\}/gi,
+        desc: "Empty catch block swallows errors silently.",
+        fix: "Log the error or re-throw: catch(err) { logger.error(err); throw err; }" },
+      { id: "PERF-001", title: "Synchronous File I/O", severity: "medium", judge: "Performance",
+        pattern: /readFileSync|writeFileSync|appendFileSync|existsSync/gi,
+        desc: "Synchronous file operations block the event loop in Node.js servers.",
+        fix: "Use async variants: fs.promises.readFile() or fs/promises API." },
+    ];
+
+    function simulateEvaluation(code, language) {
+      const findings = [];
+      const lines = code.split("\n");
+
+      for (const rule of RULES) {
+        let match;
+        const re = new RegExp(rule.pattern.source, rule.pattern.flags);
+        while ((match = re.exec(code)) !== null) {
+          // Calculate line number
+          const beforeMatch = code.slice(0, match.index);
+          const lineNum = (beforeMatch.match(/\n/g) || []).length + 1;
+
+          findings.push({
+            ruleId: rule.id,
+            title: rule.title,
+            severity: rule.severity,
+            judge: rule.judge,
+            description: rule.desc,
+            suggestedFix: rule.fix,
+            lineNumber: lineNum,
+            evidence: match[0].trim().slice(0, 80),
+          });
+        }
+      }
+
+      // Deduplicate by ruleId + lineNumber
+      const seen = new Set();
+      const deduped = findings.filter(f => {
+        const key = `${f.ruleId}:${f.lineNumber}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      // Build judge scores
+      const judgeNames = [...new Set(RULES.map(r => r.judge))];
+      const allJudges = [
+        "Cybersecurity", "Authentication", "Data Security", "Configuration Management",
+        "API Design", "Performance", "Scalability", "Reliability", "Cloud Readiness",
+        "Cost Effectiveness", "Compliance", "Data Sovereignty", "Observability",
+        "Maintainability", "Testing", "Documentation", "Accessibility",
+        "Internationalization", "UX", "Error Handling", "Concurrency",
+        "Caching", "Rate Limiting", "Logging Privacy", "Database",
+        "Dependency Health", "CI/CD", "Backwards Compatibility", "Portability",
+        "Code Structure", "Software Practices", "Ethics & Bias",
+        "Agent Instructions", "AI Code Safety", "Framework Safety"
+      ];
+
+      const judgeResults = allJudges.map(name => {
+        const judgeFindings = deduped.filter(f => f.judge === name);
+        const hasCritical = judgeFindings.some(f => f.severity === "critical");
+        const hasHigh = judgeFindings.some(f => f.severity === "high");
+        let score = 100;
+        for (const f of judgeFindings) {
+          if (f.severity === "critical") score -= 25;
+          else if (f.severity === "high") score -= 15;
+          else if (f.severity === "medium") score -= 8;
+          else score -= 3;
+        }
+        score = Math.max(0, score);
+        const verdict = hasCritical ? "fail" : hasHigh ? "warning" : score < 70 ? "warning" : "pass";
+        return { name, score, verdict, findings: judgeFindings.length };
+      });
+
+      const overallScore = Math.round(judgeResults.reduce((s, j) => s + j.score, 0) / judgeResults.length);
+      const critical = deduped.filter(f => f.severity === "critical").length;
+      const high = deduped.filter(f => f.severity === "high").length;
+      const verdict = critical > 0 ? "fail" : high > 0 ? "warning" : "pass";
+
+      return {
+        verdict,
+        score: overallScore,
+        findings: deduped,
+        judges: judgeResults,
+        criticalCount: critical,
+        highCount: high,
+        totalFindings: deduped.length,
+      };
+    }
+
+    // ─── UI Logic ─────────────────────────────────────────────────────────
+
+    function evaluate() {
+      const code = document.getElementById("code-editor").value;
+      const language = document.getElementById("language").value;
+
+      if (!code.trim()) return;
+
+      const btn = document.getElementById("eval-btn");
+      btn.innerHTML = '<span class="spinner"></span>';
+      btn.disabled = true;
+
+      // Simulate async for visual effect
+      setTimeout(() => {
+        const start = performance.now();
+        const result = simulateEvaluation(code, language);
+        const elapsed = Math.round(performance.now() - start);
+
+        renderResults(result, elapsed);
+        btn.textContent = "Evaluate";
+        btn.disabled = false;
+
+        // Update CLI command
+        const ext = { typescript: ".ts", javascript: ".js", python: ".py", go: ".go",
+          rust: ".rs", java: ".java", csharp: ".cs" }[language] || ".ts";
+        document.getElementById("cli-copy").textContent =
+          `npx @kevinrabun/judges eval --file yourfile${ext} --format json`;
+      }, 150);
+    }
+
+    function renderResults(result, elapsed) {
+      document.getElementById("tab-bar").style.display = "flex";
+      document.getElementById("results-toolbar").style.display = "flex";
+      document.getElementById("eval-time").textContent = `${elapsed}ms`;
+
+      const body = document.getElementById("results-body");
+
+      // Build findings tab
+      const verdictClass = result.verdict === "pass" ? "verdict-pass"
+        : result.verdict === "warning" ? "verdict-warning" : "verdict-fail";
+      const verdictIcon = result.verdict === "pass" ? "✅"
+        : result.verdict === "warning" ? "⚠️" : "❌";
+
+      let findingsHtml = `
+        <div class="verdict-banner ${verdictClass}">
+          <span class="verdict-score">${result.score}/100</span>
+          <span class="verdict-label">${verdictIcon} ${result.verdict.toUpperCase()}</span>
+          <span class="verdict-meta">${result.totalFindings} findings from 35 judges</span>
+        </div>
+        <div class="stats-row">
+          <div class="stat-mini"><div class="val" style="color:var(--red)">${result.criticalCount}</div><div class="lbl">Critical</div></div>
+          <div class="stat-mini"><div class="val" style="color:var(--orange)">${result.highCount}</div><div class="lbl">High</div></div>
+          <div class="stat-mini"><div class="val" style="color:var(--yellow)">${result.totalFindings - result.criticalCount - result.highCount}</div><div class="lbl">Medium/Low</div></div>
+          <div class="stat-mini"><div class="val" style="color:var(--green)">${result.judges.filter(j => j.verdict === "pass").length}</div><div class="lbl">Passing</div></div>
+        </div>
+      `;
+
+      if (result.findings.length === 0) {
+        findingsHtml += '<div class="empty-state"><div class="icon">✅</div><p>No issues found — clean code!</p></div>';
+      } else {
+        findingsHtml += '<ul class="findings-list">';
+        for (const f of result.findings) {
+          findingsHtml += `
+            <li class="finding-item" onclick="this.classList.toggle('expanded')">
+              <div class="finding-header">
+                <span class="severity-badge sev-${f.severity}">${f.severity}</span>
+                <span class="finding-rule">${f.ruleId}</span>
+                <span class="finding-title">${f.title}</span>
+                <span class="finding-line">L${f.lineNumber}</span>
+              </div>
+              <div class="finding-desc">${f.description}</div>
+              ${f.suggestedFix ? `<div class="finding-fix">💡 ${f.suggestedFix}</div>` : ""}
+            </li>`;
+        }
+        findingsHtml += '</ul>';
+      }
+
+      // Build judges tab
+      let judgesHtml = '';
+      const sorted = [...result.judges].sort((a, b) => a.score - b.score);
+      for (const j of sorted) {
+        const icon = j.verdict === "pass" ? "✅" : j.verdict === "warning" ? "⚠️" : "❌";
+        const scoreColor = j.score >= 90 ? "var(--green)" : j.score >= 70 ? "var(--yellow)" : "var(--red)";
+        judgesHtml += `
+          <div class="judge-row">
+            <span class="judge-icon">${icon}</span>
+            <span class="judge-name">${j.name}</span>
+            <span class="judge-score" style="color:${scoreColor}">${j.score}</span>
+            <span class="judge-count">${j.findings} finding${j.findings !== 1 ? "s" : ""}</span>
+          </div>`;
+      }
+
+      // Build CLI tab
+      const lang = document.getElementById("language").value;
+      const cliHtml = `
+        <div style="padding: 1rem 0;">
+          <p style="color: var(--text-muted); margin-bottom: 1rem;">
+            This playground simulates a subset of the evaluation rules client-side.
+            For full accuracy with all 35 judges, AST analysis, and auto-fix patches,
+            use the real CLI:
+          </p>
+          <div style="background: var(--bg); padding: 1rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.85rem; border: 1px solid var(--border);">
+            <div style="color: var(--text-muted); margin-bottom: 0.5rem;"># Install and run</div>
+            <div style="color: var(--green);">npx @kevinrabun/judges eval --file your-file.ts</div>
+            <div style="color: var(--text-muted); margin-top: 1rem; margin-bottom: 0.5rem;"># With auto-fix</div>
+            <div style="color: var(--green);">npx @kevinrabun/judges fix your-file.ts --apply</div>
+            <div style="color: var(--text-muted); margin-top: 1rem; margin-bottom: 0.5rem;"># As MCP server</div>
+            <div style="color: var(--green);">npm install @kevinrabun/judges</div>
+            <div style="color: var(--text-muted); margin-top: 1rem; margin-bottom: 0.5rem;"># SARIF output for CI</div>
+            <div style="color: var(--green);">npx @kevinrabun/judges eval --file src/ --format sarif</div>
+          </div>
+        </div>`;
+
+      body.innerHTML = `
+        <div class="tab-content active" id="tab-findings">${findingsHtml}</div>
+        <div class="tab-content" id="tab-judges">${judgesHtml}</div>
+        <div class="tab-content" id="tab-cli">${cliHtml}</div>
+      `;
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabId));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.toggle("active", c.id === "tab-" + tabId));
+    }
+
+    function copyCmd() {
+      const text = document.getElementById("cli-copy").textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        btn.textContent = "Copied!";
+        setTimeout(() => btn.textContent = "Copy", 1500);
+      });
+    }
+
+    // Keyboard shortcut: Ctrl/Cmd+Enter to evaluate
+    document.getElementById("code-editor").addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        evaluate();
+      }
+      // Tab key inserts spaces
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const ta = e.target;
+        const start = ta.selectionStart;
+        ta.value = ta.value.slice(0, start) + "  " + ta.value.slice(ta.selectionEnd);
+        ta.selectionStart = ta.selectionEnd = start + 2;
+      }
+    });
+  </script>
+</body>
+</html>

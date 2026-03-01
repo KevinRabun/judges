@@ -36,6 +36,12 @@ const cliCommands = new Set([
   "ci-templates",
   "completions",
   "docs",
+  "feedback",
+  "benchmark",
+  "rule",
+  "pack",
+  "config",
+  "compare",
 ]);
 const cliFlags = new Set(["--help", "-h", "--file", "-f", "--version", "-v"]);
 const firstArg = process.argv[2];
@@ -59,7 +65,7 @@ if (firstArg && (cliCommands.has(firstArg) || cliFlags.has(firstArg))) {
 
       const server = new McpServer({
         name: "judges",
-        version: "3.5.0",
+        version: "3.6.0",
       });
 
       registerTools(server);

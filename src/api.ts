@@ -81,6 +81,78 @@ export type { SarifValidationError } from "./formatters/sarif.js";
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 export { runCli } from "./cli.js";
 
+// ─── Plugin API ──────────────────────────────────────────────────────────────
+export {
+  registerPlugin,
+  unregisterPlugin,
+  getRegisteredPlugins,
+  getCustomRules,
+  getPluginJudges,
+  evaluateCustomRules,
+  runBeforeHooks,
+  runAfterHooks,
+  clearPlugins,
+} from "./plugins.js";
+export type { CustomRule, JudgesPlugin, PluginRegistration } from "./plugins.js";
+
+// ─── AI Code Fingerprinting ─────────────────────────────────────────────────
+export { fingerprintCode, fingerprintToFindings } from "./fingerprint.js";
+export type { AiFingerprint, AiSignal } from "./fingerprint.js";
+
+// ─── Confidence Calibration ─────────────────────────────────────────────────
+export { buildCalibrationProfile, calibrateFindings, autoCalibrateFindings } from "./calibration.js";
+export type { CalibrationProfile } from "./calibration.js";
+
+// ─── Feedback ────────────────────────────────────────────────────────────────
+export { loadFeedbackStore, saveFeedbackStore, computeFeedbackStats, getFpRateByRule } from "./commands/feedback.js";
+export type { FeedbackEntry, FeedbackStore, FeedbackVerdict, FeedbackStats } from "./commands/feedback.js";
+
+// ─── Fix History / Learning ──────────────────────────────────────────────────
+export {
+  loadFixHistory,
+  saveFixHistory,
+  computeFixStats,
+  recordFixAccepted,
+  recordFixRejected,
+  getFixAcceptanceRate,
+  getLowAcceptanceRules,
+} from "./fix-history.js";
+export type { FixOutcome, FixHistory, FixStats } from "./fix-history.js";
+
+// ─── IDE Diagnostics ─────────────────────────────────────────────────────────
+export {
+  findingToDiagnostic,
+  findingsToDiagnostics,
+  findingsToCodeActions,
+  formatForProblemMatcher,
+  formatAsJsonRpc,
+} from "./formatters/diagnostics.js";
+export type {
+  Diagnostic,
+  DiagnosticSeverity,
+  Position,
+  Range,
+  CodeAction,
+  PublishDiagnosticsParams,
+} from "./formatters/diagnostics.js";
+
+// ─── Comparison Benchmarks ───────────────────────────────────────────────────
+export {
+  compareCapabilities,
+  formatComparisonReport,
+  formatFullComparisonMatrix,
+  TOOL_PROFILES,
+  CAPABILITY_MATRIX,
+} from "./comparison.js";
+export type { ToolProfile, ToolCapability, ComparisonResult } from "./comparison.js";
+
+// ─── Language Packs ──────────────────────────────────────────────────────────
+export { getLanguagePack, listLanguagePacks, suggestPack, LANGUAGE_PACKS } from "./commands/language-packs.js";
+
+// ─── Smart Output ────────────────────────────────────────────────────────────
+export { formatSmartOutput, formatSmartSingleJudge } from "./commands/smart-output.js";
+export type { SmartOutputOptions } from "./commands/smart-output.js";
+
 // ─── Convenience Aliases ─────────────────────────────────────────────────────
 
 import { evaluateWithTribunal, evaluateWithJudge } from "./evaluators/index.js";

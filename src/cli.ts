@@ -46,6 +46,12 @@ import { generateGitLabCi, generateAzurePipelines, generateBitbucketPipelines } 
 import { getPreset, listPresets } from "./presets.js";
 import { parseConfig } from "./config.js";
 import type { JudgesConfig } from "./types.js";
+import { runFeedback } from "./commands/feedback.js";
+import { runBenchmark } from "./commands/benchmark.js";
+import { runRule } from "./commands/rule.js";
+import { runPack } from "./commands/language-packs.js";
+import { runConfig } from "./commands/config-share.js";
+import { formatComparisonReport, formatFullComparisonMatrix, TOOL_PROFILES } from "./comparison.js";
 
 // ─── Language Detection from Extension ──────────────────────────────────────
 
@@ -219,6 +225,12 @@ USAGE:
   judges ci-templates <provider>      Generate CI pipeline template
   judges completions <shell>          Generate shell completions
   judges docs                         Generate rule documentation
+  judges feedback                     Track finding feedback (false positives)
+  judges benchmark                    Run detection accuracy benchmarks
+  judges rule                         Create and manage custom rules
+  judges pack                         Manage language-specific rule packs
+  judges config                       Export/import shared team configs
+  judges compare                      Compare judges vs other tools
   judges list                         List all available judges
   judges --help                       Show this help
 
@@ -527,6 +539,53 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "docs") {
     runDocs(argv);
     return;
+  }
+
+  // ─── Feedback Command ─────────────────────────────────────────────────
+  if (args.command === "feedback") {
+    runFeedback(argv);
+    return;
+  }
+
+  // ─── Benchmark Command ────────────────────────────────────────────────
+  if (args.command === "benchmark") {
+    runBenchmark(argv);
+    return;
+  }
+
+  // ─── Rule Command ─────────────────────────────────────────────────────
+  if (args.command === "rule") {
+    runRule(argv);
+    return;
+  }
+
+  // ─── Pack Command ─────────────────────────────────────────────────────
+  if (args.command === "pack") {
+    runPack(argv);
+    return;
+  }
+
+  // ─── Config Command ───────────────────────────────────────────────────
+  if (args.command === "config") {
+    runConfig(argv);
+    return;
+  }
+
+  // ─── Compare Command ─────────────────────────────────────────────────
+  if (args.command === "compare") {
+    const toolName = argv[3];
+    if (!toolName || toolName === "--help" || toolName === "-h" || toolName === "all") {
+      console.log(formatFullComparisonMatrix());
+    } else {
+      const profile = TOOL_PROFILES.find((t) => t.name.toLowerCase() === toolName.toLowerCase());
+      if (!profile) {
+        console.error(`Unknown tool: ${toolName}`);
+        console.error(`Available: ${TOOL_PROFILES.map((t) => t.name).join(", ")}, all`);
+        process.exit(1);
+      }
+      console.log(formatComparisonReport(toolName));
+    }
+    process.exit(0);
   }
 
   // ─── List Command ────────────────────────────────────────────────────

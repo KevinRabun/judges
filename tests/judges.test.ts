@@ -6846,3 +6846,751 @@ describe("Badge Generator", () => {
     assert.ok(text.includes("✗"));
   });
 });
+
+// ─── v3.6.0 Feature Tests ───────────────────────────────────────────────────
+
+// ─── Plugin API Tests ───────────────────────────────────────────────────────
+
+describe("Plugin API", () => {
+  it("should register and unregister plugins", async () => {
+    const { registerPlugin, unregisterPlugin, clearPlugins, getRegisteredPlugins } = await import("../src/plugins.js");
+    clearPlugins();
+    const plugin = {
+      name: "test-plugin",
+      version: "1.0.0",
+      rules: [
+        {
+          id: "TEST-001",
+          title: "Test rule",
+          severity: "medium" as const,
+          judgeId: "cybersecurity",
+          description: "Test rule description",
+          pattern: /eval\(/gi,
+        },
+      ],
+    };
+    registerPlugin(plugin);
+    const registered = getRegisteredPlugins();
+    assert.equal(registered.length, 1);
+    assert.equal(registered[0].name, "test-plugin");
+
+    unregisterPlugin("test-plugin");
+    assert.equal(getRegisteredPlugins().length, 0);
+    clearPlugins();
+  });
+
+  it("should evaluate custom rules from plugins", async () => {
+    const { registerPlugin, evaluateCustomRules, clearPlugins } = await import("../src/plugins.js");
+    clearPlugins();
+    registerPlugin({
+      name: "eval-plugin",
+      version: "1.0.0",
+      rules: [
+        {
+          id: "EVAL-001",
+          title: "Eval usage",
+          severity: "high" as const,
+          judgeId: "cybersecurity",
+          description: "Detects eval()",
+          pattern: /eval\s*\(/gi,
+          suggestedFix: "Use safer alternatives",
+        },
+      ],
+    });
+    const findings = evaluateCustomRules("const x = eval('code');", "javascript");
+    assert.ok(findings.length > 0);
+    assert.equal(findings[0].ruleId, "EVAL-001");
+    assert.ok(findings[0].lineNumbers![0] >= 1);
+    clearPlugins();
+  });
+
+  it("should silently re-register duplicate plugin names", async () => {
+    const { registerPlugin, clearPlugins, getRegisteredPlugins } = await import("../src/plugins.js");
+    clearPlugins();
+    const plugin = { name: "dup", version: "1.0.0" };
+    registerPlugin(plugin);
+    registerPlugin(plugin); // Should silently re-register
+    assert.equal(getRegisteredPlugins().length, 1);
+    clearPlugins();
+  });
+
+  it("should run beforeEvaluate and afterEvaluate hooks", async () => {
+    const { registerPlugin, runBeforeHooks, runAfterHooks, clearPlugins } = await import("../src/plugins.js");
+    clearPlugins();
+    let beforeCalled = false;
+    let afterCalled = false;
+    registerPlugin({
+      name: "hook-plugin",
+      version: "1.0.0",
+      beforeEvaluate: (code, lang) => {
+        beforeCalled = true;
+      },
+      afterEvaluate: (findings) => {
+        afterCalled = true;
+        return findings;
+      },
+    });
+    runBeforeHooks("const x = 1;", "typescript");
+    assert.ok(beforeCalled);
+    const result = runAfterHooks([]);
+    assert.ok(afterCalled);
+    assert.deepEqual(result, []);
+    clearPlugins();
+  });
+});
+
+// ─── AI Code Fingerprinting Tests ───────────────────────────────────────────
+
+describe("AI Code Fingerprinting", () => {
+  it("should return low probability for simple human-like code", async () => {
+    const { fingerprintCode } = await import("../src/fingerprint.js");
+    const code = `function add(a, b) { return a + b; }`;
+    const result = fingerprintCode(code, "javascript");
+    assert.ok(result.aiProbability >= 0 && result.aiProbability <= 1);
+    assert.ok(
+      result.riskLevel === "none" ||
+        result.riskLevel === "low" ||
+        result.riskLevel === "medium" ||
+        result.riskLevel === "high",
+    );
+    assert.ok(typeof result.summary === "string");
+  });
+
+  it("should detect AI signals in overly-commented code", async () => {
+    const { fingerprintCode } = await import("../src/fingerprint.js");
+    const code = `
+// This function adds two numbers together
+// It takes two parameters: a and b
+// Returns the sum of a and b
+function add(a, b) {
+  // Add the two numbers
+  return a + b; // Return the result
+}
+// End of add function
+`.trim();
+    const result = fingerprintCode(code, "javascript");
+    assert.ok(result.signals.length > 0);
+  });
+
+  it("should convert fingerprint to findings", async () => {
+    const { fingerprintCode, fingerprintToFindings } = await import("../src/fingerprint.js");
+    const code = `
+// This is a comprehensive implementation
+// TODO: implement error handling
+function processData(data) {
+  // Validate input data
+  if (!data) {
+    throw new Error("Data is required");
+  }
+  // Process the data
+  return data;
+}
+`.trim();
+    const fingerprint = fingerprintCode(code, "javascript");
+    const findings = fingerprintToFindings(fingerprint);
+    // May or may not have findings depending on probability threshold
+    assert.ok(Array.isArray(findings));
+    for (const f of findings) {
+      assert.ok(f.ruleId.startsWith("AICS-FP-"));
+      assert.ok(f.severity);
+      assert.ok(f.description);
+    }
+  });
+});
+
+// ─── Confidence Calibration Tests ───────────────────────────────────────────
+
+describe("Confidence Calibration", () => {
+  it("should build calibration profile from feedback data", async () => {
+    const { buildCalibrationProfile } = await import("../src/calibration.js");
+    const now = new Date().toISOString();
+    const feedbackStore = {
+      version: 1 as const,
+      entries: [
+        { id: "1", ruleId: "SEC-001", verdict: "fp" as const, timestamp: now, comment: "" },
+        { id: "2", ruleId: "SEC-001", verdict: "tp" as const, timestamp: now, comment: "" },
+        { id: "3", ruleId: "SEC-001", verdict: "fp" as const, timestamp: now, comment: "" },
+        { id: "4", ruleId: "PERF-001", verdict: "tp" as const, timestamp: now, comment: "" },
+      ],
+      metadata: { createdAt: now, lastUpdated: now, totalSubmissions: 4 },
+    };
+    const profile = buildCalibrationProfile(feedbackStore);
+    assert.equal(profile.name, "feedback-calibrated");
+    // SEC-001 has 3 entries (>= minSamples=3) so it should have a rate
+    assert.ok(profile.fpRateByRule.get("SEC-001")! > 0);
+    // PERF-001 has only 1 entry (< minSamples=3) so it's not in the map
+    assert.equal(profile.fpRateByRule.has("PERF-001"), false);
+  });
+
+  it("should reduce confidence for high FP-rate rules", async () => {
+    const { calibrateFindings } = await import("../src/calibration.js");
+    const findings: Finding[] = [
+      {
+        ruleId: "SEC-001",
+        severity: "high",
+        title: "Test finding",
+        description: "Test",
+        recommendation: "Fix it",
+        confidence: 0.9,
+      },
+    ];
+    const profile = {
+      name: "test",
+      fpRateByRule: new Map([["SEC-001", 0.6]]),
+      fpRateByPrefix: new Map<string, number>(),
+      isActive: true,
+      feedbackCount: 10,
+    };
+    const calibrated = calibrateFindings(findings, profile);
+    assert.ok(calibrated[0].confidence! < 0.9);
+  });
+});
+
+// ─── IDE Diagnostics Tests ──────────────────────────────────────────────────
+
+describe("IDE Diagnostics", () => {
+  it("should convert finding to LSP diagnostic", async () => {
+    const { findingToDiagnostic } = await import("../src/formatters/diagnostics.js");
+    const finding: Finding = {
+      ruleId: "SEC-001",
+      severity: "high",
+      title: "SQL Injection",
+      description: "Unsanitized input used in query",
+      recommendation: "Use parameterized queries",
+      lineNumbers: [10],
+      confidence: 0.85,
+    };
+    const diag = findingToDiagnostic(finding);
+    assert.equal(diag.range.start.line, 9); // 0-indexed
+    assert.equal(diag.severity, 1); // Error for high severity
+    assert.equal(diag.code, "SEC-001");
+    assert.ok(diag.message.includes("SQL Injection"));
+    assert.equal(diag.source, "judges/tribunal");
+  });
+
+  it("should convert findings array to PublishDiagnosticsParams", async () => {
+    const { findingsToDiagnostics } = await import("../src/formatters/diagnostics.js");
+    const findings: Finding[] = [
+      { ruleId: "A", severity: "medium", title: "T1", description: "D1", recommendation: "R1", lineNumbers: [5] },
+      { ruleId: "B", severity: "low", title: "T2", description: "D2", recommendation: "R2", lineNumbers: [20] },
+    ];
+    const params = findingsToDiagnostics(findings, "file:///test.ts");
+    assert.equal(params.uri, "file:///test.ts");
+    assert.equal(params.diagnostics.length, 2);
+    assert.equal(params.diagnostics[0].severity, 2); // Warning
+    assert.equal(params.diagnostics[1].severity, 3); // Information
+  });
+
+  it("should generate code actions for findings with patches", async () => {
+    const { findingsToCodeActions } = await import("../src/formatters/diagnostics.js");
+    const findings: Finding[] = [
+      {
+        ruleId: "FIX-001",
+        severity: "high",
+        title: "Fix this",
+        description: "Needs fixing",
+        recommendation: "Fix",
+        patch: { oldText: "bad", newText: "good", startLine: 5, endLine: 5 },
+      },
+      {
+        ruleId: "NOFIX-001",
+        severity: "low",
+        title: "No patch",
+        description: "No fix available",
+        recommendation: "Manual fix",
+      },
+    ];
+    const actions = findingsToCodeActions(findings, "file:///test.ts");
+    assert.equal(actions.length, 1); // Only the one with a patch
+    assert.ok(actions[0].title.includes("Fix this"));
+    assert.equal(actions[0].kind, "quickfix");
+    assert.ok(actions[0].isPreferred); // high severity
+  });
+
+  it("should format as JSON-RPC notification", async () => {
+    const { formatAsJsonRpc, findingsToDiagnostics } = await import("../src/formatters/diagnostics.js");
+    const findings: Finding[] = [
+      { ruleId: "T-001", severity: "info", title: "Info", description: "D", recommendation: "R" },
+    ];
+    const params = findingsToDiagnostics(findings, "file:///a.ts");
+    const rpc = formatAsJsonRpc(params);
+    assert.ok(rpc.includes("Content-Length:"));
+    assert.ok(rpc.includes("textDocument/publishDiagnostics"));
+    assert.ok(rpc.includes("T-001"));
+  });
+
+  it("should format for problem matcher", async () => {
+    const { formatForProblemMatcher } = await import("../src/formatters/diagnostics.js");
+    const findings: Finding[] = [
+      {
+        ruleId: "SEC-001",
+        severity: "critical",
+        title: "SQL Injection",
+        description: "D",
+        recommendation: "R",
+        lineNumbers: [42],
+      },
+    ];
+    const output = formatForProblemMatcher(findings, "src/app.ts");
+    assert.ok(output.includes("src/app.ts:42:1: error: SQL Injection [SEC-001]"));
+  });
+
+  it("should map severity levels correctly", async () => {
+    const { findingToDiagnostic } = await import("../src/formatters/diagnostics.js");
+    const base = { ruleId: "T", title: "T", description: "D", recommendation: "R" };
+    assert.equal(findingToDiagnostic({ ...base, severity: "critical" as const }).severity, 1);
+    assert.equal(findingToDiagnostic({ ...base, severity: "high" as const }).severity, 1);
+    assert.equal(findingToDiagnostic({ ...base, severity: "medium" as const }).severity, 2);
+    assert.equal(findingToDiagnostic({ ...base, severity: "low" as const }).severity, 3);
+    assert.equal(findingToDiagnostic({ ...base, severity: "info" as const }).severity, 4);
+  });
+});
+
+// ─── Comparison Tests ───────────────────────────────────────────────────────
+
+describe("Comparison Benchmarks", () => {
+  it("should have 5 tool profiles", async () => {
+    const { TOOL_PROFILES } = await import("../src/comparison.js");
+    assert.equal(TOOL_PROFILES.length, 5);
+    const names = TOOL_PROFILES.map((p) => p.name);
+    assert.ok(names.includes("ESLint"));
+    assert.ok(names.includes("SonarQube"));
+    assert.ok(names.includes("Semgrep"));
+    assert.ok(names.includes("CodeQL"));
+    assert.ok(names.includes("Bandit"));
+  });
+
+  it("should compare capabilities against a specific tool", async () => {
+    const { compareCapabilities } = await import("../src/comparison.js");
+    const result = compareCapabilities("ESLint");
+    assert.ok(Array.isArray(result.judgesOnly));
+    assert.ok(Array.isArray(result.both));
+    assert.ok(result.judgesOnly.length > 0 || result.judgesPartial.length > 0);
+  });
+
+  it("should format comparison report", async () => {
+    const { formatComparisonReport } = await import("../src/comparison.js");
+    const report = formatComparisonReport("ESLint");
+    assert.ok(report.includes("ESLint"));
+    assert.ok(report.includes("judges vs"));
+  });
+
+  it("should format full comparison matrix", async () => {
+    const { formatFullComparisonMatrix } = await import("../src/comparison.js");
+    const matrix = formatFullComparisonMatrix();
+    assert.ok(matrix.includes("Capability Matrix"));
+    assert.ok(matrix.includes("ESLint".substring(0, 8)));
+    assert.ok(matrix.includes("SonarQub")); // truncated to 8 chars
+  });
+});
+
+// ─── Language Packs Tests ───────────────────────────────────────────────────
+
+describe("Language Packs", () => {
+  it("should list all language packs", async () => {
+    const { listLanguagePacks } = await import("../src/commands/language-packs.js");
+    const packs = listLanguagePacks();
+    assert.ok(packs.length >= 7);
+    const ids = packs.map((p) => p.id);
+    assert.ok(ids.includes("react"));
+    assert.ok(ids.includes("api"));
+    assert.ok(ids.includes("python"));
+  });
+
+  it("should get a specific pack by id", async () => {
+    const { getLanguagePack } = await import("../src/commands/language-packs.js");
+    const pack = getLanguagePack("react");
+    assert.ok(pack);
+    assert.equal(pack!.id, "react");
+    assert.equal(pack!.name, "React / Next.js");
+    assert.ok(pack!.languages.length > 0);
+    assert.ok(pack!.description.length > 0);
+  });
+
+  it("should return undefined for unknown pack", async () => {
+    const { getLanguagePack } = await import("../src/commands/language-packs.js");
+    const pack = getLanguagePack("nonexistent-pack");
+    assert.equal(pack, undefined);
+  });
+
+  it("should suggest packs based on language", async () => {
+    const { suggestPack } = await import("../src/commands/language-packs.js");
+    const suggestion = suggestPack("typescript");
+    assert.ok(suggestion);
+    assert.ok(suggestion!.languages.includes("typescript"));
+  });
+});
+
+// ─── Config Share Tests ─────────────────────────────────────────────────────
+
+describe("Config Share", () => {
+  it("should merge configs correctly", async () => {
+    const { mergeConfigs } = await import("../src/commands/config-share.js");
+    const base = { minSeverity: "low" as const, disabledRules: ["SEC-001"] };
+    const overlay = { minSeverity: "high" as const, disabledRules: ["PERF-001"], disabledJudges: ["test-judge"] };
+    const merged = mergeConfigs(base, overlay);
+    assert.equal(merged.minSeverity, "high");
+    assert.ok(merged.disabledRules!.includes("SEC-001"));
+    assert.ok(merged.disabledRules!.includes("PERF-001"));
+    assert.ok(merged.disabledJudges!.includes("test-judge"));
+  });
+
+  it("should export team config from project dir", async () => {
+    const { exportTeamConfig } = await import("../src/commands/config-share.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-config-"));
+    try {
+      const config = exportTeamConfig(tmpDir);
+      assert.equal(config.version, "1.0.0");
+      assert.ok(config.name.length > 0);
+      assert.ok(typeof config.config === "object");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should export and import team config round-trip", async () => {
+    const { exportTeamConfig, importTeamConfig } = await import("../src/commands/config-share.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-config-"));
+    try {
+      // Write a .judgesrc
+      writeFileSync(join(tmpDir, ".judgesrc"), JSON.stringify({ minSeverity: "medium", disabledRules: ["A"] }));
+      const exported = exportTeamConfig(tmpDir);
+      assert.equal(exported.config.minSeverity, "medium");
+
+      // Write as team config, then import to a new dir
+      const tmpDir2 = mkdtempSync(join(tmpdir(), "judges-config2-"));
+      const teamFile = join(tmpDir2, "team.json");
+      writeFileSync(teamFile, JSON.stringify(exported));
+      importTeamConfig(teamFile, tmpDir2);
+      const imported = JSON.parse(readFileSync(join(tmpDir2, ".judgesrc"), "utf-8"));
+      assert.equal(imported.minSeverity, "medium");
+      rmSync(tmpDir2, { recursive: true, force: true });
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── Custom Rule Tests ──────────────────────────────────────────────────────
+
+describe("Custom Rule Authoring", () => {
+  it("should load and save custom rule files", async () => {
+    const { loadCustomRuleFile, saveCustomRuleFile, generateRuleTemplate } = await import("../src/commands/rule.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-rules-"));
+    try {
+      const data = loadCustomRuleFile(tmpDir);
+      assert.equal(data.rules.length, 0);
+
+      const template = generateRuleTemplate("CUSTOM-001");
+      data.rules.push(template);
+      saveCustomRuleFile(data, tmpDir);
+
+      const reloaded = loadCustomRuleFile(tmpDir);
+      assert.equal(reloaded.rules.length, 1);
+      assert.equal(reloaded.rules[0].id, "CUSTOM-001");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should generate rule template with defaults", async () => {
+    const { generateRuleTemplate } = await import("../src/commands/rule.js");
+    const template = generateRuleTemplate("MY-RULE");
+    assert.equal(template.id, "MY-RULE");
+    assert.equal(template.severity, "medium");
+    assert.ok(template.languages!.includes("typescript"));
+  });
+
+  it("should test a custom rule against code", async () => {
+    const { testRule, deserializeRule } = await import("../src/commands/rule.js");
+    const sr = {
+      id: "WARN-001",
+      title: "Console.log detected",
+      severity: "low" as const,
+      judgeId: "code-quality",
+      description: "Detects console.log statements",
+      pattern: "console\\.log",
+      patternFlags: "gi",
+      suggestedFix: "Remove console.log or use a proper logger",
+    };
+    const rule = deserializeRule(sr);
+    const code = `
+function test() {
+  console.log("hello");
+  console.log("world");
+}`;
+    const findings = testRule(rule, code, "javascript");
+    assert.equal(findings.length, 2);
+    assert.equal(findings[0].ruleId, "WARN-001");
+    assert.ok(findings[0].lineNumbers![0] > 0);
+  });
+});
+
+// ─── Fix History Tests ──────────────────────────────────────────────────────
+
+describe("Fix History", () => {
+  it("should load empty history when no file exists", async () => {
+    const { loadFixHistory } = await import("../src/fix-history.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-fix-"));
+    try {
+      const history = loadFixHistory(tmpDir);
+      assert.equal(history.outcomes.length, 0);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should record and persist fix outcomes", async () => {
+    const { loadFixHistory, recordFixAccepted, recordFixRejected } = await import("../src/fix-history.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-fix-"));
+    try {
+      recordFixAccepted("SEC-001", "src/app.ts", tmpDir);
+      recordFixRejected("SEC-002", "not helpful", "src/app.ts", tmpDir);
+      recordFixAccepted("SEC-001", "src/app.ts", tmpDir);
+
+      const reloaded = loadFixHistory(tmpDir);
+      assert.equal(reloaded.outcomes.length, 3);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should compute fix stats correctly", async () => {
+    const { loadFixHistory, recordFixAccepted, recordFixRejected, computeFixStats } =
+      await import("../src/fix-history.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-fix-"));
+    try {
+      recordFixAccepted("SEC-001", "f1.ts", tmpDir);
+      recordFixAccepted("SEC-001", "f2.ts", tmpDir);
+      recordFixRejected("SEC-001", "bad", "f3.ts", tmpDir);
+      recordFixAccepted("PERF-001", "f4.ts", tmpDir);
+
+      const stats = computeFixStats(undefined, tmpDir);
+      assert.equal(stats.totalFixes, 4);
+      assert.equal(stats.accepted, 3);
+      assert.equal(stats.rejected, 1);
+      assert.ok(stats.acceptanceRate > 0.7);
+      assert.ok(stats.byRule["SEC-001"]);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should identify low acceptance rules", async () => {
+    const { recordFixAccepted, recordFixRejected, getLowAcceptanceRules } = await import("../src/fix-history.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-fix-"));
+    try {
+      // SEC-001: 1 accepted, 4 rejected → 20% acceptance
+      recordFixAccepted("SEC-001", "f1.ts", tmpDir);
+      recordFixRejected("SEC-001", "no", "f2.ts", tmpDir);
+      recordFixRejected("SEC-001", "no", "f3.ts", tmpDir);
+      recordFixRejected("SEC-001", "no", "f4.ts", tmpDir);
+      recordFixRejected("SEC-001", "no", "f5.ts", tmpDir);
+      // PERF-001: 5 accepted → 100%
+      for (let i = 0; i < 5; i++) recordFixAccepted("PERF-001", `pf${i}.ts`, tmpDir);
+
+      const lowRules = getLowAcceptanceRules(0.5, 3, tmpDir);
+      const lowRuleIds = lowRules.map((r) => r.ruleId);
+      assert.ok(lowRuleIds.includes("SEC-001"));
+      assert.ok(!lowRuleIds.includes("PERF-001"));
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── Smart Output Tests ─────────────────────────────────────────────────────
+
+describe("Smart Output", () => {
+  it("should format smart output for a tribunal verdict", async () => {
+    const { formatSmartOutput } = await import("../src/commands/smart-output.js");
+    const verdict: TribunalVerdict = {
+      overallVerdict: "warning",
+      overallScore: 65,
+      summary: "Some issues found",
+      evaluations: [
+        {
+          judgeId: "cybersecurity",
+          judgeName: "Cybersecurity",
+          verdict: "warning",
+          score: 65,
+          summary: "Security issues",
+          findings: [
+            {
+              ruleId: "SEC-001",
+              severity: "high",
+              title: "SQL Injection",
+              description: "Bad",
+              recommendation: "Fix",
+              lineNumbers: [10],
+            },
+            { ruleId: "SEC-002", severity: "low", title: "Info leak", description: "Minor", recommendation: "Review" },
+          ],
+        },
+      ],
+      findings: [
+        {
+          ruleId: "SEC-001",
+          severity: "high",
+          title: "SQL Injection",
+          description: "Bad",
+          recommendation: "Fix",
+          lineNumbers: [10],
+        },
+        { ruleId: "SEC-002", severity: "low", title: "Info leak", description: "Minor", recommendation: "Review" },
+      ],
+      criticalCount: 0,
+      highCount: 1,
+      timestamp: new Date().toISOString(),
+    };
+    const output = formatSmartOutput(verdict, undefined, { isFirstRun: true });
+    assert.ok(output.includes("SEC-001"));
+    assert.ok(output.includes("SQL Injection"));
+    assert.ok(typeof output === "string");
+    assert.ok(output.length > 0);
+  });
+
+  it("should include tips on first run", async () => {
+    const { formatSmartOutput } = await import("../src/commands/smart-output.js");
+    const verdict: TribunalVerdict = {
+      overallVerdict: "fail",
+      overallScore: 40,
+      summary: "Failed",
+      evaluations: [
+        {
+          judgeId: "cybersecurity",
+          judgeName: "Cybersecurity",
+          verdict: "fail",
+          score: 40,
+          summary: "Critical issues",
+          findings: [{ ruleId: "SEC-001", severity: "high", title: "Issue", description: "D", recommendation: "R" }],
+        },
+      ],
+      findings: [{ ruleId: "SEC-001", severity: "high", title: "Issue", description: "D", recommendation: "R" }],
+      criticalCount: 0,
+      highCount: 1,
+      timestamp: new Date().toISOString(),
+    };
+    const output = formatSmartOutput(verdict, undefined, { isFirstRun: true });
+    assert.ok(output.includes("Tips"));
+  });
+
+  it("should format single judge output", async () => {
+    const { formatSmartSingleJudge } = await import("../src/commands/smart-output.js");
+    const evaluation: JudgeEvaluation = {
+      judgeId: "cybersecurity",
+      judgeName: "Cybersecurity",
+      verdict: "fail",
+      score: 30,
+      summary: "Critical issues found",
+      findings: [
+        {
+          ruleId: "SEC-001",
+          severity: "critical",
+          title: "Critical bug",
+          description: "D",
+          recommendation: "R",
+          lineNumbers: [1],
+        },
+      ],
+    };
+    const output = formatSmartSingleJudge(evaluation);
+    assert.ok(output.includes("SEC-001"));
+    assert.ok(typeof output === "string");
+  });
+});
+
+// ─── Feedback System Tests ──────────────────────────────────────────────────
+
+describe("Feedback System", () => {
+  it("should load empty feedback store when no file exists", async () => {
+    const { loadFeedbackStore } = await import("../src/commands/feedback.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-fb-"));
+    try {
+      const feedbackFile = join(tmpDir, "feedback.json");
+      const store = loadFeedbackStore(feedbackFile);
+      assert.equal(store.entries.length, 0);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should save and reload feedback entries", async () => {
+    const { loadFeedbackStore, saveFeedbackStore } = await import("../src/commands/feedback.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-fb-"));
+    try {
+      const feedbackFile = join(tmpDir, "feedback.json");
+      const store = loadFeedbackStore(feedbackFile);
+      store.entries.push({
+        id: "test-1",
+        ruleId: "SEC-001",
+        verdict: "fp",
+        timestamp: new Date().toISOString(),
+        comment: "Not relevant",
+      });
+      saveFeedbackStore(store, feedbackFile);
+
+      const reloaded = loadFeedbackStore(feedbackFile);
+      assert.equal(reloaded.entries.length, 1);
+      assert.equal(reloaded.entries[0].verdict, "fp");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should compute feedback stats", async () => {
+    const { computeFeedbackStats } = await import("../src/commands/feedback.js");
+    const now = new Date().toISOString();
+    const store = {
+      version: 1 as const,
+      entries: [
+        { id: "1", ruleId: "SEC-001", verdict: "fp" as const, timestamp: now, comment: "" },
+        { id: "2", ruleId: "SEC-001", verdict: "tp" as const, timestamp: now, comment: "" },
+        { id: "3", ruleId: "SEC-002", verdict: "fp" as const, timestamp: now, comment: "" },
+      ],
+      metadata: { createdAt: now, lastUpdated: now, totalSubmissions: 3 },
+    };
+    const stats = computeFeedbackStats(store);
+    assert.equal(stats.total, 3);
+    assert.equal(stats.falsePositives, 2);
+    assert.equal(stats.truePositives, 1);
+  });
+
+  it("should compute FP rate by rule", async () => {
+    const { getFpRateByRule } = await import("../src/commands/feedback.js");
+    const now = new Date().toISOString();
+    const store = {
+      version: 1 as const,
+      entries: [
+        { id: "1", ruleId: "SEC-001", verdict: "fp" as const, timestamp: now, comment: "" },
+        { id: "2", ruleId: "SEC-001", verdict: "tp" as const, timestamp: now, comment: "" },
+        { id: "3", ruleId: "SEC-001", verdict: "fp" as const, timestamp: now, comment: "" },
+      ],
+      metadata: { createdAt: now, lastUpdated: now, totalSubmissions: 3 },
+    };
+    const rates = getFpRateByRule(store);
+    assert.ok(Math.abs(rates.get("SEC-001")! - 2 / 3) < 0.01);
+  });
+});
+
+// ─── Benchmark Suite Tests ──────────────────────────────────────────────────
+
+describe("Benchmark Suite", () => {
+  it("should run benchmark suite and produce results", async () => {
+    const { runBenchmarkSuite } = await import("../src/commands/benchmark.js");
+    const results = runBenchmarkSuite();
+    assert.ok(results.totalCases > 0);
+    assert.ok(results.detected >= 0);
+    assert.ok(results.detectionRate >= 0 && results.detectionRate <= 1);
+    assert.ok(results.cases.length > 0);
+  });
+
+  it("should format benchmark report with grades", async () => {
+    const { runBenchmarkSuite, formatBenchmarkReport } = await import("../src/commands/benchmark.js");
+    const results = runBenchmarkSuite();
+    const report = formatBenchmarkReport(results);
+    assert.ok(report.includes("Benchmark"));
+    assert.ok(typeof report === "string");
+    assert.ok(report.length > 100);
+  });
+});

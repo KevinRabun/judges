@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Judges Enterprise Dashboard</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --red: #f85149;
+      --orange: #db6d28;
+      --purple: #bc8cff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+    header { text-align: center; margin-bottom: 2rem; }
+    header h1 { font-size: 2.2rem; margin-bottom: 0.5rem; }
+    header p { color: var(--text-muted); font-size: 1.1rem; }
+    .nav-links { text-align: center; margin-bottom: 2rem; }
+    .nav-links a {
+      color: var(--accent);
+      text-decoration: none;
+      margin: 0 1rem;
+      font-size: 0.95rem;
+    }
+    .nav-links a:hover { text-decoration: underline; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem;
+      text-align: center;
+    }
+    .stat-card .value { font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .stat-card .label { color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-card .value.green { color: var(--green); }
+    .stat-card .value.yellow { color: var(--yellow); }
+    .stat-card .value.red { color: var(--red); }
+    .stat-card .value.accent { color: var(--accent); }
+    .stat-card .value.purple { color: var(--purple); }
+    .section { margin-bottom: 2.5rem; }
+    .section h2 { font-size: 1.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+
+    /* Project cards */
+    .project-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1rem;
+    }
+    .project-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .project-card:hover { border-color: var(--accent); }
+    .project-card h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+    .project-card .meta { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem; }
+    .severity-bar {
+      display: flex;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+    .severity-bar .seg-critical { background: var(--red); }
+    .severity-bar .seg-high { background: var(--orange); }
+    .severity-bar .seg-medium { background: var(--yellow); }
+    .severity-bar .seg-low { background: var(--green); }
+    .score-badges { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .score-badge {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+    }
+    .score-badge.pass { border-color: var(--green); color: var(--green); }
+    .score-badge.warn { border-color: var(--yellow); color: var(--yellow); }
+    .score-badge.fail { border-color: var(--red); color: var(--red); }
+
+    /* Trend chart (CSS-only sparkline) */
+    .trend-container { display: flex; align-items: flex-end; gap: 2px; height: 40px; }
+    .trend-bar {
+      flex: 1;
+      background: var(--accent);
+      border-radius: 2px 2px 0 0;
+      min-width: 6px;
+      opacity: 0.8;
+    }
+    .trend-bar:last-child { opacity: 1; }
+    .trend-bar.red { background: var(--red); }
+    .trend-bar.yellow { background: var(--yellow); }
+    .trend-bar.green { background: var(--green); }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      text-align: left;
+      padding: 0.6rem 0.8rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    th { color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.8rem; }
+    tr:hover { background: rgba(88,166,255,0.05); }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+    .tab {
+      padding: 0.5rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .tab:hover { border-color: var(--accent); }
+    .tab.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Health indicator */
+    .health { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.5rem; }
+    .health.healthy { background: var(--green); }
+    .health.warning { background: var(--yellow); }
+    .health.critical { background: var(--red); }
+
+    footer { text-align: center; color: var(--text-muted); margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.85rem; }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚖️ Judges Enterprise Dashboard</h1>
+      <p>Multi-project code quality aggregation and trend analysis</p>
+    </header>
+
+    <div class="nav-links">
+      <a href="index.html">← Dashboard</a>
+      <a href="playground.html">Playground</a>
+    </div>
+
+    <!-- Global Stats -->
+    <div class="stats-grid" id="globalStats"></div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" data-tab="projects">Projects</div>
+      <div class="tab" data-tab="trends">Trends</div>
+      <div class="tab" data-tab="rules">Top Rules</div>
+      <div class="tab" data-tab="compliance">Compliance</div>
+    </div>
+
+    <!-- Projects Tab -->
+    <div class="tab-content active" id="tab-projects">
+      <div class="section">
+        <h2>Project Overview</h2>
+        <div class="project-grid" id="projectGrid"></div>
+      </div>
+    </div>
+
+    <!-- Trends Tab -->
+    <div class="tab-content" id="tab-trends">
+      <div class="section">
+        <h2>Finding Trends (Last 14 Days)</h2>
+        <div id="trendsContent"></div>
+      </div>
+    </div>
+
+    <!-- Top Rules Tab -->
+    <div class="tab-content" id="tab-rules">
+      <div class="section">
+        <h2>Most Triggered Rules</h2>
+        <table id="rulesTable">
+          <thead>
+            <tr><th>Rule ID</th><th>Title</th><th>Occurrences</th><th>Projects</th><th>Severity</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Compliance Tab -->
+    <div class="tab-content" id="tab-compliance">
+      <div class="section">
+        <h2>Compliance Status</h2>
+        <div id="complianceContent"></div>
+      </div>
+    </div>
+
+    <footer>
+      <p>Judges v3.6.0 — Enterprise Dashboard</p>
+      <p><a href="index.html">Dashboard</a> · <a href="playground.html">Playground</a> · <a href="https://github.com/KevinRabun/judges">GitHub</a></p>
+    </footer>
+  </div>
+
+  <script>
+    // ─── Sample Enterprise Data ─────────────────────────────────────────────
+    // In production, this would be loaded from a JSON API or file
+
+    const enterpriseData = {
+      projects: [
+        {
+          name: "api-gateway",
+          language: "TypeScript",
+          lastScan: "2025-01-15T10:30:00Z",
+          health: "warning",
+          findings: { critical: 2, high: 5, medium: 12, low: 8 },
+          score: 72,
+          trend: [18, 22, 20, 19, 15, 14, 12, 10, 15, 18, 20, 22, 19, 15],
+          compliance: { fedramp: "partial", gdpr: "pass" },
+        },
+        {
+          name: "user-service",
+          language: "Python",
+          lastScan: "2025-01-15T10:30:00Z",
+          health: "healthy",
+          findings: { critical: 0, high: 1, medium: 4, low: 6 },
+          score: 91,
+          trend: [15, 12, 10, 8, 6, 5, 4, 3, 2, 2, 1, 1, 1, 1],
+          compliance: { fedramp: "pass", gdpr: "pass" },
+        },
+        {
+          name: "payment-processor",
+          language: "Java",
+          lastScan: "2025-01-14T22:00:00Z",
+          health: "critical",
+          findings: { critical: 5, high: 8, medium: 15, low: 3 },
+          score: 45,
+          trend: [10, 12, 15, 18, 22, 25, 28, 30, 28, 25, 22, 20, 18, 25],
+          compliance: { fedramp: "fail", gdpr: "partial" },
+        },
+        {
+          name: "web-frontend",
+          language: "TypeScript",
+          lastScan: "2025-01-15T08:00:00Z",
+          health: "healthy",
+          findings: { critical: 0, high: 0, medium: 3, low: 10 },
+          score: 95,
+          trend: [8, 7, 6, 5, 4, 4, 3, 3, 3, 2, 2, 2, 1, 1],
+          compliance: { fedramp: "pass", gdpr: "pass" },
+        },
+        {
+          name: "data-pipeline",
+          language: "Python",
+          lastScan: "2025-01-15T06:00:00Z",
+          health: "warning",
+          findings: { critical: 1, high: 3, medium: 8, low: 5 },
+          score: 78,
+          trend: [20, 18, 16, 14, 12, 10, 8, 10, 12, 14, 16, 14, 12, 10],
+          compliance: { fedramp: "partial", gdpr: "partial" },
+        },
+        {
+          name: "mobile-backend",
+          language: "Go",
+          lastScan: "2025-01-15T09:00:00Z",
+          health: "healthy",
+          findings: { critical: 0, high: 2, medium: 5, low: 7 },
+          score: 88,
+          trend: [12, 10, 8, 7, 6, 5, 5, 4, 4, 3, 3, 3, 2, 2],
+          compliance: { fedramp: "pass", gdpr: "pass" },
+        },
+      ],
+      topRules: [
+        { ruleId: "SEC-SQL-001", title: "SQL Injection", count: 12, projects: 3, severity: "critical" },
+        { ruleId: "SEC-XSS-001", title: "Cross-Site Scripting", count: 8, projects: 2, severity: "high" },
+        { ruleId: "AUTH-HASH-001", title: "Weak Password Hashing", count: 7, projects: 4, severity: "high" },
+        { ruleId: "PERF-CACHE-001", title: "Missing Cache Headers", count: 15, projects: 5, severity: "medium" },
+        { ruleId: "REL-ERR-001", title: "Unhandled Error", count: 22, projects: 6, severity: "medium" },
+        { ruleId: "API-VAL-001", title: "Missing Input Validation", count: 10, projects: 3, severity: "high" },
+        { ruleId: "STRUCT-COMPLEX", title: "High Cyclomatic Complexity", count: 18, projects: 4, severity: "low" },
+        { ruleId: "SEC-SECRET-001", title: "Hardcoded Secret", count: 5, projects: 2, severity: "critical" },
+        { ruleId: "ACC-ARIA-001", title: "Missing ARIA Labels", count: 9, projects: 1, severity: "medium" },
+        { ruleId: "CICD-PIN-001", title: "Unpinned CI Action", count: 6, projects: 3, severity: "medium" },
+      ],
+    };
+
+    // ─── Render Global Stats ────────────────────────────────────────────────
+
+    function renderGlobalStats() {
+      const totalFindings = enterpriseData.projects.reduce(
+        (sum, p) => sum + p.findings.critical + p.findings.high + p.findings.medium + p.findings.low, 0
+      );
+      const totalCritical = enterpriseData.projects.reduce((s, p) => s + p.findings.critical, 0);
+      const avgScore = Math.round(
+        enterpriseData.projects.reduce((s, p) => s + p.score, 0) / enterpriseData.projects.length
+      );
+      const healthyCount = enterpriseData.projects.filter(p => p.health === "healthy").length;
+      const compliancePass = enterpriseData.projects.filter(
+        p => p.compliance.fedramp === "pass" && p.compliance.gdpr === "pass"
+      ).length;
+
+      const stats = [
+        { value: enterpriseData.projects.length, label: "Projects", cls: "accent" },
+        { value: totalFindings, label: "Total Findings", cls: totalFindings > 50 ? "yellow" : "green" },
+        { value: totalCritical, label: "Critical", cls: totalCritical > 0 ? "red" : "green" },
+        { value: avgScore, label: "Avg Score", cls: avgScore >= 80 ? "green" : avgScore >= 60 ? "yellow" : "red" },
+        { value: healthyCount + "/" + enterpriseData.projects.length, label: "Healthy", cls: "green" },
+        { value: compliancePass + "/" + enterpriseData.projects.length, label: "Compliant", cls: compliancePass === enterpriseData.projects.length ? "green" : "yellow" },
+      ];
+
+      document.getElementById("globalStats").innerHTML = stats.map(s =>
+        `<div class="stat-card"><div class="value ${s.cls}">${s.value}</div><div class="label">${s.label}</div></div>`
+      ).join("");
+    }
+
+    // ─── Render Project Grid ────────────────────────────────────────────────
+
+    function renderProjects() {
+      const grid = document.getElementById("projectGrid");
+      grid.innerHTML = enterpriseData.projects.map(p => {
+        const total = p.findings.critical + p.findings.high + p.findings.medium + p.findings.low;
+        const pct = (v) => total > 0 ? (v / total * 100) + "%" : "0%";
+        const scoreClass = p.score >= 80 ? "pass" : p.score >= 60 ? "warn" : "fail";
+        const fedrampClass = p.compliance.fedramp === "pass" ? "pass" : p.compliance.fedramp === "partial" ? "warn" : "fail";
+        const gdprClass = p.compliance.gdpr === "pass" ? "pass" : p.compliance.gdpr === "partial" ? "warn" : "fail";
+
+        return `
+          <div class="project-card">
+            <h3><span class="health ${p.health}"></span>${p.name}</h3>
+            <div class="meta">${p.language} · Last scan: ${new Date(p.lastScan).toLocaleDateString()} · ${total} findings</div>
+            <div class="severity-bar">
+              <div class="seg-critical" style="width:${pct(p.findings.critical)}"></div>
+              <div class="seg-high" style="width:${pct(p.findings.high)}"></div>
+              <div class="seg-medium" style="width:${pct(p.findings.medium)}"></div>
+              <div class="seg-low" style="width:${pct(p.findings.low)}"></div>
+            </div>
+            <div class="score-badges">
+              <span class="score-badge ${scoreClass}">Score: ${p.score}</span>
+              <span class="score-badge ${fedrampClass}">FedRAMP: ${p.compliance.fedramp}</span>
+              <span class="score-badge ${gdprClass}">GDPR: ${p.compliance.gdpr}</span>
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    // ─── Render Trends ──────────────────────────────────────────────────────
+
+    function renderTrends() {
+      const content = document.getElementById("trendsContent");
+      content.innerHTML = enterpriseData.projects.map(p => {
+        const max = Math.max(...p.trend, 1);
+        const bars = p.trend.map((v, i) => {
+          const h = Math.max(4, (v / max) * 40);
+          const cls = v > max * 0.7 ? "red" : v > max * 0.4 ? "yellow" : "green";
+          return `<div class="trend-bar ${cls}" style="height:${h}px" title="Day ${i + 1}: ${v} findings"></div>`;
+        }).join("");
+
+        const latest = p.trend[p.trend.length - 1];
+        const first = p.trend[0];
+        const delta = latest - first;
+        const arrow = delta < 0 ? "↓" : delta > 0 ? "↑" : "→";
+        const color = delta < 0 ? "var(--green)" : delta > 0 ? "var(--red)" : "var(--text-muted)";
+
+        return `
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+              <strong>${p.name}</strong>
+              <span style="color:${color};font-weight:600">${arrow} ${Math.abs(delta)} findings</span>
+            </div>
+            <div class="trend-container">${bars}</div>
+          </div>`;
+      }).join("");
+    }
+
+    // ─── Render Rules Table ─────────────────────────────────────────────────
+
+    function renderRules() {
+      const tbody = document.querySelector("#rulesTable tbody");
+      tbody.innerHTML = enterpriseData.topRules.map(r => {
+        const sevColor = { critical: "var(--red)", high: "var(--orange)", medium: "var(--yellow)", low: "var(--green)" };
+        return `
+          <tr>
+            <td><code>${r.ruleId}</code></td>
+            <td>${r.title}</td>
+            <td>${r.count}</td>
+            <td>${r.projects}</td>
+            <td style="color:${sevColor[r.severity] || "inherit"}">${r.severity}</td>
+          </tr>`;
+      }).join("");
+    }
+
+    // ─── Render Compliance ──────────────────────────────────────────────────
+
+    function renderCompliance() {
+      const content = document.getElementById("complianceContent");
+      const frameworks = ["fedramp", "gdpr"];
+
+      let html = "";
+      for (const fw of frameworks) {
+        const pass = enterpriseData.projects.filter(p => p.compliance[fw] === "pass").length;
+        const partial = enterpriseData.projects.filter(p => p.compliance[fw] === "partial").length;
+        const fail = enterpriseData.projects.filter(p => p.compliance[fw] === "fail").length;
+        const total = enterpriseData.projects.length;
+
+        html += `
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+            <h3 style="margin-bottom:0.75rem;">${fw.toUpperCase()}</h3>
+            <div class="severity-bar" style="height:12px;margin-bottom:0.75rem;">
+              <div class="seg-low" style="width:${(pass/total)*100}%"></div>
+              <div class="seg-medium" style="width:${(partial/total)*100}%"></div>
+              <div class="seg-critical" style="width:${(fail/total)*100}%"></div>
+            </div>
+            <div style="display:flex;gap:1rem;font-size:0.9rem;">
+              <span style="color:var(--green)">● ${pass} Pass</span>
+              <span style="color:var(--yellow)">● ${partial} Partial</span>
+              <span style="color:var(--red)">● ${fail} Fail</span>
+            </div>
+            <table style="margin-top:0.75rem;">
+              <thead><tr><th>Project</th><th>Status</th></tr></thead>
+              <tbody>
+                ${enterpriseData.projects.map(p => {
+                  const status = p.compliance[fw];
+                  const cls = status === "pass" ? "pass" : status === "partial" ? "warn" : "fail";
+                  return `<tr><td>${p.name}</td><td><span class="score-badge ${cls}">${status}</span></td></tr>`;
+                }).join("")}
+              </tbody>
+            </table>
+          </div>`;
+      }
+
+      content.innerHTML = html;
+    }
+
+    // ─── Tab Switching ──────────────────────────────────────────────────────
+
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+        tab.classList.add("active");
+        document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
+      });
+    });
+
+    // ─── Init ───────────────────────────────────────────────────────────────
+
+    renderGlobalStats();
+    renderProjects();
+    renderTrends();
+    renderRules();
+    renderCompliance();
+  </script>
+</body>
+</html>
