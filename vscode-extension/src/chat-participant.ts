@@ -38,15 +38,19 @@ const SEVERITY_ICON: Record<string, string> = {
 export function registerChatParticipant(context: vscode.ExtensionContext): void {
   try {
     if (!vscode.chat?.createChatParticipant) {
-      return; // API not available on older VS Code — skip silently
+      console.warn(
+        "Judges: vscode.chat.createChatParticipant API not available — skipping chat participant registration.",
+      );
+      return;
     }
 
     const participant = vscode.chat.createChatParticipant("judges-panel.judges", handleChatRequest);
     participant.iconPath = new vscode.ThemeIcon("shield");
 
     context.subscriptions.push(participant);
-  } catch {
-    // Graceful degradation — Layer 1 diagnostics still work
+  } catch (error) {
+    // Log the error so it's visible in Developer Tools, but don't crash the extension
+    console.error("Judges: Failed to register chat participant:", error);
   }
 }
 

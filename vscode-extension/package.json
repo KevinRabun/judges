@@ -35,6 +35,7 @@
     "auto-fix"
   ],
   "activationEvents": [
+    "onChatParticipant:judges-panel.judges",
     "onLanguage:typescript",
     "onLanguage:javascript",
     "onLanguage:python",
