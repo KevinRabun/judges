@@ -2866,6 +2866,32 @@ function isExportAllowed(dataClass, targetRegion) {
     );
     assert.strictEqual(exportFindings.length, 0, "Should not flag JSDoc describing export policy as missing controls");
   });
+
+  it("should NOT flag variable names containing 'dr' substring (e.g., normalizedRegion) as replication", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const regionCode = `
+const approvedJurisdictions = ["local", "us", "eu"];
+
+function validateRegion(targetRegion) {
+  const normalizedRegion = String(targetRegion || "unknown").trim().toLowerCase();
+  if (!approvedJurisdictions.includes(normalizedRegion)) {
+    throw new Error("Region not allowed");
+  }
+  return normalizedRegion;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, regionCode, "javascript");
+    const replicationFindings = evaluation.findings.filter(
+      (f) => f.title === "Replication/backup configuration may violate localization requirements",
+    );
+    assert.strictEqual(
+      replicationFindings.length,
+      0,
+      "Should not flag 'normalizedRegion' as replication — 'dr' is a substring, not the acronym",
+    );
+  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

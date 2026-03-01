@@ -78,7 +78,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     const trimmed = line.trim();
     if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (
-      /(replica|replication|backup|dr|disaster.?recovery|geo-?redundant|read.?replica)/i.test(line) &&
+      /(\breplica\b|replication|backup|\bdr\b|disaster.?recovery|geo-?redundant|read.?replica)/i.test(line) &&
       !/same.?region|region.?locked|sovereign|local.?zone/i.test(line)
     ) {
       replicationLines.push(index + 1);
