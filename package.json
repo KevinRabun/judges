@@ -1,6 +1,6 @@
 {
   "name": "@kevinrabun/judges",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "description": "35 specialized judges that evaluate AI-generated code for security, cost, and quality.",
   "mcpName": "io.github.KevinRabun/judges",
   "type": "module",
@@ -21,6 +21,18 @@
     "./sarif": {
       "import": "./dist/formatters/sarif.js",
       "types": "./dist/formatters/sarif.d.ts"
+    },
+    "./junit": {
+      "import": "./dist/formatters/junit.js",
+      "types": "./dist/formatters/junit.d.ts"
+    },
+    "./codeclimate": {
+      "import": "./dist/formatters/codeclimate.js",
+      "types": "./dist/formatters/codeclimate.d.ts"
+    },
+    "./badge": {
+      "import": "./dist/formatters/badge.js",
+      "types": "./dist/formatters/badge.d.ts"
     }
   },
   "bin": {
@@ -30,6 +42,7 @@
     "dist",
     "grammars",
     "server.json",
+    "judgesrc.schema.json",
     "README.md",
     "LICENSE"
   ],

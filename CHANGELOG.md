@@ -2,6 +2,66 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.5.0] — 2026-03-06
+
+### Added
+- **`judges diff` command** — evaluate only changed lines from unified diff / git diff output. Pipe `git diff` directly or pass a patch file.
+- **`judges deps` command** — analyze project dependencies for supply-chain risks across 11 manifest types (package.json, requirements.txt, Cargo.toml, go.mod, pom.xml, etc.).
+- **`judges baseline create` command** — create a baseline JSON file from current findings for future suppression.
+- **`judges completions` command** — generate shell completion scripts for bash, zsh, fish, and PowerShell.
+- **`judges docs` command** — generate per-judge rule documentation in Markdown format, with `--output` for file output.
+- **JUnit XML formatter** (`--format junit`) — CI/CD compatible output for Jenkins, Azure DevOps, GitHub Actions, GitLab CI.
+- **CodeClimate JSON formatter** (`--format codeclimate`) — GitLab Code Quality widget compatible output with MD5 fingerprints.
+- **Named presets** (`--preset`) — 6 built-in profiles: `strict`, `lenient`, `security-only`, `startup`, `compliance`, `performance`.
+- **Config file support** (`--config`) — auto-discovers `.judgesrc` / `.judgesrc.json` in project root with full JSON Schema validation support.
+- **`judgesrc.schema.json`** — JSON Schema for `.judgesrc` files with IDE autocomplete and validation.
+- **`--min-score` flag** — exit non-zero when overall score falls below threshold (e.g. `--min-score 80`).
+- **`--verbose` flag** — timing statistics and file-level detail in output.
+- **`--quiet` flag** — suppress informational output, only show findings.
+- **`--no-color` flag** — disable ANSI color codes for piped output.
+- **CI Templates** — `judges ci-templates github` generates GitHub Actions workflow YAML.
+- **24 new tests** covering all new formatters, commands, presets, and JSON Schema validation.
+
+### Changed
+- CLI expanded from 8 to 14 commands.
+- Output formats expanded from 5 to 7 (added `junit`, `codeclimate`).
+- Total test count: **754** (up from 730).
+
+---
+
+## [3.4.0] — 2026-03-04
+
+### Added
+- **Init wizard** (`judges init`) — interactive project setup generating `.judgesrc` config.
+- **Fix command** (`judges fix`) — auto-apply suggested patches from findings with `--apply` flag.
+- **Watch mode** (`judges watch`) — file-system watcher for continuous evaluation during development.
+- **Report command** (`judges report`) — full project analysis with HTML/JSON/Markdown output.
+- **Hook command** (`judges hook`) — git pre-commit hook installation.
+- **HTML formatter** — interactive browser-based report with severity filters and per-judge sections.
+- **Baseline suppression** — suppress known findings from previous runs.
+- **CI template generator** — `judges ci-templates` for GitLab CI, Azure Pipelines, Bitbucket Pipelines.
+
+### Changed
+- Total test count: **730**.
+
+---
+
+## [3.3.0] — 2026-03-02
+
+### Changed
+- **Unified tree-sitter AST** — consolidated `typescript-ast.ts` into `tree-sitter-ast.ts`, single parser for all 8 languages.
+- Removed legacy TypeScript Compiler API dependency.
+
+---
+
+## [3.2.0] — 2026-02-29
+
+### Added
+- **Tree-sitter WASM integration** — structural AST analysis for 8 languages (TypeScript, JavaScript, Python, Go, Rust, Java, C#, C++).
+- Language-specific structural patterns for each grammar.
+
+---
+
 ## [3.1.1] — 2026-02-28
 
 ### Added
@@ -95,6 +155,11 @@ All notable changes to **@kevinrabun/judges** are documented here.
 
 ---
 
+[3.5.0]: https://github.com/KevinRabun/judges/compare/v3.4.0...v3.5.0
+[3.4.0]: https://github.com/KevinRabun/judges/compare/v3.3.0...v3.4.0
+[3.3.0]: https://github.com/KevinRabun/judges/compare/v3.2.0...v3.3.0
+[3.2.0]: https://github.com/KevinRabun/judges/compare/v3.1.1...v3.2.0
+[3.1.1]: https://github.com/KevinRabun/judges/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/KevinRabun/judges/compare/v3.0.3...v3.1.0
 [3.0.3]: https://github.com/KevinRabun/judges/compare/v3.0.2...v3.0.3
 [3.0.2]: https://github.com/KevinRabun/judges/compare/v3.0.1...v3.0.2

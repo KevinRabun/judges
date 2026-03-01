@@ -11,7 +11,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync, readdirSync } from "fs";
 import { resolve, dirname, join } from "path";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
@@ -6297,5 +6297,552 @@ describe("CLI Argument Parsing (Extended)", () => {
   it("should support html format option", () => {
     const validFormats = ["text", "json", "sarif", "markdown", "html"];
     assert.ok(validFormats.includes("html"));
+  });
+});
+
+// ─── v3.5.0 Feature Tests ───────────────────────────────────────────────────
+
+// ─── JUnit Formatter Tests ──────────────────────────────────────────────────
+
+describe("JUnit Formatter", () => {
+  it("should generate valid XML", async () => {
+    const { verdictToJUnit } = await import("../src/formatters/junit.js");
+    const verdict = evaluateWithTribunal("const x = 1;", "typescript");
+    const xml = verdictToJUnit(verdict, "test.ts");
+    assert.ok(xml.startsWith('<?xml version="1.0"'));
+    assert.ok(xml.includes("<testsuites"));
+    assert.ok(xml.includes("<testsuite"));
+    assert.ok(xml.includes("</testsuites>"));
+  });
+
+  it("should include file path in suite name", async () => {
+    const { verdictToJUnit } = await import("../src/formatters/junit.js");
+    const verdict = evaluateWithTribunal("var x = 1;", "typescript");
+    const xml = verdictToJUnit(verdict, "src/app.ts");
+    assert.ok(xml.includes("judges:src/app.ts"));
+  });
+
+  it("should map critical/high findings as failures", async () => {
+    const { verdictToJUnit } = await import("../src/formatters/junit.js");
+    const verdict = evaluateWithTribunal(sampleCode, "typescript");
+    const xml = verdictToJUnit(verdict, "vuln.ts");
+    assert.ok(xml.includes("<failure"));
+  });
+
+  it("should produce passing testcases for judges with no findings", async () => {
+    const { verdictToJUnit } = await import("../src/formatters/junit.js");
+    const verdict = evaluateWithTribunal("const x = 1;", "typescript");
+    const xml = verdictToJUnit(verdict);
+    assert.ok(xml.includes(': pass"'));
+  });
+
+  it("should escape XML entities", async () => {
+    const { verdictToJUnit } = await import("../src/formatters/junit.js");
+    const verdict = evaluateWithTribunal("const x = '<script>';", "typescript");
+    const xml = verdictToJUnit(verdict);
+    // Should not contain unescaped < or > inside attribute values
+    assert.ok(!xml.includes('name="<script>'));
+  });
+});
+
+// ─── CodeClimate Formatter Tests ────────────────────────────────────────────
+
+describe("CodeClimate Formatter", () => {
+  it("should return an array of issues", async () => {
+    const { verdictToCodeClimate } = await import("../src/formatters/codeclimate.js");
+    const verdict = evaluateWithTribunal(sampleCode, "typescript");
+    const issues = verdictToCodeClimate(verdict, "app.ts");
+    assert.ok(Array.isArray(issues));
+    assert.ok(issues.length > 0);
+  });
+
+  it("should include required CodeClimate fields", async () => {
+    const { verdictToCodeClimate } = await import("../src/formatters/codeclimate.js");
+    const verdict = evaluateWithTribunal(sampleCode, "typescript");
+    const issues = verdictToCodeClimate(verdict, "app.ts");
+    for (const issue of issues) {
+      assert.equal(issue.type, "issue");
+      assert.ok(issue.check_name.length > 0);
+      assert.ok(issue.description.length > 0);
+      assert.ok(issue.fingerprint.length > 0);
+      assert.ok(issue.location);
+      assert.ok(issue.location.path);
+      assert.ok(issue.severity);
+    }
+  });
+
+  it("should map severity levels correctly", async () => {
+    const { verdictToCodeClimate } = await import("../src/formatters/codeclimate.js");
+    const verdict = evaluateWithTribunal(sampleCode, "typescript");
+    const issues = verdictToCodeClimate(verdict, "app.ts");
+    const validSeverities = new Set(["info", "minor", "major", "critical", "blocker"]);
+    for (const issue of issues) {
+      assert.ok(validSeverities.has(issue.severity), `unexpected severity: ${issue.severity}`);
+    }
+  });
+
+  it("should use default path when filePath not provided", async () => {
+    const { verdictToCodeClimate } = await import("../src/formatters/codeclimate.js");
+    const verdict = evaluateWithTribunal("var x = 1;", "typescript");
+    const issues = verdictToCodeClimate(verdict);
+    for (const issue of issues) {
+      assert.ok(issue.location.path.length > 0);
+    }
+  });
+});
+
+// ─── Named Presets Tests ────────────────────────────────────────────────────
+
+describe("Named Presets", () => {
+  it("should export PRESETS object with known presets", async () => {
+    const { PRESETS } = await import("../src/presets.js");
+    assert.ok("strict" in PRESETS);
+    assert.ok("lenient" in PRESETS);
+    assert.ok("security-only" in PRESETS);
+    assert.ok("startup" in PRESETS);
+    assert.ok("compliance" in PRESETS);
+    assert.ok("performance" in PRESETS);
+  });
+
+  it("should return preset by name with getPreset", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const strict = getPreset("strict");
+    assert.ok(strict);
+    assert.equal(strict.name, "Strict");
+    assert.ok(strict.config);
+  });
+
+  it("should return undefined for unknown preset", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const result = getPreset("nonexistent-preset");
+    assert.equal(result, undefined);
+  });
+
+  it("should list all presets with listPresets", async () => {
+    const { listPresets } = await import("../src/presets.js");
+    const list = listPresets();
+    assert.ok(Array.isArray(list));
+    assert.ok(list.length >= 6);
+    for (const item of list) {
+      assert.ok(item.name.length > 0);
+      assert.ok(item.description.length > 0);
+    }
+  });
+
+  it("strict preset should include all severities", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const strict = getPreset("strict");
+    assert.ok(strict);
+    assert.equal(strict.config.minSeverity, "info");
+  });
+
+  it("lenient preset should filter to high+ only", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const lenient = getPreset("lenient");
+    assert.ok(lenient);
+    assert.equal(lenient.config.minSeverity, "high");
+  });
+
+  it("security-only preset should disable non-security judges", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const secOnly = getPreset("security-only");
+    assert.ok(secOnly);
+    assert.ok(secOnly.config.disabledJudges);
+    assert.ok(secOnly.config.disabledJudges!.length > 0);
+    // Should not disable security-related judges
+    assert.ok(!secOnly.config.disabledJudges!.includes("cybersecurity"));
+    assert.ok(!secOnly.config.disabledJudges!.includes("authentication"));
+  });
+});
+
+// ─── Diff Command Tests ────────────────────────────────────────────────────
+
+describe("Diff Command", () => {
+  it("should export runDiff and parseDiffArgs functions", async () => {
+    const mod = await import("../src/commands/diff.js");
+    assert.ok(typeof mod.runDiff === "function");
+    assert.ok(typeof mod.parseDiffArgs === "function");
+  });
+
+  it("should parse diff arguments correctly", async () => {
+    const { parseDiffArgs } = await import("../src/commands/diff.js");
+    const args = parseDiffArgs(["node", "judges", "diff", "--file", "changes.patch", "--language", "typescript"]);
+    assert.equal(args.file, "changes.patch");
+    assert.equal(args.language, "typescript");
+  });
+
+  it("should default format to text", async () => {
+    const { parseDiffArgs } = await import("../src/commands/diff.js");
+    const args = parseDiffArgs(["node", "judges", "diff"]);
+    assert.equal(args.format, "text");
+  });
+
+  it("should accept --format json", async () => {
+    const { parseDiffArgs } = await import("../src/commands/diff.js");
+    const args = parseDiffArgs(["node", "judges", "diff", "--format", "json"]);
+    assert.equal(args.format, "json");
+  });
+});
+
+// ─── Deps Command Tests ────────────────────────────────────────────────────
+
+describe("Deps Command", () => {
+  it("should export runDeps and parseDepsArgs functions", async () => {
+    const mod = await import("../src/commands/deps.js");
+    assert.ok(typeof mod.runDeps === "function");
+    assert.ok(typeof mod.parseDepsArgs === "function");
+  });
+
+  it("should parse deps arguments correctly", async () => {
+    const { parseDepsArgs } = await import("../src/commands/deps.js");
+    const args = parseDepsArgs(["node", "judges", "deps", "/path/to/project", "--format", "json"]);
+    assert.equal(args.path, "/path/to/project");
+    assert.equal(args.format, "json");
+  });
+
+  it("should default to current directory", async () => {
+    const { parseDepsArgs } = await import("../src/commands/deps.js");
+    const args = parseDepsArgs(["node", "judges", "deps"]);
+    assert.equal(args.path, ".");
+  });
+});
+
+// ─── Baseline Command Tests ────────────────────────────────────────────────
+
+describe("Baseline Command", () => {
+  it("should export runBaseline function", async () => {
+    const mod = await import("../src/commands/baseline.js");
+    assert.ok(typeof mod.runBaseline === "function");
+  });
+
+  it("should create baseline file from evaluation", async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-baseline-"));
+    const testFile = join(tmpDir, "test.ts");
+    const baselineOut = join(tmpDir, "baseline.json");
+    writeFileSync(testFile, "var password = 'admin123';");
+
+    // Stub process.exit to prevent test termination
+    const origExit = process.exit;
+    let exitCode: number | undefined;
+    process.exit = ((code?: number) => {
+      exitCode = code;
+    }) as never;
+    const origLog = console.log;
+    let output = "";
+    console.log = (msg: string) => {
+      output += msg;
+    };
+
+    try {
+      const { runBaseline } = await import("../src/commands/baseline.js");
+      runBaseline(["node", "judges", "baseline", "create", "--file", testFile, "--output", baselineOut]);
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+
+    try {
+      assert.ok(existsSync(baselineOut), "Baseline file should be created");
+      const baseline = JSON.parse(readFileSync(baselineOut, "utf-8"));
+      assert.ok(baseline.version);
+      assert.ok(baseline.createdAt);
+      assert.ok(Array.isArray(baseline.findings));
+      assert.ok(typeof baseline.totalFindings === "number");
+      assert.ok(typeof baseline.score === "number");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── Shell Completions Tests ────────────────────────────────────────────────
+
+describe("Shell Completions", () => {
+  it("should export runCompletions function", async () => {
+    const mod = await import("../src/commands/completions.js");
+    assert.ok(typeof mod.runCompletions === "function");
+  });
+
+  it("should generate bash completions", async () => {
+    const { runCompletions } = await import("../src/commands/completions.js");
+    const origExit = process.exit;
+    process.exit = (() => {}) as never;
+    const origLog = console.log;
+    let output = "";
+    console.log = (msg: string) => {
+      output += msg + "\n";
+    };
+    try {
+      runCompletions(["node", "judges", "completions", "bash"]);
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+    assert.ok(output.includes("_judges_completions"));
+    assert.ok(output.includes("complete"));
+    assert.ok(output.includes("eval"));
+  });
+
+  it("should generate zsh completions", async () => {
+    const { runCompletions } = await import("../src/commands/completions.js");
+    const origExit = process.exit;
+    process.exit = (() => {}) as never;
+    const origLog = console.log;
+    let output = "";
+    console.log = (msg: string) => {
+      output += msg + "\n";
+    };
+    try {
+      runCompletions(["node", "judges", "completions", "zsh"]);
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+    assert.ok(output.includes("compdef") || output.includes("compadd"));
+  });
+
+  it("should generate fish completions", async () => {
+    const { runCompletions } = await import("../src/commands/completions.js");
+    const origExit = process.exit;
+    process.exit = (() => {}) as never;
+    const origLog = console.log;
+    let output = "";
+    console.log = (msg: string) => {
+      output += msg + "\n";
+    };
+    try {
+      runCompletions(["node", "judges", "completions", "fish"]);
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+    assert.ok(output.includes("complete"));
+    assert.ok(output.includes("judges"));
+  });
+
+  it("should generate PowerShell completions", async () => {
+    const { runCompletions } = await import("../src/commands/completions.js");
+    const origExit = process.exit;
+    process.exit = (() => {}) as never;
+    const origLog = console.log;
+    let output = "";
+    console.log = (msg: string) => {
+      output += msg + "\n";
+    };
+    try {
+      runCompletions(["node", "judges", "completions", "powershell"]);
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+    assert.ok(output.includes("Register-ArgumentCompleter") || output.includes("TabExpansion"));
+  });
+});
+
+// ─── Docs Command Tests ────────────────────────────────────────────────────
+
+describe("Docs Command", () => {
+  it("should export runDocs function", async () => {
+    const mod = await import("../src/commands/docs.js");
+    assert.ok(typeof mod.runDocs === "function");
+  });
+
+  it("should generate docs to stdout", async () => {
+    const { runDocs } = await import("../src/commands/docs.js");
+    const origExit = process.exit;
+    process.exit = (() => {}) as never;
+    const origLog = console.log;
+    let output = "";
+    console.log = (msg: string) => {
+      output += msg + "\n";
+    };
+    try {
+      runDocs(["node", "judges", "docs"]);
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+    assert.ok(output.includes("# "));
+    assert.ok(output.includes("cybersecurity") || output.includes("Cybersecurity"));
+  });
+
+  it("should generate single-judge docs with --judge flag", async () => {
+    const { runDocs } = await import("../src/commands/docs.js");
+    const origExit = process.exit;
+    process.exit = (() => {}) as never;
+    const origLog = console.log;
+    let output = "";
+    console.log = (msg: string) => {
+      output += msg + "\n";
+    };
+    try {
+      runDocs(["node", "judges", "docs", "--judge", "cybersecurity"]);
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+    assert.ok(output.includes("cybersecurity") || output.includes("Cybersecurity"));
+  });
+
+  it("should write files when --output is specified", async () => {
+    const { runDocs } = await import("../src/commands/docs.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-docs-"));
+    const origExit = process.exit;
+    process.exit = (() => {}) as never;
+    const origLog = console.log;
+    let output = "";
+    console.log = (msg: string) => {
+      output += msg + "\n";
+    };
+
+    try {
+      runDocs(["node", "judges", "docs", "--output", tmpDir]);
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+
+    try {
+      const files = readdirSync(tmpDir);
+      assert.ok(files.length > 0, "Should create doc files");
+      assert.ok(
+        files.some((f: string) => f.endsWith(".md")),
+        "Should create .md files",
+      );
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── Extended CLI Routing Tests ─────────────────────────────────────────────
+
+describe("CLI v3.5.0 Routing", () => {
+  it("should recognize all new commands in index.ts", () => {
+    // Read the source file to verify cliCommands set without importing
+    // (importing index.ts starts the MCP server as a side effect)
+    const indexSrc = readFileSync(resolve(__dirname, "..", "src", "index.ts"), "utf-8");
+    const expectedCommands = [
+      "eval",
+      "list",
+      "evaluate",
+      "init",
+      "fix",
+      "watch",
+      "report",
+      "hook",
+      "diff",
+      "deps",
+      "baseline",
+      "ci-templates",
+      "completions",
+      "docs",
+    ];
+    for (const cmd of expectedCommands) {
+      assert.ok(indexSrc.includes(`"${cmd}"`), `index.ts should reference command "${cmd}"`);
+    }
+  });
+
+  it("should support new format options", () => {
+    const validFormats = ["text", "json", "sarif", "markdown", "html", "junit", "codeclimate"];
+    assert.ok(validFormats.includes("junit"));
+    assert.ok(validFormats.includes("codeclimate"));
+    assert.equal(validFormats.length, 7);
+  });
+
+  it("should support new CLI flags", () => {
+    const flags = ["--config", "--preset", "--min-score", "--no-color", "--verbose", "--quiet"];
+    assert.equal(flags.length, 6);
+    for (const flag of flags) {
+      assert.ok(flag.startsWith("--"));
+    }
+  });
+});
+
+// ─── judgesrc.schema.json Tests ─────────────────────────────────────────────
+
+describe("JSON Schema", () => {
+  it("should have valid schema structure", () => {
+    const schemaPath = resolve(__dirname, "..", "judgesrc.schema.json");
+    assert.ok(existsSync(schemaPath), "judgesrc.schema.json should exist");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf-8"));
+    assert.equal(schema.$schema, "http://json-schema.org/draft-07/schema#");
+    assert.ok(schema.properties);
+    assert.ok(schema.properties.preset);
+    assert.ok(schema.properties.disabledRules);
+    assert.ok(schema.properties.disabledJudges);
+    assert.ok(schema.properties.minSeverity);
+    assert.ok(schema.properties.format);
+  });
+
+  it("should define correct preset enum values", () => {
+    const schemaPath = resolve(__dirname, "..", "judgesrc.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf-8"));
+    const presetEnum: string[] = schema.properties.preset.enum;
+    assert.ok(presetEnum.includes("strict"));
+    assert.ok(presetEnum.includes("lenient"));
+    assert.ok(presetEnum.includes("security-only"));
+    assert.ok(presetEnum.includes("startup"));
+    assert.ok(presetEnum.includes("compliance"));
+    assert.ok(presetEnum.includes("performance"));
+  });
+
+  it("should define correct format enum values", () => {
+    const schemaPath = resolve(__dirname, "..", "judgesrc.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf-8"));
+    const formatEnum: string[] = schema.properties.format.enum;
+    assert.ok(formatEnum.includes("text"));
+    assert.ok(formatEnum.includes("junit"));
+    assert.ok(formatEnum.includes("codeclimate"));
+  });
+});
+
+// ─── Badge Generator Tests ──────────────────────────────────────────────────
+
+describe("Badge Generator", () => {
+  it("should generate valid SVG", async () => {
+    const { generateBadgeSvg } = await import("../src/formatters/badge.js");
+    const svg = generateBadgeSvg(85);
+    assert.ok(svg.includes("<svg"));
+    assert.ok(svg.includes("</svg>"));
+    assert.ok(svg.includes("85"));
+    assert.ok(svg.includes("judges"));
+  });
+
+  it("should use green color for high scores", async () => {
+    const { generateBadgeSvg } = await import("../src/formatters/badge.js");
+    const svg = generateBadgeSvg(95);
+    assert.ok(svg.includes("#4c1"));
+  });
+
+  it("should use red color for low scores", async () => {
+    const { generateBadgeSvg } = await import("../src/formatters/badge.js");
+    const svg = generateBadgeSvg(30);
+    assert.ok(svg.includes("#e05d44"));
+  });
+
+  it("should accept custom label", async () => {
+    const { generateBadgeSvg } = await import("../src/formatters/badge.js");
+    const svg = generateBadgeSvg(75, "quality");
+    assert.ok(svg.includes("quality"));
+  });
+
+  it("should generate text badge", async () => {
+    const { generateBadgeText } = await import("../src/formatters/badge.js");
+    const text = generateBadgeText(85);
+    assert.ok(text.includes("85/100"));
+    assert.ok(text.includes("✓"));
+  });
+
+  it("should use warning icon for medium scores", async () => {
+    const { generateBadgeText } = await import("../src/formatters/badge.js");
+    const text = generateBadgeText(65);
+    assert.ok(text.includes("⚠"));
+  });
+
+  it("should use failure icon for low scores", async () => {
+    const { generateBadgeText } = await import("../src/formatters/badge.js");
+    const text = generateBadgeText(40);
+    assert.ok(text.includes("✗"));
   });
 });

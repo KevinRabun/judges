@@ -11,7 +11,7 @@ An MCP (Model Context Protocol) server that provides a panel of **35 specialized
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![npm downloads](https://img.shields.io/npm/dw/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-730-brightgreen)](https://github.com/KevinRabun/judges/actions)
+[![Tests](https://img.shields.io/badge/tests-777-brightgreen)](https://github.com/KevinRabun/judges/actions)
 
 ---
 
@@ -63,6 +63,15 @@ judges eval --fail-on-findings src/api.ts
 # Suppress known findings via baseline
 judges eval --baseline baseline.json src/api.ts
 
+# Use a named preset
+judges eval --preset security-only src/api.ts
+
+# Use a config file
+judges eval --config .judgesrc.json src/api.ts
+
+# Set a minimum score threshold (exit 1 if below)
+judges eval --min-score 80 src/api.ts
+
 # One-line summary for scripts
 judges eval --summary src/api.ts
 
@@ -87,6 +96,32 @@ judges watch src/
 
 # Project-level report (local directory)
 judges report . --format html --output report.html
+
+# Evaluate a unified diff (pipe from git diff)
+git diff HEAD~1 | judges diff
+
+# Analyze dependencies for supply-chain risks
+judges deps --path . --format json
+
+# Create a baseline file to suppress known findings
+judges baseline create --file src/api.ts -o baseline.json
+
+# Generate CI template files
+judges ci-templates --provider github
+judges ci-templates --provider gitlab
+judges ci-templates --provider azure
+judges ci-templates --provider bitbucket
+
+# Generate per-judge rule documentation
+judges docs
+judges docs --judge cybersecurity
+judges docs --output docs/
+
+# Install shell completions
+judges completions bash   # eval "$(judges completions bash)"
+judges completions zsh
+judges completions fish
+judges completions powershell
 
 # Install pre-commit hook
 judges hook install
@@ -371,11 +406,17 @@ Evaluate a file with all 35 judges or a single judge.
 | `--file <path>` / positional | File to evaluate |
 | `--judge <id>` / `-j <id>` | Single judge mode |
 | `--language <lang>` / `-l <lang>` | Language hint (auto-detected from extension) |
-| `--format <fmt>` / `-f <fmt>` | Output format: `text`, `json`, `sarif`, `markdown`, `html` |
+| `--format <fmt>` / `-f <fmt>` | Output format: `text`, `json`, `sarif`, `markdown`, `html`, `junit`, `codeclimate` |
 | `--output <path>` / `-o <path>` | Write output to file |
 | `--fail-on-findings` | Exit with code 1 if verdict is FAIL |
 | `--baseline <path>` / `-b <path>` | JSON baseline file — suppress known findings |
 | `--summary` | Print a single summary line (ideal for scripts) |
+| `--config <path>` | Load a `.judgesrc` / `.judgesrc.json` config file |
+| `--preset <name>` | Use a named preset: `strict`, `lenient`, `security-only`, `startup`, `compliance`, `performance` |
+| `--min-score <n>` | Exit with code 1 if overall score is below this threshold |
+| `--verbose` | Print timing and debug information |
+| `--quiet` | Suppress non-essential output |
+| `--no-color` | Disable ANSI colors |
 
 ### `judges init`
 
@@ -427,6 +468,131 @@ judges hook uninstall  # remove pre-commit hook
 ```
 
 Detects Husky (`.husky/pre-commit`) and falls back to `.git/hooks/pre-commit`. Uses marker-based injection so it won't clobber existing hooks.
+
+### `judges diff`
+
+Evaluate only the changed lines from a unified diff (e.g., `git diff` output).
+
+| Flag | Description |
+|------|-------------|
+| `--file <path>` | Read diff from file instead of stdin |
+| `--format <fmt>` | Output format: `text`, `json`, `sarif`, `junit`, `codeclimate` |
+| `--output <path>` | Write output to file |
+
+```bash
+git diff HEAD~1 | judges diff
+judges diff --file changes.patch --format sarif
+```
+
+### `judges deps`
+
+Analyze project dependencies for supply-chain risks.
+
+| Flag | Description |
+|------|-------------|
+| `--path <dir>` | Project root to scan (default: `.`) |
+| `--format <fmt>` | Output format: `text`, `json` |
+
+```bash
+judges deps --path .
+judges deps --path ./backend --format json
+```
+
+### `judges baseline`
+
+Create a baseline file to suppress known findings in future evaluations.
+
+```bash
+judges baseline create --file src/api.ts
+judges baseline create --file src/api.ts -o .judges-baseline.json
+```
+
+### `judges ci-templates`
+
+Generate CI/CD configuration templates for popular providers.
+
+```bash
+judges ci-templates --provider github   # .github/workflows/judges.yml
+judges ci-templates --provider gitlab   # .gitlab-ci.judges.yml
+judges ci-templates --provider azure    # azure-pipelines.judges.yml
+judges ci-templates --provider bitbucket # bitbucket-pipelines.yml (snippet)
+```
+
+### `judges docs`
+
+Generate per-judge rule documentation in Markdown.
+
+| Flag | Description |
+|------|-------------|
+| `--judge <id>` | Generate docs for a single judge |
+| `--output <dir>` | Write individual `.md` files per judge |
+
+```bash
+judges docs                          # all judges to stdout
+judges docs --judge cybersecurity    # single judge
+judges docs --output docs/judges/    # write files to directory
+```
+
+### `judges completions`
+
+Generate shell completion scripts.
+
+```bash
+eval "$(judges completions bash)"        # Bash
+eval "$(judges completions zsh)"         # Zsh
+judges completions fish | source         # Fish
+judges completions powershell            # PowerShell (Register-ArgumentCompleter)
+```
+
+### Named Presets
+
+Use `--preset` to apply pre-configured evaluation settings:
+
+| Preset | Description |
+|--------|-------------|
+| `strict` | All severities, all judges — maximum thoroughness |
+| `lenient` | Only high and critical findings — fast and focused |
+| `security-only` | Security judges only — cybersecurity, data-security, authentication, logging-privacy |
+| `startup` | Skip compliance, sovereignty, i18n judges — move fast |
+| `compliance` | Only compliance, data-sovereignty, authentication — regulatory focus |
+| `performance` | Only performance, scalability, caching, cost-effectiveness |
+
+```bash
+judges eval --preset security-only src/api.ts
+judges eval --preset strict --format sarif src/app.ts > results.sarif
+```
+
+### CI Output Formats
+
+#### JUnit XML
+
+Generate JUnit XML for Jenkins, Azure DevOps, GitHub Actions, or GitLab test result viewers:
+
+```bash
+judges eval --format junit src/api.ts > results.xml
+```
+
+Each judge maps to a `<testsuite>`, each finding becomes a `<testcase>` with `<failure>` for critical/high severity.
+
+#### CodeClimate / GitLab Code Quality
+
+Generate CodeClimate JSON for GitLab Code Quality or similar tools:
+
+```bash
+judges eval --format codeclimate src/api.ts > codequality.json
+```
+
+#### Score Badges
+
+Generate SVG or text badges for your README:
+
+```typescript
+import { generateBadgeSvg, generateBadgeText } from "@kevinrabun/judges/badge";
+
+const svg = generateBadgeSvg(85);          // shields.io-style SVG
+const text = generateBadgeText(85);        // "✓ judges 85/100"
+const svg2 = generateBadgeSvg(75, "quality"); // custom label
+```
 
 ---
 
@@ -926,14 +1092,23 @@ judges/
 │   │   └── *.ts              # One analyzer per judge (35 files)
 │   ├── formatters/           # Output formatters
 │   │   ├── sarif.ts              # SARIF 2.1.0 output
-│   │   └── html.ts               # Self-contained HTML report (dark/light theme, filters)
+│   │   ├── html.ts               # Self-contained HTML report (dark/light theme, filters)
+│   │   ├── junit.ts              # JUnit XML output (Jenkins, Azure DevOps, GitHub Actions)
+│   │   ├── codeclimate.ts        # CodeClimate/GitLab Code Quality JSON
+│   │   └── badge.ts              # SVG and text badge generator
 │   ├── commands/             # CLI subcommands
 │   │   ├── init.ts               # Interactive project setup wizard
 │   │   ├── fix.ts                # Auto-fix patch preview and application
 │   │   ├── watch.ts              # Watch mode — re-evaluate on save
 │   │   ├── report.ts             # Project-level local report
 │   │   ├── hook.ts               # Pre-commit hook install/uninstall
-│   │   └── ci-templates.ts       # GitLab, Azure, Bitbucket CI templates
+│   │   ├── ci-templates.ts       # GitLab, Azure, Bitbucket CI templates
+│   │   ├── diff.ts               # Evaluate unified diff (git diff)
+│   │   ├── deps.ts               # Dependency supply-chain analysis
+│   │   ├── baseline.ts           # Create baseline for finding suppression
+│   │   ├── completions.ts        # Shell completions (bash/zsh/fish/PowerShell)
+│   │   └── docs.ts               # Per-judge rule documentation generator
+│   ├── presets.ts            # Named evaluation presets (strict, lenient, security-only, …)
 │   ├── reports/
 │   │   └── public-repo-report.ts   # Public repo clone + full tribunal report generation
 │   └── judges/               # Judge definitions (id, name, domain, system prompt)
@@ -955,6 +1130,7 @@ judges/
 │   ├── tree-sitter-rust.wasm
 │   ├── tree-sitter-java.wasm
 │   └── tree-sitter-c_sharp.wasm
+├── judgesrc.schema.json      # JSON Schema for .judgesrc config files
 ├── server.json               # MCP Registry manifest
 ├── package.json
 ├── tsconfig.json
@@ -981,6 +1157,12 @@ judges/
 | `judges watch <dir>` | Watch mode — re-evaluate on file save |
 | `judges report <dir>` | Full tribunal report on a local directory |
 | `judges hook install` | Install a Git pre-commit hook |
+| `judges diff` | Evaluate changed lines from unified diff |
+| `judges deps` | Analyze dependencies for supply-chain risks |
+| `judges baseline create` | Create baseline for finding suppression |
+| `judges ci-templates` | Generate CI pipeline templates |
+| `judges docs` | Generate per-judge rule documentation |
+| `judges completions <shell>` | Shell completion scripts |
 
 ---
 
@@ -1051,6 +1233,9 @@ const sarif = findingsToSarif(verdict.evaluations.flatMap(e => e.findings));
 | `@kevinrabun/judges/api` | Programmatic API (default) |
 | `@kevinrabun/judges/server` | MCP server entry point |
 | `@kevinrabun/judges/sarif` | SARIF 2.1.0 formatter |
+| `@kevinrabun/judges/junit` | JUnit XML formatter |
+| `@kevinrabun/judges/codeclimate` | CodeClimate/GitLab Code Quality JSON |
+| `@kevinrabun/judges/badge` | SVG and text badge generator |
 
 ### SARIF Output
 

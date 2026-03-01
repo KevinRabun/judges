@@ -21,7 +21,22 @@
 // ─── CLI Detection ──────────────────────────────────────────────────────────
 // If the user passed a subcommand or flag, run as CLI instead of MCP server.
 
-const cliCommands = new Set(["eval", "list", "evaluate", "init", "fix", "watch", "report", "hook"]);
+const cliCommands = new Set([
+  "eval",
+  "list",
+  "evaluate",
+  "init",
+  "fix",
+  "watch",
+  "report",
+  "hook",
+  "diff",
+  "deps",
+  "baseline",
+  "ci-templates",
+  "completions",
+  "docs",
+]);
 const cliFlags = new Set(["--help", "-h", "--file", "-f", "--version", "-v"]);
 const firstArg = process.argv[2];
 
@@ -44,7 +59,7 @@ if (firstArg && (cliCommands.has(firstArg) || cliFlags.has(firstArg))) {
 
       const server = new McpServer({
         name: "judges",
-        version: "3.4.0",
+        version: "3.5.0",
       });
 
       registerTools(server);

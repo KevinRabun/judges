@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/KevinRabun/judges/blob/main/judgesrc.schema.json",
+  "title": "Judges Panel Configuration",
+  "description": "Configuration schema for .judgesrc / .judgesrc.json files used by the Judges Panel CLI.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference for IDE validation."
+    },
+    "preset": {
+      "type": "string",
+      "enum": ["strict", "lenient", "security-only", "startup", "compliance", "performance"],
+      "description": "Named preset to use as a base configuration. Individual settings override preset values."
+    },
+    "disabledRules": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Rule IDs to suppress entirely (e.g. [\"SEC-003\", \"COST-001\"])."
+    },
+    "disabledJudges": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Judge IDs to skip during evaluation (e.g. [\"accessibility\", \"documentation\"])."
+    },
+    "minSeverity": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low", "info"],
+      "description": "Minimum finding severity to report. Anything below this threshold is filtered out.",
+      "default": "info"
+    },
+    "languages": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Languages to restrict analysis to. When empty, all languages are analyzed."
+    },
+    "ruleOverrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "disabled": {
+            "type": "boolean",
+            "description": "Disable this specific rule."
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low", "info"],
+            "description": "Override the default severity for this rule."
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Per-rule overrides keyed by rule ID or wildcard prefix (e.g. \"SEC-*\")."
+    },
+    "failOnFindings": {
+      "type": "boolean",
+      "description": "Exit with code 1 when the verdict is fail. Useful for CI pipelines.",
+      "default": false
+    },
+    "baseline": {
+      "type": "string",
+      "description": "Path to a baseline JSON file. Findings matching the baseline are suppressed."
+    },
+    "format": {
+      "type": "string",
+      "enum": ["text", "json", "sarif", "markdown", "html", "junit", "codeclimate"],
+      "description": "Default output format.",
+      "default": "text"
+    }
+  },
+  "additionalProperties": false
+}

@@ -33,8 +33,19 @@ import {
 import { getJudge, getJudgeSummaries } from "./judges/index.js";
 import { verdictToSarif } from "./formatters/sarif.js";
 import { verdictToHtml } from "./formatters/html.js";
+import { verdictToJUnit } from "./formatters/junit.js";
+import { verdictToCodeClimate } from "./formatters/codeclimate.js";
 import { runReport } from "./commands/report.js";
 import { runHook } from "./commands/hook.js";
+import { runDiff } from "./commands/diff.js";
+import { runDeps } from "./commands/deps.js";
+import { runBaseline } from "./commands/baseline.js";
+import { runCompletions } from "./commands/completions.js";
+import { runDocs } from "./commands/docs.js";
+import { generateGitLabCi, generateAzurePipelines, generateBitbucketPipelines } from "./commands/ci-templates.js";
+import { getPreset, listPresets } from "./presets.js";
+import { parseConfig } from "./config.js";
+import type { JudgesConfig } from "./types.js";
 
 // ─── Language Detection from Extension ──────────────────────────────────────
 
@@ -83,12 +94,18 @@ interface CliArgs {
   command: string | undefined;
   file: string | undefined;
   language: string | undefined;
-  format: "text" | "json" | "sarif" | "markdown" | "html";
+  format: "text" | "json" | "sarif" | "markdown" | "html" | "junit" | "codeclimate";
   judge: string | undefined;
   help: boolean;
   failOnFindings: boolean;
   baseline: string | undefined;
   summary: boolean;
+  config: string | undefined;
+  preset: string | undefined;
+  minScore: number | undefined;
+  noColor: boolean;
+  verbose: boolean;
+  quiet: boolean;
 }
 
 function parseCliArgs(argv: string[]): CliArgs {
@@ -102,6 +119,12 @@ function parseCliArgs(argv: string[]): CliArgs {
     failOnFindings: false,
     baseline: undefined,
     summary: false,
+    config: undefined,
+    preset: undefined,
+    minScore: undefined,
+    noColor: false,
+    verbose: false,
+    quiet: false,
   };
 
   // First non-flag arg is the command
@@ -144,6 +167,26 @@ function parseCliArgs(argv: string[]): CliArgs {
       case "--summary":
         args.summary = true;
         break;
+      case "--config":
+      case "-c":
+        args.config = argv[++i];
+        break;
+      case "--preset":
+      case "-p":
+        args.preset = argv[++i];
+        break;
+      case "--min-score":
+        args.minScore = parseInt(argv[++i], 10);
+        break;
+      case "--no-color":
+        args.noColor = true;
+        break;
+      case "--verbose":
+        args.verbose = true;
+        break;
+      case "--quiet":
+        args.quiet = true;
+        break;
       default:
         // If it looks like a file path (not a flag), treat as --file
         if (!arg.startsWith("-") && !args.file) {
@@ -170,17 +213,29 @@ USAGE:
   judges watch <path>                 Watch files and re-evaluate on save
   judges report <dir>                 Generate project-level report
   judges hook install                 Install pre-commit git hook
+  judges diff                         Evaluate only changed lines from a diff
+  judges deps [dir]                   Analyze dependencies for supply-chain risks
+  judges baseline create <file>       Create a findings baseline
+  judges ci-templates <provider>      Generate CI pipeline template
+  judges completions <shell>          Generate shell completions
+  judges docs                         Generate rule documentation
   judges list                         List all available judges
   judges --help                       Show this help
 
 EVAL OPTIONS:
   --file, -f <path>          File to evaluate (or pass as positional arg)
   --language, -l <lang>      Language override (auto-detected from extension)
-  --format, -o <fmt>         Output: text (default), json, sarif, markdown, html
+  --format, -o <fmt>         Output: text, json, sarif, markdown, html, junit, codeclimate
   --judge, -j <id>           Run a single judge instead of the full tribunal
   --fail-on-findings         Exit with code 1 when verdict is fail
   --baseline, -b <path>      Suppress findings already in baseline file
   --summary                  Show one-line summary instead of full output
+  --config, -c <path>        Path to .judgesrc config file
+  --preset, -p <name>        Use a named preset (strict, lenient, security-only, startup, compliance, performance)
+  --min-score <n>            Fail if score drops below threshold (0-100)
+  --no-color                 Disable colored output
+  --verbose                  Show detailed evaluation information
+  --quiet                    Suppress non-essential output
   --help, -h                 Show this help
 
 FIX OPTIONS:
@@ -191,20 +246,50 @@ WATCH OPTIONS:
   --judge, -j <id>           Only evaluate with a specific judge
   --fail-on-findings         Exit on first failure
 
+DIFF OPTIONS:
+  --file, -f <path>          Read diff from file (or pipe via stdin)
+  --language, -l <lang>      Language override for all files in diff
+
+DEPS OPTIONS:
+  --file, -f <path>          Specific manifest to analyze
+  --format, -o <fmt>         Output: text, json
+
+CI-TEMPLATES:
+  judges ci-templates github  GitHub Actions workflow
+  judges ci-templates gitlab  GitLab CI pipeline
+  judges ci-templates azure   Azure Pipelines
+  judges ci-templates bitbucket  Bitbucket Pipelines
+
+COMPLETIONS:
+  judges completions bash        Bash completions
+  judges completions zsh         Zsh completions
+  judges completions fish        Fish completions
+  judges completions powershell  PowerShell completions
+
 STDIN:
   cat file.ts | judges eval --language typescript
+  git diff | judges diff --language typescript
 
 EXAMPLES:
   judges eval src/app.ts
   judges eval --file api.py --format sarif
   judges eval --judge cybersecurity server.ts
-  judges eval --format html --fail-on-findings src/
+  judges eval --format junit --fail-on-findings src/
   judges eval --baseline .judges-baseline.json src/app.ts
+  judges eval --preset security-only src/app.ts
+  judges eval --config .judgesrc src/app.ts
+  judges eval --min-score 80 src/app.ts
   judges init
   judges fix src/app.ts --apply
   judges watch src/
   judges report .
   judges hook install
+  judges diff --file changes.patch
+  judges deps .
+  judges baseline create --file src/app.ts
+  judges ci-templates github
+  judges docs --output docs/rules/
+  judges completions bash >> ~/.bashrc
   judges list
 
 SUPPORTED LANGUAGES:
@@ -408,6 +493,42 @@ export async function runCli(argv: string[]): Promise<void> {
     return;
   }
 
+  // ─── Diff Command ────────────────────────────────────────────────────
+  if (args.command === "diff") {
+    runDiff(argv);
+    return;
+  }
+
+  // ─── Deps Command ────────────────────────────────────────────────────
+  if (args.command === "deps") {
+    runDeps(argv);
+    return;
+  }
+
+  // ─── Baseline Command ────────────────────────────────────────────────
+  if (args.command === "baseline") {
+    runBaseline(argv);
+    return;
+  }
+
+  // ─── CI Templates Command ────────────────────────────────────────────
+  if (args.command === "ci-templates") {
+    runCiTemplates(argv);
+    return;
+  }
+
+  // ─── Completions Command ─────────────────────────────────────────────
+  if (args.command === "completions") {
+    runCompletions(argv);
+    return;
+  }
+
+  // ─── Docs Command ────────────────────────────────────────────────────
+  if (args.command === "docs") {
+    runDocs(argv);
+    return;
+  }
+
   // ─── List Command ────────────────────────────────────────────────────
   if (args.command === "list") {
     listJudges();
@@ -416,14 +537,21 @@ export async function runCli(argv: string[]): Promise<void> {
 
   // ─── Eval Command ────────────────────────────────────────────────────
   if (args.command === "eval" || args.file) {
+    const startTime = Date.now();
     const { code, resolvedPath } = readCode(args.file);
     const language = args.language || detectLanguage(args.file || resolvedPath) || "typescript";
 
-    // Load baseline if specified
+    // Load config from file or preset
+    const evalConfig = loadEvalConfig(args);
+
+    // Load baseline if specified (from CLI flag — config doesn't carry baseline)
     let baselineFindings: Set<string> | undefined;
     if (args.baseline) {
       baselineFindings = loadBaseline(args.baseline);
     }
+
+    // Build evaluation options from config
+    const evalOptions = evalConfig ? { config: evalConfig } : undefined;
 
     if (args.judge) {
       // Single judge mode
@@ -440,6 +568,13 @@ export async function runCli(argv: string[]): Promise<void> {
       if (baselineFindings) {
         evaluation.findings = evaluation.findings.filter((f) => !baselineFindings!.has(baselineKey(f)));
       }
+
+      // Apply min-severity filter from config
+      if (evalConfig?.minSeverity) {
+        evaluation.findings = filterBySeverity(evaluation.findings, evalConfig.minSeverity);
+      }
+
+      const elapsed = Date.now() - startTime;
 
       if (args.summary) {
         printSummaryLine(evaluation.verdict, evaluation.score, evaluation.findings.length);
@@ -464,13 +599,19 @@ export async function runCli(argv: string[]): Promise<void> {
         console.log(formatSingleJudgeTextOutput(evaluation));
       }
 
-      // Exit code
-      if (args.failOnFindings && evaluation.verdict === "fail") {
+      if (args.verbose) {
+        console.log(`  ⏱  Evaluated in ${elapsed}ms`);
+      }
+
+      // Exit code — fail-on-findings or min-score
+      if (args.failOnFindings && evaluation.verdict === "fail") process.exit(1);
+      if (args.minScore !== undefined && evaluation.score < args.minScore) {
+        console.error(`Score ${evaluation.score} is below minimum threshold ${args.minScore}`);
         process.exit(1);
       }
     } else {
       // Full tribunal mode
-      const verdict = evaluateWithTribunal(code, language);
+      const verdict = evaluateWithTribunal(code, language, undefined, evalOptions);
 
       // Apply baseline suppression
       if (baselineFindings) {
@@ -480,17 +621,38 @@ export async function runCli(argv: string[]): Promise<void> {
         verdict.findings = verdict.findings.filter((f) => !baselineFindings!.has(baselineKey(f)));
       }
 
+      // Apply min-severity filter from config
+      if (evalConfig?.minSeverity) {
+        for (const evaluation of verdict.evaluations) {
+          evaluation.findings = filterBySeverity(evaluation.findings, evalConfig.minSeverity!);
+        }
+        verdict.findings = filterBySeverity(verdict.findings, evalConfig.minSeverity);
+      }
+
+      const elapsed = Date.now() - startTime;
+
       if (args.summary) {
         const totalFindings = verdict.evaluations.reduce((s, e) => s + e.findings.length, 0);
         printSummaryLine(verdict.overallVerdict, verdict.overallScore, totalFindings);
       } else if (args.format === "html") {
         console.log(verdictToHtml(verdict, resolvedPath || args.file));
+      } else if (args.format === "junit") {
+        console.log(verdictToJUnit(verdict, resolvedPath || args.file));
+      } else if (args.format === "codeclimate") {
+        console.log(JSON.stringify(verdictToCodeClimate(verdict, resolvedPath || args.file), null, 2));
       } else {
         console.log(formatTribunalOutput(verdict, args.format, resolvedPath || args.file));
       }
 
-      // Exit code
-      if (args.failOnFindings && verdict.overallVerdict === "fail") {
+      if (args.verbose) {
+        console.log(`  ⏱  Evaluated in ${elapsed}ms`);
+        console.log(`  📊 ${verdict.evaluations.length} judges, ${verdict.findings.length} total findings`);
+      }
+
+      // Exit code — fail-on-findings or min-score
+      if (args.failOnFindings && verdict.overallVerdict === "fail") process.exit(1);
+      if (args.minScore !== undefined && verdict.overallScore < args.minScore) {
+        console.error(`Score ${verdict.overallScore} is below minimum threshold ${args.minScore}`);
         process.exit(1);
       }
     }
@@ -536,4 +698,143 @@ function loadBaseline(baselinePath: string): Set<string> {
 function printSummaryLine(verdict: string, score: number, findings: number): void {
   const icon = verdict === "pass" ? "✅" : verdict === "warning" ? "⚠️" : "❌";
   console.log(`${icon} ${verdict.toUpperCase()} ${score}/100 (${findings} findings)`);
+}
+
+// ─── Config / Preset Loader ────────────────────────────────────────────────
+
+function loadEvalConfig(args: CliArgs): JudgesConfig | undefined {
+  let config: JudgesConfig | undefined;
+
+  // 1. Load from preset
+  if (args.preset) {
+    const preset = getPreset(args.preset);
+    if (!preset) {
+      console.error(`Unknown preset: ${args.preset}`);
+      console.error(
+        `Available: ${listPresets()
+          .map((p) => p.name)
+          .join(", ")}`,
+      );
+      process.exit(1);
+    }
+    config = { ...preset.config };
+  }
+
+  // 2. Load from --config file (overrides preset)
+  if (args.config) {
+    const configPath = resolve(args.config);
+    if (!existsSync(configPath)) {
+      console.error(`Config file not found: ${configPath}`);
+      process.exit(1);
+    }
+    const fileConfig = parseConfig(readFileSync(configPath, "utf-8"));
+    config = config ? { ...config, ...fileConfig } : fileConfig;
+  }
+
+  // 3. Auto-discover .judgesrc or .judgesrc.json if no explicit config
+  if (!config && !args.config) {
+    for (const name of [".judgesrc", ".judgesrc.json"]) {
+      const p = resolve(name);
+      if (existsSync(p)) {
+        try {
+          config = parseConfig(readFileSync(p, "utf-8"));
+        } catch {
+          // Silently skip invalid auto-discovered configs
+        }
+        break;
+      }
+    }
+  }
+
+  return config;
+}
+
+// ─── Severity Filter ────────────────────────────────────────────────────────
+
+const SEVERITY_ORDER = ["critical", "high", "medium", "low", "info"];
+
+function filterBySeverity<T extends { severity: string }>(findings: T[], minSeverity: string): T[] {
+  const minIndex = SEVERITY_ORDER.indexOf(minSeverity);
+  if (minIndex < 0) return findings;
+  return findings.filter((f) => {
+    const idx = SEVERITY_ORDER.indexOf(f.severity);
+    return idx >= 0 && idx <= minIndex;
+  });
+}
+
+// ─── CI Templates CLI ──────────────────────────────────────────────────────
+
+function runCiTemplates(argv: string[]): void {
+  const provider = argv[3];
+
+  if (!provider || provider === "--help" || provider === "-h") {
+    console.log(`
+Judges Panel — CI Template Generator
+
+USAGE:
+  judges ci-templates github      GitHub Actions workflow
+  judges ci-templates gitlab      GitLab CI pipeline
+  judges ci-templates azure       Azure Pipelines
+  judges ci-templates bitbucket   Bitbucket Pipelines
+`);
+    process.exit(0);
+  }
+
+  switch (provider) {
+    case "github":
+      console.log(generateGitHubActions());
+      break;
+    case "gitlab":
+      console.log(generateGitLabCi());
+      break;
+    case "azure":
+      console.log(generateAzurePipelines());
+      break;
+    case "bitbucket":
+      console.log(generateBitbucketPipelines());
+      break;
+    default:
+      console.error(`Unknown provider: ${provider}`);
+      console.error("Supported: github, gitlab, azure, bitbucket");
+      process.exit(1);
+  }
+
+  process.exit(0);
+}
+
+function generateGitHubActions(): string {
+  return `# .github/workflows/judges.yml
+name: Judges Panel Code Review
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  judges:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Judges
+        run: npm install -g @kevinrabun/judges
+
+      - name: Run Judges Evaluation
+        run: |
+          for file in $(git diff --name-only HEAD~1 -- '*.ts' '*.js' '*.py' '*.go' '*.rs' '*.java' '*.cs'); do
+            judges eval --file "$file" --format sarif --fail-on-findings >> results.sarif || true
+          done
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+`;
 }
