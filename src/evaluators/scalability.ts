@@ -6,7 +6,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "SCALE";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Global mutable state (multi-language)
   const globalStateLines = getLangLineNumbers(code, language, LP.SHARED_MUTABLE);
@@ -237,7 +237,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   const hasWsLimit = /maxPayload|maxConnections|connectionLimit|max_connections/gi.test(code);
   if (wsLines.length > 0 && !hasWsLimit) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "WebSocket without connection limits",
       description:

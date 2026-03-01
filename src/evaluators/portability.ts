@@ -5,7 +5,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "PORTA";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Hardcoded Windows/Unix file paths
   const windowsPathPattern = /['"` ](?:[A-Z]:\\|\\\\[a-zA-Z])/g;
@@ -229,7 +229,7 @@ export function analyzePortability(code: string, language: string): Finding[] {
   const signalLines = getLineNumbers(code, signalPattern);
   if (signalLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "low",
       title: "Platform-specific process signals used",
       description: `Found ${signalLines.length} Unix-specific signal handler(s) (SIGUSR1, SIGHUP, etc.). These signals are not available on Windows and will cause errors.`,

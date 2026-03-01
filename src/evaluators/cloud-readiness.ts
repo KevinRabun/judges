@@ -6,7 +6,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "CLOUD";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Hardcoded hosts/ports
   const hardcodedHostPattern = /(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d{4,5}(?!.*(?:test|spec|mock|example))/gi;
@@ -272,7 +272,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   );
   if (!hasFeatureFlags && code.split("\n").length > 100) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "info",
       title: "No feature flag mechanism detected",
       description:

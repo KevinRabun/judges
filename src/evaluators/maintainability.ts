@@ -6,7 +6,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "MAINT";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Weak / unsafe type usage (any, object, dynamic, interface{}, unsafe)
   const anyLines = getLangLineNumbers(code, language, LP.WEAK_TYPE);
@@ -27,7 +27,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   }
 
   // Magic numbers
-  const magicNumberPattern = /(?<![.\w])(?:0x[0-9a-f]{4,}|\d{4,})(?!\s*[;:)\]}]?\s*\/\/|\.\d|px|em|rem|ms|%|e\+)/gi;
+  const _magicNumberPattern = /(?<![.\w])(?:0x[0-9a-f]{4,}|\d{4,})(?!\s*[;:)\]}]?\s*\/\/|\.\d|px|em|rem|ms|%|e\+)/gi;
   const lines = code.split("\n");
   const magicLines: number[] = [];
   for (let i = 0; i < lines.length; i++) {
@@ -214,7 +214,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   }
 
   // Single-letter variable names (outside loops)
-  const singleLetterVarPattern = /(?:const|let|var)\s+([a-zA-Z])\s*[:=]/g;
+  const _singleLetterVarPattern = /(?:const|let|var)\s+([a-zA-Z])\s*[:=]/g;
   const singleLetterLines: number[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -296,7 +296,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   const duplicateStrings = Object.entries(stringLiterals).filter(([, count]) => count >= 3);
   if (duplicateStrings.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "low",
       title: "Duplicate string literals — extract to constants",
       description: `Found ${duplicateStrings.length} string value(s) repeated 3+ times. Duplicate strings are easy to typo and hard to update consistently.`,

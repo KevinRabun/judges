@@ -288,7 +288,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
   );
   if (heavyImportLines.length > 3) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "Heavy SDK imports may increase cold-start costs",
       description: `Found ${heavyImportLines.length} heavy SDK imports. In serverless environments, large imports increase cold-start duration and cost.`,

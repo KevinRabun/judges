@@ -7,7 +7,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   const lines = code.split("\n");
   const prefix = "API";
   let ruleNum = 1;
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Detect inconsistent HTTP methods
   const verbInUrlLines: number[] = [];
@@ -276,7 +276,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   const hasRequestId = /x-request-id|requestId|correlationId|traceId/i.test(code);
   if (hasRoutes2 && !hasRequestId && routeRegLines.length > 3) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "low",
       title: "No request ID in API responses",
       description:

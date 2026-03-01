@@ -352,7 +352,9 @@ function calibrateScoreAndVerdict(findings: SpecializedFindingV2[]): {
   score: number;
   verdict: Verdict;
 } {
-  const baseFindings: Finding[] = findings.map(({ specialtyArea, confidence, evidenceBasis, ...finding }) => finding);
+  const baseFindings: Finding[] = findings.map(
+    ({ specialtyArea: _specialtyArea, confidence: _confidence, evidenceBasis: _evidenceBasis, ...finding }) => finding,
+  );
   const score = calculateScore(baseFindings);
   const verdict = deriveVerdict(baseFindings, score);
   return { score, verdict };

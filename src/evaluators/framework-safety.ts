@@ -495,7 +495,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
     const hasSanitizer = /DOMPurify|sanitize|purify|xss|sanitizeHtml/i.test(code);
     if (!hasSanitizer) {
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "critical",
         title: "dangerouslySetInnerHTML without DOMPurify — XSS vulnerability",
         description:

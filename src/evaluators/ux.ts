@@ -5,7 +5,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "UX";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Inline event handlers (onClick, onSubmit in HTML)
   const inlineHandlerPattern = /\bon[A-Z]\w+\s*=\s*["'`]/gi;
@@ -85,7 +85,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
   }
 
   // No placeholder/label on inputs
-  const inputNoLabelPattern = /<input[^>]*(?!.*(?:aria-label|placeholder|id=))[^>]*>/gi;
+  const _inputNoLabelPattern = /<input[^>]*(?!.*(?:aria-label|placeholder|id=))[^>]*>/gi;
   const inputLines = getLineNumbers(code, /<input\b/gi);
   const hasLabels = /<label|aria-label|placeholder/gi.test(code);
   if (inputLines.length > 0 && !hasLabels) {
@@ -106,7 +106,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
   }
 
   // Confirmation for destructive actions
-  const destructivePattern = /delete|remove|destroy|drop|purge|erase/gi;
+  const _destructivePattern = /delete|remove|destroy|drop|purge|erase/gi;
   const hasConfirmation = /confirm|modal|dialog|are you sure|confirmation/gi.test(code);
   const hasDestructiveEndpoint = /app\.(delete|post)\s*\([^)]*(?:delete|remove|destroy)/gi.test(code);
   if (hasDestructiveEndpoint && !hasConfirmation) {
@@ -234,7 +234,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
   const hasValidation = /validate|validator|yup|zod|joi|schema|required|minLength|maxLength|pattern\s*=/gi.test(code);
   if (formLines.length > 0 && !hasValidation) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "Form submission without client-side validation",
       description: `Found ${formLines.length} form submission handler(s) without visible validation. Submitting invalid data wastes round trips and frustrates users with server-side error messages.`,

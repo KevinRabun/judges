@@ -7,7 +7,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   const lines = code.split("\n");
   const prefix = "DEPS";
   let ruleNum = 1;
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Detect wildcard version ranges
   const wildcardLines: number[] = [];
@@ -498,7 +498,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
     }
     if (prereleaseLines.length > 0) {
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "medium",
         title: "Pre-release dependency version in production",
         description: `${prereleaseLines.length} production dependencies use pre-release versions (alpha/beta/rc). Pre-release versions may have breaking changes and are not guaranteed stable.`,

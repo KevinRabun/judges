@@ -6,7 +6,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "RATE";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // No rate limiting middleware (multi-language server detection)
   const hasRateLimit =
@@ -221,7 +221,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
   const hasBackoffStrategy = /backoff|exponential|delay\s*\*|Math\.pow|jitter/gi.test(code);
   if (retryLines.length > 0 && !hasBackoffStrategy) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "Retry logic without exponential backoff",
       description: `Found ${retryLines.length} retry reference(s) without backoff or delay escalation. Retrying at a fixed rate can overwhelm downstream services and cause cascading failures.`,

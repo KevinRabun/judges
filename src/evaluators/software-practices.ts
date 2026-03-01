@@ -208,7 +208,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   const deepNestLines: number[] = [];
   codeLines.forEach((line, i) => {
     const leadingSpaces = line.search(/\S/);
-    if (leadingSpaces >= 16 && !/^\s*[\/*#]/.test(line) && !/^\s*$/.test(line)) {
+    if (leadingSpaces >= 16 && !/^\s*[/*#]/.test(line) && !/^\s*$/.test(line)) {
       deepNestLines.push(i + 1);
     }
   });
@@ -397,7 +397,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
     );
   if (hasRetry && hasFixedDelay && !hasBackoff) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "Retry logic without exponential backoff",
       description:

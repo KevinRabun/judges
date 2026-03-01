@@ -512,7 +512,7 @@ const MULTI_LINE_PATCH_RULES: MultiLinePatchRule[] = [
   {
     match: /empty.*catch|catch.*swallow|catch.*discard/i,
     contextLines: 6,
-    generate: (windowLines, windowStart, findingLine) => {
+    generate: (windowLines, windowStart, _findingLine) => {
       for (let i = 0; i < windowLines.length; i++) {
         const line = windowLines[i];
         const catchMatch = line.match(/^(\s*)(?:}\s*)?catch\s*\(([^)]*)\)\s*\{\s*$/);

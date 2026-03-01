@@ -7,7 +7,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
   const lines = code.split("\n");
   const prefix = "TEST";
   let ruleNum = 1;
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Detect test files with no assertions (multi-language)
   const hasTestStructure =
@@ -225,7 +225,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     });
     if (snapshotLines.length > 5) {
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "low",
         title: "Heavy reliance on snapshot testing",
         description:
@@ -254,7 +254,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     const hasMinimalLogic = (code.match(/(?:if|for|while|switch|match)\s*[\s(]/g) || []).length >= 3;
     if (hasFunctions && isLargeFile && hasMinimalLogic && !isConfigOrUtility && !isTypeDefinitionFile) {
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "medium",
         title: "No tests detected for production code",
         description:

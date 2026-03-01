@@ -6,7 +6,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "LOGPRIV";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Helper: find log statement lines that contain sensitive data (multi-language)
   const logLineSet = new Set([
@@ -211,7 +211,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
   const stackExposedLines = getLineNumbers(code, stackExposedPattern);
   if (stackExposedLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "high",
       title: "Stack traces exposed in API responses",
       description:

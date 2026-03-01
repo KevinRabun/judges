@@ -2,6 +2,20 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.7.2] — 2026-03-01
+
+### Fixed
+- Resolved all 168 lint warnings across 45 source files (0 errors, 0 warnings).
+- Fixed unused `lang` parameter in 25 evaluators (`lang` → `_lang`).
+- Fixed last `ruleNum++` assignment (value never read) in 34 evaluators.
+- Removed unused imports from `data-security.ts`, `evaluators/index.ts`, `negative.test.ts`, `subsystems.test.ts`.
+- Prefixed unused variables with `_` in `ai-code-safety.ts`, `v2.ts`, `patches/index.ts`, `cross-file-taint.ts`, `structural-parser.ts`, `taint-tracker.ts`.
+- Fixed unnecessary escape characters in `structural-parser.ts`, `ai-code-safety.ts`, `documentation.ts`, `shared.ts`, `software-practices.ts`.
+- Removed dead `else { ruleNum++; }` branch in `ai-code-safety.ts`.
+- All 1039 tests passing (842 + 28 + 169).
+
+---
+
 ## [3.7.1] — 2026-03-01
 
 ### Fixed

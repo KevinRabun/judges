@@ -33,7 +33,7 @@ import {
   detectFrameworks,
   applyFrameworkAwareness,
 } from "../src/evaluators/shared.js";
-import type { Finding, Severity, JudgesConfig } from "../src/types.js";
+import type { Finding, Severity } from "../src/types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers

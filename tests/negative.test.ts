@@ -13,8 +13,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { evaluateWithJudge, evaluateWithTribunal } from "../src/evaluators/index.js";
-import { JUDGES, getJudge } from "../src/judges/index.js";
-import type { Finding, TribunalVerdict } from "../src/types.js";
+import { getJudge } from "../src/judges/index.js";
+import type { TribunalVerdict } from "../src/types.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 

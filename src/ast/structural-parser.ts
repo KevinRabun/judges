@@ -47,9 +47,9 @@ export function analyzeStructurally(code: string, language: string): CodeStructu
 const FUNC_PATTERNS: Record<string, RegExp> = {
   rust: /^\s*(?:pub\s+)?(?:async\s+)?fn\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)/,
   go: /^\s*func\s+(?:\([^)]*\)\s*)?(\w+)\s*\(([^)]*)\)/,
-  java: /^\s*(?:(?:public|private|protected|static|final|abstract|synchronized)\s+)*\w[\w<>,\s\[\]]*\s+(\w+)\s*\(([^)]*)\)/,
+  java: /^\s*(?:(?:public|private|protected|static|final|abstract|synchronized)\s+)*\w[\w<>,\s[\]]*\s+(\w+)\s*\(([^)]*)\)/,
   csharp:
-    /^\s*(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|sealed)\s+)*\w[\w<>,\s\[\]\?]*\s+(\w+)\s*\(([^)]*)\)/,
+    /^\s*(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|sealed)\s+)*\w[\w<>,\s[\]?]*\s+(\w+)\s*\(([^)]*)\)/,
 };
 
 function extractBraceFunctions(lines: string[], language: string): FunctionInfo[] {
@@ -288,8 +288,8 @@ function computeComplexityFromLines(lines: string[], language: string): number {
 
     // Reset lastIndex for global regex
     pattern.lastIndex = 0;
-    let match;
-    while ((match = pattern.exec(line)) !== null) {
+    let _match;
+    while ((_match = pattern.exec(line)) !== null) {
       complexity++;
     }
   }

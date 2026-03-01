@@ -7,7 +7,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   const lines = code.split("\n");
   const prefix = "COMP";
   let ruleNum = 1;
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   const isCommentLikeLine = (line: string): boolean => {
     const trimmed = line.trim();
@@ -319,7 +319,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   const hasAuditTrail = /audit|auditLog|audit_log|audit_trail|compliance_log/i.test(code);
   if (regulatedOpLines.length > 0 && !hasAuditTrail) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "high",
       title: "Regulated operations without audit trail",
       description:

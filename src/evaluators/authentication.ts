@@ -1,12 +1,5 @@
 import type { Finding } from "../types.js";
-import {
-  getLineNumbers,
-  getLangLineNumbers,
-  getLangFamily,
-  isLikelyPlaceholderCredentialValue,
-  isStrictCredentialDetectionEnabled,
-  looksLikeRealCredentialValue,
-} from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, looksLikeRealCredentialValue } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 function getHardcodedCredentialLinesWithoutPlaceholders(code: string): number[] {
@@ -77,7 +70,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "AUTH";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Hardcoded credentials
   const credentialLines = getHardcodedCredentialLinesWithoutPlaceholders(code);
@@ -361,7 +354,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
     );
   if ((hasAuthFlow || hasProtectedOps) && !hasMfa && code.split("\n").length > 40) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "No MFA/2FA consideration in authentication flow",
       description:

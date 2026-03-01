@@ -6,7 +6,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "COMPAT";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // No API versioning (multi-language route detection)
   const routeLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
@@ -68,7 +68,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
   }
 
   // Response type changes (sending different structures)
-  const mixedResponsePattern = /res\.json\s*\(\s*(?:\{|\[)/g;
+  const _mixedResponsePattern = /res\.json\s*\(\s*(?:\{|\[)/g;
   const responseLines = getLineNumbers(code, /res\.json\s*\(/g);
   if (responseLines.length > 2) {
     findings.push({
@@ -190,7 +190,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
   const fieldRenameLines = getLineNumbers(code, fieldRenamePattern);
   if (fieldRenameLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "Possible field rename — breaking serialization change",
       description: `Found ${fieldRenameLines.length} comment(s) suggesting renamed fields. Renaming JSON response fields breaks API clients that depend on the old names.`,

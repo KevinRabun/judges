@@ -1,12 +1,5 @@
 import type { Finding } from "../types.js";
-import {
-  getLineNumbers,
-  getLangLineNumbers,
-  getLangFamily,
-  isLikelyPlaceholderCredentialValue,
-  isStrictCredentialDetectionEnabled,
-  looksLikeRealCredentialValue,
-} from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, looksLikeRealCredentialValue } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 function lineContainsRealQuotedSecret(line: string, pattern: RegExp): boolean {
@@ -56,7 +49,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "DATA";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Hardcoded secrets (multi-language)
   const secretPatterns = [
@@ -535,7 +528,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   const logRawBodyLines = getLineNumbers(code, logRawBodyPattern);
   if (logRawBodyLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "high",
       title: "Logging raw request/response bodies",
       description: `Found ${logRawBodyLines.length} location(s) logging entire HTTP request or response bodies. These may contain passwords, tokens, PII, credit card numbers, or health data that will be exposed in log aggregators.`,

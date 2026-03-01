@@ -7,7 +7,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
   const lines = code.split("\n");
   const prefix = "CONC";
   let ruleNum = 1;
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Detect unbounded Promise.all
   const promiseAllLines: number[] = [];
@@ -282,7 +282,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
   });
   if (nestedAwaitLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "critical",
       title: "Potential deadlock: nested lock acquisition",
       description:

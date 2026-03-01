@@ -7,7 +7,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
   const lines = code.split("\n");
   const prefix = "OBS";
   let ruleNum = 1;
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Detect console.log used instead of structured logging (multi-language)
   const consoleLogLines = getLangLineNumbers(code, language, LP.CONSOLE_LOG);
@@ -226,7 +226,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
   const hasAuditLog = /audit|auditLog|audit_log/i.test(code);
   if (securityOpLines.length > 0 && !hasAuditLog) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "Security-sensitive operations without audit logging",
       description:

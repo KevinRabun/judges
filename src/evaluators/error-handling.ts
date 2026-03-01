@@ -6,7 +6,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "ERR";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Empty catch blocks (multi-language)
   const emptyCatchLines = getLangLineNumbers(code, language, LP.EMPTY_CATCH);
@@ -112,7 +112,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   }
 
   // Callback without error check (Node.js pattern)
-  const callbackNoErrPattern = /(?:callback|cb|done|next)\s*\(\s*(?:null|undefined)\s*[,)]/gi;
+  const _callbackNoErrPattern = /(?:callback|cb|done|next)\s*\(\s*(?:null|undefined)\s*[,)]/gi;
   const callbackErrPattern = /(?:if\s*\(\s*err|if\s*\(\s*error)/gi;
   const hasCallbacks = /function\s*\([^)]*(?:err|error|cb|callback|done)[^)]*\)/gi.test(code);
   if (hasCallbacks && !callbackErrPattern.test(code) && code.split("\n").length > 20) {
@@ -285,7 +285,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   const stackExposureLines = getLineNumbers(code, stackExposurePattern);
   if (stackExposureLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "high",
       title: "Stack trace or error internals exposed to client",
       description: `Found ${stackExposureLines.length} location(s) where error objects or stack traces may be sent directly in HTTP responses. This leaks internal file paths, library versions, and system details to attackers.`,

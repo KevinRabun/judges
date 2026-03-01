@@ -116,7 +116,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       }
       if (fnLength > 40) {
         const fnBody = lines.slice(idx, idx + fnLength).join("\n");
-        const commentCount = (fnBody.match(/#\s|"""|\'\'\'|^\s*#/gm) || []).length;
+        const commentCount = (fnBody.match(/#\s|"""|'''|^\s*#/gm) || []).length;
         if (commentCount < 2) complexFnLines.push(ln);
       }
     }
@@ -290,7 +290,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   });
   if (noReturnDocLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "info",
       title: "JSDoc present but missing @returns",
       description: "Functions have JSDoc documentation but don't document their return value.",

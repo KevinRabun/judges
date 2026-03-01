@@ -196,7 +196,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
     );
   if (hasLoopConcept && !hasTermination) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "high",
       title: "Agent loop without termination condition",
       description:

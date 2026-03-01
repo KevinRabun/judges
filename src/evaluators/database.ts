@@ -6,7 +6,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "DB";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // SQL injection via string concatenation (multi-language)
   const sqlInjectionLines = getLangLineNumbers(code, language, LP.SQL_INJECTION);
@@ -236,7 +236,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   const credInConnLines = getLineNumbers(code, credInConnPattern);
   if (credInConnLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "high",
       title: "Database credentials embedded in connection string",
       description:

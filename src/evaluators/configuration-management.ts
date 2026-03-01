@@ -6,7 +6,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "CFG";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Hardcoded secrets / credentials
   const secretPattern = /(?:password|passwd|secret|api_?key|token|private_?key)\s*[:=]\s*["'`][^"'`]{3,}/gi;
@@ -120,8 +120,8 @@ export function analyzeConfigurationManagement(code: string, language: string): 
   }
 
   // .env file committed (detected by its presence in code)
-  const dotenvCommitPattern = /\.env\b(?!\.example|\.sample|\.template|\.schema)/gi;
-  const hasGitignore = /\.gitignore/gi.test(code);
+  const _dotenvCommitPattern = /\.env\b(?!\.example|\.sample|\.template|\.schema)/gi;
+  const _hasGitignore = /\.gitignore/gi.test(code);
   const hasEnvFile = /dotenv|\.env\b/gi.test(code);
   // This is a heuristic — can't truly check .gitignore from code alone
   if (hasEnvFile && code.split("\n").length > 10) {
@@ -247,7 +247,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
     const isTestFile = /\b(?:describe|it|test)\s*\(/i.test(code) || /\b(?:test|spec|__tests__)\b/i.test(language);
     if (!isTestFile) {
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "medium",
         title: "Debug mode or development settings enabled",
         description: `Found ${debugLines.length} instance(s) of debug mode or development settings left enabled. These expose verbose error messages, internal state, and configuration details when deployed to production.`,

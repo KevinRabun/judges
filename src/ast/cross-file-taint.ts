@@ -13,7 +13,12 @@
 // 5. Emit CrossFileTaintFlow findings with full file-to-file provenance
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { analyzeTaintFlows, type TaintFlow, type TaintSourceKind, type TaintSinkKind } from "./taint-tracker.js";
+import {
+  analyzeTaintFlows as _analyzeTaintFlows,
+  type TaintFlow as _TaintFlow,
+  type TaintSourceKind,
+  type TaintSinkKind,
+} from "./taint-tracker.js";
 import { normalizeLanguage } from "../language-patterns.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -127,7 +132,7 @@ function isSanitized(expression: string): boolean {
  * - Exported functions that return tainted data
  * - Exported functions that pass tainted parameters through to dangerous sinks
  */
-function analyzeTaintedExports(code: string, filePath: string): TaintedExport[] {
+function analyzeTaintedExports(code: string, _filePath: string): TaintedExport[] {
   const lines = code.split("\n");
   const exports: TaintedExport[] = [];
 
@@ -338,7 +343,7 @@ function analyzeTaintedExports(code: string, filePath: string): TaintedExport[] 
           }
         }
         if (foundOpen && braceDepth <= 0) {
-          const body = lines.slice(bodyStart, j + 1).join("\n");
+          const _body = lines.slice(bodyStart, j + 1).join("\n");
           const taintedIndices: number[] = [];
 
           for (let pi = 0; pi < paramNames.length; pi++) {

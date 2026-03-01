@@ -4336,7 +4336,7 @@ app.listen(3000);
     const verdict = evaluateWithTribunal(sqlInjectionCode, "typescript");
     // SQL injection should be found by multiple judges (cybersecurity, data-security, etc.)
     // but dedup should merge overlapping findings
-    const sqlFindings = verdict.findings.filter(
+    const _sqlFindings = verdict.findings.filter(
       (f) => f.title.toLowerCase().includes("sql") || f.ruleId.toLowerCase().includes("sql"),
     );
     // After dedup, we should have fewer findings than if each judge reported separately
@@ -4548,7 +4548,7 @@ app.get("/api", (req, res) => {
 `;
     const verdict = evaluateWithTribunal(taintConfirmedCode, "typescript");
     // Findings confirmed by taint flow should have higher confidence
-    const evalFindings = verdict.findings.filter((f) => f.description?.includes("Confirmed data flow"));
+    const _evalFindings = verdict.findings.filter((f) => f.description?.includes("Confirmed data flow"));
     // There should be at least one finding annotated with taint flow confirmation
     // (eval with tainted input is a classic case)
     // Note: this depends on the eval finding having line numbers matching the sink
@@ -5809,7 +5809,7 @@ describe("Expanded Auto-Fix Patches", () => {
     const code = `const result = eval(userInput);`;
     const tribunal = evaluateWithTribunal(code, "typescript");
     const enriched = enrichWithPatches(tribunal.findings, code);
-    const evalPatches = enriched.filter((f) => f.patch && f.patch.oldText.includes("eval"));
+    const _evalPatches = enriched.filter((f) => f.patch && f.patch.oldText.includes("eval"));
     // Patches are only applied when the line matches, so check the enrichment ran
     assert.ok(enriched.length > 0, "Should have findings for eval");
   });
@@ -6523,14 +6523,14 @@ describe("Baseline Command", () => {
 
     // Stub process.exit to prevent test termination
     const origExit = process.exit;
-    let exitCode: number | undefined;
+    let _exitCode: number | undefined;
     process.exit = ((code?: number) => {
-      exitCode = code;
+      _exitCode = code;
     }) as never;
     const origLog = console.log;
-    let output = "";
+    let _output = "";
     console.log = (msg: string) => {
-      output += msg;
+      _output += msg;
     };
 
     try {
@@ -6690,9 +6690,9 @@ describe("Docs Command", () => {
     const origExit = process.exit;
     process.exit = (() => {}) as never;
     const origLog = console.log;
-    let output = "";
+    let _output = "";
     console.log = (msg: string) => {
-      output += msg + "\n";
+      _output += msg + "\n";
     };
 
     try {
@@ -6922,7 +6922,7 @@ describe("Plugin API", () => {
     registerPlugin({
       name: "hook-plugin",
       version: "1.0.0",
-      beforeEvaluate: (code, lang) => {
+      beforeEvaluate: (_code, _lang) => {
         beforeCalled = true;
       },
       afterEvaluate: (findings) => {
@@ -7356,8 +7356,12 @@ describe("Fix History", () => {
   });
 
   it("should compute fix stats correctly", async () => {
-    const { loadFixHistory, recordFixAccepted, recordFixRejected, computeFixStats } =
-      await import("../src/fix-history.js");
+    const {
+      loadFixHistory: _loadFixHistory,
+      recordFixAccepted,
+      recordFixRejected,
+      computeFixStats,
+    } = await import("../src/fix-history.js");
     const tmpDir = mkdtempSync(join(tmpdir(), "judges-fix-"));
     try {
       recordFixAccepted("SEC-001", "f1.ts", tmpDir);

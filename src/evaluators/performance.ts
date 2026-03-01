@@ -612,7 +612,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   });
   if (promiseAllLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "Promise.all without error handling",
       description:

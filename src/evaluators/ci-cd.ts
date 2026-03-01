@@ -6,7 +6,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "CICD";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // No test script (multi-language test detection)
   const hasTestScript =
@@ -202,11 +202,11 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   }
 
   // Running as root in Docker
-  const hasRootUser = /^USER\s+root/gim.test(code);
+  const _hasRootUser = /^USER\s+root/gim.test(code);
   const hasNonRootUser = /^USER\s+(?!root)\w+/gim.test(code);
   if (hasDockerfile && !hasNonRootUser) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "high",
       title: "Docker container runs as root user",
       description:

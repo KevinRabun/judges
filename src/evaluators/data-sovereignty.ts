@@ -1,6 +1,6 @@
 import type { Finding } from "../types.js";
 
-export function analyzeDataSovereignty(code: string, language: string): Finding[] {
+export function analyzeDataSovereignty(code: string, _language: string): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "SOV";
@@ -253,7 +253,7 @@ export function analyzeDataSovereignty(code: string, language: string): Finding[
     const hasDataHandling = /(user|customer|personal|profile|account|email|phone|pii|data)/i.test(code);
     if (hasDataHandling) {
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "info",
         title: "Sovereignty evidence not explicit in code",
         description:

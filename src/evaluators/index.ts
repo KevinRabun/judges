@@ -12,7 +12,6 @@ import type {
   Severity,
   Verdict,
   MustFixGateOptions,
-  MustFixGateResult,
   JudgesConfig,
 } from "../types.js";
 import { JUDGES } from "../judges/index.js";
@@ -37,13 +36,7 @@ import {
 } from "./shared.js";
 
 // ─── Extracted Modules ───────────────────────────────────────────────────────
-import {
-  evaluateMustFixGate,
-  clampConfidence,
-  estimateFindingConfidence,
-  applyConfidenceThreshold,
-  isAbsenceBasedFinding,
-} from "../scoring.js";
+import { evaluateMustFixGate, clampConfidence, applyConfidenceThreshold, isAbsenceBasedFinding } from "../scoring.js";
 import { enrichWithPatches } from "../patches/index.js";
 import { crossEvaluatorDedup } from "../dedup.js";
 

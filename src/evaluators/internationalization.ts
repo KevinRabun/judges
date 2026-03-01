@@ -6,7 +6,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   const lines = code.split("\n");
   const prefix = "I18N";
   let ruleNum = 1;
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Detect hardcoded user-facing strings in UI code
   const hardcodedStringLines: number[] = [];
@@ -260,7 +260,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   });
   if (rawNumberLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "Numeric values formatted without locale awareness",
       description:

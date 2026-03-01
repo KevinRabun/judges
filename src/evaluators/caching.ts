@@ -6,7 +6,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "CACHE";
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Unbounded in-memory cache
   const inMemoryCachePattern = /(?:const|let|var)\s+\w*[Cc]ache\w*\s*[:=]\s*(?:new\s+Map|\{\}|\[\])/gi;
@@ -128,7 +128,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
         "Use namespaced, structured cache keys: 'users:byId:${id}'. Include version or tenant info for multi-tenant apps. Consider hashing complex keys.",
       reference: "Cache Key Design Best Practices",
       suggestedFix:
-        "Prefix cache keys with a namespace and version, e.g. `cache.set(\`v1:users:byId:\${userId}\`, data)`, to prevent collisions across features.",
+        "Prefix cache keys with a namespace and version, e.g. `cache.set(`v1:users:byId:${userId}`, data)`, to prevent collisions across features.",
       confidence: 0.75,
     });
   }
@@ -199,7 +199,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
   const hasCacheWarm = /warm|preheat|preload|seed.*cache|cache.*seed|cache.*warm/gi.test(code);
   if (hasStartup && hasCacheRead && !hasCacheWarm && code.split("\n").length > 50) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "info",
       title: "No cache warming strategy for cold starts",
       description:

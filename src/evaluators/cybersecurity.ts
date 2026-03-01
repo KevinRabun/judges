@@ -616,7 +616,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
   const fwMassAssignLines = getLangLineNumbers(code, language, LP.FRAMEWORK_MASS_ASSIGNMENT);
   if (fwMassAssignLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "high",
       title: "Potential mass assignment vulnerability",
       description:

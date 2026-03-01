@@ -215,7 +215,7 @@ interface FunctionTaintInfo {
  */
 function buildFunctionTaintMap(
   sourceFile: ts.SourceFile,
-  taintMap: Map<string, TaintEntry>,
+  _taintMap: Map<string, TaintEntry>,
 ): Map<string, FunctionTaintInfo> {
   const result = new Map<string, FunctionTaintInfo>();
 

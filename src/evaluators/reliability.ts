@@ -7,7 +7,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
   const lines = code.split("\n");
   const prefix = "REL";
   let ruleNum = 1;
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Detect empty catch blocks (multi-language)
   const emptyCatchLines = getLangLineNumbers(code, language, LP.EMPTY_CATCH);
@@ -227,7 +227,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
   });
   if (unhandledPromiseLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "high",
       title: "Promise without rejection handling",
       description:

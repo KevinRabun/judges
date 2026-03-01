@@ -16,7 +16,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
 
   // ── AICS-001  Prompt injection — user input concatenated into LLM prompts ──
   const promptConcatPattern =
-    /(?:system|user|assistant|prompt|messages)\s*[:=\[{].*(?:req\.|request\.|params\.|query\.|body\.|input|user[Ii]nput|message|content)/gi;
+    /(?:system|user|assistant|prompt|messages)\s*[:=[{].*(?:req\.|request\.|params\.|query\.|body\.|input|user[Ii]nput|message|content)/gi;
   const promptTemplatePattern =
     /(?:`[^`]*\$\{[^}]*(?:req|request|params|query|body|input|user|message)[^}]*\}[^`]*`|f["'].*\{.*(?:request|input|user|message).*\})/gi;
   const llmCallPattern =
@@ -165,7 +165,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
   // ── AICS-006  Overly permissive Content-Security-Policy directives ─────────
   const cspPattern = /Content-Security-Policy|contentSecurityPolicy|csp|helmet\s*\(\s*\{/gi;
   const cspUnsafePattern = /unsafe-inline|unsafe-eval|script-src\s+['"]\s*\*\s*['"]/gi;
-  const cspLines = getLineNumbers(code, cspPattern);
+  const _cspLines = getLineNumbers(code, cspPattern);
   const cspUnsafeLines = getLineNumbers(code, cspUnsafePattern);
 
   if (cspUnsafeLines.length > 0) {
@@ -586,7 +586,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
   const unsafeDeserLines = getLangLineNumbers(code, language, LP.UNSAFE_DESERIALIZATION);
   if (unsafeDeserLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "critical",
       title: "Unsafe deserialization of untrusted data",
       description:
@@ -599,8 +599,6 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
         "Replace unsafe deserialization: yaml.safe_load(data) instead of yaml.load(data). For Python, use json.loads() instead of pickle.loads() for untrusted data. Always validate output against a schema.",
       confidence: 0.85,
     });
-  } else {
-    ruleNum++;
   }
 
   return findings;

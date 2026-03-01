@@ -6,7 +6,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   const lines = code.split("\n");
   const prefix = "A11Y";
   let ruleNum = 1;
-  const lang = getLangFamily(language);
+  const _lang = getLangFamily(language);
 
   // Detect images without alt attributes
   const imgNoAltLines: number[] = [];
@@ -394,7 +394,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   });
   if (errorMsgLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "Form error not associated with input via ARIA",
       description:

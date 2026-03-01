@@ -154,10 +154,10 @@ export type DetectedFramework = string;
 const FRAMEWORK_DETECT_PATTERNS: [DetectedFramework, RegExp][] = [
   // ── JavaScript / TypeScript ──
   ["express", /\brequire\s*\(\s*['"]express['"]\)|from\s+['"]express['"]/],
-  ["next", /from\s+['"]next['"\/]|getServerSideProps|getStaticProps|NextRequest|NextResponse/],
-  ["hono", /from\s+['"]hono['"\/]|new\s+Hono\s*\(/],
-  ["koa", /from\s+['"]koa['"\/]|new\s+Koa\s*\(|require\s*\(\s*['"]koa['"]\)/],
-  ["fastify", /from\s+['"]fastify['"\/]|require\s*\(\s*['"]fastify['"]\)/],
+  ["next", /from\s+['"]next['"/]|getServerSideProps|getStaticProps|NextRequest|NextResponse/],
+  ["hono", /from\s+['"]hono['"/]|new\s+Hono\s*\(/],
+  ["koa", /from\s+['"]koa['"/]|new\s+Koa\s*\(|require\s*\(\s*['"]koa['"]\)/],
+  ["fastify", /from\s+['"]fastify['"/]|require\s*\(\s*['"]fastify['"]\)/],
   ["helmet", /\bhelmet\s*\(|from\s+['"]helmet['"]/],
   ["express-rate-limit", /express-rate-limit|rateLimit\s*\(\s*\{/],
   ["cors-middleware", /\bcors\s*\(|from\s+['"]cors['"]/],
