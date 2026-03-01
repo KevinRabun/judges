@@ -30,7 +30,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("judges.evaluateFile", () => {
       const editor = vscode.window.activeTextEditor;
       if (editor) {
-        diagnosticProvider.evaluate(editor.document);
+        diagnosticProvider.forceEvaluate(editor.document);
         vscode.window.showInformationMessage("Judges: Evaluation complete.");
       } else {
         vscode.window.showWarningMessage("Judges: No file is open. Open a file to evaluate.");
