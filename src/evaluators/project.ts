@@ -294,10 +294,28 @@ export function evaluateProject(
     const imports = f.content.match(/(?:import|from|require)[\s(]+['"]\.{1,2}\/([^'"]+)['"]/g) ?? [];
     importMap.set(
       f.path,
-      // Bound [^'"] to {1,500} and drop trailing .* to prevent polynomial
-      // backtracking on strings with many non-quote characters
-      // (CodeQL js/polynomial-redos).
-      imports.map((i) => i.replace(/[^'"]*['"]\.\.?\/([^'"]{1,500})['"].*/, "$1")),
+      // Use indexOf/substring instead of regex to extract the path from each
+      // import match — avoids polynomial backtracking on inputs with many
+      // non-quote characters (CodeQL js/polynomial-redos alert #35).
+      imports.map((i) => {
+        const sq = i.indexOf("'");
+        const dq = i.indexOf('"');
+        let qIdx: number;
+        let qChar: string;
+        if (sq >= 0 && (dq < 0 || sq < dq)) {
+          qIdx = sq;
+          qChar = "'";
+        } else if (dq >= 0) {
+          qIdx = dq;
+          qChar = '"';
+        } else {
+          return i;
+        }
+        const slash = i.indexOf("/", qIdx);
+        if (slash < 0) return i;
+        const end = i.indexOf(qChar, slash + 1);
+        return end >= 0 ? i.substring(slash + 1, end) : i.substring(slash + 1);
+      }),
     );
   }
 
