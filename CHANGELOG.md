@@ -2,6 +2,17 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.7.1] — 2026-03-01
+
+### Fixed
+- Added root `LICENSE` file (MIT) — was referenced in `package.json` `files` but missing from tarball.
+- Added `CHANGELOG.md` to npm `files` array so it ships in the published package.
+- Fixed CHANGELOG date and test count accuracy.
+- VS Code extension: switched to `bundler` module resolution, fixed ESM/CJS import errors.
+- VS Code extension: added `.vscodeignore` tuning, `galleryBanner` metadata, esbuild bundling.
+
+---
+
 ## [3.7.0] — 2026-03-01
 
 ### Added
