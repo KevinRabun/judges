@@ -4151,6 +4151,28 @@ describe("DateUtils", () => {
     );
     assert.ok(dateFindings.length > 0, "Expected hardcoded date findings");
   });
+
+  it("should NOT flag JSDoc comments mentioning HttpClient as external dependencies", () => {
+    const judge = getJudge("testing");
+    assert.ok(judge, "testing judge should exist");
+
+    const testWithJsDocCode = `
+describe("EgressClient", () => {
+  /**
+   * Creates an HTTP client that enforces egress security policies.
+   * @param {object} [httpClient=null] - Optional HTTP client with fetchJson and fetchText methods
+   * @returns {object} An egress-aware HTTP client with fetchJson and fetchText methods
+   */
+  it("should enforce egress policy", () => {
+    const client = createEgressClient();
+    expect(client).toBeDefined();
+  });
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, testWithJsDocCode, "javascript");
+    const extDepFindings = evaluation.findings.filter((f) => f.title === "Tests with real external dependencies");
+    assert.strictEqual(extDepFindings.length, 0, "Should not flag JSDoc comments as real external dependencies");
+  });
 });
 
 // =============================================================================

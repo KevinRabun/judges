@@ -99,6 +99,9 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // Detect tests with external dependencies (multi-language)
     const externalDepLines: number[] = [];
     lines.forEach((line, i) => {
+      const trimmed = line.trim();
+      // Skip comment lines — doc blocks mentioning HttpClient/database are not real calls
+      if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
       if (
         /fetch\s*\(|axios\.|https?:\/\/|database|redis|mongodb|requests\.|reqwest::|HttpClient|http\.Get/i.test(line) &&
         !/mock|stub|fake|spy|nock|msw|Mock|patch|@patch|mockito|Moq/i.test(line)
