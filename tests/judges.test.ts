@@ -4408,6 +4408,47 @@ describe("EgressClient", () => {
     const extDepFindings = evaluation.findings.filter((f) => f.title === "Tests with real external dependencies");
     assert.strictEqual(extDepFindings.length, 0, "Should not flag JSDoc comments as real external dependencies");
   });
+
+  it("should NOT flag DI-injected HTTP clients in production code within test files", () => {
+    const judge = getJudge("testing");
+    assert.ok(judge, "testing judge should exist");
+
+    const diClientCode = `
+describe("EgressAwareHttpClient", () => {
+  /**
+   * Creates an HTTP client that enforces egress security policies.
+   * @param {object} [httpClient=null] - Optional HTTP client with fetchJson and fetchText methods
+   * @returns {object} An egress-aware HTTP client with fetchJson and fetchText methods
+   */
+  function createEgressAwareHttpClient(httpClient = null) {
+    const client = httpClient || { fetchJson, fetchText };
+
+    return {
+      fetchJson: async (url, options = {}) => {
+        assertAllowedEgress(url);
+        return await client.fetchJson(url, { ...options });
+      },
+      fetchText: async (url, options = {}) => {
+        assertAllowedEgress(url);
+        return await client.fetchText(url, { ...options });
+      }
+    };
+  }
+
+  it("should enforce egress policy", () => {
+    const client = createEgressAwareHttpClient({ fetchJson: jest.fn(), fetchText: jest.fn() });
+    expect(client).toBeDefined();
+  });
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, diClientCode, "javascript");
+    const extDepFindings = evaluation.findings.filter((f) => f.title === "Tests with real external dependencies");
+    assert.strictEqual(
+      extDepFindings.length,
+      0,
+      "Should not flag DI-injected httpClient patterns as real external dependencies",
+    );
+  });
 });
 
 // =============================================================================

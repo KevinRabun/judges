@@ -102,8 +102,18 @@ export function analyzeTesting(code: string, language: string): Finding[] {
       const trimmed = line.trim();
       // Skip comment lines — doc blocks mentioning HttpClient/database are not real calls
       if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
+      // Skip function/method declarations & DI parameter defaults — these define
+      // the interface, not actual external calls (e.g., createEgressAwareHttpClient(httpClient = null))
+      if (/^\s*(?:export\s+)?(?:function|class|const|let|var|def|fn|func|async\s+function)\s/i.test(line)) return;
+      // Skip test framework calls (describe/it/test labels often contain class names)
+      if (/^\s*(?:describe|it|test|context)\s*\(/i.test(trimmed)) return;
+      // Skip lines that are assigning/falling-back to an injected dependency
+      if (/=\s*(?:httpClient|client|db|database|redis)\b/i.test(line) && /\|\||null|undefined|=\s*null/i.test(line))
+        return;
       if (
-        /fetch\s*\(|axios\.|https?:\/\/|database|redis|mongodb|requests\.|reqwest::|HttpClient|http\.Get/i.test(line) &&
+        /fetch\s*\(|axios\.|https?:\/\/|\bdatabase\b|\bredis\b|\bmongodb\b|requests\.|reqwest::|(?<![a-zA-Z])HttpClient(?![a-zA-Z])|http\.Get/i.test(
+          line,
+        ) &&
         !/mock|stub|fake|spy|nock|msw|Mock|patch|@patch|mockito|Moq/i.test(line)
       ) {
         externalDepLines.push(i + 1);
