@@ -3657,6 +3657,33 @@ async function getAllData() {
     );
     assert.ok(unboundedFindings.length > 0, "Expected unbounded query findings");
   });
+
+  it("should NOT flag JSDoc comments containing the word 'for' as nested loops", () => {
+    const judge = getJudge("cost-effectiveness");
+    assert.ok(judge, "cost-effectiveness judge should exist");
+
+    const codeWithJSDocFor = `
+/**
+ * JSON body parser middleware - Parses incoming request bodies as JSON
+ * @description Limits request body size to 1MB for security
+ */
+export function createBodyParser(options) {
+  return (req, res, next) => {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => {
+      req.body = JSON.parse(body);
+      next();
+    });
+  };
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, codeWithJSDocFor, "typescript");
+    const nestedLoopFindings = evaluation.findings.filter(
+      (f) => f.title.includes("Nested loops") || f.title.includes("O(n²)"),
+    );
+    assert.strictEqual(nestedLoopFindings.length, 0, "Should not detect nested loops from 'for' in JSDoc comments");
+  });
 });
 
 // =============================================================================

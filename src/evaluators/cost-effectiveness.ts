@@ -14,6 +14,8 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
   const nestedLoopLines: number[] = [];
   const loopPattern = lang === "python" ? /\b(?:for|while)\s/ : /\b(?:for|while|loop)\s*[\s(]/;
   for (let i = 0; i < lines.length; i++) {
+    const trimmedLoop = lines[i].trim();
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmedLoop)) continue;
     if (loopPattern.test(lines[i])) {
       loopDepth++;
       if (loopDepth >= 2) {
@@ -124,6 +126,8 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
   // String concatenation in loops (Java/C#/Python)
   const strConcatLoopLines: number[] = [];
   lines.forEach((line, i) => {
+    const trimmed = line.trim();
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (/\b(?:for|while)\s*[\s(]/.test(line)) {
       const loopBody = lines.slice(i + 1, Math.min(lines.length, i + 10)).join("\n");
       if (/\+=\s*["']|\+\s*=\s*str|\.concat\s*\(|String\s*\+/i.test(loopBody)) {
@@ -257,6 +261,8 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
   // Redundant data transformations
   const multiMapLines: number[] = [];
   lines.forEach((line, i) => {
+    const trimmed = line.trim();
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (/\.map\s*\(/.test(line)) {
       const nextLines = lines.slice(i + 1, Math.min(lines.length, i + 3)).join("\n");
       if (/\.map\s*\(|\.filter\s*\(/.test(nextLines)) {
