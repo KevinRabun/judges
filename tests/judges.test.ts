@@ -44,6 +44,8 @@ import type {
 import { analyzeStructure, isTreeSitterAvailable } from "../src/ast/index.js";
 import { analyzeCodeStructure } from "../src/evaluators/code-structure.js";
 import { analyzeIacSecurity } from "../src/evaluators/iac-security.js";
+import { analyzeMaintainability } from "../src/evaluators/maintainability.js";
+import { analyzeSoftwarePractices } from "../src/evaluators/software-practices.js";
 
 // ─── Tree-sitter warm-up ────────────────────────────────────────────────────
 // Must happen BEFORE any describe/it blocks so that tree-sitter grammars are
@@ -8583,5 +8585,29 @@ resource "azurerm_storage_account" "main" {
     const iacEval = verdict.evaluations.find((e) => e.judgeId === "iac-security");
     assert.ok(iacEval);
     findingsAreWellFormed(iacEval!.findings);
+  });
+});
+
+// ── Regression: 'var' in comments should not trigger var-declaration findings ──
+describe("False-positive: var keyword in comments", () => {
+  it("should NOT flag 'var' inside JSDoc comments as var declarations", () => {
+    const code = `
+/** @constant {number} Default port when PORT env var is unset */
+const DEFAULT_PORT = 3000;
+
+/** This helper var-ifies the config object for legacy callers */
+function legacyConfig(cfg) {
+  return Object.assign({}, cfg);
+}
+`;
+    const maintFindings = analyzeMaintainability(code, "typescript").filter(
+      (f) => f.title.includes("var") && f.title.includes("declaration"),
+    );
+    assert.strictEqual(maintFindings.length, 0, "Should not flag 'var' in JSDoc comments as var declarations");
+
+    const spFindings = analyzeSoftwarePractices(code, "typescript").filter(
+      (f) => f.title.includes("var") && f.title.includes("keyword"),
+    );
+    assert.strictEqual(spFindings.length, 0, "Should not flag 'var' in JSDoc comments as var keyword usage");
   });
 });

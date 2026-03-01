@@ -75,7 +75,11 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   // var keyword usage (JS/TS)
   if (["typescript", "javascript", "ts", "js"].includes(language.toLowerCase())) {
     const varPattern = /\bvar\s+\w/g;
-    const varLines = getLineNumbers(code, varPattern);
+    const commentLine = /^\s*(?:\/\/|\/\*|\*|\*\/)/;
+    const varLines = getLineNumbers(code, varPattern).filter((ln) => {
+      const line = lines[ln - 1];
+      return line !== undefined && !commentLine.test(line);
+    });
     if (varLines.length > 0) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

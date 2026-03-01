@@ -232,7 +232,12 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   // var usage in JavaScript/TypeScript
   if (LP.isJsTs(lang)) {
     const varPattern = /^\s*var\s+\w/gm;
-    const varLines = getLineNumbers(code, varPattern);
+    const commentLine = /^\s*(?:\/\/|\/\*|\*|\*\/)/;
+    const varLines = getLineNumbers(code, varPattern).filter((ln) => {
+      const srcLines = code.split("\n");
+      const line = srcLines[ln - 1];
+      return line !== undefined && !commentLine.test(line);
+    });
     if (varLines.length > 0) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
