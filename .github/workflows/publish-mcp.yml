@@ -29,6 +29,9 @@ jobs:
       - name: Build package
         run: npm run build
 
+      - name: Create local package tarball
+        run: npm pack
+
       - name: Publish package to npm
         run: |
           npm publish --provenance --access public || {
@@ -81,14 +84,14 @@ jobs:
           node -e "
             const pkg = JSON.parse(require('fs').readFileSync('package.json','utf8'));
             pkg.version = '${VERSION}';
-            pkg.dependencies['@kevinrabun/judges'] = '^${VERSION}';
             require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
-      - name: Install extension dependencies
+      - name: Install extension dependencies (use local build)
         run: |
           cd vscode-extension
           npm install
+          npm install --no-save ../kevinrabun-judges-*.tgz
 
       - name: Publish extension to VS Code Marketplace
         run: |

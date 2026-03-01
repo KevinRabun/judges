@@ -2,6 +2,13 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.7.3] — 2026-03-01
+
+### Fixed
+- Fixed CI workflow race condition: extension install failed because `@kevinrabun/judges@^3.7.2` wasn't propagated on npm yet.
+- Workflow now uses local tarball (`npm pack`) for the extension build instead of relying on npm registry propagation.
+- Removed dependency version sync from the extension publish step; `^3.7.1` semver range covers all 3.x patches.
+
 ## [3.7.2] — 2026-03-01
 
 ### Fixed
