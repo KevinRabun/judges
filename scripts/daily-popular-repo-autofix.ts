@@ -1,55 +1,56 @@
 #!/usr/bin/env tsx
 
 import { execFileSync } from "child_process";
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { extname, join, resolve } from "path";
 
 import { evaluateWithTribunal } from "../src/evaluators/index.js";
-import { Finding } from "../src/types.js";
+import type { Finding } from "../src/types.js";
 
+// Curated list of popular AI/ML repos that are small-to-medium sized.
+// Massive repos (vscode, pytorch, tensorflow, kubernetes, cpython, etc.)
+// are excluded to avoid timeouts on GitHub Actions (6-hour hard limit).
 const DEFAULT_POPULAR_REPOS = [
+  // --- AI Agent frameworks (small–medium) ---
   "https://github.com/OpenClawAI/OpenClaw",
   "https://github.com/All-Hands-AI/OpenHands",
-  "https://github.com/OpenDevin/OpenDevin",
   "https://github.com/Significant-Gravitas/AutoGPT",
   "https://github.com/microsoft/autogen",
   "https://github.com/microsoft/semantic-kernel",
   "https://github.com/microsoft/promptflow",
   "https://github.com/microsoft/graphrag",
-  "https://github.com/microsoft/onnxruntime",
-  "https://github.com/microsoft/Olive",
   "https://github.com/microsoft/markitdown",
-  "https://github.com/microsoft/vscode",
-  "https://github.com/microsoft/vscode-copilot-release",
+  "https://github.com/crewAIInc/crewAI",
+  "https://github.com/crewAIInc/crewAI-tools",
+  "https://github.com/stanfordnlp/dspy",
+  "https://github.com/OpenInterpreter/open-interpreter",
+  "https://github.com/Aider-AI/aider",
+  "https://github.com/Codium-ai/pr-agent",
+  "https://github.com/SweepAI/sweep",
+  "https://github.com/cline/cline",
+  "https://github.com/browser-use/browser-use",
+  "https://github.com/assafelovic/gpt-researcher",
+
+  // --- LLM tooling / SDKs ---
   "https://github.com/langchain-ai/langchain",
   "https://github.com/langchain-ai/langgraph",
   "https://github.com/langchain-ai/langchainjs",
   "https://github.com/langchain-ai/langserve",
   "https://github.com/run-llama/llama_index",
-  "https://github.com/crewAIInc/crewAI",
-  "https://github.com/crewAIInc/crewAI-tools",
   "https://github.com/BerriAI/litellm",
   "https://github.com/camel-ai/camel",
-  "https://github.com/stanfordnlp/dspy",
-  "https://github.com/OpenInterpreter/open-interpreter",
-  "https://github.com/Aider-AI/aider",
-  "https://github.com/continue-rev/continue",
-  "https://github.com/Codium-ai/pr-agent",
-  "https://github.com/SweepAI/sweep",
-  "https://github.com/TabbyML/tabby",
-  "https://github.com/cline/cline",
-  "https://github.com/stackblitz-labs/bolt.diy",
-  "https://github.com/browser-use/browser-use",
-  "https://github.com/assafelovic/gpt-researcher",
+  "https://github.com/openai/openai-python",
+  "https://github.com/openai/openai-node",
+  "https://github.com/openai/openai-cookbook",
+  "https://github.com/anthropics/anthropic-sdk-python",
+  "https://github.com/instructor-ai/instructor",
+  "https://github.com/guidance-ai/guidance",
+  "https://github.com/dottxt-ai/outlines",
+  "https://github.com/modelcontextprotocol/servers",
+  "https://github.com/modelcontextprotocol/specification",
+
+  // --- LLM-powered apps / chat UIs ---
   "https://github.com/langgenius/dify",
   "https://github.com/FlowiseAI/Flowise",
   "https://github.com/open-webui/open-webui",
@@ -57,95 +58,49 @@ const DEFAULT_POPULAR_REPOS = [
   "https://github.com/ChatGPTNextWeb/NextChat",
   "https://github.com/mckaywrigley/chatbot-ui",
   "https://github.com/Mintplex-Labs/anything-llm",
-  "https://github.com/vercel/ai",
-  "https://github.com/modelcontextprotocol/servers",
-  "https://github.com/modelcontextprotocol/specification",
+  "https://github.com/stackblitz-labs/bolt.diy",
+
+  // --- Observability / evaluation ---
   "https://github.com/langfuse/langfuse",
   "https://github.com/Arize-ai/phoenix",
   "https://github.com/traceloop/openllmetry",
   "https://github.com/promptfoo/promptfoo",
-  "https://github.com/mlflow/mlflow",
-  "https://github.com/wandb/wandb",
-  "https://github.com/openai/openai-python",
-  "https://github.com/openai/openai-node",
-  "https://github.com/openai/openai-cookbook",
-  "https://github.com/openai/whisper",
-  "https://github.com/anthropics/anthropic-sdk-python",
-  "https://github.com/huggingface/transformers",
-  "https://github.com/huggingface/diffusers",
-  "https://github.com/huggingface/text-generation-inference",
-  "https://github.com/huggingface/accelerate",
-  "https://github.com/huggingface/peft",
-  "https://github.com/huggingface/trl",
-  "https://github.com/huggingface/tokenizers",
-  "https://github.com/ggerganov/llama.cpp",
+
+  // --- AI/ML libraries (medium-sized) ---
+  "https://github.com/vercel/ai",
+  "https://github.com/TabbyML/tabby",
   "https://github.com/abetlen/llama-cpp-python",
-  "https://github.com/ollama/ollama",
-  "https://github.com/vllm-project/vllm",
-  "https://github.com/ray-project/ray",
-  "https://github.com/pytorch/pytorch",
   "https://github.com/Lightning-AI/litgpt",
-  "https://github.com/NVIDIA/TensorRT-LLM",
-  "https://github.com/NVIDIA/NeMo",
-  "https://github.com/NVIDIA/Megatron-LM",
-  "https://github.com/deepspeedai/DeepSpeed",
-  "https://github.com/mlc-ai/mlc-llm",
-  "https://github.com/apache/tvm",
-  "https://github.com/tensorflow/tensorflow",
-  "https://github.com/keras-team/keras",
-  "https://github.com/jax-ml/jax",
-  "https://github.com/google/flax",
-  "https://github.com/google-deepmind/alphafold",
-  "https://github.com/lm-sys/FastChat",
-  "https://github.com/Dao-AILab/flash-attention",
-  "https://github.com/SYSTRAN/faster-whisper",
-  "https://github.com/karpathy/llm.c",
   "https://github.com/karpathy/minGPT",
   "https://github.com/karpathy/nanoGPT",
   "https://github.com/deepset-ai/haystack",
   "https://github.com/infiniflow/ragflow",
-  "https://github.com/Qdrant/qdrant",
-  "https://github.com/chroma-core/chroma",
-  "https://github.com/milvus-io/milvus",
-  "https://github.com/weaviate/weaviate",
-  "https://github.com/lancedb/lancedb",
-  "https://github.com/jina-ai/reader",
-  "https://github.com/jina-ai/serve",
-  "https://github.com/instructor-ai/instructor",
-  "https://github.com/guidance-ai/guidance",
-  "https://github.com/dottxt-ai/outlines",
   "https://github.com/mem0ai/mem0",
+
+  // --- Vector DBs ---
+  "https://github.com/chroma-core/chroma",
+  "https://github.com/lancedb/lancedb",
+
+  // --- Dev tools / frameworks (medium) ---
   "https://github.com/e2b-dev/E2B",
   "https://github.com/exa-labs/exa-py",
   "https://github.com/composiohq/composio",
-  "https://github.com/supabase/supabase",
-  "https://github.com/n8n-io/n8n",
-  "https://github.com/vercel/next.js",
-  "https://github.com/remix-run/remix",
-  "https://github.com/nuxt/nuxt",
-  "https://github.com/sveltejs/kit",
   "https://github.com/fastapi/fastapi",
-  "https://github.com/tiangolo/fastapi",
-  "https://github.com/expressjs/express",
-  "https://github.com/nestjs/nest",
-  "https://github.com/django/django",
-  "https://github.com/pallets/flask",
-  "https://github.com/nodejs/node",
-  "https://github.com/python/cpython",
-  "https://github.com/golang/go",
-  "https://github.com/rust-lang/rust",
-  "https://github.com/microsoft/TypeScript",
-  "https://github.com/denoland/deno",
-  "https://github.com/astral-sh/uv",
-  "https://github.com/docker/cli",
-  "https://github.com/kubernetes/kubernetes",
-  "https://github.com/hashicorp/terraform",
-  "https://github.com/prometheus/prometheus",
-  "https://github.com/grafana/grafana",
+  "https://github.com/n8n-io/n8n",
 ];
 
 const DEFAULT_MAX_REPOS_PER_DAY = 10;
 const DEFAULT_MAX_PRS_PER_REPO = 5;
+const DEFAULT_PER_REPO_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes per repo
+const MAX_SOURCE_FILES_PER_REPO = 500;
+const MAX_FILE_SIZE_BYTES = 100 * 1024; // 100 KB
+
+class RepoTimeoutError extends Error {
+  constructor(repoUrl: string, timeoutMs: number) {
+    super(`Repository ${repoUrl} exceeded ${Math.round(timeoutMs / 60_000)}m timeout`);
+    this.name = "RepoTimeoutError";
+  }
+}
 
 const SOURCE_EXTENSIONS = new Set([
   ".ts",
@@ -308,7 +263,12 @@ function isPublicRepo(owner: string, repo: string): boolean {
 
 function canSubmitPrWithoutExtraAuth(owner: string, repo: string): { allowed: boolean; reason?: string } {
   try {
-    const visibility = run("gh", ["api", `repos/${owner}/${repo}`, "--jq", "[.private,.archived,.allow_forking] | @tsv"])
+    const visibility = run("gh", [
+      "api",
+      `repos/${owner}/${repo}`,
+      "--jq",
+      "[.private,.archived,.allow_forking] | @tsv",
+    ])
       .split("\t")
       .map((value) => value.trim());
 
@@ -351,7 +311,7 @@ function listPublicReposForOwner(owner: string): string[] {
     "--paginate",
     `users/${owner}/repos?per_page=100&type=public&sort=updated`,
     "--jq",
-    '.[] | select((.private == false) and (.archived == false) and (.fork == false)) | .html_url',
+    ".[] | select((.private == false) and (.archived == false) and (.fork == false)) | .html_url",
   ]);
 
   return output
@@ -382,8 +342,7 @@ function selectRepositories(maxReposPerDay: number): string[] {
     return selected;
   }
 
-  const fromEnv = process.env.POPULAR_REPOS
-    ?.split(",")
+  const fromEnv = process.env.POPULAR_REPOS?.split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 
@@ -403,16 +362,29 @@ function detectDefaultBranch(clonePath: string): string {
   return ref.replace("refs/remotes/origin/", "");
 }
 
-function collectSourceFiles(rootPath: string): string[] {
-  const results: string[] = [];
+function collectSourceFiles(rootPath: string, deadline?: number): string[] {
+  const results: Array<{ relative: string; size: number }> = [];
   const stack = [rootPath];
 
   while (stack.length > 0) {
+    if (deadline && Date.now() > deadline) break;
+
     const current = stack.pop()!;
-    for (const item of readdirSync(current)) {
+    let entries: string[];
+    try {
+      entries = readdirSync(current);
+    } catch {
+      continue;
+    }
+    for (const item of entries) {
       const absolute = join(current, item);
       const relative = absolute.slice(rootPath.length + 1).replace(/\\/g, "/");
-      const stat = statSync(absolute);
+      let stat;
+      try {
+        stat = statSync(absolute);
+      } catch {
+        continue;
+      }
 
       if (stat.isDirectory()) {
         if (EXCLUDED_DIRS.has(item) || item === "coverage") {
@@ -422,14 +394,18 @@ function collectSourceFiles(rootPath: string): string[] {
         continue;
       }
 
+      if (stat.size > MAX_FILE_SIZE_BYTES) continue;
+
       const ext = extname(item).toLowerCase();
       if (SOURCE_EXTENSIONS.has(ext)) {
-        results.push(relative);
+        results.push({ relative, size: stat.size });
       }
     }
   }
 
-  return results;
+  // Prioritise smaller files so we maximise coverage within the cap
+  results.sort((a, b) => a.size - b.size);
+  return results.slice(0, MAX_SOURCE_FILES_PER_REPO).map((entry) => entry.relative);
 }
 
 function languageFromPath(filePath: string): string {
@@ -488,8 +464,7 @@ function normalizeConfidence(confidence?: number): number {
 }
 
 function parsePriorityRulePrefixes(): string[] {
-  const configured = process.env.AUTOFIX_PRIORITY_RULE_PREFIXES
-    ?.split(",")
+  const configured = process.env.AUTOFIX_PRIORITY_RULE_PREFIXES?.split(",")
     .map((value) => value.trim().toUpperCase())
     .filter(Boolean);
 
@@ -538,7 +513,7 @@ function summarizePrioritizedRuleCounts(candidates: CandidateFix[]): Array<{ rul
 
 function summarizeTopPrioritizedCandidates(
   candidates: CandidateFix[],
-  priorityPrefixes: string[]
+  priorityPrefixes: string[],
 ): RepoRunSummary["topPrioritizedCandidates"] {
   return candidates.slice(0, 10).map((candidate) => ({
     ruleId: candidate.ruleId,
@@ -550,10 +525,7 @@ function summarizeTopPrioritizedCandidates(
   }));
 }
 
-function dedupeCandidatesByLocation(
-  candidates: CandidateFix[],
-  priorityPrefixes: string[]
-): CandidateFix[] {
+function dedupeCandidatesByLocation(candidates: CandidateFix[], priorityPrefixes: string[]): CandidateFix[] {
   const byLocation = new Map<string, CandidateFix>();
 
   for (const candidate of candidates) {
@@ -578,7 +550,7 @@ function dedupeCandidatesByLocation(
 function applyMinimumPriorityThreshold(
   candidates: CandidateFix[],
   priorityPrefixes: string[],
-  minPriorityScore: number
+  minPriorityScore: number,
 ): CandidateFix[] {
   if (!Number.isFinite(minPriorityScore) || minPriorityScore <= 0) {
     return candidates;
@@ -606,34 +578,36 @@ function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] 
 
   const reposWithPrioritizedCandidates = repoRuns.filter((repoRun) => repoRun.candidatesInspected > 0).length;
   const reposWithOpenedPrs = repoRuns.filter((repoRun) => repoRun.prsOpened.length > 0).length;
-  const totalCandidatesDiscovered = repoRuns.reduce(
-    (sum, repoRun) => sum + repoRun.candidatesDiscovered,
-    0
-  );
+  const totalCandidatesDiscovered = repoRuns.reduce((sum, repoRun) => sum + repoRun.candidatesDiscovered, 0);
   const totalCandidatesAfterLocationDedupe = repoRuns.reduce(
     (sum, repoRun) => sum + repoRun.candidatesAfterLocationDedupe,
-    0
+    0,
   );
   const totalCandidatesAfterPriorityThreshold = repoRuns.reduce(
     (sum, repoRun) => sum + repoRun.candidatesAfterPriorityThreshold,
-    0
+    0,
   );
-  const totalPrioritizedCandidates = repoRuns.reduce(
-    (sum, repoRun) => sum + repoRun.candidatesInspected,
-    0
-  );
+  const totalPrioritizedCandidates = repoRuns.reduce((sum, repoRun) => sum + repoRun.candidatesInspected, 0);
   const dedupeReductionPercent =
     totalCandidatesDiscovered > 0
-      ? Number((((totalCandidatesDiscovered - totalCandidatesAfterLocationDedupe) / totalCandidatesDiscovered) * 100).toFixed(2))
+      ? Number(
+          (
+            ((totalCandidatesDiscovered - totalCandidatesAfterLocationDedupe) / totalCandidatesDiscovered) *
+            100
+          ).toFixed(2),
+        )
       : 0;
   const priorityThresholdReductionPercent =
     totalCandidatesAfterLocationDedupe > 0
-      ? Number((((totalCandidatesAfterLocationDedupe - totalCandidatesAfterPriorityThreshold) / totalCandidatesAfterLocationDedupe) * 100).toFixed(2))
+      ? Number(
+          (
+            ((totalCandidatesAfterLocationDedupe - totalCandidatesAfterPriorityThreshold) /
+              totalCandidatesAfterLocationDedupe) *
+            100
+          ).toFixed(2),
+        )
       : 0;
-  const totalPrioritizedRuleOccurrences = [...topRuleCounts.values()].reduce(
-    (sum, count) => sum + count,
-    0
-  );
+  const totalPrioritizedRuleOccurrences = [...topRuleCounts.values()].reduce((sum, count) => sum + count, 0);
 
   return {
     reposProcessed: repoRuns.length,
@@ -651,7 +625,9 @@ function buildRunAggregate(repoRuns: RepoRunSummary[]): Summary["runAggregate"] 
 }
 
 function isNonProductionPath(path: string): boolean {
-  return /(^|\/)(test|tests|__tests__|spec|specs|e2e|docs|examples?|fixtures?|mocks?)(\/|\.|$)|\.(test|spec)\./i.test(path);
+  return /(^|\/)(test|tests|__tests__|spec|specs|e2e|docs|examples?|fixtures?|mocks?)(\/|\.|$)|\.(test|spec)\./i.test(
+    path,
+  );
 }
 
 function flattenFindings(source: string, language: string, minConfidence: number): Finding[] {
@@ -713,12 +689,17 @@ function remediateCorsWildcardLine(line: string): string | undefined {
 
   let next = line;
   next = next.replace(/origin\s*:\s*["'`]\*["'`]/g, 'origin: (process.env.ALLOWED_ORIGIN ?? "https://example.com")');
-  next = next.replace(/(Access-Control-Allow-Origin["'`]?,\s*)["'`]\*["'`]/g, '$1(process.env.ALLOWED_ORIGIN ?? "https://example.com")');
+  next = next.replace(
+    /(Access-Control-Allow-Origin["'`]?,\s*)["'`]\*["'`]/g,
+    '$1(process.env.ALLOWED_ORIGIN ?? "https://example.com")',
+  );
   return next === line ? undefined : next;
 }
 
 function remediateHardcodedSecretLine(line: string): string | undefined {
-  const assignment = line.match(/\b(password|passwd|pwd|secret|api_?key|apikey|token|auth_?token|private_?key)\b\s*[:=]\s*(["'`])([^"'`]{3,})\2/i);
+  const assignment = line.match(
+    /\b(password|passwd|pwd|secret|api_?key|apikey|token|auth_?token|private_?key)\b\s*[:=]\s*(["'`])([^"'`]{3,})\2/i,
+  );
   if (!assignment) return undefined;
 
   const keyName = assignment[1];
@@ -729,7 +710,9 @@ function remediateHardcodedSecretLine(line: string): string | undefined {
 }
 
 function remediateHardcodedConfigLine(line: string): string | undefined {
-  const match = line.match(/^(\s*)(const|let|var)\s+(PORT|HOST|DATABASE|REDIS|MONGO|API_URL|BASE_URL|TIMEOUT|INTERVAL)\s*=\s*([^;]+)(;?\s*)$/i);
+  const match = line.match(
+    /^(\s*)(const|let|var)\s+(PORT|HOST|DATABASE|REDIS|MONGO|API_URL|BASE_URL|TIMEOUT|INTERVAL)\s*=\s*([^;]+)(;?\s*)$/i,
+  );
   if (!match) return undefined;
 
   const indent = match[1] ?? "";
@@ -751,17 +734,26 @@ function remediateHardcodedConfigLine(line: string): string | undefined {
 
 function remediateCookieSecurityFlagsLine(line: string): string | undefined {
   if (/res\.cookie\s*\(/.test(line) && !/(httpOnly|secure|sameSite)/i.test(line)) {
-    const replaced = line.replace(/res\.cookie\s*\(([^)]+)\)/, "res.cookie($1, { httpOnly: true, secure: true, sameSite: \"strict\" })");
+    const replaced = line.replace(
+      /res\.cookie\s*\(([^)]+)\)/,
+      'res.cookie($1, { httpOnly: true, secure: true, sameSite: "strict" })',
+    );
     return replaced === line ? undefined : replaced;
   }
 
   if (/set_cookie\s*\(/.test(line) && !/(httponly|secure|samesite)/i.test(line)) {
-    const replaced = line.replace(/set_cookie\s*\(([^)]+)\)/, "set_cookie($1, httponly=True, secure=True, samesite=\"Strict\")");
+    const replaced = line.replace(
+      /set_cookie\s*\(([^)]+)\)/,
+      'set_cookie($1, httponly=True, secure=True, samesite="Strict")',
+    );
     return replaced === line ? undefined : replaced;
   }
 
   if (/Set-Cookie/i.test(line) && !/(HttpOnly|Secure|SameSite)/i.test(line)) {
-    const replaced = line.replace(/(["'][^"']*Set-Cookie[^"']*["']\s*,\s*["'][^"']+)(["'])/, "$1; HttpOnly; Secure; SameSite=Strict$2");
+    const replaced = line.replace(
+      /(["'][^"']*Set-Cookie[^"']*["']\s*,\s*["'][^"']+)(["'])/,
+      "$1; HttpOnly; Secure; SameSite=Strict$2",
+    );
     return replaced === line ? undefined : replaced;
   }
 
@@ -771,7 +763,7 @@ function remediateCookieSecurityFlagsLine(line: string): string | undefined {
 function generateReplacement(
   finding: Finding,
   previousLine: string,
-  language: string
+  language: string,
 ): { replacementLine?: string; reason?: string } {
   const title = finding.title.toLowerCase();
   const rulePrefix = finding.ruleId.split("-")[0];
@@ -797,7 +789,11 @@ function generateReplacement(
     }
   }
 
-  if (rulePrefix === "AUTH" && /query parameters/.test(title) && (language === "typescript" || language === "javascript")) {
+  if (
+    rulePrefix === "AUTH" &&
+    /query parameters/.test(title) &&
+    (language === "typescript" || language === "javascript")
+  ) {
     const replacementLine = remediateTokenQueryLine(previousLine);
     if (replacementLine && replacementLine !== previousLine) {
       return { replacementLine, reason: "Move token source away from query parameters." };
@@ -811,14 +807,22 @@ function generateReplacement(
     }
   }
 
-  if ((rulePrefix === "CFG" || rulePrefix === "AUTH" || rulePrefix === "DATA") && /hardcoded|secret|credential/.test(title) && (language === "typescript" || language === "javascript")) {
+  if (
+    (rulePrefix === "CFG" || rulePrefix === "AUTH" || rulePrefix === "DATA") &&
+    /hardcoded|secret|credential/.test(title) &&
+    (language === "typescript" || language === "javascript")
+  ) {
     const replacementLine = remediateHardcodedSecretLine(previousLine);
     if (replacementLine && replacementLine !== previousLine) {
       return { replacementLine, reason: "Externalize hardcoded secret to environment variable." };
     }
   }
 
-  if (rulePrefix === "CFG" && /configuration values hardcoded|no environment variable usage/.test(title) && (language === "typescript" || language === "javascript")) {
+  if (
+    rulePrefix === "CFG" &&
+    /configuration values hardcoded|no environment variable usage/.test(title) &&
+    (language === "typescript" || language === "javascript")
+  ) {
     const replacementLine = remediateHardcodedConfigLine(previousLine);
     if (replacementLine && replacementLine !== previousLine) {
       return { replacementLine, reason: "Externalize hardcoded configuration to environment variable fallback." };
@@ -835,12 +839,17 @@ function generateReplacement(
   return {};
 }
 
-function discoverFixCandidates(rootPath: string, options: CandidateDiscoveryOptions): CandidateFix[] {
-  const files = collectSourceFiles(rootPath);
+function discoverFixCandidates(
+  rootPath: string,
+  options: CandidateDiscoveryOptions & { deadline?: number },
+): CandidateFix[] {
+  const files = collectSourceFiles(rootPath, options.deadline);
   const candidates: CandidateFix[] = [];
   const seen = new Set<string>();
 
   for (const relativePath of files) {
+    if (options.deadline && Date.now() > options.deadline) break;
+
     if (isNonProductionPath(relativePath)) {
       continue;
     }
@@ -854,11 +863,7 @@ function discoverFixCandidates(rootPath: string, options: CandidateDiscoveryOpti
 
     const lines = source.split("\n");
     for (const finding of findings) {
-      if (
-        options.highCriticalOnly &&
-        finding.severity !== "critical" &&
-        finding.severity !== "high"
-      ) {
+      if (options.highCriticalOnly && finding.severity !== "critical" && finding.severity !== "high") {
         continue;
       }
 
@@ -892,11 +897,13 @@ function discoverFixCandidates(rootPath: string, options: CandidateDiscoveryOpti
   return candidates;
 }
 
-function countTotalFindings(rootPath: string, minConfidence: number): number {
-  const files = collectSourceFiles(rootPath);
+function countTotalFindings(rootPath: string, minConfidence: number, deadline?: number): number {
+  const files = collectSourceFiles(rootPath, deadline);
   let total = 0;
 
   for (const relativePath of files) {
+    if (deadline && Date.now() > deadline) break;
+
     const absolutePath = join(rootPath, ...relativePath.split("/"));
     const source = readFileSync(absolutePath, "utf8");
     const language = languageFromPath(relativePath);
@@ -942,24 +949,27 @@ function applySingleLineFix(clonePath: string, candidate: CandidateFix, minConfi
     return false;
   }
 
-  const before = source;
   lines[candidate.line - 1] = candidate.replacementLine;
   const after = lines.join("\n");
-  if (before === after) return false;
+  if (source === after) return false;
 
-  const beforeFindings = flattenFindings(before, candidate.language, minConfidence);
+  // Only evaluate the "after" content — the finding was already confirmed
+  // during discovery, so re-running all 35 judges on "before" is redundant.
   const afterFindings = flattenFindings(after, candidate.language, minConfidence);
 
-  const beforeCount = countRule(beforeFindings, candidate.ruleId);
-  const afterCount = countRule(afterFindings, candidate.ruleId);
-  if (afterCount >= beforeCount) {
+  // The targeted rule must no longer fire on the fixed content.
+  if (countRule(afterFindings, candidate.ruleId) > 0) {
     return false;
   }
 
-  const beforeHighCritical = countHighOrCritical(beforeFindings);
+  // Lazy regression check: only evaluate "before" when the fixed content has
+  // high/critical findings, to verify they are pre-existing rather than new.
   const afterHighCritical = countHighOrCritical(afterFindings);
-  if (afterHighCritical > beforeHighCritical) {
-    return false;
+  if (afterHighCritical > 0) {
+    const beforeFindings = flattenFindings(source, candidate.language, minConfidence);
+    if (afterHighCritical > countHighOrCritical(beforeFindings)) {
+      return false;
+    }
   }
 
   writeFileSync(absolutePath, after, "utf8");
@@ -973,7 +983,7 @@ function createPullRequest(
   login: string,
   defaultBranch: string,
   branchName: string,
-  candidate: CandidateFix
+  candidate: CandidateFix,
 ): string {
   run("git", ["add", candidate.filePath], clonePath);
   run(
@@ -985,7 +995,7 @@ function createPullRequest(
       "-m",
       `Automated remediation for Judges finding ${candidate.ruleId} in ${candidate.filePath}:${candidate.line}.`,
     ],
-    clonePath
+    clonePath,
   );
 
   run("git", ["push", "-u", "fork", branchName], clonePath);
@@ -1019,7 +1029,7 @@ function createPullRequest(
       "--body",
       body,
     ],
-    clonePath
+    clonePath,
   );
 }
 
@@ -1032,7 +1042,8 @@ function processRepository(
   fallbackEnabled: boolean,
   fallbackMinConfidence: number,
   fallbackHighCriticalOnly: boolean,
-  minPriorityScore: number
+  minPriorityScore: number,
+  perRepoTimeoutMs: number,
 ): RepoRunSummary {
   const { owner, repo } = parseRepoFromUrl(selectedRepo);
   const repoRun: RepoRunSummary = {
@@ -1055,6 +1066,8 @@ function processRepository(
   };
   const priorityRulePrefixes = parsePriorityRulePrefixes();
   repoRun.priorityRulePrefixesUsed = [...priorityRulePrefixes];
+
+  const deadline = Date.now() + perRepoTimeoutMs;
 
   const workspace = mkdtempSync(join(tmpdir(), "judges-daily-autofix-"));
   const clonePath = join(workspace, `${owner}-${repo}`);
@@ -1083,12 +1096,13 @@ function processRepository(
     ensureForkRemote(clonePath, login, repo);
 
     if (includeTotalFindingsScan) {
-      repoRun.judgesFindingsScanned = countTotalFindings(clonePath, 0);
+      repoRun.judgesFindingsScanned = countTotalFindings(clonePath, 0, deadline);
     }
 
     let candidates = discoverFixCandidates(clonePath, {
       minConfidence,
       highCriticalOnly: false,
+      deadline,
     });
 
     repoRun.candidatesDiscovered = candidates.length;
@@ -1108,6 +1122,7 @@ function processRepository(
       const fallbackCandidates = discoverFixCandidates(clonePath, {
         minConfidence: fallbackMinConfidence,
         highCriticalOnly: fallbackHighCriticalOnly,
+        deadline,
       });
 
       if (fallbackCandidates.length > 0) {
@@ -1120,22 +1135,17 @@ function processRepository(
         repoRun.candidateConfidenceUsed = fallbackMinConfidence;
         repoRun.fallbackUsed = true;
         repoRun.skipped.push(
-          `Fallback mode engaged at confidence ${fallbackMinConfidence} (${fallbackHighCriticalOnly ? "high/critical only" : "all severities"}).`
+          `Fallback mode engaged at confidence ${fallbackMinConfidence} (${fallbackHighCriticalOnly ? "high/critical only" : "all severities"}).`,
         );
       } else {
-        repoRun.skipped.push(
-          `Fallback mode found no safe candidates at confidence ${fallbackMinConfidence}.`
-        );
+        repoRun.skipped.push(`Fallback mode found no safe candidates at confidence ${fallbackMinConfidence}.`);
       }
     }
 
     repoRun.candidatesInspected = candidates.length;
     repoRun.prioritizedRuleCounts = summarizePrioritizedRuleCounts(candidates);
     repoRun.topPrioritizedRuleCounts = repoRun.prioritizedRuleCounts.slice(0, 10);
-    repoRun.topPrioritizedCandidates = summarizeTopPrioritizedCandidates(
-      candidates,
-      priorityRulePrefixes
-    );
+    repoRun.topPrioritizedCandidates = summarizeTopPrioritizedCandidates(candidates, priorityRulePrefixes);
 
     if (candidates.length === 0) {
       repoRun.skipped.push("No safe auto-fix candidates found at configured confidence threshold.");
@@ -1143,6 +1153,12 @@ function processRepository(
 
     for (let index = 0; index < candidates.length; index += 1) {
       if (repoRun.prsOpened.length >= maxPrs) break;
+      if (Date.now() > deadline) {
+        repoRun.skipped.push(
+          `Per-repo timeout reached after ${Math.round(perRepoTimeoutMs / 60_000)}m; stopping PR creation.`,
+        );
+        break;
+      }
 
       const candidate = candidates[index];
       checkoutDefault(clonePath, defaultBranch);
@@ -1153,28 +1169,20 @@ function processRepository(
       const changed = applySingleLineFix(clonePath, candidate, repoRun.candidateConfidenceUsed);
       if (!changed) {
         repoRun.skipped.push(
-          `Skipped ${candidate.ruleId} (${candidate.severity}) ${candidate.filePath}:${candidate.line} (did not improve finding count).`
+          `Skipped ${candidate.ruleId} (${candidate.severity}) ${candidate.filePath}:${candidate.line} (did not improve finding count).`,
         );
         continue;
       }
 
       if (dryRun) {
         repoRun.skipped.push(
-          `Dry run: prepared ${candidate.ruleId} (${candidate.severity}) fix for ${candidate.filePath}:${candidate.line} on branch ${branchName}.`
+          `Dry run: prepared ${candidate.ruleId} (${candidate.severity}) fix for ${candidate.filePath}:${candidate.line} on branch ${branchName}.`,
         );
         continue;
       }
 
       try {
-        const prUrl = createPullRequest(
-          clonePath,
-          owner,
-          repo,
-          login,
-          defaultBranch,
-          branchName,
-          candidate
-        );
+        const prUrl = createPullRequest(clonePath, owner, repo, login, defaultBranch, branchName, candidate);
 
         repoRun.prsOpened.push({
           branch: branchName,
@@ -1188,7 +1196,7 @@ function processRepository(
         repoRun.skipped.push(
           `Failed PR for ${candidate.ruleId} (${candidate.severity}) ${candidate.filePath}:${candidate.line}: ${
             error instanceof Error ? error.message : String(error)
-          }`
+          }`,
         );
       }
     }
@@ -1206,31 +1214,29 @@ function main() {
 
   const dryRun = (process.env.DRY_RUN ?? "false").toLowerCase() === "true";
   const parsedMaxPrs = Number.parseInt(process.env.MAX_PRS ?? `${DEFAULT_MAX_PRS_PER_REPO}`, 10);
-  const parsedMaxReposPerDay = Number.parseInt(
-    process.env.MAX_REPOS_PER_DAY ?? `${DEFAULT_MAX_REPOS_PER_DAY}`,
-    10
-  );
+  const parsedMaxReposPerDay = Number.parseInt(process.env.MAX_REPOS_PER_DAY ?? `${DEFAULT_MAX_REPOS_PER_DAY}`, 10);
   const parsedMinConfidence = Number.parseFloat(process.env.MIN_CONFIDENCE ?? "0.9");
   const parsedMinPriorityScore = Number.parseInt(process.env.AUTOFIX_MIN_PRIORITY_SCORE ?? "0", 10);
   const includeTotalFindingsScan = (process.env.INCLUDE_TOTAL_FINDINGS_SCAN ?? "false").toLowerCase() === "true";
-  const fallbackEnabled = (process.env.ENABLE_FALLBACK ?? "true").toLowerCase() === "true";
+  const fallbackEnabled = (process.env.ENABLE_FALLBACK ?? "false").toLowerCase() === "true";
   const parsedFallbackMinConfidence = Number.parseFloat(process.env.FALLBACK_MIN_CONFIDENCE ?? "0.8");
   const fallbackHighCriticalOnly = (process.env.FALLBACK_HIGH_CRITICAL_ONLY ?? "true").toLowerCase() !== "false";
-  const requestedMaxPrs = Number.isFinite(parsedMaxPrs) && parsedMaxPrs > 0
-    ? parsedMaxPrs
-    : DEFAULT_MAX_PRS_PER_REPO;
+  const requestedMaxPrs = Number.isFinite(parsedMaxPrs) && parsedMaxPrs > 0 ? parsedMaxPrs : DEFAULT_MAX_PRS_PER_REPO;
   const maxPrs = Math.min(DEFAULT_MAX_PRS_PER_REPO, requestedMaxPrs);
-  const requestedMaxReposPerDay = Number.isFinite(parsedMaxReposPerDay) && parsedMaxReposPerDay > 0
-    ? parsedMaxReposPerDay
-    : DEFAULT_MAX_REPOS_PER_DAY;
+  const requestedMaxReposPerDay =
+    Number.isFinite(parsedMaxReposPerDay) && parsedMaxReposPerDay > 0
+      ? parsedMaxReposPerDay
+      : DEFAULT_MAX_REPOS_PER_DAY;
   const maxReposPerDay = Math.min(DEFAULT_MAX_REPOS_PER_DAY, requestedMaxReposPerDay);
   const minConfidence = Number.isFinite(parsedMinConfidence) ? parsedMinConfidence : 0.9;
-  const minPriorityScore = Number.isFinite(parsedMinPriorityScore) && parsedMinPriorityScore > 0
-    ? parsedMinPriorityScore
-    : 0;
-  const fallbackMinConfidence = Number.isFinite(parsedFallbackMinConfidence)
-    ? parsedFallbackMinConfidence
-    : 0.8;
+  const minPriorityScore =
+    Number.isFinite(parsedMinPriorityScore) && parsedMinPriorityScore > 0 ? parsedMinPriorityScore : 0;
+  const fallbackMinConfidence = Number.isFinite(parsedFallbackMinConfidence) ? parsedFallbackMinConfidence : 0.8;
+  const parsedPerRepoTimeout = Number.parseInt(process.env.PER_REPO_TIMEOUT_MINUTES ?? "0", 10);
+  const perRepoTimeoutMs =
+    Number.isFinite(parsedPerRepoTimeout) && parsedPerRepoTimeout > 0
+      ? parsedPerRepoTimeout * 60_000
+      : DEFAULT_PER_REPO_TIMEOUT_MS;
 
   const selectedRepos = selectRepositories(maxReposPerDay);
   const summary: Summary = {
@@ -1268,7 +1274,8 @@ function main() {
           fallbackEnabled,
           fallbackMinConfidence,
           fallbackHighCriticalOnly,
-          minPriorityScore
+          minPriorityScore,
+          perRepoTimeoutMs,
         );
         summary.repoRuns.push(repoRun);
       } catch (error) {
@@ -1288,9 +1295,7 @@ function main() {
           topPrioritizedRuleCounts: [],
           topPrioritizedCandidates: [],
           prsOpened: [],
-          skipped: [
-            `Repository run failed: ${error instanceof Error ? error.message : String(error)}`,
-          ],
+          skipped: [`Repository run failed: ${error instanceof Error ? error.message : String(error)}`],
         });
       }
     }

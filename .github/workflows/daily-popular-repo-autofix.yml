@@ -21,6 +21,7 @@ permissions:
 jobs:
   analyze-and-pr:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - name: Checkout judges repository
         uses: actions/checkout@v6
@@ -33,15 +34,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run daily owner-scoped autofix
+      - name: Run daily popular-repo autofix
         env:
           GH_TOKEN: ${{ secrets.JUDGES_AUTOFIX_GH_TOKEN }}
           TARGET_REPO_URL: ${{ inputs.targetRepoUrl }}
-          TARGET_REPO_OWNER: "KevinRabun"
           MAX_PRS: "5"
-          MAX_REPOS_PER_DAY: "2"
+          MAX_REPOS_PER_DAY: "3"
           MIN_CONFIDENCE: "0.9"
+          PER_REPO_TIMEOUT_MINUTES: "15"
           INCLUDE_TOTAL_FINDINGS_SCAN: "false"
+          ENABLE_FALLBACK: "false"
           DRY_RUN: ${{ inputs.dryRun }}
           SUMMARY_PATH: "daily-autofix-summary.json"
         run: |
@@ -51,7 +53,7 @@ jobs:
             exit 0
           fi
 
-          echo "Running full Judges-based autofix flow (owner-scoped public repos, no extra auth escalation)."
+          echo "Running Judges autofix against popular AI/ML repos (15m per-repo timeout, max 3 repos)."
           npx tsx scripts/daily-popular-repo-autofix.ts
 
       - name: Upload automation summary

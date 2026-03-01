@@ -69,3 +69,4 @@ test-output.txt
 vscode-extension/out/
 vscode-extension/node_modules/
 vscode-extension/*.vsix
+test-output-redos.txt
