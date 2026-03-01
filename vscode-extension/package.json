@@ -2,7 +2,7 @@
   "name": "judges-panel",
   "displayName": "Judges Panel",
   "description": "35 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -144,7 +144,91 @@
           "group": "judges@2"
         }
       ]
-    }
+    },
+    "chatParticipants": [
+      {
+        "id": "judges-panel.judges",
+        "name": "judges",
+        "fullName": "Judges Panel",
+        "description": "Evaluate code for security, performance, reliability, and quality using 35 specialized judges",
+        "isSticky": false,
+        "commands": [
+          {
+            "name": "review",
+            "description": "Review the current file with all 35 judges"
+          },
+          {
+            "name": "security",
+            "description": "Security-focused review of the current file"
+          },
+          {
+            "name": "fix",
+            "description": "Auto-fix all fixable findings in the current file"
+          },
+          {
+            "name": "help",
+            "description": "Show available commands and usage"
+          }
+        ],
+        "disambiguation": [
+          {
+            "category": "judges",
+            "description": "The user wants to review or evaluate code using judges, judges panel, or judges evaluation",
+            "examples": [
+              "Review this file with judges",
+              "Run a judges panel review",
+              "Judges panel evaluation",
+              "Evaluate this code with judges",
+              "Do a judges review",
+              "Run the judges on this file",
+              "Judges evaluation of my code",
+              "Check this file with judges panel"
+            ]
+          },
+          {
+            "category": "code-review",
+            "description": "The user wants to evaluate or review code for security, quality, performance, or compliance issues",
+            "examples": [
+              "Evaluate this code for security issues",
+              "Check this file for vulnerabilities",
+              "Review code quality",
+              "Run a security review on this file",
+              "Check this for compliance issues"
+            ]
+          }
+        ]
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "judges_evaluate",
+        "displayName": "Judges: Evaluate Code",
+        "modelDescription": "Evaluate source code using 35 specialized judges covering security, performance, reliability, cost, compliance, observability, API design, and more. Use this tool when the user asks for a judges panel review, judges evaluation, code quality review, security review, or wants to check code against best practices. Returns findings with severity, description, and suggested fixes.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Source code to evaluate. If omitted, evaluates the currently open file."
+            },
+            "language": {
+              "type": "string",
+              "description": "Programming language (typescript, javascript, python, go, rust, java, csharp, cpp). If omitted, auto-detected from the open file.",
+              "enum": ["typescript", "javascript", "python", "go", "rust", "java", "csharp", "cpp"]
+            }
+          }
+        },
+        "tags": [
+          "judges",
+          "code-review",
+          "security",
+          "evaluate",
+          "quality",
+          "judges-panel"
+        ]
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run esbuild -- --minify",

@@ -289,7 +289,11 @@ Runs automated tests covering all judges, AST parsers, markdown formatters, and 
 
 #### VS Code (recommended — zero config)
 
-Install the **[Judges Panel](https://marketplace.visualstudio.com/items?itemName=kevinrabun.judges-panel)** extension from the Marketplace. It auto-configures the MCP server on activation — Copilot and other LMs can immediately use all 35 expert-persona prompts with no manual setup.
+Install the **[Judges Panel](https://marketplace.visualstudio.com/items?itemName=kevinrabun.judges-panel)** extension from the Marketplace. It provides:
+
+- **Inline diagnostics & quick-fixes** on every file save
+- **`@judges` chat participant** — type `@judges` in Copilot Chat, or just ask for a "judges panel review" and Copilot routes automatically
+- **Auto-configured MCP server** — all 35 expert-persona prompts available to Copilot with zero setup
 
 ```bash
 code --install-extension kevinrabun.judges-panel

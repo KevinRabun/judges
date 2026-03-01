@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import { JudgesDiagnosticProvider } from "./diagnostics";
 import { JudgesCodeActionProvider } from "./code-actions";
+import { registerChatParticipant } from "./chat-participant";
+import { registerLmTools } from "./lm-tool";
 
 let diagnosticProvider: JudgesDiagnosticProvider;
 
@@ -13,6 +15,14 @@ export function activate(context: vscode.ExtensionContext): void {
   // (expert-persona prompts) without any manual configuration.
 
   registerMcpServer(context);
+
+  // ─── Chat Participant & LM Tools ─────────────────────────────────────
+  // Register @judges chat participant (natural-language commands) and
+  // judges_evaluate LM tool (Copilot auto-discovery). These let users
+  // trigger evaluations via chat without knowing about the extension.
+
+  registerChatParticipant(context);
+  registerLmTools(context);
 
   // ─── Commands ─────────────────────────────────────────────────────────
 

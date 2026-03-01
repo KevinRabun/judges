@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0] — 2025-07-15
+
+### Added
+
+- **`@judges` chat participant** — type `@judges` in Copilot Chat to review, security-check, or auto-fix files directly from chat
+- **Chat commands** — `/review`, `/security`, `/fix`, `/help` slash-commands
+- **Disambiguation routing** — Copilot auto-routes queries like "judges panel review" or "judges evaluation" to the `@judges` participant without needing the `@` prefix
+- **`judges_evaluate` Language Model tool** — registered via `vscode.lm.registerTool` so Copilot can auto-discover and invoke Judges evaluation
+- **Domain-focused reviews** — ask `@judges review for performance` or mention security, cost, compliance, etc. to filter findings by domain
+- **Action buttons** — chat responses include "Auto-Fix All" and "Re-Evaluate" buttons
+
 ## [0.1.0] — 2026-03-01
 
 ### Added
