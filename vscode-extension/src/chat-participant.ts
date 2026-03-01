@@ -239,9 +239,11 @@ async function handleReview(
       title: "$(shield) Re-Evaluate",
     });
 
-    // Populate diagnostics provider so buttons work
+    // Populate diagnostics provider cache with the findings we already
+    // computed — avoids a redundant evaluation and ensures the "Auto-Fix All"
+    // and "Re-Evaluate" buttons work immediately.
     if (_diagnosticProvider) {
-      _diagnosticProvider.evaluate(document);
+      _diagnosticProvider.populateFindings(document, findings);
     }
   } catch (error) {
     stream.markdown(`**Error** running evaluation: ${error instanceof Error ? error.message : String(error)}`);

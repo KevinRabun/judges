@@ -74,15 +74,27 @@ export class JudgesDiagnosticProvider {
           ? filtered.filter((f) => enabledJudges.some((j) => f.ruleId.toLowerCase().startsWith(j.toLowerCase())))
           : filtered;
 
-      // Cache findings for code actions
-      this.findingsMap.set(document.uri.toString(), finalFindings);
-
-      // Convert to diagnostics
-      const diagnostics = finalFindings.map((f) => this.findingToDiagnostic(document, f));
-      this.diagnosticCollection.set(document.uri, diagnostics);
+      this.publishFindings(document, finalFindings);
     } catch (error) {
       console.error("Judges evaluation error:", error);
     }
+  }
+
+  /**
+   * Populate the cache with pre-computed findings (e.g. from a chat review)
+   * and publish diagnostics — avoids a redundant evaluateWithTribunal() call.
+   */
+  populateFindings(document: vscode.TextDocument, findings: FindingWithPatch[]): void {
+    this.publishFindings(document, findings);
+  }
+
+  /**
+   * Store findings in cache and publish them as VS Code diagnostics.
+   */
+  private publishFindings(document: vscode.TextDocument, findings: FindingWithPatch[]): void {
+    this.findingsMap.set(document.uri.toString(), findings);
+    const diagnostics = findings.map((f) => this.findingToDiagnostic(document, f));
+    this.diagnosticCollection.set(document.uri, diagnostics);
   }
 
   /**
