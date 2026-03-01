@@ -67,3 +67,12 @@ Always cross-reference the official `vscode-extension-samples` repo for the cont
 ## Version sync reminder
 
 The `vscode-extension/package.json` version should match the root `package.json` version. The CI workflow patches the extension version from the git tag at publish time, but keeping them in sync locally avoids confusion during debugging.
+
+## ESM/CJS bundling pitfalls
+
+The root `@kevinrabun/judges` package is ESM (`"type": "module"`). The VS Code extension is bundled by esbuild with `--format=cjs`. This creates interop issues:
+
+- **`import.meta.url` becomes `undefined` in CJS bundles.** esbuild replaces `import.meta` with `{}`, so `.url` is `undefined`. Any code that uses `createRequire(import.meta.url)` or `fileURLToPath(import.meta.url)` will crash at runtime with: `The argument 'filename' must be a file URL object, file URL string, or absolute path string. Received undefined.`
+- **Always guard `import.meta.url` usage** with a runtime check: `typeof import.meta?.url === "string"`, then fall back to `globalThis.require` and `__dirname` for CJS.
+- **The bundle loads from `node_modules/`**, not from local `src/`. To test source changes locally, you must: (1) `npm run build` at root, (2) `npm pack`, (3) `npm install --no-save ../kevinrabun-judges-*.tgz` in `vscode-extension/`, (4) rebuild the extension.
+- **Top-level `import.meta.url` executes at module load time**, not lazily. If it throws, the entire `activate()` function fails, taking down ALL extension features (diagnostics, chat participant, commands — everything).
