@@ -539,7 +539,13 @@ export function analyzePerformance(code: string, language: string): Finding[] {
     }
   }
   for (const fn of funcDefs) {
-    const bodyEnd = Math.min(lines.length, fn.line + 30);
+    // Find where the body actually ends: stop at the next function definition
+    // or after 30 lines, whichever comes first.
+    const nextFuncLine = funcDefs
+      .filter((other) => other.line > fn.line)
+      .map((other) => other.line)
+      .sort((a, b) => a - b)[0];
+    const bodyEnd = Math.min(lines.length, fn.line + 30, nextFuncLine ?? Infinity);
     const body = lines.slice(fn.line + 1, bodyEnd).join("\n");
     const selfCallRe = new RegExp(`\\b${fn.name}\\s*\\(`);
     if (selfCallRe.test(body)) {

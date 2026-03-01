@@ -46,6 +46,7 @@ import { analyzeCodeStructure } from "../src/evaluators/code-structure.js";
 import { analyzeIacSecurity } from "../src/evaluators/iac-security.js";
 import { analyzeMaintainability } from "../src/evaluators/maintainability.js";
 import { analyzeSoftwarePractices } from "../src/evaluators/software-practices.js";
+import { analyzePerformance } from "../src/evaluators/performance.js";
 
 // ─── Tree-sitter warm-up ────────────────────────────────────────────────────
 // Must happen BEFORE any describe/it blocks so that tree-sitter grammars are
@@ -8609,5 +8610,53 @@ function legacyConfig(cfg) {
       (f) => f.title.includes("var") && f.title.includes("keyword"),
     );
     assert.strictEqual(spFindings.length, 0, "Should not flag 'var' in JSDoc comments as var keyword usage");
+  });
+});
+
+// ── Regression: non-recursive functions should not be flagged as recursive ──
+describe("False-positive: non-recursive function flagged as recursive", () => {
+  it("should NOT flag a function as recursive when another function nearby calls it", () => {
+    const code = `
+/**
+ * Validates a date-of-birth field entry and returns the calculated age or null if invalid.
+ * @param {object} entry - DOB entry with path and value
+ * @returns {object|null} Validation result { age: number } or error response object
+ */
+function validateDobEntry(entry) {
+  const dobAge = calculateAge(entry.value);
+  if (dobAge === null) {
+    return {
+      error: "Invalid date of birth value",
+      fieldErrors: [buildAriaFieldError(entry.path, "Provide a valid date of birth in ISO format.")]
+    };
+  }
+  return { age: dobAge };
+}
+
+function processFormEntries(entries) {
+  for (const entry of entries) {
+    const result = validateDobEntry(entry);
+    if (result.error) {
+      return result;
+    }
+  }
+  return { success: true };
+}
+`;
+    const findings = analyzePerformance(code, "typescript").filter(
+      (f) => f.title.includes("Recursive") || f.title.includes("recursive"),
+    );
+    // validateDobEntry is NOT recursive — processFormEntries calls it, but that's not self-recursion
+    const dobFinding = findings.filter((f) =>
+      f.lineNumbers?.some((ln) => {
+        const line = code.split("\\n")[ln - 1] || "";
+        return line.includes("validateDobEntry");
+      }),
+    );
+    assert.strictEqual(
+      dobFinding.length,
+      0,
+      "Should not flag validateDobEntry as recursive when called by a neighboring function",
+    );
   });
 });
