@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.2] — 2025-07-17
+
+### Improved
+
+- **Re-Evaluate shows results in chat** — "Re-Evaluate" is now a chat followup instead of a command button, so clicking it runs a fresh `@judges /review` and streams the updated findings directly into the chat window (previously it only showed a toast notification)
+- **Context-aware followup** — security reviews offer a "Re-Evaluate" that re-runs `/security`; workspace reviews offer "Re-Evaluate Workspace"
+- **Post-fix followup** — after `/fix`, the Re-Evaluate followup lets users immediately see remaining findings in chat
+
 ## [0.2.1] — 2025-07-17
 
 ### Improved

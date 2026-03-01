@@ -54,6 +54,31 @@ export function registerChatParticipant(
     const participant = vscode.chat.createChatParticipant("judges-panel.judges", handleChatRequest);
     participant.iconPath = new vscode.ThemeIcon("shield");
 
+    // Provide "Re-Evaluate" as a chat followup so results render in the
+    // chat window instead of only updating diagnostics with a toast.
+    participant.followupProvider = {
+      provideFollowups(result, _ctx, _tok) {
+        const followups: vscode.ChatFollowup[] = [];
+        const meta = result.metadata as Record<string, unknown> | undefined;
+        if (!meta?.showReEvaluate) return followups;
+
+        if (meta.isWorkspace) {
+          followups.push({
+            prompt: "review the workspace",
+            command: "review",
+            label: "$(shield) Re-Evaluate Workspace",
+          });
+        } else {
+          followups.push({
+            prompt: "",
+            command: (meta.reviewCommand as string) || "review",
+            label: "$(shield) Re-Evaluate",
+          });
+        }
+        return followups;
+      },
+    };
+
     context.subscriptions.push(participant);
   } catch (error) {
     // Log the error so it's visible in Developer Tools, but don't crash the extension
@@ -249,17 +274,19 @@ async function handleReview(
     } else {
       stream.markdown(`> All ${findings.length} findings require manual review — no auto-fixes available.\n\n`);
     }
-    stream.button({
-      command: "judges.evaluateFile",
-      title: "$(shield) Re-Evaluate",
-    });
-
     // Populate diagnostics provider cache with the findings we already
-    // computed — avoids a redundant evaluation and ensures the "Auto-Fix All"
-    // and "Re-Evaluate" buttons work immediately.
+    // computed — avoids a redundant evaluation and ensures the "Auto-Fix"
+    // button and "Re-Evaluate" followup work immediately.
     if (_diagnosticProvider) {
       _diagnosticProvider.populateFindings(document, findings);
     }
+
+    return {
+      metadata: {
+        showReEvaluate: true,
+        reviewCommand: preset === "security-only" ? "security" : "review",
+      },
+    };
   } catch (error) {
     stream.markdown(`**Error** running evaluation: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -415,10 +442,7 @@ async function handleWorkspaceReview(
   }
 
   // ── Footer ──
-  stream.button({
-    command: "judges.evaluateWorkspace",
-    title: "$(shield) Re-Evaluate Workspace",
-  });
+  return { metadata: { showReEvaluate: true, isWorkspace: true } };
 }
 
 // ─── /fix Handler ────────────────────────────────────────────────────────────
@@ -457,10 +481,7 @@ async function handleFix(
         remainingNote +
         `\n`,
     );
-    stream.button({
-      command: "judges.evaluateFile",
-      title: "$(shield) Re-Evaluate",
-    });
+    return { metadata: { showReEvaluate: true, reviewCommand: "review" } };
   } else if (result.fixable === 0) {
     const allFindings = _diagnosticProvider.getFindings(editor.document.uri.toString());
     if (allFindings.length > 0) {
@@ -469,6 +490,7 @@ async function handleFix(
           `All **${allFindings.length}** finding(s) require manual review — none have auto-fixes available.\n\n` +
           `Use \`@judges /review\` to see detailed recommendations for each finding.\n`,
       );
+      return { metadata: { showReEvaluate: true, reviewCommand: "review" } };
     } else {
       stream.markdown("No findings detected — the file looks clean! 🎉");
     }
@@ -477,6 +499,7 @@ async function handleFix(
       "Fixes could not be applied — the code may have changed since the last evaluation. " +
         "Try `@judges /review` to get fresh results.",
     );
+    return { metadata: { showReEvaluate: true, reviewCommand: "review" } };
   }
 }
 
