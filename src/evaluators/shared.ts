@@ -111,9 +111,9 @@ export function classifyFile(code: string, language: string, filePath?: string):
   if (
     /(?:\/health|\/ready|\/live|\/ping|\/status)\b/i.test(code) &&
     lineCount < 50 &&
-    // Use [^\n]* instead of .* to avoid quadratic backtracking across
-    // newlines when tested against multi-line code (CodeQL js/polynomial-redos).
-    /(?:res\.(?:send|json|status)|return[^\n]*(?:ok|healthy|200))/i.test(code)
+    // Bound [^\n] to {0,200} to prevent polynomial backtracking when a line
+    // contains many 'return' sub-strings (CodeQL js/polynomial-redos).
+    /(?:res\.(?:send|json|status)|return[^\n]{0,200}(?:ok|healthy|200))/i.test(code)
   ) {
     return "utility";
   }
@@ -355,10 +355,20 @@ export function detectPositiveSignals(code: string): number {
   if (/\$\d+|PreparedStatement|\?\s*(?:,|\))|\.prepare\s*\(/i.test(code)) bonus += 3;
   // Security headers imported (helmet, csp, hsts)
   if (/\bhelmet\b|content-security-policy|strict-transport-security/i.test(code)) bonus += 3;
-  // Proper error handling (try/catch with actual handling, not empty catch)
-  // Bound [^}] to {0,500} to prevent polynomial matching on large catch
-  // blocks that lack the target keywords (CodeQL js/polynomial-redos).
-  if (/catch\s*\([^)]+\)\s*\{[^}]{0,500}(?:log|throw|return|next|reject|emit)/i.test(code)) bonus += 2;
+  // Proper error handling (try/catch with actual handling, not empty catch).
+  // Use a line-by-line scan instead of a single whole-file regex to avoid
+  // polynomial backtracking when 'catch(' appears inside the [^}] window
+  // (CodeQL js/polynomial-redos).
+  const catchHasHandler = (() => {
+    const cl = code.split("\n");
+    for (let ci = 0; ci < cl.length; ci++) {
+      if (!/catch\s*\(/.test(cl[ci])) continue;
+      const window = cl.slice(ci, ci + 15).join("\n");
+      if (/\b(?:log|throw|return|next|reject|emit)\b/i.test(window)) return true;
+    }
+    return false;
+  })();
+  if (catchHasHandler) bonus += 2;
   // Input validation present (joi, zod, yup, express-validator, class-validator)
   if (/\b(?:joi|zod|yup|ajv|class-validator|express-validator)\b/i.test(code)) bonus += 2;
   // Authentication middleware

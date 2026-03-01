@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.8.4] — 2026-03-01
+
+### Security
+- Fixed 8 polynomial-ReDoS vulnerabilities flagged by CodeQL code scanning:
+  - `structural-parser.ts`: PYTHON_CLASS regex — merged competing `\s*` quantifiers around optional base-list group.
+  - `taint-tracker.ts`: GUARD_PATTERNS — eliminated `[ \t]*!?[ \t]*` overlap that caused polynomial backtracking.
+  - `shared.ts`: health-check pattern — bounded `[^\n]*` to `{0,200}`; catch-block signal — replaced whole-file regex with line-by-line scan.
+  - `dependencies.ts`: requirements.txt parser — replaced `[>=<~!]+` character class with explicit pip-operator alternation.
+  - `project.ts`: import-path extractor — bounded `[^'"]` quantifier to `{1,500}`; normalise helper — replaced chained regex with `lastIndexOf` calls.
+- Dismissed 6 false-positive / intentional alerts:
+  - 2 intentional vulnerabilities in `examples/sample-vulnerable-api.ts` (demo file).
+  - 4 URL-substring-sanitization false positives in test assertions.
+
 ## [3.8.3] — 2026-03-01
 
 ### Changed

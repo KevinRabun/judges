@@ -121,7 +121,10 @@ function extractBraceFunctions(lines: string[], language: string): FunctionInfo[
 // The negated class excludes both open and close parens, eliminating overlap
 // between the inner and outer quantifiers.
 const PYTHON_FUNC = /^(\s*)(?:async\s+)?def\s+(\w+)\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)\s*(?:->.*)?:/;
-const PYTHON_CLASS = /^(\s*)class\s+(\w+)\s*(?:\([^()]*\))?\s*:/;
+// Move leading \s* inside the optional group so only one \s*
+// competes for whitespace when the parenthesised base-list is absent
+// (prevents polynomial backtracking — CodeQL js/polynomial-redos).
+const PYTHON_CLASS = /^(\s*)class\s+(\w+)(?:\s*\([^()]*\))?\s*:/;
 const PYTHON_DECORATOR = /^(\s*)@(\w[\w.]*(?:\([^()]*\))?)/;
 
 function extractPythonFunctions(lines: string[]): FunctionInfo[] {

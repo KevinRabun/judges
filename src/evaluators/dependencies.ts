@@ -49,11 +49,14 @@ export function analyzeDependencies(manifest: string, manifestType: string): Dep
     for (const line of manifest.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith("#")) continue;
-      const match = trimmed.match(/^([a-zA-Z0-9_-]+)[ \t]*(?:[>=<~!]+[ \t]*(\S.*))?$/);
+      // Use an explicit alternation of known pip operators instead of a
+      // repeating character class to prevent overlap between [>=<~!]+ and
+      // the version \S* (CodeQL js/polynomial-redos).
+      const match = trimmed.match(/^([a-zA-Z0-9_-]+)[ \t]*(?:(>=|<=|~=|!=|===?|==|>|<|~)[ \t]*(\S*))?$/);
       if (match) {
         dependencies.push({
           name: match[1],
-          version: match[2] ?? "*",
+          version: match[3] ?? "*",
           isDev: false,
           source: manifestType,
         });

@@ -294,18 +294,23 @@ export function evaluateProject(
     const imports = f.content.match(/(?:import|from|require)[\s(]+['"]\.{1,2}\/([^'"]+)['"]/g) ?? [];
     importMap.set(
       f.path,
-      // Use [^'"]* instead of .* to prevent quadratic backtracking on
-      // strings with multiple quote characters (CodeQL js/polynomial-redos).
-      imports.map((i) => i.replace(/[^'"]*['"]\.{1,2}\/([^'"]+)['"].*/, "$1")),
+      // Bound [^'"] to {1,500} and drop trailing .* to prevent polynomial
+      // backtracking on strings with many non-quote characters
+      // (CodeQL js/polynomial-redos).
+      imports.map((i) => i.replace(/[^'"]*['"]\.\.?\/([^'"]{1,500})['"].*/, "$1")),
     );
   }
 
   // ── Import cycle detection (DFS-based) ──────────────────────────────────
-  const normalise = (p: string) =>
-    p
-      .replace(/\\/g, "/")
-      .replace(/\.\w+$/, "")
-      .replace(/.*\//, "");
+  // Use indexOf instead of regex to avoid polynomial backtracking on paths
+  // with many dots or slashes (CodeQL js/polynomial-redos).
+  const normalise = (p: string) => {
+    const fwd = p.replace(/\\/g, "/");
+    const dotIdx = fwd.lastIndexOf(".");
+    const noExt = dotIdx >= 0 ? fwd.substring(0, dotIdx) : fwd;
+    const slashIdx = noExt.lastIndexOf("/");
+    return slashIdx >= 0 ? noExt.substring(slashIdx + 1) : noExt;
+  };
   const adjList = new Map<string, Set<string>>();
   for (const f of files) {
     const key = normalise(f.path);
