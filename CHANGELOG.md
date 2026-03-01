@@ -2,6 +2,12 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.8.2] — 2026-03-01
+
+### Fixed
+- Added `workflow_dispatch` trigger to publish workflow for manual re-runs.
+- Fixed tag-push not triggering CI when pushed alongside branch updates.
+
 ## [3.8.1] — 2026-03-01
 
 ### Fixed
