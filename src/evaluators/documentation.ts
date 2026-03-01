@@ -166,9 +166,10 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   const httpRouteLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
   httpRouteLines.forEach((ln) => {
     const idx = ln - 1;
-    const prevLines = lines.slice(Math.max(0, idx - 5), idx).join("\n");
+    // Look back up to 15 lines to cover large JSDoc / docstring blocks
+    const prevLines = lines.slice(Math.max(0, idx - 15), idx).join("\n");
     if (
-      !/\/\*\*|@swagger|@api|@route|@openapi|@summary|@description|""".*@|#\s+@|@ApiOperation|@Operation|godoc/i.test(
+      !/\/\*\*|\*\/|@swagger|@api|@route|@openapi|@summary|@description|""".*@|#\s+@|@ApiOperation|@Operation|godoc/i.test(
         prevLines,
       )
     ) {

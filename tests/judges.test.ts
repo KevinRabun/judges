@@ -3629,6 +3629,35 @@ export async function fetchUserData(id: string) {
     assert.ok(docFindings.length > 0, "Expected missing documentation findings");
   });
 
+  it("should NOT flag API routes with large JSDoc blocks (> 5 lines)", () => {
+    const judge = getJudge("documentation");
+    assert.ok(judge, "documentation judge should exist");
+
+    const wellDocumentedRoute = `
+const express = require("express");
+const app = express();
+
+/**
+ * GET /api/health
+ * @description Health check endpoint that returns server status and operational metadata.
+ * @param {import("express").Request} request - Express request object (no body required)
+ * @param {import("express").Response} response - Express response object
+ * @returns {object} { status: "ok", time: ISO8601 timestamp, mode: "ephemeral-compilation" }
+ * @status 200 - Server is healthy
+ * @status 403 - Export blocked by sovereignty policy
+ * @status 500 - Internal server error
+ * @headers X-Export-Region - Target export region
+ * @headers X-Data-Class - Data classification
+ */
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", time: new Date().toISOString() });
+});
+`;
+    const evaluation = evaluateWithJudge(judge!, wellDocumentedRoute, "javascript");
+    const endpointDocFindings = evaluation.findings.filter((f) => f.title === "API endpoints without documentation");
+    assert.strictEqual(endpointDocFindings.length, 0, "Should not flag route handlers that have JSDoc comments");
+  });
+
   it("should detect TODO/FIXME without issue tracking reference", () => {
     const judge = getJudge("documentation");
     assert.ok(judge, "documentation judge should exist");
