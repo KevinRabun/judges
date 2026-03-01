@@ -2,6 +2,11 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.8.1] — 2026-03-01
+
+### Fixed
+- Aligned VS Code engine constraint (`^1.109.0`) with `@types/vscode` to fix vsce publish validation.
+
 ## [3.8.0] — 2026-03-01
 
 ### Added
