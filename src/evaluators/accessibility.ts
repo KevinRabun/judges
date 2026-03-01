@@ -131,6 +131,8 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Detect color-only status indicators
   const colorOnlyLines: number[] = [];
   lines.forEach((line, i) => {
+    const trimmed = line.trim();
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (
       /color\s*[:=].*(?:red|green|#f00|#0f0|#ff0000|#00ff00)/i.test(line) &&
       /(?:status|error|success|warning|valid|invalid)/i.test(line)
@@ -248,6 +250,8 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Missing ARIA live regions for dynamic content
   const dynamicUpdateLines: number[] = [];
   lines.forEach((line, i) => {
+    const trimmed = line.trim();
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (
       /(?:toast|notification|alert|snackbar|banner)\s*[=(]/i.test(line) ||
       /setState.*(?:error|message|notification)/i.test(line)
@@ -385,6 +389,11 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Form error messages not associated with inputs
   const errorMsgLines: number[] = [];
   lines.forEach((line, i) => {
+    const trimmed = line.trim();
+    // Skip comment lines — doc blocks describing ARIA helpers are not violations
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
+    // Skip function/class declarations — definitions are not rendering patterns
+    if (/^\s*(?:export\s+)?(?:function|class|const|let|var|def|fn|func)\s/i.test(line)) return;
     if (
       /(?:error|invalid|validation).*(?:message|msg|text)/i.test(line) &&
       !/aria-describedby|aria-errormessage|aria-invalid/i.test(line)

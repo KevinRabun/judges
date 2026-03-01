@@ -3131,6 +3131,35 @@ const el = \`
     );
     assert.ok(ariaFindings.length > 0, "Expected ARIA role findings");
   });
+
+  it("should NOT flag JSDoc comments describing ARIA-aware error helpers", () => {
+    const judge = getJudge("accessibility");
+    assert.ok(judge, "accessibility judge should exist");
+
+    const ariaHelperCode = `
+/**
+ * Builds an accessibility-friendly field error payload with linked input/error ARIA attributes.
+ * @param {string} field Field path/name associated with the validation error.
+ * @param {string} message Human-readable validation message for the field.
+ * @returns {{ field: string, message: string, ariaDescribedBy: string, ariaInvalid: boolean }}
+ */
+function buildFieldError(field, message) {
+  return {
+    field,
+    message,
+    inputId: field + "-input",
+    errorId: field + "-error",
+    ariaDescribedBy: field + "-error",
+    ariaInvalid: true,
+  };
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, ariaHelperCode, "typescript");
+    const formErrorFindings = evaluation.findings.filter(
+      (f) => f.title === "Form error not associated with input via ARIA",
+    );
+    assert.strictEqual(formErrorFindings.length, 0, "Should not flag JSDoc describing ARIA helpers as missing ARIA");
+  });
 });
 
 // =============================================================================
