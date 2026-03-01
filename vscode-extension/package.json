@@ -138,6 +138,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@kevinrabun/judges": "file:.."
+    "@kevinrabun/judges": "^3.7.1"
   }
 }
