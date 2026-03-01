@@ -65,6 +65,10 @@ export function classifyFile(code: string, language: string, filePath?: string):
     if (/(?:^|[/\\])(?:migrations?|seeds?|fixtures)[/\\]/i.test(lowerPath)) {
       return "config";
     }
+    // Infrastructure as Code files
+    if (/\.(?:tf|tfvars|bicep)$/i.test(lowerPath)) {
+      return "config";
+    }
   }
 
   // ── Content-based classification ─────────────────────────────────────────

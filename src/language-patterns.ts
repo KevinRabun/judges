@@ -35,6 +35,13 @@ const LANG_ALIAS_MAP: Record<string, LangFamily> = {
   c: "cpp",
   h: "cpp",
   hpp: "cpp",
+  terraform: "terraform",
+  tf: "terraform",
+  hcl: "terraform",
+  bicep: "bicep",
+  arm: "arm",
+  armtemplate: "arm",
+  "arm-template": "arm",
 };
 
 /**
@@ -53,10 +60,17 @@ export function isJsTs(lang: LangFamily): boolean {
 }
 
 /**
- * Returns true if the language uses braces for blocks (all except Python).
+ * Returns true if the language uses braces for blocks (all except Python and IaC).
  */
 export function isBraceLang(lang: LangFamily): boolean {
-  return lang !== "python" && lang !== "unknown";
+  return lang !== "python" && lang !== "unknown" && lang !== "terraform" && lang !== "bicep" && lang !== "arm";
+}
+
+/**
+ * Returns true if the language is an Infrastructure as Code language.
+ */
+export function isIaC(lang: LangFamily): boolean {
+  return lang === "terraform" || lang === "bicep" || lang === "arm";
 }
 
 // ─── Pattern Builders ────────────────────────────────────────────────────────
@@ -418,6 +432,9 @@ export const MANIFEST_FILES: Record<LangFamily, string[]> = {
   java: ["pom.xml", "build.gradle", "build.gradle.kts"],
   go: ["go.mod"],
   cpp: ["CMakeLists.txt", "Makefile", "conanfile.txt", "vcpkg.json"],
+  terraform: ["*.tf", "terraform.tfvars", ".terraform.lock.hcl"],
+  bicep: ["*.bicep", "bicepconfig.json"],
+  arm: ["*.json"],
   unknown: [],
 };
 
@@ -570,4 +587,90 @@ export const FRAMEWORK_GO_WEB = {
 /** Rust-specific: Actix-web / Axum security patterns */
 export const FRAMEWORK_RUST_WEB = {
   rust: String.raw`HttpServer::new\s*\([^)]*\)\.bind\s*\(\s*["']0\.0\.0\.0|\.app_data\s*\(\s*web::JsonConfig::default\s*\(\)\s*\)(?!.*limit|.*error)`,
+};
+
+// ─── Infrastructure as Code Patterns ─────────────────────────────────────────
+
+/** IaC resource definitions */
+export const IAC_RESOURCE_DEF = {
+  terraform: String.raw`resource\s+"[^"]+"\s+"[^"]+"\s*\{`,
+  bicep: String.raw`resource\s+\w+\s+'[^']+'\s*=`,
+  arm: String.raw`"type"\s*:\s*"Microsoft\.\w+/\w+"`,
+};
+
+/** IaC hardcoded secrets / passwords / keys */
+export const IAC_HARDCODED_SECRET = {
+  terraform: String.raw`(?:password|secret|key|token|api_key|access_key|secret_key|connection_string|value)\s*=\s*"[^"$\{]{4,}"`,
+  bicep: String.raw`(?:password|secret|key|token|apiKey|accessKey|connectionString)\s*:\s*'[^']{4,}'`,
+  arm: String.raw`"(?:adminPassword|password|secret|key|connectionString|storageAccountKey)"\s*:\s*\{\s*"value"\s*:\s*"[^[\]{}]{4,}"`,
+};
+
+/** IaC missing encryption at rest */
+export const IAC_MISSING_ENCRYPTION = {
+  terraform: String.raw`encryption_at_rest_enabled\s*=\s*false|encryption.*enabled\s*=\s*false`,
+  bicep: String.raw`status\s*:\s*'Disabled'`,
+  arm: String.raw`"status"\s*:\s*"Disabled"`,
+};
+
+/** IaC public access enabled */
+export const IAC_PUBLIC_ACCESS = {
+  terraform: String.raw`public_access_enabled\s*=\s*true|public_network_access_enabled\s*=\s*true|publicly_accessible\s*=\s*true|associate_public_ip_address\s*=\s*true`,
+  bicep: String.raw`publicAccess\s*:\s*'Enabled'|publicNetworkAccess\s*:\s*'Enabled'|publiclyAccessible\s*:\s*true`,
+  arm: String.raw`"publicAccess"\s*:\s*"Enabled"|"publicNetworkAccess"\s*:\s*"Enabled"|"publiclyAccessible"\s*:\s*true`,
+};
+
+/** IaC overly permissive network rules (0.0.0.0/0 ingress, open ports) */
+export const IAC_OPEN_NETWORK = {
+  terraform: String.raw`cidr_blocks\s*=\s*\[\s*"0\.0\.0\.0/0"\s*\]|source_address_prefix\s*=\s*"\*"|ingress\s*\{[^}]*from_port\s*=\s*0[^}]*to_port\s*=\s*65535`,
+  bicep: String.raw`sourceAddressPrefix\s*:\s*'\*'|destinationPortRange\s*:\s*'\*'`,
+  arm: String.raw`"sourceAddressPrefix"\s*:\s*"\*"|"destinationPortRange"\s*:\s*"\*"`,
+};
+
+/** IaC overly permissive IAM / RBAC */
+export const IAC_OVERPERMISSIVE_IAM = {
+  terraform: String.raw`actions\s*=\s*\[\s*"\*"\s*\]|effect\s*=\s*"Allow"[^}]*actions\s*=\s*\[\s*"\*"|policy\s*=.*"Action"\s*:\s*"\*"`,
+  bicep: String.raw`roleDefinitionId\s*:.*Owner|actions\s*:\s*\[\s*'\*'\s*\]`,
+  arm: String.raw`"roleDefinitionId"\s*:.*Owner|"actions"\s*:\s*\[\s*"\*"\s*\]`,
+};
+
+/** IaC missing HTTPS / TLS enforcement */
+export const IAC_MISSING_HTTPS = {
+  terraform: String.raw`https_only\s*=\s*false|enable_https_traffic_only\s*=\s*false|ssl_enforcement_enabled\s*=\s*false|minimum_tls_version\s*=\s*"TLS1_0"|protocol\s*=\s*"Http"`,
+  bicep: String.raw`httpsOnly\s*:\s*false|supportsHttpsTrafficOnly\s*:\s*false|sslEnforcement\s*:\s*'Disabled'|minTlsVersion\s*:\s*'1\.0'`,
+  arm: String.raw`"httpsOnly"\s*:\s*false|"supportsHttpsTrafficOnly"\s*:\s*false|"sslEnforcement"\s*:\s*"Disabled"|"minTlsVersion"\s*:\s*"1\.0"`,
+};
+
+/** IaC missing logging / monitoring */
+export const IAC_MISSING_LOGGING = {
+  terraform: String.raw`logging\s*\{[^}]*enabled\s*=\s*false|enable_logging\s*=\s*false`,
+  bicep: String.raw`diagnosticSettings\s*:\s*\[\s*\]|logging\s*:\s*\{\s*enabled\s*:\s*false`,
+  arm: String.raw`"diagnosticSettings"\s*:\s*\[\s*\]|"logging"\s*:\s*\{\s*"enabled"\s*:\s*false`,
+};
+
+/** IaC missing tags (cost / compliance tagging) */
+export const IAC_MISSING_TAGS_CHECK = {
+  terraform: String.raw`resource\s+"(?:azurerm|aws|google)_[^"]+"\s+"[^"]+"\s*\{(?:(?!tags\s*=)[^}])*\}`,
+  bicep: String.raw`resource\s+\w+\s+'[^']+'\s*=\s*\{(?:(?!tags\s*:)[^}])*\}`,
+  arm: String.raw`"type"\s*:\s*"Microsoft\.\w+/\w+"[^}]*(?!"tags"\s*:)`,
+};
+
+/** IaC hardcoded resource locations / IDs */
+export const IAC_HARDCODED_LOCATION = {
+  terraform: String.raw`location\s*=\s*"(?:eastus|westus|centralus|westeurope|northeurope|southeastasia|eastasia|uksouth|ukwest|japaneast|japanwest|australiaeast|canadacentral|brazilsouth)"`,
+  bicep: String.raw`location\s*:\s*'(?:eastus|westus|centralus|westeurope|northeurope|southeastasia|eastasia|uksouth|ukwest|japaneast)'`,
+  arm: String.raw`"location"\s*:\s*"(?:eastus|westus|centralus|westeurope|northeurope|southeastasia|eastasia|uksouth)"`,
+};
+
+/** IaC insecure defaults — HTTP allowed, no min TLS version */
+export const IAC_INSECURE_DEFAULT = {
+  terraform: String.raw`(?:min_tls_version|minimum_tls_version)\s*=\s*"(?:TLS1_0|TLS1_1|1\.0|1\.1)"|ssl_policy\s*\{[^}]*min_protocol_version\s*=\s*"TLSv1(?:\.1)?"`,
+  bicep: String.raw`minTlsVersion\s*:\s*'(?:1\.0|1\.1)'|sslPolicy\s*:\s*\{[^}]*minProtocolVersion\s*:\s*'TLSv1(?:\.1)?'`,
+  arm: String.raw`"minTlsVersion"\s*:\s*"(?:1\.0|1\.1)"|"minProtocolVersion"\s*:\s*"TLSv1(?:\.1)?"`,
+};
+
+/** IaC missing backup / disaster recovery config */
+export const IAC_MISSING_BACKUP = {
+  terraform: String.raw`backup_policy_id\s*=\s*""|backup\s*\{[^}]*enabled\s*=\s*false|geo_redundant_backup_enabled\s*=\s*false`,
+  bicep: String.raw`backup\s*:\s*\{\s*enabled\s*:\s*false|geoRedundantBackup\s*:\s*'Disabled'`,
+  arm: String.raw`"backup"\s*:\s*\{\s*"enabled"\s*:\s*false|"geoRedundantBackup"\s*:\s*"Disabled"`,
 };

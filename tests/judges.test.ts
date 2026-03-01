@@ -43,6 +43,7 @@ import type {
 } from "../src/types.js";
 import { analyzeStructure, isTreeSitterAvailable } from "../src/ast/index.js";
 import { analyzeCodeStructure } from "../src/evaluators/code-structure.js";
+import { analyzeIacSecurity } from "../src/evaluators/iac-security.js";
 
 // ─── Tree-sitter warm-up ────────────────────────────────────────────────────
 // Must happen BEFORE any describe/it blocks so that tree-sitter grammars are
@@ -91,8 +92,8 @@ function findingsAreWellFormed(findings: Finding[]): void {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Judge Registry", () => {
-  it("should have exactly 35 judges registered", () => {
-    assert.equal(JUDGES.length, 35);
+  it("should have exactly 36 judges registered", () => {
+    assert.equal(JUDGES.length, 36);
   });
 
   it("should allow lookup of every judge by ID", () => {
@@ -4668,7 +4669,7 @@ export const sanitizeBody = body("name").trim().escape();
 
 import { parseConfig, defaultConfig } from "../src/config.js";
 import { applyConfig, detectPositiveSignals } from "../src/evaluators/shared.js";
-import { langPattern, allLangPattern } from "../src/language-patterns.js";
+import { langPattern, allLangPattern, normalizeLanguage, isIaC } from "../src/language-patterns.js";
 
 describe("Config System — parseConfig", () => {
   it("should parse empty object", () => {
@@ -7881,5 +7882,379 @@ describe("Presets", () => {
     assert.ok(secOnly.config.disabledJudges);
     assert.ok(secOnly.config.disabledJudges!.includes("cost-effectiveness"));
     assert.ok(secOnly.config.disabledJudges!.includes("accessibility"));
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Infrastructure as Code (IaC) Support
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("IaC Language Support", () => {
+  it("should normalise terraform aliases", () => {
+    assert.equal(normalizeLanguage("terraform"), "terraform");
+    assert.equal(normalizeLanguage("tf"), "terraform");
+    assert.equal(normalizeLanguage("hcl"), "terraform");
+  });
+
+  it("should normalise bicep alias", () => {
+    assert.equal(normalizeLanguage("bicep"), "bicep");
+  });
+
+  it("should normalise arm aliases", () => {
+    assert.equal(normalizeLanguage("arm"), "arm");
+    assert.equal(normalizeLanguage("armtemplate"), "arm");
+    assert.equal(normalizeLanguage("arm-template"), "arm");
+  });
+
+  it("isIaC should return true for IaC languages", () => {
+    assert.ok(isIaC("terraform"));
+    assert.ok(isIaC("bicep"));
+    assert.ok(isIaC("arm"));
+  });
+
+  it("isIaC should return false for non-IaC languages", () => {
+    assert.ok(!isIaC("typescript"));
+    assert.ok(!isIaC("python"));
+    assert.ok(!isIaC("unknown"));
+  });
+});
+
+describe("IaC Security Judge", () => {
+  it("should be registered in the JUDGES array", () => {
+    const judge = getJudge("iac-security");
+    assert.ok(judge, "iac-security judge should be registered");
+    assert.equal(judge!.rulePrefix, "IAC");
+    assert.equal(judge!.domain, "Infrastructure as Code");
+    assert.ok(typeof judge!.analyze === "function");
+  });
+});
+
+describe("IaC Security Evaluator — Terraform", () => {
+  const tfInsecure = `
+resource "azurerm_storage_account" "main" {
+  name                     = "mystorageaccount"
+  resource_group_name      = "my-rg"
+  location                 = "eastus"
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+
+  enable_https_traffic_only = false
+  min_tls_version           = "TLS1_0"
+  public_network_access_enabled = true
+}
+
+resource "azurerm_network_security_rule" "allow_all" {
+  source_address_prefix = "*"
+  destination_port_range = "*"
+  direction             = "Inbound"
+  access                = "Allow"
+}
+
+resource "azurerm_key_vault_secret" "db_password" {
+  name         = "db-pass"
+  value        = "SuperSecretPassword123!"
+  key_vault_id = azurerm_key_vault.main.id
+}
+
+resource "azurerm_role_assignment" "owner" {
+  actions = ["*"]
+}
+
+provider "azurerm" {
+  features {}
+}
+
+terraform {
+}
+`;
+
+  it("should return no findings for non-IaC languages", () => {
+    const findings = analyzeIacSecurity(tfInsecure, "typescript");
+    assert.equal(findings.length, 0);
+  });
+
+  it("should detect hardcoded secrets", () => {
+    const findings = analyzeIacSecurity(tfInsecure, "terraform");
+    assert.ok(
+      findings.some((f) => f.ruleId.startsWith("IAC-") && f.title.toLowerCase().includes("secret")),
+      "Should detect hardcoded secrets",
+    );
+  });
+
+  it("should detect missing HTTPS enforcement", () => {
+    const findings = analyzeIacSecurity(tfInsecure, "terraform");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("https") || f.title.toLowerCase().includes("tls")),
+      "Should detect HTTPS/TLS issues",
+    );
+  });
+
+  it("should detect public access", () => {
+    const findings = analyzeIacSecurity(tfInsecure, "terraform");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("public access")),
+      "Should detect public access enabled",
+    );
+  });
+
+  it("should detect overly permissive network rules", () => {
+    const findings = analyzeIacSecurity(tfInsecure, "terraform");
+    assert.ok(
+      findings.some(
+        (f) => f.title.toLowerCase().includes("permissive network") || f.title.toLowerCase().includes("0.0.0.0"),
+      ),
+      "Should detect open network rules",
+    );
+  });
+
+  it("should detect overly permissive IAM", () => {
+    const findings = analyzeIacSecurity(tfInsecure, "terraform");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("iam") || f.title.toLowerCase().includes("rbac")),
+      "Should detect permissive IAM",
+    );
+  });
+
+  it("should detect hardcoded location", () => {
+    const findings = analyzeIacSecurity(tfInsecure, "terraform");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("location")),
+      "Should detect hardcoded location",
+    );
+  });
+
+  it("should detect insecure TLS version", () => {
+    const findings = analyzeIacSecurity(tfInsecure, "terraform");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("tls version")),
+      "Should detect insecure TLS config",
+    );
+  });
+
+  it("should detect missing required_providers", () => {
+    const findings = analyzeIacSecurity(tfInsecure, "terraform");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("required_providers")),
+      "Should detect missing required_providers",
+    );
+  });
+
+  it("should detect missing remote backend", () => {
+    const findings = analyzeIacSecurity(tfInsecure, "terraform");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("backend")),
+      "Should detect missing backend",
+    );
+  });
+
+  it("all findings should be well-formed", () => {
+    const findings = analyzeIacSecurity(tfInsecure, "terraform");
+    findingsAreWellFormed(findings);
+    for (const f of findings) {
+      assert.ok(f.ruleId.startsWith("IAC-"), `ruleId should start with IAC-: ${f.ruleId}`);
+    }
+  });
+});
+
+describe("IaC Security Evaluator — Bicep", () => {
+  const bicepInsecure = `
+param adminPassword string
+
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+  name: 'mystorageaccount'
+  location: 'eastus'
+  kind: 'StorageV2'
+  sku: {
+    name: 'Standard_LRS'
+  }
+  properties: {
+    supportsHttpsTrafficOnly: false
+    publicAccess: 'Enabled'
+    minTlsVersion: '1.0'
+    encryption: {
+      status: 'Disabled'
+    }
+  }
+}
+
+resource nsg 'Microsoft.Network/networkSecurityGroups/securityRules@2023-01-01' = {
+  properties: {
+    sourceAddressPrefix: '*'
+    destinationPortRange: '*'
+    access: 'Allow'
+    direction: 'Inbound'
+  }
+}
+
+resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  properties: {
+    roleDefinitionId: '/providers/Microsoft.Authorization/roleDefinitions/Owner'
+  }
+}
+`;
+
+  it("should detect hardcoded secrets (missing @secure)", () => {
+    const findings = analyzeIacSecurity(bicepInsecure, "bicep");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("@secure")),
+      "Should detect missing @secure on password param",
+    );
+  });
+
+  it("should detect encryption disabled", () => {
+    const findings = analyzeIacSecurity(bicepInsecure, "bicep");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("encryption")),
+      "Should detect disabled encryption",
+    );
+  });
+
+  it("should detect public access", () => {
+    const findings = analyzeIacSecurity(bicepInsecure, "bicep");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("public access")),
+      "Should detect public access enabled",
+    );
+  });
+
+  it("should detect permissive network rules", () => {
+    const findings = analyzeIacSecurity(bicepInsecure, "bicep");
+    assert.ok(
+      findings.some(
+        (f) => f.title.toLowerCase().includes("permissive network") || f.title.toLowerCase().includes("wildcard"),
+      ),
+      "Should detect open network rules",
+    );
+  });
+
+  it("should detect insecure TLS", () => {
+    const findings = analyzeIacSecurity(bicepInsecure, "bicep");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("tls") || f.title.toLowerCase().includes("https")),
+      "Should detect insecure TLS/HTTPS",
+    );
+  });
+
+  it("all findings should be well-formed", () => {
+    const findings = analyzeIacSecurity(bicepInsecure, "bicep");
+    findingsAreWellFormed(findings);
+    for (const f of findings) {
+      assert.ok(f.ruleId.startsWith("IAC-"), `ruleId should start with IAC-: ${f.ruleId}`);
+    }
+  });
+});
+
+describe("IaC Security Evaluator — ARM", () => {
+  const armInsecure = `{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "parameters": {
+    "adminPassword": {
+      "type": "string",
+      "defaultValue": "SuperSecretPassword123!"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "mystorageaccount",
+      "location": "eastus",
+      "properties": {
+        "supportsHttpsTrafficOnly": false,
+        "publicNetworkAccess": "Enabled",
+        "minTlsVersion": "1.0",
+        "encryption": {
+          "status": "Disabled"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+      "properties": {
+        "sourceAddressPrefix": "*",
+        "destinationPortRange": "*"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "properties": {
+        "actions": ["*"]
+      }
+    }
+  ]
+}`;
+
+  it("should detect ARM template secret with default value", () => {
+    const findings = analyzeIacSecurity(armInsecure, "arm");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("default value") || f.title.toLowerCase().includes("secret")),
+      "Should detect secret parameter with default value",
+    );
+  });
+
+  it("should detect missing HTTPS enforcement", () => {
+    const findings = analyzeIacSecurity(armInsecure, "arm");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("https") || f.title.toLowerCase().includes("tls")),
+      "Should detect HTTPS/TLS issues",
+    );
+  });
+
+  it("should detect public access", () => {
+    const findings = analyzeIacSecurity(armInsecure, "arm");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("public access")),
+      "Should detect public access enabled",
+    );
+  });
+
+  it("should detect encryption disabled", () => {
+    const findings = analyzeIacSecurity(armInsecure, "arm");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("encryption")),
+      "Should detect disabled encryption",
+    );
+  });
+
+  it("should detect permissive network rules", () => {
+    const findings = analyzeIacSecurity(armInsecure, "arm");
+    assert.ok(
+      findings.some((f) => f.title.toLowerCase().includes("permissive") || f.title.toLowerCase().includes("wildcard")),
+      "Should detect open network rules",
+    );
+  });
+
+  it("all findings should be well-formed", () => {
+    const findings = analyzeIacSecurity(armInsecure, "arm");
+    findingsAreWellFormed(findings);
+    for (const f of findings) {
+      assert.ok(f.ruleId.startsWith("IAC-"), `ruleId should start with IAC-: ${f.ruleId}`);
+    }
+  });
+});
+
+describe("IaC Tribunal Integration", () => {
+  const tfCode = `
+resource "azurerm_storage_account" "main" {
+  name                     = "mystorageaccount"
+  location                 = "eastus"
+  enable_https_traffic_only = false
+  public_network_access_enabled = true
+}
+`;
+
+  it("should include IaC judge findings in tribunal verdict", () => {
+    const verdict = evaluateWithTribunal(tfCode, "terraform");
+    assert.ok(verdict);
+    const iacEval = verdict.evaluations.find((e) => e.judgeId === "iac-security");
+    assert.ok(iacEval, "Tribunal should include iac-security judge evaluation");
+    assert.ok(iacEval!.findings.length > 0, "IaC judge should produce findings for insecure Terraform code");
+  });
+
+  it("should produce well-formed IaC findings via tribunal", () => {
+    const verdict = evaluateWithTribunal(tfCode, "terraform");
+    const iacEval = verdict.evaluations.find((e) => e.judgeId === "iac-security");
+    assert.ok(iacEval);
+    findingsAreWellFormed(iacEval!.findings);
   });
 });

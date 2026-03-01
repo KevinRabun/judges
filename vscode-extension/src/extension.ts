@@ -94,6 +94,8 @@ export function activate(context: vscode.ExtensionContext): void {
     "java",
     "csharp",
     "cpp",
+    "terraform",
+    "bicep",
   ];
 
   for (const lang of supportedLanguages) {

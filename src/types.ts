@@ -70,7 +70,19 @@ export interface Patch {
 /**
  * Supported language families for multi-language analysis.
  */
-export type LangFamily = "javascript" | "typescript" | "python" | "rust" | "csharp" | "java" | "go" | "cpp" | "unknown";
+export type LangFamily =
+  | "javascript"
+  | "typescript"
+  | "python"
+  | "rust"
+  | "csharp"
+  | "java"
+  | "go"
+  | "cpp"
+  | "terraform"
+  | "bicep"
+  | "arm"
+  | "unknown";
 
 /**
  * Per-rule configuration override.
