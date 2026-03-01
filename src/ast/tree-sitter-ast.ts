@@ -16,7 +16,16 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import type { CodeStructure, FunctionInfo } from "./types.js";
 
-const require = createRequire(import.meta.url);
+// Support both ESM (import.meta.url) and CJS (esbuild bundle) environments.
+// When bundled by esbuild with --format=cjs, import.meta.url is undefined,
+// so we fall back to __filename (which esbuild injects for CJS bundles).
+const _importMetaUrl: string | undefined = typeof import.meta?.url === "string" ? import.meta.url : undefined;
+
+const require = _importMetaUrl
+  ? createRequire(_importMetaUrl)
+  : typeof globalThis.require === "function"
+    ? globalThis.require
+    : createRequire(__filename ?? import.meta.url);
 
 // ─── Lazy Initialization ────────────────────────────────────────────────────
 
@@ -79,11 +88,18 @@ const GRAMMAR_FILES: Record<string, string> = {
 // Cached language instances
 const languageCache = new Map<string, TreeSitterLanguage>();
 
-// Resolve grammar directory relative to this module
-const __dirname = dirname(fileURLToPath(import.meta.url));
+// Resolve grammar directory relative to this module.
+// In ESM: use import.meta.url; in CJS (esbuild bundle): use __filename.
+const _moduleDir: string = _importMetaUrl
+  ? dirname(fileURLToPath(_importMetaUrl))
+  : typeof __dirname === "string"
+    ? __dirname
+    : dirname(__filename ?? "");
+
 // In development: src/ast/ → ../../grammars/
 // In dist: dist/ast/ → ../../grammars/
-const GRAMMAR_DIR = join(__dirname, "..", "..", "grammars");
+// In vscode bundle: out/ → ../grammars/ (but tree-sitter gracefully degrades)
+const GRAMMAR_DIR = join(_moduleDir, "..", "..", "grammars");
 
 async function ensureInit(): Promise<boolean> {
   if (initPromise) return initPromise;
