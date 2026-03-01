@@ -47,7 +47,7 @@ function detectLanguage(filePath: string): string {
 
 // ─── Patch Application Engine ───────────────────────────────────────────────
 
-interface PatchCandidate {
+export interface PatchCandidate {
   ruleId: string;
   title: string;
   severity: string;
@@ -58,7 +58,7 @@ interface PatchCandidate {
 /**
  * Sort patches bottom-to-top (by startLine descending) to avoid line offsets.
  */
-function sortPatchesBottomUp(patches: PatchCandidate[]): PatchCandidate[] {
+export function sortPatchesBottomUp(patches: PatchCandidate[]): PatchCandidate[] {
   return [...patches].sort((a, b) => b.patch.startLine - a.patch.startLine);
 }
 
@@ -66,7 +66,10 @@ function sortPatchesBottomUp(patches: PatchCandidate[]): PatchCandidate[] {
  * Apply patches to source code. Patches are applied bottom-to-top so that
  * earlier line numbers remain stable.
  */
-function applyPatches(code: string, patches: PatchCandidate[]): { result: string; applied: number; skipped: number } {
+export function applyPatches(
+  code: string,
+  patches: PatchCandidate[],
+): { result: string; applied: number; skipped: number } {
   const lines = code.split("\n");
   const sorted = sortPatchesBottomUp(patches);
   let applied = 0;

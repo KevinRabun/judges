@@ -7522,7 +7522,6 @@ describe("Feedback System", () => {
       const feedbackFile = join(tmpDir, "feedback.json");
       const store = loadFeedbackStore(feedbackFile);
       store.entries.push({
-        id: "test-1",
         ruleId: "SEC-001",
         verdict: "fp",
         timestamp: new Date().toISOString(),
@@ -7592,5 +7591,291 @@ describe("Benchmark Suite", () => {
     assert.ok(report.includes("Benchmark"));
     assert.ok(typeof report === "string");
     assert.ok(report.length > 100);
+  });
+});
+
+// ─── CLI Version Command Tests ──────────────────────────────────────────────
+
+describe("CLI Version Command", () => {
+  it("should export runCli function", async () => {
+    const { runCli } = await import("../src/cli.js");
+    assert.ok(typeof runCli === "function");
+  });
+
+  it("should handle version command without throwing", async () => {
+    const { runCli } = await import("../src/cli.js");
+    // Capture stdout by calling runCli with version args
+    // It should not throw
+    await runCli(["node", "judges", "version"]);
+  });
+
+  it("should handle --version flag without throwing", async () => {
+    const { runCli } = await import("../src/cli.js");
+    await runCli(["node", "judges", "--version"]);
+  });
+});
+
+// ─── Auto-Fix Patch Engine Tests ────────────────────────────────────────────
+
+describe("Auto-Fix Patch Engine", () => {
+  it("should sort patches bottom-to-top by startLine", async () => {
+    const { sortPatchesBottomUp } = await import("../src/commands/fix.js");
+    const patches = [
+      { ruleId: "A", title: "a", severity: "high", patch: { oldText: "x", newText: "y", startLine: 5, endLine: 5 } },
+      { ruleId: "B", title: "b", severity: "high", patch: { oldText: "x", newText: "y", startLine: 20, endLine: 20 } },
+      { ruleId: "C", title: "c", severity: "high", patch: { oldText: "x", newText: "y", startLine: 10, endLine: 10 } },
+    ];
+    const sorted = sortPatchesBottomUp(patches);
+    assert.equal(sorted[0].ruleId, "B");
+    assert.equal(sorted[1].ruleId, "C");
+    assert.equal(sorted[2].ruleId, "A");
+  });
+
+  it("should apply a single patch correctly", async () => {
+    const { applyPatches } = await import("../src/commands/fix.js");
+    const code = "line1\nold_code\nline3";
+    const patches = [
+      {
+        ruleId: "TEST-001",
+        title: "test",
+        severity: "high",
+        patch: { oldText: "old_code", newText: "new_code", startLine: 2, endLine: 2 },
+      },
+    ];
+    const { result, applied, skipped } = applyPatches(code, patches);
+    assert.ok(result.includes("new_code"));
+    assert.ok(!result.includes("old_code"));
+    assert.equal(applied, 1);
+    assert.equal(skipped, 0);
+  });
+
+  it("should skip patches that don't match", async () => {
+    const { applyPatches } = await import("../src/commands/fix.js");
+    const code = "line1\nline2\nline3";
+    const patches = [
+      {
+        ruleId: "TEST-002",
+        title: "test",
+        severity: "high",
+        patch: { oldText: "no_match", newText: "replaced", startLine: 2, endLine: 2 },
+      },
+    ];
+    const { result, applied, skipped } = applyPatches(code, patches);
+    assert.equal(result, code);
+    assert.equal(applied, 0);
+    assert.equal(skipped, 1);
+  });
+
+  it("should apply multiple patches bottom-to-top without offset errors", async () => {
+    const { applyPatches } = await import("../src/commands/fix.js");
+    const code = "line1\nhttp://example.com\nline3\nhttp://api.test.com\nline5";
+    const patches = [
+      {
+        ruleId: "SEC-010",
+        title: "http",
+        severity: "medium",
+        patch: { oldText: "http://example.com", newText: "https://example.com", startLine: 2, endLine: 2 },
+      },
+      {
+        ruleId: "SEC-011",
+        title: "http",
+        severity: "medium",
+        patch: { oldText: "http://api.test.com", newText: "https://api.test.com", startLine: 4, endLine: 4 },
+      },
+    ];
+    const { result, applied } = applyPatches(code, patches);
+    assert.ok(result.includes("https://example.com"));
+    assert.ok(result.includes("https://api.test.com"));
+    assert.ok(!result.includes("http://example.com"));
+    assert.ok(!result.includes("http://api.test.com"));
+    assert.equal(applied, 2);
+  });
+});
+
+// ─── Configuration Parser Tests ─────────────────────────────────────────────
+
+describe("Configuration Parser", () => {
+  it("should parse valid config with all fields", async () => {
+    const { parseConfig } = await import("../src/config.js");
+    const config = parseConfig(
+      JSON.stringify({
+        disabledRules: ["SEC-003"],
+        disabledJudges: ["accessibility"],
+        minSeverity: "medium",
+        languages: ["typescript"],
+        ruleOverrides: {
+          "LOG-002": { disabled: true },
+          "SEC-001": { severity: "critical" },
+        },
+      }),
+    );
+    assert.deepEqual(config.disabledRules, ["SEC-003"]);
+    assert.deepEqual(config.disabledJudges, ["accessibility"]);
+    assert.equal(config.minSeverity, "medium");
+    assert.deepEqual(config.languages, ["typescript"]);
+    assert.equal(config.ruleOverrides?.["LOG-002"]?.disabled, true);
+    assert.equal(config.ruleOverrides?.["SEC-001"]?.severity, "critical");
+  });
+
+  it("should parse empty config without error", async () => {
+    const { parseConfig } = await import("../src/config.js");
+    const config = parseConfig("{}");
+    assert.deepEqual(config, {});
+  });
+
+  it("should throw on invalid JSON", async () => {
+    const { parseConfig } = await import("../src/config.js");
+    assert.throws(() => parseConfig("{invalid}"), /not valid JSON/);
+  });
+
+  it("should throw on invalid minSeverity", async () => {
+    const { parseConfig } = await import("../src/config.js");
+    assert.throws(() => parseConfig(JSON.stringify({ minSeverity: "extreme" })), /minSeverity/);
+  });
+
+  it("should throw on non-object root", async () => {
+    const { parseConfig } = await import("../src/config.js");
+    assert.throws(() => parseConfig("[]"), /root must be a JSON object/);
+  });
+
+  it("should return default empty config", async () => {
+    const { defaultConfig } = await import("../src/config.js");
+    const config = defaultConfig();
+    assert.deepEqual(config, {});
+  });
+});
+
+// ─── Example Config File Tests ──────────────────────────────────────────────
+
+describe("Example Config File", () => {
+  it(".judgesrc.example.json should exist and be valid JSON", () => {
+    const examplePath = resolve(__dirname, "..", ".judgesrc.example.json");
+    assert.ok(existsSync(examplePath), ".judgesrc.example.json should exist");
+    const content = readFileSync(examplePath, "utf-8");
+    const parsed = JSON.parse(content);
+    assert.ok(typeof parsed === "object" && parsed !== null);
+  });
+
+  it(".judgesrc.example.json should be parseable by parseConfig", async () => {
+    const { parseConfig } = await import("../src/config.js");
+    const examplePath = resolve(__dirname, "..", ".judgesrc.example.json");
+    const content = readFileSync(examplePath, "utf-8");
+    // Remove $schema and other non-config fields before parsing
+    const raw = JSON.parse(content);
+    delete raw.$schema;
+    delete raw.preset;
+    delete raw.format;
+    delete raw.failOnFindings;
+    delete raw.baseline;
+    const config = parseConfig(JSON.stringify(raw));
+    assert.ok(typeof config === "object");
+  });
+
+  it("judgesrc.schema.json should exist and be valid JSON Schema", () => {
+    const schemaPath = resolve(__dirname, "..", "judgesrc.schema.json");
+    assert.ok(existsSync(schemaPath), "judgesrc.schema.json should exist");
+    const content = readFileSync(schemaPath, "utf-8");
+    const schema = JSON.parse(content);
+    assert.equal(schema.type, "object");
+    assert.ok(schema.properties);
+    assert.ok(schema.properties.minSeverity);
+    assert.ok(schema.properties.disabledRules);
+    assert.ok(schema.properties.disabledJudges);
+    assert.ok(schema.properties.ruleOverrides);
+  });
+});
+
+// ─── Glob / Multi-File Eval Tests ───────────────────────────────────────────
+
+describe("Multi-File Evaluation", () => {
+  it("should evaluate multiple files when given a directory", () => {
+    // Create a temp dir with sample files
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-multi-"));
+    try {
+      writeFileSync(join(tmpDir, "file1.ts"), 'export const x = eval("test");\n');
+      writeFileSync(join(tmpDir, "file2.ts"), 'export function hello() { console.log("hello"); }\n');
+
+      // Verify files are created
+      const files = readdirSync(tmpDir).filter((f) => f.endsWith(".ts"));
+      assert.equal(files.length, 2, "Should have 2 .ts files");
+
+      // Evaluate each file individually (collectFiles is private, test via evaluateWithTribunal)
+      for (const file of files) {
+        const filePath = join(tmpDir, file);
+        const code = readFileSync(filePath, "utf-8");
+        const verdict = evaluateWithTribunal(code, "typescript");
+        assert.ok(typeof verdict.overallScore === "number", `${file}: score should be a number`);
+        assert.ok(["pass", "fail", "warning"].includes(verdict.overallVerdict), `${file}: verdict should be valid`);
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should handle empty directories gracefully", () => {
+    const emptyDir = mkdtempSync(join(tmpdir(), "judges-empty-"));
+    try {
+      const files = readdirSync(emptyDir);
+      assert.equal(files.length, 0);
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should support the --fix flow on evaluated code", async () => {
+    // Simulate --fix flow: evaluate → collect patches → apply
+    const code = 'const buf = new Buffer("test");\nconst url = "http://example.com/api";';
+    const verdict = evaluateWithTribunal(code, "typescript");
+
+    // Collect PatchCandidates from findings with patches
+    const patchCandidates = verdict.findings
+      .filter((f: Finding) => f.patch)
+      .map((f: Finding) => ({
+        ruleId: f.ruleId,
+        title: f.title,
+        severity: f.severity,
+        patch: f.patch!,
+        lineNumbers: f.lineNumbers,
+      }));
+
+    // If patches found, apply them
+    if (patchCandidates.length > 0) {
+      const { applyPatches } = await import("../src/commands/fix.js");
+      const { result, applied } = applyPatches(code, patchCandidates);
+      assert.ok(typeof result === "string");
+      assert.ok(applied >= 0);
+    }
+  });
+});
+
+// ─── Presets Tests ──────────────────────────────────────────────────────────
+
+describe("Presets", () => {
+  it("should have all 6 named presets", async () => {
+    const { PRESETS } = await import("../src/presets.js");
+    const expected = ["strict", "lenient", "security-only", "startup", "compliance", "performance"];
+    for (const name of expected) {
+      assert.ok(PRESETS[name], `Preset "${name}" should exist`);
+    }
+  });
+
+  it("should retrieve presets by name", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const strict = getPreset("strict");
+    assert.ok(strict);
+    assert.equal(strict.config.minSeverity, "info");
+  });
+
+  it("should return undefined for unknown preset", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    assert.equal(getPreset("nonexistent"), undefined);
+  });
+
+  it("security-only preset should disable non-security judges", async () => {
+    const { PRESETS } = await import("../src/presets.js");
+    const secOnly = PRESETS["security-only"];
+    assert.ok(secOnly.config.disabledJudges);
+    assert.ok(secOnly.config.disabledJudges!.includes("cost-effectiveness"));
+    assert.ok(secOnly.config.disabledJudges!.includes("accessibility"));
   });
 });

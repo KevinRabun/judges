@@ -1,0 +1,143 @@
+{
+  "name": "judges-panel",
+  "displayName": "Judges Panel",
+  "description": "35 specialized judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and one-click evaluation.",
+  "version": "0.1.0",
+  "publisher": "kevinrabun",
+  "license": "MIT",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KevinRabun/judges"
+  },
+  "homepage": "https://github.com/KevinRabun/judges#readme",
+  "bugs": {
+    "url": "https://github.com/KevinRabun/judges/issues"
+  },
+  "galleryBanner": {
+    "color": "#1e1b4b",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "code-review",
+    "security",
+    "mcp",
+    "ai-code-review",
+    "static-analysis",
+    "judges",
+    "auto-fix"
+  ],
+  "activationEvents": [
+    "onLanguage:typescript",
+    "onLanguage:javascript",
+    "onLanguage:python",
+    "onLanguage:go",
+    "onLanguage:rust",
+    "onLanguage:java",
+    "onLanguage:csharp",
+    "onLanguage:cpp"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "judges.evaluateFile",
+        "title": "Judges: Evaluate Current File",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "judges.evaluateWorkspace",
+        "title": "Judges: Evaluate Workspace"
+      },
+      {
+        "command": "judges.fixFile",
+        "title": "Judges: Auto-Fix Current File",
+        "icon": "$(wrench)"
+      },
+      {
+        "command": "judges.clearDiagnostics",
+        "title": "Judges: Clear Diagnostics"
+      },
+      {
+        "command": "judges.showPanel",
+        "title": "Judges: Show Results Panel"
+      }
+    ],
+    "configuration": {
+      "title": "Judges Panel",
+      "properties": {
+        "judges.evaluateOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically evaluate files when saved."
+        },
+        "judges.preset": {
+          "type": "string",
+          "default": "",
+          "enum": ["", "strict", "lenient", "security-only", "startup", "compliance", "performance"],
+          "description": "Named preset for evaluation configuration."
+        },
+        "judges.minSeverity": {
+          "type": "string",
+          "default": "medium",
+          "enum": ["critical", "high", "medium", "low", "info"],
+          "description": "Minimum severity level to show as diagnostics."
+        },
+        "judges.enabledJudges": {
+          "type": "array",
+          "default": [],
+          "description": "List of judge IDs to enable (empty = all judges)."
+        },
+        "judges.debounceMs": {
+          "type": "number",
+          "default": 1000,
+          "description": "Debounce delay in milliseconds for on-save evaluation."
+        }
+      }
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "judges.evaluateFile",
+          "group": "navigation",
+          "when": "editorLangId =~ /typescript|javascript|python|go|rust|java|csharp|cpp/"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "judges.evaluateFile",
+          "group": "judges@1"
+        },
+        {
+          "command": "judges.fixFile",
+          "group": "judges@2"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run esbuild -- --minify",
+    "esbuild": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+    "compile": "npm run esbuild",
+    "watch": "npm run esbuild -- --watch --sourcemap",
+    "package": "npx @vscode/vsce package",
+    "lint": "eslint src/"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^22.0.0",
+    "@vscode/vsce": "^3.3.2",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@kevinrabun/judges": "file:.."
+  }
+}

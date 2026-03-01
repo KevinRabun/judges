@@ -2,7 +2,48 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
-## [3.5.0] — 2026-03-06
+## [3.7.0] — 2026-03-08
+
+### Added
+- **`judges --version` command** — display installed version with update check.
+- **`--fix` flag on eval** — evaluate and auto-fix in one step: `judges eval --fix src/app.ts`.
+- **Glob / multi-file eval** — evaluate directories and patterns: `judges eval src/**/*.ts`.
+- **Progress indicators** — `[1/12] src/app.ts…` progress during multi-file evaluation.
+- **VS Code extension** — diagnostics, code actions, and quick-fix integration (`vscode-extension/`).
+- **README terminal mockup** — SVG-based visual showing evaluation output.
+- **`.judgesrc.example.json`** — annotated example configuration file.
+- **GitHub Marketplace metadata** — enhanced `action.yml` for Marketplace discovery.
+
+### Changed
+- `server.json` version synced to `3.7.0`.
+- README test badge updated to **819**.
+- Total test count: **819+**.
+
+---
+
+## [3.6.0] — 2026-03-07
+
+### Added
+- **Plugin system** (`--plugin`) — load custom evaluator plugins from npm packages or local files.
+- **Finding fingerprints** — stable content-hash IDs for tracking findings across runs.
+- **Calibration mode** (`judges calibrate`) — tune judge thresholds against known-good codebases.
+- **Diagnostics format** (`--format diagnostics`) — LSP-compatible diagnostic output for editor integration.
+- **Comparison command** (`judges compare`) — side-by-side feature matrix vs ESLint, SonarQube, Semgrep, CodeQL.
+- **Language packs** (`judges pack`) — manage language-specific rule extensions.
+- **Config sharing** (`judges config export/import`) — export and import team configurations.
+- **Custom rules** (`judges rule create`) — define and manage custom evaluation rules.
+- **Fix history** — track applied patches with undo support.
+- **Smart output** — auto-detect terminal width and format output accordingly.
+- **Feedback command** (`judges feedback`) — submit false-positive feedback for rule tuning.
+- **Benchmark command** (`judges benchmark`) — run detection accuracy benchmarks against test suites.
+- **14 new subsystem tests** for plugins, fingerprinting, calibration, and diagnostics.
+
+### Changed
+- CLI expanded from 14 to 22 commands.
+- Output formats expanded from 7 to 8 (added `diagnostics`).
+- Total test count: **819** (up from 754).
+
+---
 
 ### Added
 - **`judges diff` command** — evaluate only changed lines from unified diff / git diff output. Pipe `git diff` directly or pass a patch file.
@@ -155,6 +196,8 @@ All notable changes to **@kevinrabun/judges** are documented here.
 
 ---
 
+[3.7.0]: https://github.com/KevinRabun/judges/compare/v3.6.0...v3.7.0
+[3.6.0]: https://github.com/KevinRabun/judges/compare/v3.5.0...v3.6.0
 [3.5.0]: https://github.com/KevinRabun/judges/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/KevinRabun/judges/compare/v3.3.0...v3.4.0
 [3.3.0]: https://github.com/KevinRabun/judges/compare/v3.2.0...v3.3.0

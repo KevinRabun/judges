@@ -8,8 +8,6 @@
  * but we provide the framework and known capability matrices.
  */
 
-import type { Finding } from "./types.js";
-
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface ToolCapability {

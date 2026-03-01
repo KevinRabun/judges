@@ -21,8 +21,9 @@
  *   judges eval --help                                    # show help
  */
 
-import { readFileSync, existsSync } from "fs";
-import { resolve, extname } from "path";
+import { readFileSync, existsSync, readdirSync, statSync, writeFileSync } from "fs";
+import { resolve, extname, dirname, relative, join } from "path";
+import { fileURLToPath } from "url";
 
 import {
   evaluateWithTribunal,
@@ -46,6 +47,7 @@ import { generateGitLabCi, generateAzurePipelines, generateBitbucketPipelines } 
 import { getPreset, listPresets } from "./presets.js";
 import { parseConfig } from "./config.js";
 import type { JudgesConfig } from "./types.js";
+import { applyPatches, type PatchCandidate } from "./commands/fix.js";
 import { runFeedback } from "./commands/feedback.js";
 import { runBenchmark } from "./commands/benchmark.js";
 import { runRule } from "./commands/rule.js";
@@ -112,6 +114,7 @@ interface CliArgs {
   noColor: boolean;
   verbose: boolean;
   quiet: boolean;
+  fix: boolean;
 }
 
 function parseCliArgs(argv: string[]): CliArgs {
@@ -131,6 +134,7 @@ function parseCliArgs(argv: string[]): CliArgs {
     noColor: false,
     verbose: false,
     quiet: false,
+    fix: false,
   };
 
   // First non-flag arg is the command
@@ -193,6 +197,9 @@ function parseCliArgs(argv: string[]): CliArgs {
       case "--quiet":
         args.quiet = true;
         break;
+      case "--fix":
+        args.fix = true;
+        break;
       default:
         // If it looks like a file path (not a flag), treat as --file
         if (!arg.startsWith("-") && !args.file) {
@@ -232,6 +239,7 @@ USAGE:
   judges config                       Export/import shared team configs
   judges compare                      Compare judges vs other tools
   judges list                         List all available judges
+  judges version                      Show version information
   judges --help                       Show this help
 
 EVAL OPTIONS:
@@ -248,6 +256,7 @@ EVAL OPTIONS:
   --no-color                 Disable colored output
   --verbose                  Show detailed evaluation information
   --quiet                    Suppress non-essential output
+  --fix                      Auto-fix findings after evaluation (applies patches in-place)
   --help, -h                 Show this help
 
 FIX OPTIONS:
@@ -337,6 +346,52 @@ function readCode(filePath: string | undefined): { code: string; resolvedPath: s
   console.error("Error: No file specified and no stdin input detected.");
   console.error("Usage: judges eval --file <path> or cat file | judges eval --language <lang>");
   process.exit(1);
+}
+
+// ─── Glob / Multi-File Resolution ───────────────────────────────────────────
+
+const SUPPORTED_EXTENSIONS = new Set(Object.keys(EXT_TO_LANG));
+
+function collectFiles(target: string): string[] {
+  const resolved = resolve(target);
+  if (!existsSync(resolved)) return [];
+
+  const stat = statSync(resolved);
+  if (stat.isFile()) return [resolved];
+
+  if (stat.isDirectory()) {
+    const files: string[] = [];
+    walkDir(resolved, files);
+    return files;
+  }
+
+  return [];
+}
+
+function walkDir(dir: string, results: string[]): void {
+  const entries = readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    // Skip common non-source directories
+    if (entry.isDirectory()) {
+      if (["node_modules", ".git", "dist", "build", ".next", "__pycache__", "target", "vendor"].includes(entry.name))
+        continue;
+      walkDir(fullPath, results);
+    } else if (entry.isFile()) {
+      const ext = extname(entry.name);
+      if (SUPPORTED_EXTENSIONS.has(ext)) {
+        results.push(fullPath);
+      }
+    }
+  }
+}
+
+function isDirectory(filePath: string): boolean {
+  try {
+    return statSync(resolve(filePath)).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 // ─── Format Output ──────────────────────────────────────────────────────────
@@ -462,10 +517,40 @@ function listJudges(): void {
   console.log("");
 }
 
+// ─── Version ────────────────────────────────────────────────────────────────
+
+function getPackageVersion(): string {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const pkgPath = resolve(__dirname, "..", "package.json");
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+      return pkg.version || "unknown";
+    }
+  } catch {
+    // fallback
+  }
+  return "unknown";
+}
+
+function printVersion(): void {
+  const version = getPackageVersion();
+  console.log(`@kevinrabun/judges v${version}`);
+  console.log(`Node.js ${process.version}`);
+  console.log(`Platform: ${process.platform} ${process.arch}`);
+}
+
 // ─── Main CLI Entry Point ───────────────────────────────────────────────────
 
 export async function runCli(argv: string[]): Promise<void> {
   const args = parseCliArgs(argv);
+
+  // ─── Version Command ─────────────────────────────────────────────────
+  if (args.command === "version" || args.command === "--version" || argv.includes("--version") || argv.includes("-V")) {
+    printVersion();
+    return;
+  }
 
   if (args.help || (!args.command && !args.file)) {
     printHelp();
@@ -597,8 +682,6 @@ export async function runCli(argv: string[]): Promise<void> {
   // ─── Eval Command ────────────────────────────────────────────────────
   if (args.command === "eval" || args.file) {
     const startTime = Date.now();
-    const { code, resolvedPath } = readCode(args.file);
-    const language = args.language || detectLanguage(args.file || resolvedPath) || "typescript";
 
     // Load config from file or preset
     const evalConfig = loadEvalConfig(args);
@@ -611,6 +694,104 @@ export async function runCli(argv: string[]): Promise<void> {
 
     // Build evaluation options from config
     const evalOptions = evalConfig ? { config: evalConfig } : undefined;
+
+    // ── Multi-file / directory mode ──────────────────────────────────────
+    const target = args.file;
+    if (target && isDirectory(target)) {
+      const files = collectFiles(target);
+      if (files.length === 0) {
+        console.error(`No supported source files found in: ${target}`);
+        process.exit(1);
+      }
+
+      if (!args.quiet) {
+        console.log(`\n  Scanning ${files.length} file(s) in ${target}…\n`);
+      }
+
+      let totalFindings = 0;
+      let totalCritical = 0;
+      let totalHigh = 0;
+      let failCount = 0;
+      let totalFixed = 0;
+
+      for (let idx = 0; idx < files.length; idx++) {
+        const filePath = files[idx];
+        const relPath = relative(resolve("."), filePath);
+
+        if (!args.quiet) {
+          process.stderr.write(`  [${idx + 1}/${files.length}] ${relPath}…`);
+        }
+
+        const fileCode = readFileSync(filePath, "utf-8");
+        const fileLang = args.language || detectLanguage(filePath) || "typescript";
+
+        const verdict = evaluateWithTribunal(fileCode, fileLang, undefined, evalOptions);
+
+        // Apply baseline suppression
+        if (baselineFindings) {
+          for (const evaluation of verdict.evaluations) {
+            evaluation.findings = evaluation.findings.filter((f) => !baselineFindings!.has(baselineKey(f)));
+          }
+          verdict.findings = verdict.findings.filter((f) => !baselineFindings!.has(baselineKey(f)));
+        }
+
+        const fileFindings = verdict.evaluations.reduce((s, e) => s + e.findings.length, 0);
+        totalFindings += fileFindings;
+        totalCritical += verdict.criticalCount;
+        totalHigh += verdict.highCount;
+        if (verdict.overallVerdict === "fail") failCount++;
+
+        if (!args.quiet) {
+          const icon = verdict.overallVerdict === "pass" ? "✅" : verdict.overallVerdict === "warning" ? "⚠️" : "❌";
+          process.stderr.write(` ${icon} ${verdict.overallScore}/100 (${fileFindings} findings)\n`);
+        }
+
+        // Auto-fix in multi-file mode
+        if (args.fix) {
+          const allFileFindings = verdict.evaluations.flatMap((e) => e.findings);
+          const fixable: PatchCandidate[] = allFileFindings
+            .filter((f) => f.patch)
+            .map((f) => ({
+              ruleId: f.ruleId,
+              title: f.title,
+              severity: f.severity,
+              patch: f.patch!,
+              lineNumbers: f.lineNumbers,
+            }));
+          if (fixable.length > 0) {
+            const patchResult = applyPatches(fileCode, fixable);
+            writeFileSync(filePath, patchResult.result, "utf-8");
+            totalFixed += patchResult.applied;
+          }
+        }
+      }
+
+      const elapsed = Date.now() - startTime;
+
+      // Summary
+      console.log("");
+      console.log("╔══════════════════════════════════════════════════════════════╗");
+      console.log("║           Judges Panel — Multi-File Summary                 ║");
+      console.log("╚══════════════════════════════════════════════════════════════╝");
+      console.log("");
+      console.log(`  Files    : ${files.length}`);
+      console.log(`  Findings : ${totalFindings}`);
+      console.log(`  Critical : ${totalCritical}`);
+      console.log(`  High     : ${totalHigh}`);
+      console.log(`  Failed   : ${failCount} file(s)`);
+      if (args.fix && totalFixed > 0) {
+        console.log(`  Fixed    : ${totalFixed} patch(es) applied`);
+      }
+      console.log(`  Time     : ${elapsed}ms`);
+      console.log("");
+
+      if (args.failOnFindings && failCount > 0) process.exit(1);
+      process.exit(0);
+    }
+
+    // ── Single-file mode ─────────────────────────────────────────────────
+    const { code, resolvedPath } = readCode(args.file);
+    const language = args.language || detectLanguage(args.file || resolvedPath) || "typescript";
 
     if (args.judge) {
       // Single judge mode
@@ -668,6 +849,30 @@ export async function runCli(argv: string[]): Promise<void> {
         console.error(`Score ${evaluation.score} is below minimum threshold ${args.minScore}`);
         process.exit(1);
       }
+
+      // Auto-fix if --fix flag is set (single judge mode)
+      if (args.fix && resolvedPath) {
+        const fixable: PatchCandidate[] = evaluation.findings
+          .filter((f) => f.patch)
+          .map((f) => ({
+            ruleId: f.ruleId,
+            title: f.title,
+            severity: f.severity,
+            patch: f.patch!,
+            lineNumbers: f.lineNumbers,
+          }));
+
+        if (fixable.length > 0) {
+          const { result, applied, skipped } = applyPatches(code, fixable);
+          writeFileSync(resolvedPath, result, "utf-8");
+          console.log(`\n  ✅ Applied ${applied} fix(es) to ${args.file || resolvedPath}`);
+          if (skipped > 0) {
+            console.log(`  ⏭  Skipped ${skipped} fix(es) (source text changed)`);
+          }
+        } else if (!args.quiet) {
+          console.log("\n  No auto-fixable findings.");
+        }
+      }
     } else {
       // Full tribunal mode
       const verdict = evaluateWithTribunal(code, language, undefined, evalOptions);
@@ -713,6 +918,31 @@ export async function runCli(argv: string[]): Promise<void> {
       if (args.minScore !== undefined && verdict.overallScore < args.minScore) {
         console.error(`Score ${verdict.overallScore} is below minimum threshold ${args.minScore}`);
         process.exit(1);
+      }
+
+      // Auto-fix if --fix flag is set
+      if (args.fix && resolvedPath) {
+        const allFindings = verdict.evaluations.flatMap((e) => e.findings);
+        const fixable: PatchCandidate[] = allFindings
+          .filter((f) => f.patch)
+          .map((f) => ({
+            ruleId: f.ruleId,
+            title: f.title,
+            severity: f.severity,
+            patch: f.patch!,
+            lineNumbers: f.lineNumbers,
+          }));
+
+        if (fixable.length > 0) {
+          const { result, applied, skipped } = applyPatches(code, fixable);
+          writeFileSync(resolvedPath, result, "utf-8");
+          console.log(`\n  ✅ Applied ${applied} fix(es) to ${args.file || resolvedPath}`);
+          if (skipped > 0) {
+            console.log(`  ⏭  Skipped ${skipped} fix(es) (source text changed)`);
+          }
+        } else if (!args.quiet) {
+          console.log("\n  No auto-fixable findings.");
+        }
       }
     }
 

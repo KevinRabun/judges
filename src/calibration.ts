@@ -10,7 +10,7 @@
  */
 
 import type { Finding } from "./types.js";
-import { loadFeedbackStore, getFpRateByRule, type FeedbackStore } from "./commands/feedback.js";
+import { loadFeedbackStore, type FeedbackStore } from "./commands/feedback.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

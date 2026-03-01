@@ -64,3 +64,8 @@ one-time-sanity-summary.json
 reports/
 artifacts/
 test-output.txt
+
+# VS Code Extension build artifacts
+vscode-extension/out/
+vscode-extension/node_modules/
+vscode-extension/*.vsix

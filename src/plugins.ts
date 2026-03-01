@@ -188,8 +188,6 @@ export function evaluateCustomRules(code: string, language: string): Finding[] {
     if (rule.pattern) {
       const re = new RegExp(rule.pattern.source, rule.pattern.flags);
       let match: RegExpExecArray | null;
-      const lines = code.split("\n");
-
       while ((match = re.exec(code)) !== null) {
         const beforeMatch = code.slice(0, match.index);
         const lineNum = (beforeMatch.match(/\n/g) || []).length + 1;

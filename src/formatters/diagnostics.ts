@@ -77,7 +77,7 @@ function getDiagnosticTags(finding: Finding): number[] | undefined {
 /**
  * Convert a Finding to an LSP Diagnostic.
  */
-export function findingToDiagnostic(finding: Finding, fileUri?: string): Diagnostic {
+export function findingToDiagnostic(finding: Finding, _fileUri?: string): Diagnostic {
   const startLine = finding.lineNumbers?.[0];
   const line = startLine && startLine > 0 ? startLine - 1 : 0; // LSP is 0-indexed
   const lastLine = finding.lineNumbers?.[finding.lineNumbers.length - 1];

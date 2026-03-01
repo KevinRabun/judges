@@ -1,0 +1,15 @@
+{
+  "$schema": "https://github.com/KevinRabun/judges/blob/main/judgesrc.schema.json",
+  "preset": "strict",
+  "minSeverity": "low",
+  "disabledJudges": [],
+  "disabledRules": [],
+  "ruleOverrides": {
+    "SEC-003": { "severity": "medium" },
+    "LOG-002": { "disabled": true }
+  },
+  "languages": [],
+  "format": "text",
+  "failOnFindings": false,
+  "baseline": ""
+}

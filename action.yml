@@ -1,5 +1,5 @@
 name: "Judges Code Review"
-description: "Run 35 specialized judges against your code for security, cost, and quality analysis. Deterministic tools + LLM-powered expert prompts."
+description: "Run 35 specialized judges against your code — security, cost, scalability, accessibility, compliance, and 30 more dimensions. Deterministic evaluators + expert-persona LLM prompts. Zero config, instant results."
 author: "kevinrabun"
 
 branding:
@@ -17,10 +17,20 @@ inputs:
   judge:
     description: "Run a single judge instead of the full tribunal (e.g., cybersecurity, authentication)"
     required: false
+  preset:
+    description: "Named preset: strict, lenient, security-only, startup, compliance, performance"
+    required: false
+  config:
+    description: "Path to a .judgesrc.json configuration file"
+    required: false
   format:
-    description: "Output format: text, json, sarif, markdown"
+    description: "Output format: text, json, sarif, markdown, html, junit, codeclimate"
     required: false
     default: "text"
+  fix:
+    description: "Automatically apply machine-applicable patches from findings"
+    required: false
+    default: "false"
   max-files:
     description: "Maximum number of files to analyze when path is a directory"
     required: false
@@ -77,7 +87,10 @@ runs:
         INPUT_PATH: ${{ inputs.path }}
         INPUT_LANGUAGE: ${{ inputs.language }}
         INPUT_JUDGE: ${{ inputs.judge }}
+        INPUT_PRESET: ${{ inputs.preset }}
+        INPUT_CONFIG: ${{ inputs.config }}
         INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_FIX: ${{ inputs.fix }}
         INPUT_MAX_FILES: ${{ inputs.max-files }}
         INPUT_MIN_CONFIDENCE: ${{ inputs.min-confidence }}
         INPUT_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
@@ -130,6 +143,18 @@ runs:
 
         if [ -n "$INPUT_JUDGE" ]; then
           ARGS+=(--judge "$INPUT_JUDGE")
+        fi
+
+        if [ -n "$INPUT_PRESET" ]; then
+          ARGS+=(--preset "$INPUT_PRESET")
+        fi
+
+        if [ -n "$INPUT_CONFIG" ]; then
+          ARGS+=(--config "$INPUT_CONFIG")
+        fi
+
+        if [ "$INPUT_FIX" = "true" ]; then
+          ARGS+=(--fix)
         fi
 
         # Always get JSON output for parsing, then convert

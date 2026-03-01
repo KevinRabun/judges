@@ -10,7 +10,6 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import type { Finding, Patch } from "./types.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

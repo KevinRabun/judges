@@ -12,7 +12,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve, basename } from "path";
-import type { JudgesConfig, Severity, RuleOverride } from "../types.js";
+import type { JudgesConfig, RuleOverride } from "../types.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -84,17 +84,14 @@ export function exportTeamConfig(projectDir: string = "."): TeamConfig {
   const configJsonPath = resolve(projectDir, ".judgesrc.json");
 
   let config: JudgesConfig = {};
-  let source = "";
 
   if (existsSync(configPath)) {
-    source = configPath;
     try {
       config = JSON.parse(readFileSync(configPath, "utf-8"));
     } catch {
       /* empty */
     }
   } else if (existsSync(configJsonPath)) {
-    source = configJsonPath;
     try {
       config = JSON.parse(readFileSync(configJsonPath, "utf-8"));
     } catch {

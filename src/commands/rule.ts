@@ -10,8 +10,8 @@
  *   judges rule test <rule-id>      Test a custom rule against sample code
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { resolve, join } from "path";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { resolve } from "path";
 import type { Finding, Severity } from "../types.js";
 import type { CustomRule } from "../plugins.js";
 

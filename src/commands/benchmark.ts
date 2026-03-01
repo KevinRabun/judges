@@ -14,8 +14,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { resolve, dirname } from "path";
 import { evaluateWithTribunal, evaluateWithJudge } from "../evaluators/index.js";
-import { JUDGES, getJudge } from "../judges/index.js";
-import type { Finding, TribunalVerdict, JudgeEvaluation } from "../types.js";
+import { getJudge } from "../judges/index.js";
+import type { Finding } from "../types.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -468,18 +468,6 @@ app.post("/withdraw", async (req, res) => {
 ];
 
 // ─── Benchmark Runner ───────────────────────────────────────────────────────
-
-function ruleIdMatchesExpected(foundRuleId: string, expectedRuleIds: string[]): boolean {
-  return expectedRuleIds.some((expected) => {
-    // Exact match
-    if (foundRuleId === expected) return true;
-    // Prefix match: CYBER-001 matches CYBER-*
-    if (expected.endsWith("*") && foundRuleId.startsWith(expected.slice(0, -1))) return true;
-    // Prefix match: CYBER-003 matches when we expect CYBER-001 (same judge domain)
-    const foundPrefix = foundRuleId.split("-")[0];
-    return expectedRuleIds.some((e) => e.split("-")[0] === foundPrefix);
-  });
-}
 
 export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): BenchmarkResult {
   const testCases = cases || BENCHMARK_CASES;

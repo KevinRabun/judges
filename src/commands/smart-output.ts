@@ -73,9 +73,9 @@ export function formatSmartOutput(
     columns = 80,
     showNextSteps = true,
     maxFindings = 15,
-    hideCleanJudges = true,
+    hideCleanJudges: _hideCleanJudges = true,
     collapsePassingJudges = true,
-    showFixCommands = true,
+    showFixCommands: _showFixCommands = true,
     showTimeEstimates = true,
     ci = false,
   } = options;
@@ -238,7 +238,7 @@ export function formatSmartSingleJudge(
   filePath?: string,
   options: SmartOutputOptions = {},
 ): string {
-  const { ci = false, showFixCommands = true } = options;
+  const { ci: _ci = false, showFixCommands = true } = options;
   const lines: string[] = [];
 
   const icon = evaluation.verdict === "pass" ? "✅" : evaluation.verdict === "warning" ? "⚠️" : "❌";
