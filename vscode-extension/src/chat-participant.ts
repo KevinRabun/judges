@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { evaluateWithTribunal } from "@kevinrabun/judges/api";
 import type { Finding } from "@kevinrabun/judges/api";
+import type { JudgesDiagnosticProvider } from "./diagnostics";
 
 // ─── Language Map ────────────────────────────────────────────────────────────
 
@@ -35,7 +36,10 @@ const SEVERITY_ICON: Record<string, string> = {
  * VS Code's disambiguation also routes natural-language queries like
  * "run a judges panel review" to this participant automatically.
  */
-export function registerChatParticipant(context: vscode.ExtensionContext): void {
+export function registerChatParticipant(
+  context: vscode.ExtensionContext,
+  diagnosticProvider: JudgesDiagnosticProvider,
+): void {
   try {
     if (!vscode.chat?.createChatParticipant) {
       console.warn(
@@ -43,6 +47,9 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
       );
       return;
     }
+
+    // Store reference so handlers can populate diagnostics
+    _diagnosticProvider = diagnosticProvider;
 
     const participant = vscode.chat.createChatParticipant("judges-panel.judges", handleChatRequest);
     participant.iconPath = new vscode.ThemeIcon("shield");
@@ -55,6 +62,9 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 }
 
 // ─── Request Handler ─────────────────────────────────────────────────────────
+
+/** Module-level reference to the diagnostic provider, set during registration. */
+let _diagnosticProvider: JudgesDiagnosticProvider | undefined;
 
 const handleChatRequest: vscode.ChatRequestHandler = async (
   request: vscode.ChatRequest,
@@ -87,7 +97,7 @@ const handleChatRequest: vscode.ChatRequestHandler = async (
 function inferCommand(prompt: string): string {
   const lower = prompt.toLowerCase();
   if (/\bfix\b/.test(lower)) return "fix";
-  if (/\bsecur\b/.test(lower)) return "security";
+  if (/\bsecur/.test(lower)) return "security";
   if (/\bhelp\b/.test(lower)) return "help";
   return "review";
 }
@@ -228,6 +238,11 @@ async function handleReview(
       command: "judges.evaluateFile",
       title: "$(shield) Re-Evaluate",
     });
+
+    // Populate diagnostics provider so buttons work
+    if (_diagnosticProvider) {
+      _diagnosticProvider.evaluate(document);
+    }
   } catch (error) {
     stream.markdown(`**Error** running evaluation: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -395,13 +410,47 @@ async function handleFix(
   stream: vscode.ChatResponseStream,
   _token: vscode.CancellationToken,
 ): Promise<vscode.ChatResult | void> {
-  stream.markdown("Running auto-fix on the current file…\n\n");
-  await vscode.commands.executeCommand("judges.fixFile");
-  stream.markdown("Done. Check the editor for applied fixes, then re-evaluate.");
-  stream.button({
-    command: "judges.evaluateFile",
-    title: "$(shield) Re-Evaluate",
-  });
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    stream.markdown("No file is open. Open a file and try `@judges /fix` again.");
+    return;
+  }
+
+  stream.progress("Evaluating and applying fixes…");
+
+  if (!_diagnosticProvider) {
+    stream.markdown("**Error:** Diagnostic provider not initialized.");
+    return;
+  }
+
+  const result = await _diagnosticProvider.fix(editor.document);
+
+  if (result.applied > 0) {
+    stream.markdown(
+      `### $(wrench) Auto-Fix Applied\n\n` +
+        `Applied **${result.applied}** fix(es) to **${vscode.workspace.asRelativePath(editor.document.uri)}**.\n\n` +
+        `The file has been re-evaluated automatically.\n`,
+    );
+    stream.button({
+      command: "judges.evaluateFile",
+      title: "$(shield) Re-Evaluate",
+    });
+  } else if (result.fixable === 0) {
+    const hasFindings = _diagnosticProvider.getFindings(editor.document.uri.toString()).length > 0;
+    if (hasFindings) {
+      stream.markdown(
+        "No auto-fixable findings. The current findings require manual review — " +
+          "use `@judges /review` to see recommendations.",
+      );
+    } else {
+      stream.markdown("No findings detected — the file looks clean! 🎉");
+    }
+  } else {
+    stream.markdown(
+      "Fixes could not be applied — the code may have changed since the last evaluation. " +
+        "Try `@judges /review` to get fresh results.",
+    );
+  }
 }
 
 // ─── /help Handler ──────────────────────────────────────────────────────────
@@ -451,15 +500,15 @@ function capitalize(s: string): string {
  */
 function detectFocusFilter(prompt: string): RegExp | null {
   if (/\bperformance?\b/.test(prompt)) return /^PERF/i;
-  if (/\breliab\b/.test(prompt)) return /^REL/i;
+  if (/\breliab/.test(prompt)) return /^REL/i;
   if (/\bcost\b/.test(prompt)) return /^COST/i;
-  if (/\bscal\b/.test(prompt)) return /^SCAL/i;
+  if (/\bscal/.test(prompt)) return /^SCAL/i;
   if (/\bapi\b/.test(prompt)) return /^API/i;
-  if (/\bdoc\b/.test(prompt)) return /^DOC/i;
-  if (/\bcompli\b/.test(prompt)) return /^COMP/i;
-  if (/\bobserv\b/.test(prompt)) return /^(OBS|LOG)/i;
-  if (/\btest\b/.test(prompt)) return /^TEST/i;
-  if (/\baccessib\b/.test(prompt)) return /^A11Y/i;
-  if (/\bconcurren\b/.test(prompt)) return /^CONC/i;
+  if (/\bdoc/.test(prompt)) return /^DOC/i;
+  if (/\bcompli/.test(prompt)) return /^COMP/i;
+  if (/\bobserv/.test(prompt)) return /^(OBS|LOG)/i;
+  if (/\btest/.test(prompt)) return /^TEST/i;
+  if (/\baccessib/.test(prompt)) return /^A11Y/i;
+  if (/\bconcurren/.test(prompt)) return /^CONC/i;
   return null;
 }

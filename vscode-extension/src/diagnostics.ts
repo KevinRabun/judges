@@ -88,17 +88,25 @@ export class JudgesDiagnosticProvider {
   /**
    * Auto-fix all fixable findings in a document.
    */
-  fix(document: vscode.TextDocument): void {
-    const findings = this.findingsMap.get(document.uri.toString());
+  async fix(document: vscode.TextDocument): Promise<{ applied: number; fixable: number; evaluated: boolean }> {
+    let findings = this.findingsMap.get(document.uri.toString());
+
+    // If no cached findings, run evaluation first so the button works
+    // from chat context where evaluate() was never called on this provider
+    let evaluated = false;
     if (!findings) {
-      vscode.window.showInformationMessage("Judges: No findings to fix. Run evaluation first.");
-      return;
+      this.evaluate(document);
+      findings = this.findingsMap.get(document.uri.toString());
+      evaluated = true;
+    }
+
+    if (!findings || findings.length === 0) {
+      return { applied: 0, fixable: 0, evaluated };
     }
 
     const fixable = findings.filter((f) => f.patch);
     if (fixable.length === 0) {
-      vscode.window.showInformationMessage("Judges: No auto-fixable findings.");
-      return;
+      return { applied: 0, fixable: 0, evaluated };
     }
 
     const edit = new vscode.WorkspaceEdit();
@@ -127,14 +135,15 @@ export class JudgesDiagnosticProvider {
     }
 
     if (applied > 0) {
-      vscode.workspace.applyEdit(edit).then((success) => {
-        if (success) {
-          vscode.window.showInformationMessage(`Judges: Applied ${applied} fix(es).`);
-          // Re-evaluate after fixes
-          setTimeout(() => this.evaluate(document), 500);
-        }
-      });
+      const success = await vscode.workspace.applyEdit(edit);
+      if (success) {
+        // Re-evaluate after fixes
+        setTimeout(() => this.evaluate(document), 500);
+      }
+      return { applied: success ? applied : 0, fixable: fixable.length, evaluated };
     }
+
+    return { applied: 0, fixable: fixable.length, evaluated };
   }
 
   /**

@@ -21,7 +21,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // judges_evaluate LM tool (Copilot auto-discovery). These let users
   // trigger evaluations via chat without knowing about the extension.
 
-  registerChatParticipant(context);
+  registerChatParticipant(context, diagnosticProvider);
   registerLmTools(context);
 
   // ─── Commands ─────────────────────────────────────────────────────────
@@ -32,6 +32,8 @@ export function activate(context: vscode.ExtensionContext): void {
       if (editor) {
         diagnosticProvider.evaluate(editor.document);
         vscode.window.showInformationMessage("Judges: Evaluation complete.");
+      } else {
+        vscode.window.showWarningMessage("Judges: No file is open. Open a file to evaluate.");
       }
     }),
 
@@ -51,10 +53,19 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.window.showInformationMessage(`Judges: Evaluated ${files.length} files.`);
     }),
 
-    vscode.commands.registerCommand("judges.fixFile", () => {
+    vscode.commands.registerCommand("judges.fixFile", async () => {
       const editor = vscode.window.activeTextEditor;
       if (editor) {
-        diagnosticProvider.fix(editor.document);
+        const result = await diagnosticProvider.fix(editor.document);
+        if (result.applied > 0) {
+          vscode.window.showInformationMessage(`Judges: Applied ${result.applied} fix(es).`);
+        } else if (result.fixable === 0) {
+          vscode.window.showInformationMessage("Judges: No auto-fixable findings.");
+        } else {
+          vscode.window.showInformationMessage("Judges: Fixes could not be applied (code may have changed).");
+        }
+      } else {
+        vscode.window.showWarningMessage("Judges: No file is open. Open a file to fix.");
       }
     }),
 
