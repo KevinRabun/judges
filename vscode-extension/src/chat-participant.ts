@@ -202,12 +202,18 @@ async function handleReview(
       return;
     }
 
+    // Count auto-fixable vs manual-only findings
+    const autoFixable = findings.filter((f) => f.patch);
+    const manualOnly = findings.length - autoFixable.length;
+
     // Header
     stream.markdown(
       `### 🔍 Judges Panel Review — ${relativePath}\n\n` +
         `**Score:** ${verdict.overallScore}/100  |  ` +
         `**Findings:** ${findings.length}  |  ` +
-        `**Judges run:** ${verdict.evaluations.length}\n\n`,
+        `**Judges run:** ${verdict.evaluations.length}\n\n` +
+        `🔧 **${autoFixable.length}** auto-fixable  |  ` +
+        `📝 **${manualOnly}** require manual review\n\n`,
     );
 
     // Group by severity
@@ -221,7 +227,8 @@ async function handleReview(
 
       for (const f of group) {
         const lineRef = f.lineNumbers?.length ? ` (line ${f.lineNumbers[0]})` : "";
-        stream.markdown(`- **\`${f.ruleId}\`** ${f.title}${lineRef}\n` + `  ${f.description}\n`);
+        const fixTag = f.patch ? " 🔧" : " 📝";
+        stream.markdown(`- **\`${f.ruleId}\`** ${f.title}${lineRef}${fixTag}\n` + `  ${f.description}\n`);
         if (f.suggestedFix) {
           stream.markdown(`  💡 *Fix:* ${f.suggestedFix}\n`);
         }
@@ -229,11 +236,19 @@ async function handleReview(
       }
     }
 
-    // Footer with action buttons
-    stream.button({
-      command: "judges.fixFile",
-      title: "$(wrench) Auto-Fix All",
-    });
+    // Footer with action buttons and context
+    if (autoFixable.length > 0 && manualOnly > 0) {
+      stream.markdown(`---\n\n` + `> 🔧 = auto-fixable  |  📝 = requires manual review\n\n`);
+    }
+
+    if (autoFixable.length > 0) {
+      stream.button({
+        command: "judges.fixFile",
+        title: `$(wrench) Auto-Fix ${autoFixable.length} of ${findings.length} Findings`,
+      });
+    } else {
+      stream.markdown(`> All ${findings.length} findings require manual review — no auto-fixes available.\n\n`);
+    }
     stream.button({
       command: "judges.evaluateFile",
       title: "$(shield) Re-Evaluate",
@@ -428,21 +443,31 @@ async function handleFix(
   const result = await _diagnosticProvider.fix(editor.document);
 
   if (result.applied > 0) {
+    const totalFindings = _diagnosticProvider.getFindings(editor.document.uri.toString()).length;
+    const remaining = totalFindings > 0 ? totalFindings : 0;
+    const remainingNote =
+      remaining > 0
+        ? `\n\n📝 **${remaining}** finding(s) remain that require manual review — ` +
+          `use \`@judges /review\` to see details.`
+        : `\n\n✅ No remaining findings.`;
     stream.markdown(
-      `### $(wrench) Auto-Fix Applied\n\n` +
-        `Applied **${result.applied}** fix(es) to **${vscode.workspace.asRelativePath(editor.document.uri)}**.\n\n` +
-        `The file has been re-evaluated automatically.\n`,
+      `### 🔧 Auto-Fix Applied\n\n` +
+        `Applied **${result.applied}** of **${result.fixable}** auto-fixable fix(es) ` +
+        `to **${vscode.workspace.asRelativePath(editor.document.uri)}**.` +
+        remainingNote +
+        `\n`,
     );
     stream.button({
       command: "judges.evaluateFile",
       title: "$(shield) Re-Evaluate",
     });
   } else if (result.fixable === 0) {
-    const hasFindings = _diagnosticProvider.getFindings(editor.document.uri.toString()).length > 0;
-    if (hasFindings) {
+    const allFindings = _diagnosticProvider.getFindings(editor.document.uri.toString());
+    if (allFindings.length > 0) {
       stream.markdown(
-        "No auto-fixable findings. The current findings require manual review — " +
-          "use `@judges /review` to see recommendations.",
+        `### 📝 Manual Review Required\n\n` +
+          `All **${allFindings.length}** finding(s) require manual review — none have auto-fixes available.\n\n` +
+          `Use \`@judges /review\` to see detailed recommendations for each finding.\n`,
       );
     } else {
       stream.markdown("No findings detected — the file looks clean! 🎉");
@@ -466,7 +491,7 @@ function handleHelp(stream: vscode.ChatResponseStream): vscode.ChatResult | void
       `| \`@judges /review\` | Same as above |\n` +
       `| \`@judges /review review the codebase\` | Review all files in the workspace |\n` +
       `| \`@judges /security\` | Security-focused review only |\n` +
-      `| \`@judges /fix\` | Auto-fix all fixable findings |\n` +
+      `| \`@judges /fix\` | Auto-fix findings that have patches (not all findings are auto-fixable) |\n` +
       `| \`@judges /help\` | Show this help |\n\n` +
       `**Workspace review** triggers automatically when you mention ` +
       `*codebase*, *workspace*, *project*, *all files*, *repo*, or *folder* ` +

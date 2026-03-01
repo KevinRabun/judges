@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.1] — 2025-07-17
+
+### Improved
+
+- **Auto-fix clarity** — review output now tags each finding with 🔧 (auto-fixable) or 📝 (manual review) so users know which findings can be auto-fixed
+- **Fixability summary** — header shows counts of auto-fixable vs manual-only findings
+- **Dynamic button label** — "Auto-Fix N of M Findings" replaces the former "Auto-Fix All" to set accurate expectations
+- **Button hidden when irrelevant** — when no findings are auto-fixable the button is replaced with an explanatory message
+- **Post-fix feedback** — `/fix` response now reports how many findings remain for manual review after auto-fixes are applied
+- **Help text** — `/fix` description updated to clarify not all findings are auto-fixable
+
 ## [0.2.0] — 2025-07-15
 
 ### Added
