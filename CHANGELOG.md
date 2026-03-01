@@ -2,7 +2,7 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
-## [3.7.0] — 2026-03-08
+## [3.7.0] — 2026-03-01
 
 ### Added
 - **`judges --version` command** — display installed version with update check.
@@ -16,8 +16,8 @@ All notable changes to **@kevinrabun/judges** are documented here.
 
 ### Changed
 - `server.json` version synced to `3.7.0`.
-- README test badge updated to **819**.
-- Total test count: **819+**.
+- README test badge updated to **842**.
+- Total test count: **842**.
 
 ---
 

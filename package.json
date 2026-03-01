@@ -59,6 +59,7 @@
     "grammars",
     "server.json",
     "judgesrc.schema.json",
+    "CHANGELOG.md",
     "README.md",
     "LICENSE"
   ],
