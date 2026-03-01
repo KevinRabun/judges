@@ -9,6 +9,10 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   const regionMentionLines: number[] = [];
   const hardcodedGlobalOrForeignLines: number[] = [];
   lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    // Skip comment lines — doc blocks describing sovereignty controls are not violations
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
+
     if (/region|location|geo|jurisdiction|data.?residen/i.test(line)) {
       regionMentionLines.push(index + 1);
     }
@@ -42,6 +46,8 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
 
   const crossBorderEgressLines: number[] = [];
   lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (
       /(fetch\(|axios\.|http(s)?:\/\/|webhook|third.?party|external.?api|sendTo|forwardTo)/i.test(line) &&
       !/consent|scc|adequacy|jurisdiction|region|residency|sovereignty/i.test(line)
@@ -69,6 +75,8 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
 
   const replicationLines: number[] = [];
   lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (
       /(replica|replication|backup|dr|disaster.?recovery|geo-?redundant|read.?replica)/i.test(line) &&
       !/same.?region|region.?locked|sovereign|local.?zone/i.test(line)
@@ -96,9 +104,12 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
 
   const exportLines: number[] = [];
   lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    // Skip comment lines — doc blocks describing export policy are not real export paths
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (
       /(export|download|dump|report|analytics|telemetry|support.?bundle)/i.test(line) &&
-      !/redact|anonym|aggregate|jurisdiction|policy/i.test(line)
+      !/redact|anonym|aggregate|jurisdiction|policy|allowed|blocked|guard|check|validate/i.test(line)
     ) {
       exportLines.push(index + 1);
     }
@@ -144,6 +155,8 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   // CDN or third-party asset loading from external origins
   const cdnLines: number[] = [];
   lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (
       /(?:cdn\.|cloudflare|unpkg|jsdelivr|cdnjs|googleapis|bootstrapcdn|cloudfront|akamai|maxcdn|stackpath)/i.test(
         line,
@@ -174,6 +187,8 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   // Telemetry / analytics to external services
   const telemetryLines: number[] = [];
   lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (
       /(?:google.?analytics|gtag|mixpanel|segment|amplitude|hotjar|heap|fullstory|posthog|sentry|datadog|newrelic|appinsights|applicationinsights|bugsnag|rollbar|logrocket)/i.test(
         line,

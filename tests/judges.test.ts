@@ -2836,6 +2836,39 @@ console.log("Auth:", password, token);
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+// Test: Data Sovereignty Judge Dedicated Tests
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Data Sovereignty Judge Dedicated Tests", () => {
+  it("should NOT flag JSDoc comments describing export policy functions", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const policyFunctionCode = `
+const approvedJurisdictions = ["local", "us", "eu"];
+
+/**
+ * Determines if data export to a target region is allowed.
+ * @param {string} dataClass - Data classification (event-feed, operational-metadata, minor-data, etc.)
+ * @param {string} targetRegion - Target region (must be in approvedJurisdictions: local, us, eu)
+ * @returns {boolean} True if export is allowed, false otherwise
+ */
+function isExportAllowed(dataClass, targetRegion) {
+  if (!approvedJurisdictions.includes(targetRegion)) {
+    throw new Error("Export blocked by sovereignty policy");
+  }
+  return true;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, policyFunctionCode, "javascript");
+    const exportFindings = evaluation.findings.filter(
+      (f) => f.title === "Data export path without sovereignty-aware controls",
+    );
+    assert.strictEqual(exportFindings.length, 0, "Should not flag JSDoc describing export policy as missing controls");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 // Test: Logging Privacy Judge Dedicated Tests
 // ═════════════════════════════════════════════════════════════════════════════
 
