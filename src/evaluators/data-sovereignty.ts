@@ -31,6 +31,18 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       /(global|multi-?region|us-|asia-|ap-|worldwide|any-region|default-region)/i.test(line) &&
       !/allow|approved|whitelist|policy|guard|eu-|sovereign/i.test(line)
     ) {
+      // Skip Python 'global' scope declarations (e.g., "global my_var") and
+      // variable names prefixed/suffixed with 'global' (GLOBAL_CONFIG,
+      // global_cache, _global) — these are programming-scope identifiers,
+      // not geographic deployment targets.  Do NOT suppress when the line also
+      // contains other geographic patterns (us-, asia-, ap-, etc.).
+      if (
+        /global/i.test(line) &&
+        !/multi-?region|us-|asia-|ap-|worldwide|any-region|default-region/i.test(line) &&
+        /^\s*global\s+\w+|\bglobal[_.]|[_.]global\b|\bGLOBAL[_A-Z]/i.test(line)
+      ) {
+        return;
+      }
       hardcodedGlobalOrForeignLines.push(index + 1);
     }
   });
@@ -76,7 +88,15 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     }
   });
 
-  if (crossBorderEgressLines.length > 0 && !hasEgressGate) {
+  // Only flag cross-border egress when the code actually handles personal or
+  // sensitive data.  Modules that exclusively fetch read-only reference content
+  // (e.g., regulation text loaders, documentation fetchers) have no personal-data
+  // export risk.
+  const handlesPersonalData =
+    /(?:user|customer|patient|email|phone|ssn|passport|payment|credit.?card|personal.?data|\bpii\b|sensitive|address|profile|account|identity|subscriber)/i.test(
+      code,
+    );
+  if (crossBorderEgressLines.length > 0 && !hasEgressGate && handlesPersonalData) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -145,6 +165,12 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       /(export|download|dump|report|analytics|telemetry|support.?bundle)/i.test(line) &&
       !/redact|anonym|aggregate|jurisdiction|policy|allowed|blocked|guard|check|validate/i.test(line)
     ) {
+      // Skip standard serialization library dump/dumps calls — json.dumps(),
+      // pickle.dump(), yaml.dump(), etc. are in-memory or local-file
+      // serialization primitives, not cross-border data export operations.
+      if (/(?:json|pickle|yaml|toml|msgpack|marshal|csv|pprint)\.(?:dumps?|dump_all)\s*\(/i.test(line)) {
+        return;
+      }
       exportLines.push(index + 1);
     }
   });

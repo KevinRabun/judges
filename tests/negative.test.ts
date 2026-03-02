@@ -34,6 +34,7 @@ import { analyzeCiCd } from "../src/evaluators/ci-cd.js";
 import { analyzeCybersecurity } from "../src/evaluators/cybersecurity.js";
 import { analyzeAiCodeSafety } from "../src/evaluators/ai-code-safety.js";
 import { analyzeConfigurationManagement } from "../src/evaluators/configuration-management.js";
+import { analyzePerformance } from "../src/evaluators/performance.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 
@@ -2895,5 +2896,255 @@ describe("CLOUD FP: Bicep template — connection strings & config (IaC)", () =>
       0,
       "ARM template config values are infrastructure — should be suppressed",
     );
+  });
+});
+
+// ─── v3.13.10 — Python Data Loader FP Fixes ─────────────────────────────────
+// Fixes for false positives from a GDPR text loader/indexer (data_loader.py)
+// where cache-age logs, Python 'global' keyword, reference-content fetches,
+// json.dumps serialization, and dict.get() calls triggered rules incorrectly.
+
+describe("COMP-001 FP: 'age' in cache/TTL context (data loader)", () => {
+  it("should NOT flag age-verification when 'age' is in cache-age context", () => {
+    const cacheAgeCode = [
+      "import logging",
+      "logger = logging.getLogger(__name__)",
+      "",
+      "def check_cache_freshness(entry):",
+      "    age = time.time() - entry['created_at']",
+      "    if age > MAX_CACHE_AGE:",
+      "        logger.info('cache age expired: %s seconds', age)",
+      "        return False",
+      "    logger.debug('cache age OK, freshness within TTL')",
+      "    return True",
+    ].join("\n");
+    const findings = analyzeCompliance(cacheAgeCode, "python");
+    const ageFindings = findings.filter((f) => f.title.toLowerCase().includes("age"));
+    assert.strictEqual(
+      ageFindings.length,
+      0,
+      "Cache-age / TTL usage of 'age' should not trigger age-verification rule",
+    );
+  });
+
+  it("should STILL flag age-verification when code handles user DOB/minor data", () => {
+    const userAgeCode = [
+      "def register_user(data):",
+      "    age = calculate_age(data['date_of_birth'])",
+      "    if age < 13:",
+      "        raise ValueError('User too young')",
+      "    save_user(data)",
+    ].join("\n");
+    const findings = analyzeCompliance(userAgeCode, "python");
+    const ageFindings = findings.filter((f) => f.title.toLowerCase().includes("age"));
+    assert.ok(ageFindings.length > 0, "User age/DOB context should still be flagged");
+  });
+});
+
+describe("SOV-001 FP: Python 'global' keyword (data loader)", () => {
+  it("should NOT flag region-policy when 'global' is a Python scope declaration", () => {
+    const pythonGlobalCode = [
+      "import json",
+      "",
+      "_gdpr_data = None",
+      "_cache = {}",
+      "",
+      "def load_data(path):",
+      "    global _gdpr_data",
+      "    global _cache",
+      "    with open(path) as f:",
+      "        _gdpr_data = json.load(f)",
+      "    _cache = build_index(_gdpr_data)",
+      "",
+      "def get_article(num):",
+      "    global _gdpr_data",
+      "    return _gdpr_data['articles'][num]",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(pythonGlobalCode, "python");
+    const regionFindings = findings.filter((f) => f.title.toLowerCase().includes("region"));
+    assert.strictEqual(
+      regionFindings.length,
+      0,
+      "Python 'global' scope declarations should not trigger region-policy rule",
+    );
+  });
+
+  it("should NOT flag GLOBAL_CONFIG variable names", () => {
+    const globalVarCode = [
+      "GLOBAL_CONFIG = {",
+      "    'timeout': 30,",
+      "    'retries': 3,",
+      "}",
+      "",
+      "def init():",
+      "    global_cache = {}",
+      "    return global_cache",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(globalVarCode, "python");
+    const regionFindings = findings.filter((f) => f.title.toLowerCase().includes("region"));
+    assert.strictEqual(
+      regionFindings.length,
+      0,
+      "GLOBAL_ prefixed variables and global_xxx names are not geographic — should be suppressed",
+    );
+  });
+
+  it("should STILL flag actual global-region deployment patterns", () => {
+    const geoGlobalCode = [
+      "function deployService(config) {",
+      "  const region = config.global || 'us-east-1';",
+      "  deployToRegion(region);",
+      "}",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(geoGlobalCode, "javascript");
+    const regionFindings = findings.filter((f) => f.title.toLowerCase().includes("region"));
+    assert.ok(regionFindings.length > 0, "Geographic 'global' region usage should still be flagged");
+  });
+});
+
+describe("SOV-002 FP: read-only content fetch (data loader)", () => {
+  it("should NOT flag cross-border egress for reference-content loader without personal data", () => {
+    const referenceLoader = [
+      "import httpx",
+      "",
+      "GDPR_TEXT_URL = 'https://gdpr.eu/gdpr-full-text'",
+      "",
+      "def _fetch_online():",
+      "    response = httpx.get(GDPR_TEXT_URL, timeout=30)",
+      "    response.raise_for_status()",
+      "    return response.text",
+      "",
+      "def load_regulation():",
+      "    text = _fetch_online()",
+      "    return parse_articles(text)",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(referenceLoader, "python");
+    const egressFindings = findings.filter((f) => f.title.toLowerCase().includes("cross-border"));
+    assert.strictEqual(
+      egressFindings.length,
+      0,
+      "Read-only reference content fetch without personal data should not trigger cross-border egress rule",
+    );
+  });
+
+  it("should STILL flag cross-border fetch when personal data is involved", () => {
+    const userDataExporter = [
+      "import requests",
+      "",
+      "def export_user_data(user_id):",
+      "    user = db.get_user(user_id)",
+      "    email = user.email",
+      "    payload = {'email': email, 'profile': user.profile}",
+      "    requests.post('https://partner-api.example.com/sync', json=payload)",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(userDataExporter, "python");
+    const egressFindings = findings.filter((f) => f.title.toLowerCase().includes("cross-border"));
+    assert.ok(egressFindings.length > 0, "HTTP calls sending personal data should still be flagged");
+  });
+});
+
+describe("SOV-003 FP: json.dumps serialization (data loader)", () => {
+  it("should NOT flag export-path for json.dumps used for in-memory indexing", () => {
+    const serializationCode = [
+      "import json",
+      "",
+      "def build_search_index(articles):",
+      "    index = {}",
+      "    for article in articles:",
+      "        key = json.dumps(article['keywords'], sort_keys=True)",
+      "        index[key] = article",
+      "    return index",
+      "",
+      "def serialize_cache(data):",
+      "    return json.dumps(data, indent=2)",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(serializationCode, "python");
+    const exportFindings = findings.filter((f) => f.title.toLowerCase().includes("export"));
+    assert.strictEqual(
+      exportFindings.length,
+      0,
+      "json.dumps/json.dump for in-memory serialization should not trigger export-path rule",
+    );
+  });
+
+  it("should also suppress yaml.dump and pickle.dumps", () => {
+    const otherSerializers = [
+      "import yaml",
+      "import pickle",
+      "",
+      "def save_config(config):",
+      "    yaml.dump(config, open('config.yml', 'w'))",
+      "",
+      "def cache_result(result):",
+      "    return pickle.dumps(result)",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(otherSerializers, "python");
+    const exportFindings = findings.filter((f) => f.title.toLowerCase().includes("export"));
+    assert.strictEqual(
+      exportFindings.length,
+      0,
+      "yaml.dump and pickle.dumps are serialization primitives — should be suppressed",
+    );
+  });
+
+  it("should STILL flag actual data export endpoints", () => {
+    const exportEndpoint = [
+      "from flask import send_file",
+      "",
+      "def download_report(report_id):",
+      "    report = generate_report(report_id)",
+      "    return send_file(report.path, as_attachment=True)",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(exportEndpoint, "python");
+    const exportFindings = findings.filter((f) => f.title.toLowerCase().includes("export"));
+    assert.ok(exportFindings.length > 0, "Actual data download/export endpoints should still be flagged");
+  });
+});
+
+describe("PERF-001 FP: dict.get() not a network fetch (data loader)", () => {
+  it("should NOT flag duplicate-fetch for dict.get() with same key", () => {
+    const dictGetCode = [
+      "config = load_config()",
+      "timeout = config.get('timeout')",
+      "retries = config.get('retries')",
+      "",
+      "mapping = build_mapping()",
+      "value_a = mapping.get('timeout')",
+      "value_b = mapping.get('timeout')",
+    ].join("\n");
+    const findings = analyzePerformance(dictGetCode, "python");
+    const fetchFindings = findings.filter((f) => f.title.toLowerCase().includes("duplicate fetch"));
+    assert.strictEqual(
+      fetchFindings.length,
+      0,
+      "dict.get() with same key is not a duplicate network fetch — should be suppressed",
+    );
+  });
+
+  it("should STILL flag actual duplicate HTTP fetches to same URL", () => {
+    const duplicateFetchCode = [
+      "async function loadData() {",
+      "  const users = await fetch('https://api.example.com/users');",
+      "  const same = await fetch('https://api.example.com/users');",
+      "  return [users, same];",
+      "}",
+    ].join("\n");
+    const findings = analyzePerformance(duplicateFetchCode, "javascript");
+    const fetchFindings = findings.filter((f) => f.title.toLowerCase().includes("duplicate fetch"));
+    assert.ok(fetchFindings.length > 0, "Duplicate fetch() to same URL should still be flagged");
+  });
+
+  it("should still flag requests.get() with same literal URL as duplicate", () => {
+    const duplicateRequestsGet = [
+      "import requests",
+      "",
+      "def fetch_data():",
+      "    a = requests.get('https://api.example.com/data')",
+      "    b = requests.get('https://api.example.com/data')",
+      "    return a, b",
+    ].join("\n");
+    const findings = analyzePerformance(duplicateRequestsGet, "python");
+    const fetchFindings = findings.filter((f) => f.title.toLowerCase().includes("duplicate fetch"));
+    assert.ok(fetchFindings.length > 0, "requests.get() with same URL should still be flagged");
   });
 });

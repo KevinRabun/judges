@@ -80,6 +80,19 @@ export function analyzePerformance(code: string, language: string): Finding[] {
     if (isCommentLine(line)) return;
     const urlMatch = line.match(/(?:fetch|get|request)\s*\(\s*["'`]([^"'`]+)["'`]/i);
     if (urlMatch) {
+      // Filter out non-HTTP get() calls — dict.get("key"), config.get("name"),
+      // os.environ.get("VAR"), etc. are NOT network requests.  Only count get()
+      // when it looks like an HTTP client call (requests.get, http.get, etc.) or
+      // when the captured argument is an actual URL (http:// / https://).
+      if (
+        /\bget\s*\(/i.test(line) &&
+        !/^\s*(?:fetch|requests?\.get|axios\.get|http[s]?\.get|client\.get|session\.get|api\.get|\$\.get)\s*\(/i.test(
+          line.trim(),
+        ) &&
+        !/^https?:\/\//i.test(urlMatch[1])
+      ) {
+        return;
+      }
       const existing = fetchCalls.find((f) => f.url === urlMatch[1]);
       if (existing) {
         repeatedFetchLines.push(i + 1);

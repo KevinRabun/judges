@@ -317,6 +317,22 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
           line,
         )
       ) {
+        // Skip lines where 'age' appears in cache/TTL/HTTP-header context
+        // (e.g., cache_age, max-age, staleness age, "age" in logging about
+        // cache freshness).  Only applies when the sole trigger is \bage.
+        // Check a ±3 line context window since a variable like `age = ...`
+        // may be on a different line from the `cache` reference.
+        if (
+          /\bage(?![a-z])/i.test(line) &&
+          !/date.?of.?birth|\bdob\b|birthdate|birth_date|\bminor\b|\bchild(?:ren)?\b|under.?13|under.?16|\bcoppa\b/i.test(
+            line,
+          )
+        ) {
+          const ageContext = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 4)).join("\n");
+          if (/cache|\bttl\b|max.?age|stale|freshness|expir.*\bage|\bage.*expir|header/i.test(ageContext)) {
+            return;
+          }
+        }
         ageRelatedLines.push(i + 1);
       }
     });

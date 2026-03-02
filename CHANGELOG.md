@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.13.10] — 2026-03-02
+
+### Fixed
+- **5 evaluator false-positive fixes** from ninth round of real-world Copilot feedback (`data_loader.py` Python GDPR text loader/indexer, persisted across 3 remediation iterations):
+  - **COMP-001** (compliance) — Age-verification rule now checks ±3 line context window for cache/TTL keywords (`cache`, `ttl`, `max_age`, `stale`, `freshness`, `expir`). The word "age" in cache-age/TTL logging contexts is no longer flagged as age-related user data.
+  - **SOV-001** (data-sovereignty) — Region-policy rule now suppresses Python `global` scope declarations (`global my_var`), `GLOBAL_CONFIG`-style variable names, and `global_cache`/`_global` identifiers. Suppression is bypassed when the line also contains real geographic patterns (`us-`, `asia-`, `ap-`, etc.).
+  - **SOV-002** (data-sovereignty) — Cross-border egress rule now requires personal/sensitive data context (`user`, `customer`, `email`, `payment`, `pii`, etc.) before flagging HTTP calls. Modules that only fetch read-only reference content (regulation text, documentation) are no longer flagged.
+  - **SOV-003** (data-sovereignty) — Export-path rule now suppresses standard serialization library calls (`json.dumps`, `json.dump`, `pickle.dump`, `yaml.dump`, `csv.dump`, `msgpack`, `marshal`, `toml.dump`, `pprint`). In-memory or local-file serialization is not cross-border data export.
+  - **PERF-001** (performance) — Duplicate-fetch rule now validates that `get()` calls are actual HTTP client methods (`requests.get`, `axios.get`, `http.get`, `fetch`) or use URL-like arguments (`http://`/`https://`). Python `dict.get("key")`, `config.get("name")`, and `os.environ.get("VAR")` are no longer counted as network fetches.
+
+### Added
+- **13 new regression tests** (1326 total) covering all 5 FP fixes: cache-age suppression (positive + negative), Python global keyword suppression (scope declaration, variable names, geographic passthrough), read-only content fetch (reference loader vs personal data exporter), serialization dump (json/yaml/pickle + real export passthrough), dict.get vs HTTP get (dict.get, fetch, requests.get).
+
 ## [3.13.9] — 2026-03-02
 
 ### Fixed
