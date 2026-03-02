@@ -57,7 +57,7 @@ jobs:
           npx tsx scripts/daily-popular-repo-autofix.ts
 
       - name: Upload automation summary
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: daily-autofix-summary
           path: daily-autofix-summary.json
