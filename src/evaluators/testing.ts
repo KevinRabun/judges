@@ -10,10 +10,14 @@ export function analyzeTesting(code: string, language: string): Finding[] {
   const _lang = getLangFamily(language);
 
   // Detect test files with no assertions (multi-language)
+  // For JS/TS, require at least 2 of (describe, it, test) to avoid false
+  // positives on browser code where `it` is a common iterator variable name.
+  const jsTestSignals = [/\bdescribe\s*\(/i.test(code), /\bit\s*\(/i.test(code), /\btest\s*\(/i.test(code)].filter(
+    Boolean,
+  ).length;
   const hasTestStructure =
-    /\bdescribe\s*\(|\bit\s*\(|\btest\s*\(|def\s+test_|@Test|#\[test\]|#\[cfg\(test\)\]|func\s+Test[A-Z]|\[Fact\]|\[Theory\]|@pytest/i.test(
-      code,
-    );
+    jsTestSignals >= 2 ||
+    /def\s+test_|@Test|#\[test\]|#\[cfg\(test\)\]|func\s+Test[A-Z]|\[Fact\]|\[Theory\]|@pytest/i.test(code);
   if (hasTestStructure) {
     // Check for assertions (multi-language)
     const assertionLines = getLangLineNumbers(code, language, LP.ASSERTION);

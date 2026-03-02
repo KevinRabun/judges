@@ -115,7 +115,12 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       confidence: 0.85,
     });
   }
-
+  // Frontend/browser code — keywords like analytics, report, download in UI
+  // rendering or event handling are not data-export operations.
+  const isFrontendCode =
+    /document\.|window\.|addEventListener|querySelector|getElementById|innerHTML|createElement|\.classList|\.style\b|ReactDOM|createRoot|hydrateRoot|React\.|useState|useEffect|angular|Vue\.|createApp|\$\(|jQuery/i.test(
+      code,
+    );
   const exportLines: number[] = [];
   lines.forEach((line, index) => {
     const trimmed = line.trim();
@@ -144,7 +149,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       code,
     );
 
-  if (exportLines.length > 0 && !hasCentralizedSovereignResponse) {
+  if (exportLines.length > 0 && !hasCentralizedSovereignResponse && !isFrontendCode) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

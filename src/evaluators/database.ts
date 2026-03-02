@@ -83,7 +83,19 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       }
     }
   }
-  if (n1Lines.length > 0) {
+  // Gate N+1 finding on actual database context — browser-side JS using
+  // fetch(), Array.find(), or DOM .select() inside loops is not N+1 DB access.
+  const hasDatabaseContext =
+    sqlInjectionLines.length > 0 ||
+    selectStarLines.length > 0 ||
+    /createConnection|new\s+Client|new\s+Pool|mongoose\.connect|createPool|DataSource|DriverManager|SqlConnection/i.test(
+      code,
+    ) ||
+    /(?:require|import).*(?:mysql|pg|postgres|mongodb|mongoose|prisma|knex|sequelize|typeorm|drizzle|redis|sqlite|better-sqlite|database)\b/i.test(
+      code,
+    ) ||
+    /\b(?:SELECT|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+TABLE)\b/i.test(code);
+  if (n1Lines.length > 0 && hasDatabaseContext) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

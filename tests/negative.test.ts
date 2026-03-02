@@ -2221,3 +2221,223 @@ describe("FP Regression — COST-001: HTML text with 'fetch' is not data-fetchin
     assert.ok(cachingFindings.length > 0, "Real data-fetching code should still be flagged for missing caching");
   });
 });
+
+// ─── v3.13.7 — Browser-side JS FP suppression ───────────────────────────────
+
+/** Browser-side app.js: map viewer with analytics, preset controls, DOM usage */
+const browserAppJs = [
+  '"use strict";',
+  "",
+  "// Map application — Leaflet-based tile viewer",
+  "const map = L.map('map-container').setView([51.505, -0.09], 13);",
+  "L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {",
+  "  attribution: '&copy; OpenStreetMap contributors'",
+  "}).addTo(map);",
+  "",
+  "// DOM helpers",
+  "const sidebar = document.getElementById('sidebar');",
+  "const reportBtn = document.querySelector('.report-button');",
+  "const downloadLink = document.querySelector('#download-link');",
+  "",
+  "// Analytics tracking",
+  "function trackPageView(page) {",
+  "  window.analytics.track('page_view', { page });",
+  "}",
+  "",
+  "// Preset management",
+  "const presets = [",
+  "  { name: 'Default', zoom: 13, center: [51.505, -0.09] },",
+  "  { name: 'Europe', zoom: 5, center: [48.85, 2.35] },",
+  "  { name: 'Asia Pacific', zoom: 4, center: [35.68, 139.69] },",
+  "];",
+  "",
+  "function renderPresets(container) {",
+  "  presets.forEach(it => {",
+  "    const el = document.createElement('div');",
+  "    el.classList.add('preset-card');",
+  "    el.innerHTML = `<h3>${it.name}</h3><p>Zoom: ${it.zoom}</p>`;",
+  "    el.addEventListener('click', () => applyPreset(it));",
+  "    container.appendChild(el);",
+  "  });",
+  "}",
+  "",
+  "function applyPreset(preset) {",
+  "  map.setView(preset.center, preset.zoom);",
+  "  trackPageView('preset_' + preset.name);",
+  "}",
+  "",
+  "// Data layer",
+  "async function loadMarkers() {",
+  "  const markers = await fetch('/api/markers').then(r => r.json());",
+  "  markers.forEach(m => {",
+  "    L.marker(m.coords).addTo(map).bindPopup(m.label);",
+  "  });",
+  "}",
+  "",
+  "// UI reports",
+  "function showReport(data) {",
+  "  const report = data.map(it => `<tr><td>${it.name}</td><td>${it.value}</td></tr>`);",
+  "  document.getElementById('report-table').innerHTML = report.join('');",
+  "}",
+  "",
+  "// Export button handler",
+  "downloadLink.addEventListener('click', () => {",
+  "  const href = '/assets/downloads/package-guide.pdf';",
+  "  window.open(href, '_blank');",
+  "});",
+  "",
+  "// Initialize",
+  "document.addEventListener('DOMContentLoaded', () => {",
+  "  renderPresets(sidebar);",
+  "  loadMarkers();",
+  "  trackPageView('home');",
+  "});",
+].join("\n");
+
+describe("FP Regression — DB-001: Browser JS with fetch/find in loops is not N+1 DB", () => {
+  it("should NOT flag browser code with fetch/find in loops for N+1 queries", () => {
+    const findings = analyzeDatabase(browserAppJs, "javascript");
+    const n1Findings = findings.filter((f) => /N\+1|n.?1.*query/i.test(f.title));
+    assert.equal(n1Findings.length, 0, "Browser code with fetch/find in loops should not trigger N+1 DB findings");
+  });
+
+  it("should STILL flag real DB code with queries inside loops", () => {
+    const lines = [
+      'import { Pool } from "pg";',
+      "const pool = new Pool();",
+      "",
+      "async function loadUsersWithOrders(userIds) {",
+      "  const results = [];",
+      "  for (const id of userIds) {",
+      "    const user = await pool.query('SELECT * FROM users WHERE id = $1', [id]);",
+      "    results.push(user.rows[0]);",
+      "  }",
+      "  return results;",
+      "}",
+    ];
+    while (lines.length <= 35) lines.push("// db line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeDatabase(code, "javascript");
+    const n1Findings = findings.filter((f) => /N\+1|n.?1.*query/i.test(f.title));
+    assert.ok(n1Findings.length > 0, "Real DB queries in loops should still flag N+1");
+  });
+});
+
+describe("FP Regression — COMP-001: 'age' inside common words is not age collection", () => {
+  it("should NOT flag browser code with 'package', 'page', 'image' words for age verification", () => {
+    const lines = [
+      "// Browser UI for package manager",
+      "function renderPackageList(packages) {",
+      "  packages.forEach(pkg => {",
+      "    const card = document.createElement('div');",
+      '    card.innerHTML = `<h3>${pkg.name}</h3><img src="${pkg.image}" />`;',
+      "    document.getElementById('page-content').appendChild(card);",
+      "  });",
+      "}",
+      "",
+      "function updateStorage(key, value) {",
+      "  localStorage.setItem(key, JSON.stringify(value));",
+      "  console.log('Manage storage: updated', key);",
+      "}",
+      "",
+      "function getPageTitle() {",
+      "  return document.title || 'Package Manager';",
+      "}",
+    ];
+    while (lines.length <= 55) lines.push("// ui line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeCompliance(code, "javascript");
+    const ageFindings = findings.filter((f) => /age.related|coppa|minor|child/i.test(f.title));
+    assert.equal(
+      ageFindings.length,
+      0,
+      "Words containing 'age' (package, page, image, storage, manage) should not trigger age verification",
+    );
+  });
+
+  it("should STILL flag code with standalone 'age' field collection", () => {
+    const lines = [
+      'import express from "express";',
+      "const app = express();",
+      "",
+      'app.post("/signup", (req, res) => {',
+      "  const { name, email, age } = req.body;",
+      "  if (age < 13) {",
+      "    // Missing: COPPA consent flow",
+      "  }",
+      "  db.users.insert({ name, email, age });",
+      "  res.json({ success: true });",
+      "});",
+    ];
+    while (lines.length <= 55) lines.push("// reg line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeCompliance(code, "javascript");
+    const ageFindings = findings.filter((f) => /age.related|coppa|minor|child/i.test(f.title));
+    assert.ok(ageFindings.length > 0, "Standalone 'age' field collection should still require age verification");
+  });
+});
+
+describe("FP Regression — SOV-002: Browser analytics/report UI is not data export", () => {
+  it("should NOT flag browser code with analytics/report keywords for export path sovereignty", () => {
+    const findings = analyzeDataSovereignty(browserAppJs, "javascript");
+    const exportFindings = findings.filter((f) => /export.*path|sovereignty.*control/i.test(f.title));
+    assert.equal(
+      exportFindings.length,
+      0,
+      "Browser UI with analytics/report keywords should not trigger export path findings",
+    );
+  });
+
+  it("should STILL flag server-side export paths without sovereignty controls", () => {
+    const lines = [
+      'import express from "express";',
+      "const app = express();",
+      "",
+      'app.get("/api/export/users", async (req, res) => {',
+      "  const users = await db.findAll();",
+      '  res.setHeader("Content-Disposition", "attachment; filename=users.csv");',
+      "  const csv = users.map(u => `${u.name},${u.email}`).join('\\n');",
+      "  res.send(csv);",
+      "});",
+      "",
+      'app.post("/api/analytics/dump", async (req, res) => {',
+      "  const data = await analytics.export(req.body.dateRange);",
+      "  res.json(data);",
+      "});",
+    ];
+    while (lines.length <= 55) lines.push("// server line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeDataSovereignty(code, "javascript");
+    const exportFindings = findings.filter((f) => /export.*path|sovereignty.*control/i.test(f.title));
+    assert.ok(exportFindings.length > 0, "Server-side export paths should still need sovereignty controls");
+  });
+});
+
+describe("FP Regression — TEST-001: Single 'it(' in browser code is not test structure", () => {
+  it("should NOT flag browser code with 'it' iterator variable for test rules", () => {
+    const findings = analyzeTesting(browserAppJs, "javascript");
+    assert.equal(findings.length, 0, "Browser code using 'it' as iterator should not trigger any test findings");
+  });
+
+  it("should STILL flag actual test files with describe + it blocks", () => {
+    const lines = [
+      'import { describe, it, expect } from "vitest";',
+      "",
+      'describe("Calculator", () => {',
+      '  it("should add two numbers", () => {',
+      "    const result = add(2, 3);",
+      "    // Missing assertion",
+      "  });",
+      "",
+      '  it("should subtract two numbers", () => {',
+      "    const result = subtract(5, 3);",
+      "    // Missing assertion",
+      "  });",
+      "});",
+    ];
+    while (lines.length <= 35) lines.push("// test line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeTesting(code, "javascript");
+    assert.ok(findings.length > 0, "Test files with describe + it should still be analyzed by testing evaluator");
+  });
+});

@@ -307,7 +307,13 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   if (!isMarkup) {
     lines.forEach((line, i) => {
       if (isCommentLine(line)) return;
-      if (/(?:age|date.?of.?birth|dob|birthdate|birth_date|minor|child|under.?13|under.?16|coppa)/i.test(line)) {
+      // Use word-bounded \bage(?![a-z]) to avoid matching 'age' inside common
+      // words like package, page, image, storage, manage, etc.
+      if (
+        /(?:\bage(?![a-z])|date.?of.?birth|\bdob\b|birthdate|birth_date|\bminor\b|\bchild(?:ren)?\b|under.?13|under.?16|\bcoppa\b)/i.test(
+          line,
+        )
+      ) {
         ageRelatedLines.push(i + 1);
       }
     });

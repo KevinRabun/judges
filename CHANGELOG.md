@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.13.7] — 2026-03-02
+
+### Fixed
+- **4 evaluator false-positive fixes** from seventh round of real-world Copilot feedback (`public/app.js` browser-side JavaScript, score 91→94):
+  - **DB-001** (database) — N+1 query rule now gated on `hasDatabaseContext` (DB imports, SQL statements, connection patterns). Browser-side `fetch()`, `Array.find()`, DOM `.select()` in loops are not N+1 database access.
+  - **COMP-001** (compliance) — Age-related regex now uses `\bage(?![a-z])` word boundary to prevent matching `age` embedded in common words (`package`, `page`, `image`, `storage`, `manage`, `voltage`, etc.). Also word-bounded `child`, `minor`, `dob`, `coppa`.
+  - **SOV-002** (data-sovereignty) — Export path rule now gated on `!isFrontendCode`. Browser code with `document.`, `window.`, `addEventListener`, `querySelector`, React/Vue/Angular/jQuery signals is UI rendering, not data export.
+  - **TEST-001** (testing) — `hasTestStructure` now requires ≥2 of (`describe`, `it`, `test`) for JS/TS instead of any single match. A lone `it(` in browser code (common iterator variable) no longer triggers test evaluator.
+
+### Added
+- **8 new regression tests** (1294 total) covering all 4 FP fixes with both negative (browser code suppressed) and positive (real server/test code still detected) cases.
+
 ## [3.13.6] — 2026-03-02
 
 ### Fixed
