@@ -65,10 +65,9 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   }
 
   // Synchronous blocking in hot paths (multi-language)
-  // Require a word-char before "Sync(" so we match readFileSync(), writeSync(),
-  // etc., but not unrelated identifiers that happen to contain "Sync".
+  // Only match known blocking APIs — not arbitrary functions that end in "Sync"
   const blockingPattern =
-    /\wSync\s*\(|\.sleep\s*\(|Thread\.sleep|time\.sleep|threading\.Event\(\)\.wait|Task\.Delay.*\.Wait\(\)|\.Result\b|std::thread::sleep|tokio::task::block_in_place/gi;
+    /(?:readFileSync|writeFileSync|readSync|writeSync|execSync|execFileSync|spawnSync|accessSync|statSync|lstatSync|readdirSync|mkdirSync|rmdirSync|unlinkSync|renameSync|copyFileSync|openSync|closeSync|appendFileSync|existsSync|realpathSync|chmodSync|chownSync|linkSync|symlinkSync|ftruncateSync|truncateSync|createReadStream|createWriteStream|pbkdf2Sync|scryptSync|randomFillSync|hashSync|compareSync|genSaltSync)\s*\(|\.sleep\s*\(|Thread\.sleep|time\.sleep|threading\.Event\(\)\.wait|Task\.Delay.*\.Wait\(\)|\.Result\b|std::thread::sleep|tokio::task::block_in_place/gi;
   const blockingLines = getLineNumbers(code, blockingPattern);
   if (blockingLines.length > 0) {
     findings.push({

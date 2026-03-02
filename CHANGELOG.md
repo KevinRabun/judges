@@ -2,6 +2,33 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.14.0] — 2026-03-02
+
+### Added
+- **Combined Layer 1 + Layer 2 deep review** — new `@judges /deepreview` chat sub-command and `Judges: Deep Review (Layer 1 + Layer 2)` VS Code command. Runs all 35 deterministic evaluators (L1), then sends findings + source code to GPT-4o with the full tribunal deep-review prompt (L2) for contextual AI analysis — all in a single user action.
+- **`/deepreview` chat sub-command** — streams L1 findings grouped by severity with fix buttons, then streams the L2 LLM deep-review response directly in Copilot Chat. Gracefully degrades to L1-only when no LLM is available.
+- **`judges.deepReview` command** — accessible from command palette and editor context menu (🚀 icon). Runs L1 + L2 and opens the full report as a new markdown tab.
+- **Deep-review prompt builders exported from public API** — `buildSingleJudgeDeepReviewSection` and `buildTribunalDeepReviewSection` are now available via `@kevinrabun/judges/api`.
+- **10 new tests** (1220 total): deep-review intent detection (3), L1→L2 prompt construction (3), tribunal section validation (2), JUDGES array contract (1), API export accessibility (1).
+
+## [3.13.1] — 2026-03-02
+
+### Fixed
+- **10 evaluator false-positive fixes** from real-world Copilot review feedback:
+  - **REL-002** (reliability) — expanded timeout context window from 5 lines to ±15 lines; added file-level `AbortController`/`AbortSignal`/`signal` scan so files with centralized timeout handling are not flagged.
+  - **SOV-002** (data-sovereignty) — added egress gate detection (`assertAllowedEgress`, `egressPolicy`, `jurisdictionCheck`, etc.) to suppress cross-border findings when a guard function exists.
+  - **SOV-004** (data-sovereignty) — added centralized sovereignty response handler detection (`finalizeSovereignResponse`, `sovereigntyMiddleware`, etc.) to suppress export-path findings.
+  - **SOV-007** (data-sovereignty) — added telemetry kill-switch detection; files that throw on external telemetry enable are no longer flagged.
+  - **SOV-008** (data-sovereignty) — tightened PII partition rule to require concrete DB mutation evidence (SQL DML in query context or ORM method calls) instead of matching generic verbs like `create`/`save`.
+  - **DOC-001** (documentation) — undocumented-function rule now only flags exported/public functions. Internal helpers, private utilities, and language-specific private patterns (`_`-prefixed in Python, non-`pub` in Rust) are skipped.
+  - **A11Y form error** (accessibility) — form error ARIA rule now gated on HTML/JSX rendering evidence; pure backend files generating validation schemas are no longer flagged.
+  - **SCALE-003** (scalability) — replaced generic `*Sync(` regex with an explicit list of 30+ known Node.js synchronous blocking APIs. Custom functions like `ensureModelSync()` or `performDataSync()` are no longer flagged.
+  - **AUTH-002** (authentication) — added public endpoint marker detection (`isPublic`, `@PermitAll`, `noAuth`, `AllowAnonymous`, etc.) and health-check-only route file suppression.
+  - **DB-006** (database) — tightened mutation detection to require SQL DML in `query()`/`execute()` context or ORM method calls; function names containing `create`/`update`/`delete` no longer trigger false positives.
+
+### Added
+- **15 new regression tests** (1235 total) covering all 10 false-positive fixes, including both negative cases (FP suppressed) and positive cases (real issues still detected) for DOC-001, A11Y, SCALE-003, AUTH-002, and DB-006.
+
 ## [3.13.0] — 2026-03-02
 
 ### Added

@@ -46,18 +46,25 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   }
 
   const crossBorderEgressLines: number[] = [];
+  // File-level check for jurisdiction gate helpers (e.g., assertAllowedEgress, approvedJurisdictions)
+  const hasEgressGate =
+    /assertAllowedEgress|approvedJurisdictions|egressPolicy|egressGate|allowedEgress|jurisdictionCheck|checkJurisdiction|validateDestination|transferControl|crossBorder.*check|egress.*guard/i.test(
+      code,
+    );
   lines.forEach((line, index) => {
     const trimmed = line.trim();
     if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (
       /(fetch\(|axios\.|http(s)?:\/\/|webhook|third.?party|external.?api|sendTo|forwardTo)/i.test(line) &&
-      !/consent|scc|adequacy|jurisdiction|region|residency|sovereignty/i.test(line)
+      !/consent|scc|adequacy|jurisdiction|region|residency|sovereignty|allowedEgress|egressPolicy|egressGate|transferControl/i.test(
+        line,
+      )
     ) {
       crossBorderEgressLines.push(index + 1);
     }
   });
 
-  if (crossBorderEgressLines.length > 0) {
+  if (crossBorderEgressLines.length > 0 && !hasEgressGate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -123,7 +130,13 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     }
   });
 
-  if (exportLines.length > 0) {
+  // Check for centralized sovereignty response handler at file level
+  const hasCentralizedSovereignResponse =
+    /finalizeSovereignResponse|sovereignResponse|responseFinalize|exportFinalize|sovereigntyCheck|applySovereigntyControls|sovereigntyMiddleware|sovereigntyGuard/i.test(
+      code,
+    );
+
+  if (exportLines.length > 0 && !hasCentralizedSovereignResponse) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -208,20 +221,27 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   });
 
   if (telemetryLines.length > 0) {
-    findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
-      severity: "high",
-      title: "Telemetry/analytics data sent to external service",
-      description:
-        "Code integrates with external telemetry or analytics services that may process and store user behavior data, IP addresses, or session information in jurisdictions outside sovereignty boundaries.",
-      lineNumbers: telemetryLines.slice(0, 10),
-      recommendation:
-        "Verify the analytics provider's data residency options and configure region-specific endpoints. Consider self-hosted alternatives (Plausible, Matomo, self-hosted PostHog) for sovereign environments. Ensure DPAs cover data processing locations.",
-      reference: "GDPR Articles 44-49 / Telemetry Data Sovereignty",
-      suggestedFix:
-        "Configure region-specific telemetry endpoints or use self-hosted alternatives (Plausible, self-hosted PostHog). Ensure DPAs cover data processing locations.",
-      confidence: 0.85,
-    });
+    // Check for kill-switch / negative guard: code that explicitly disables or throws on telemetry enablement
+    const hasTelemetryKillSwitch =
+      /(?:throw.*telemetry|telemetry.*(?:disabled|disallow|forbidden|blocked|throw)|ALLOW_EXTERNAL_TELEMETRY.*(?:throw|false|disabled)|disable.*telemetry|telemetry.*kill.?switch|no.?external.?telemetry)/i.test(
+        code,
+      );
+    if (!hasTelemetryKillSwitch) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Telemetry/analytics data sent to external service",
+        description:
+          "Code integrates with external telemetry or analytics services that may process and store user behavior data, IP addresses, or session information in jurisdictions outside sovereignty boundaries.",
+        lineNumbers: telemetryLines.slice(0, 10),
+        recommendation:
+          "Verify the analytics provider's data residency options and configure region-specific endpoints. Consider self-hosted alternatives (Plausible, Matomo, self-hosted PostHog) for sovereign environments. Ensure DPAs cover data processing locations.",
+        reference: "GDPR Articles 44-49 / Telemetry Data Sovereignty",
+        suggestedFix:
+          "Configure region-specific telemetry endpoints or use self-hosted alternatives (Plausible, self-hosted PostHog). Ensure DPAs cover data processing locations.",
+        confidence: 0.85,
+      });
+    }
   }
 
   // PII stored without geographic partitioning
@@ -231,7 +251,12 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     );
   const hasGeoPartitioning =
     /(?:partition|shard|region.*key|tenant.*region|geo.*route|data.*boundary|residency.*tag|region.*id)/i.test(code);
-  const hasDbOps = /(?:create|insert|save|store|persist|write|update|upsert|put)/i.test(code);
+  // Require concrete DB mutation evidence: ORM method calls (.save(), .create(), etc.)
+  // or SQL DML keywords (INSERT INTO, UPDATE...SET, DELETE FROM) — not just generic words
+  const hasDbOps =
+    /(?:\.(?:save|create|insertOne|insertMany|updateOne|updateMany|deleteOne|deleteMany|bulkWrite|persist|upsert)\s*\(|(?:INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b|cursor\.execute|\.execute\s*\(\s*["'`](?:INSERT|UPDATE|DELETE))/i.test(
+      code,
+    );
 
   if (hasPiiFields && hasDbOps && !hasGeoPartitioning && code.split("\n").length > 20) {
     findings.push({

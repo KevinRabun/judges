@@ -78,6 +78,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   let ruleNum = 1;
   const prefix = "AUTH";
   const _lang = getLangFamily(language);
+  const lines = code.split("\n");
 
   // Hardcoded credentials
   const credentialLines = getHardcodedCredentialLinesWithoutPlaceholders(code);
@@ -104,7 +105,26 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
     /(?:authenticate|authorize|requireAuth|ensureAuth|isAuthenticated|verifyToken|passport\.authenticate|jwt\.verify|auth\(\)|protect|guard|requireLogin|@login_required|@requires_auth|@Authorize|@PreAuthorize|@Secured)/gi.test(
       code,
     );
-  if (hasRoutes && !hasAuthMiddleware && code.split("\n").length > 20) {
+  // Suppress when endpoints are explicitly marked as public/anonymous or are standard health-check routes
+  const hasPublicEndpointMarker =
+    /(?:public|noAuth|anonymous|unauthenticated|AllowAnonymous|\@PermitAll|permitAll|open.?api|isPublic|skipAuth|no.?auth.?required)/i.test(
+      code,
+    );
+  const isHealthCheckOnly =
+    routeLines.length > 0 &&
+    routeLines.every((ln) => {
+      const line = lines[ln - 1] || "";
+      return /['"\/](?:health|status|metrics|ready|live|liveness|readiness|ping|version|favicon|\.well-known)/i.test(
+        line,
+      );
+    });
+  if (
+    hasRoutes &&
+    !hasAuthMiddleware &&
+    !hasPublicEndpointMarker &&
+    !isHealthCheckOnly &&
+    code.split("\n").length > 20
+  ) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

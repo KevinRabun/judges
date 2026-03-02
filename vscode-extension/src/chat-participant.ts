@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { evaluateWithTribunal } from "@kevinrabun/judges/api";
+import { evaluateWithTribunal, JUDGES, buildTribunalDeepReviewSection } from "@kevinrabun/judges/api";
 import type { Finding } from "@kevinrabun/judges/api";
 import type { JudgesDiagnosticProvider } from "./diagnostics";
 
@@ -106,6 +106,8 @@ const handleChatRequest: vscode.ChatRequestHandler = async (
       return await handleReview(request, stream, token);
     case "security":
       return await handleReview(request, stream, token, "security-only");
+    case "deepreview":
+      return await handleDeepReview(request, stream, token);
     case "fix":
       return await handleFix(stream, token);
     case "help":
@@ -124,6 +126,7 @@ const handleChatRequest: vscode.ChatRequestHandler = async (
 function inferCommand(prompt: string): string {
   const lower = prompt.toLowerCase();
   if (/\bfix\b/.test(lower)) return "fix";
+  if (/\bdeep\s*review\b/.test(lower)) return "deepreview";
   if (/\bsecur/.test(lower)) return "security";
   if (/\bhelp\b/.test(lower)) return "help";
   return "review";
@@ -449,6 +452,177 @@ async function handleWorkspaceReview(
   return { metadata: { showReEvaluate: true, isWorkspace: true } };
 }
 
+// ─── /deepreview Handler ─────────────────────────────────────────────────────
+
+/**
+ * Combined Layer 1 + Layer 2 analysis.
+ *
+ * 1. Runs all 35 deterministic evaluators (Layer 1)
+ * 2. Streams the pattern-match findings to chat
+ * 3. Builds a deep-review prompt with the L1 findings + expert criteria
+ * 4. Sends to the VS Code Language Model API (Layer 2)
+ * 5. Streams the LLM's contextual deep-review analysis to chat
+ */
+async function handleDeepReview(
+  request: vscode.ChatRequest,
+  stream: vscode.ChatResponseStream,
+  token: vscode.CancellationToken,
+): Promise<vscode.ChatResult | void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    stream.markdown("No file is open. Open a file and try `@judges /deepreview` again.");
+    return;
+  }
+
+  const document = editor.document;
+  const language = LANG_MAP[document.languageId];
+  if (!language) {
+    stream.markdown(
+      `Language **${document.languageId}** is not supported. Supported: TypeScript, JavaScript, Python, Go, Rust, Java, C#, C++.`,
+    );
+    return;
+  }
+
+  const code = document.getText();
+  if (!code.trim()) {
+    stream.markdown("The file is empty — nothing to evaluate.");
+    return;
+  }
+
+  if (token.isCancellationRequested) return;
+
+  // ── Layer 1: Deterministic Evaluation ──────────────────────────────────
+  stream.progress("Layer 1 — Running 35 judges (deterministic analysis)…");
+
+  const relativePath = vscode.workspace.asRelativePath(document.uri);
+  let findings: Finding[];
+
+  try {
+    const verdict = evaluateWithTribunal(code, language);
+    findings = verdict.evaluations.flatMap((e) => e.findings);
+
+    if (token.isCancellationRequested) return;
+
+    // Populate diagnostics cache
+    if (_diagnosticProvider) {
+      _diagnosticProvider.populateFindings(document, findings);
+    }
+
+    // Stream L1 summary
+    const autoFixable = findings.filter((f) => f.patch);
+    const manualOnly = findings.length - autoFixable.length;
+
+    stream.markdown(
+      `### 🔍 Layer 1 — Deterministic Analysis — ${relativePath}\n\n` +
+        `**Score:** ${verdict.overallScore}/100  |  ` +
+        `**Findings:** ${findings.length}  |  ` +
+        `**Judges run:** ${verdict.evaluations.length}\n\n` +
+        `🔧 **${autoFixable.length}** auto-fixable  |  ` +
+        `📝 **${manualOnly}** require manual review\n\n`,
+    );
+
+    if (findings.length > 0) {
+      const bySeverity = groupBySeverity(findings);
+
+      for (const [severity, group] of bySeverity) {
+        if (token.isCancellationRequested) return;
+
+        const icon = SEVERITY_ICON[severity] ?? "⚪";
+        stream.markdown(`#### ${icon} ${capitalize(severity)} (${group.length})\n\n`);
+
+        for (const f of group) {
+          const lineRef = f.lineNumbers?.length ? ` (line ${f.lineNumbers[0]})` : "";
+          const fixTag = f.patch ? " 🔧" : " 📝";
+          stream.markdown(`- **\`${f.ruleId}\`** ${f.title}${lineRef}${fixTag}\n` + `  ${f.description}\n`);
+          if (f.suggestedFix) {
+            stream.markdown(`  💡 *Fix:* ${f.suggestedFix}\n`);
+          }
+          stream.markdown("\n");
+        }
+      }
+
+      if (autoFixable.length > 0) {
+        stream.button({
+          command: "judges.fixFile",
+          title: `$(wrench) Auto-Fix ${autoFixable.length} of ${findings.length} Findings`,
+        });
+      }
+    } else {
+      stream.markdown(`All ${verdict.evaluations.length} judges passed — no pattern-based findings. ✅\n\n`);
+    }
+  } catch (error) {
+    stream.markdown(`**Error** running Layer 1 evaluation: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+
+  if (token.isCancellationRequested) return;
+
+  // ── Layer 2: LLM Deep Review ───────────────────────────────────────────
+  stream.progress("Layer 2 — Running AI deep review (contextual analysis)…");
+
+  // Build the L1 findings summary for the prompt
+  const findingsSummary = findings
+    .map((f, i) => {
+      const lineRef = f.lineNumbers?.length ? ` (line ${f.lineNumbers[0]})` : "";
+      return `${i + 1}. [${f.severity.toUpperCase()}] ${f.ruleId} — ${f.title}${lineRef}\n   ${f.description}`;
+    })
+    .join("\n");
+
+  // Get the deep review prompt section with all judge expert criteria
+  const context = request.prompt.trim() || undefined;
+  const deepReviewSection = buildTribunalDeepReviewSection(JUDGES, language, context);
+
+  const prompt =
+    `You are performing a deep contextual code review.\n\n` +
+    `--- SOURCE CODE (${language}) ---\n${code}\n\n` +
+    `--- LAYER 1 FINDINGS (${findings.length} pattern-based) ---\n` +
+    (findings.length > 0 ? findingsSummary : "(No pattern-based findings)") +
+    `\n\n` +
+    deepReviewSection;
+
+  try {
+    const models = await vscode.lm.selectChatModels({ family: "gpt-4o" });
+    let model = models[0];
+    if (!model) {
+      const allModels = await vscode.lm.selectChatModels();
+      model = allModels[0];
+    }
+    if (!model) {
+      stream.markdown(
+        `\n\n---\n\n### ⚠️ Layer 2 Unavailable\n\n` +
+          `No language model is available for the AI deep review. ` +
+          `Layer 1 findings above are still valid. ` +
+          `Ensure GitHub Copilot or another language model extension is installed and signed in.\n`,
+      );
+      return { metadata: { showReEvaluate: true, reviewCommand: "deepreview" } };
+    }
+
+    if (token.isCancellationRequested) return;
+
+    stream.markdown(`\n\n---\n\n### 🧠 Layer 2 — AI Deep Contextual Review\n\n`);
+
+    const messages = [vscode.LanguageModelChatMessage.User(prompt)];
+    const response = await model.sendRequest(messages, {}, token);
+
+    // Stream the LLM response directly to chat
+    for await (const chunk of response.text) {
+      if (token.isCancellationRequested) return;
+      stream.markdown(chunk);
+    }
+
+    stream.markdown("\n");
+  } catch (error) {
+    if (error instanceof vscode.CancellationError) return;
+    stream.markdown(
+      `\n\n---\n\n### ⚠️ Layer 2 Error\n\n` +
+        `AI deep review failed: ${error instanceof Error ? error.message : String(error)}\n\n` +
+        `Layer 1 findings above are still valid.\n`,
+    );
+  }
+
+  return { metadata: { showReEvaluate: true, reviewCommand: "deepreview" } };
+}
+
 // ─── /fix Handler ────────────────────────────────────────────────────────────
 
 async function handleFix(
@@ -517,9 +691,13 @@ function handleHelp(stream: vscode.ChatResponseStream): vscode.ChatResult | void
       `| \`@judges\` | Review the active file with all 35 judges |\n` +
       `| \`@judges /review\` | Same as above |\n` +
       `| \`@judges /review review the codebase\` | Review all files in the workspace |\n` +
+      `| \`@judges /deepreview\` | Combined Layer 1 (pattern) + Layer 2 (AI deep review) |\n` +
       `| \`@judges /security\` | Security-focused review only |\n` +
       `| \`@judges /fix\` | Auto-fix findings that have patches (not all findings are auto-fixable) |\n` +
       `| \`@judges /help\` | Show this help |\n\n` +
+      `**\`/deepreview\`** runs the fast deterministic evaluators first, then sends the code ` +
+      `and findings to an AI model for contextual deep analysis — catching semantic issues, ` +
+      `false positives, and architectural concerns that pattern matching cannot detect.\n\n` +
       `**Workspace review** triggers automatically when you mention ` +
       `*codebase*, *workspace*, *project*, *all files*, *repo*, or *folder* ` +
       `in your prompt (up to ${MAX_WORKSPACE_FILES} files).\n\n` +
@@ -527,6 +705,7 @@ function handleHelp(stream: vscode.ChatResponseStream): vscode.ChatResult | void
       `- *"@judges review this file for performance issues"*\n` +
       `- *"@judges review the entire codebase"*\n` +
       `- *"@judges check security across the project"*\n` +
+      `- *"@judges deep review this file"*\n` +
       `- *"@judges fix this file"*\n`,
   );
 }

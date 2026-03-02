@@ -15,6 +15,13 @@ import assert from "node:assert/strict";
 import { evaluateWithJudge, evaluateWithTribunal } from "../src/evaluators/index.js";
 import { getJudge } from "../src/judges/index.js";
 import type { TribunalVerdict } from "../src/types.js";
+import { analyzeReliability } from "../src/evaluators/reliability.js";
+import { analyzeDataSovereignty } from "../src/evaluators/data-sovereignty.js";
+import { analyzeDocumentation } from "../src/evaluators/documentation.js";
+import { analyzeAccessibility } from "../src/evaluators/accessibility.js";
+import { analyzeScalability } from "../src/evaluators/scalability.js";
+import { analyzeAuthentication } from "../src/evaluators/authentication.js";
+import { analyzeDatabase } from "../src/evaluators/database.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 
@@ -671,5 +678,377 @@ app.listen(3000);
         `Score should be reasonable with confidence weighting, got ${evaluation.score}`,
       );
     });
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Negative Tests: FP Regression — Evaluator-Level Fixes
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("FP Regression — REL-002: Timeout with AbortController/signal", () => {
+  it("should NOT flag fetch when AbortController/signal is present in surrounding scope", () => {
+    const code = `
+import { AbortController } from "node-abort-controller";
+
+export async function fetchWithTimeout(url: string, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+`;
+    const findings = analyzeReliability(code, "typescript");
+    const timeoutFindings = findings.filter((f) => /timeout/i.test(f.title));
+    assert.equal(timeoutFindings.length, 0, "Should not flag fetch when AbortController/signal is in scope");
+  });
+
+  it("should NOT flag HTTP calls when file-level timeout helpers exist", () => {
+    const code = `
+const createTimeoutSignal = (ms: number) => AbortSignal.timeout(ms);
+
+export async function getData() {
+  const res = await fetch("/api/data", { signal: createTimeoutSignal(5000) });
+  return res.json();
+}
+
+export async function postData(body: unknown) {
+  const res = await fetch("/api/data", {
+    method: "POST",
+    body: JSON.stringify(body),
+    signal: createTimeoutSignal(10000),
+  });
+  return res.json();
+}
+`;
+    const findings = analyzeReliability(code, "typescript");
+    const timeoutFindings = findings.filter((f) => /timeout/i.test(f.title));
+    assert.equal(timeoutFindings.length, 0, "Should not flag when file has AbortSignal.timeout helper");
+  });
+});
+
+describe("FP Regression — SOV-002: Cross-border egress with jurisdiction gate", () => {
+  it("should NOT flag fetch calls when assertAllowedEgress gate exists in file", () => {
+    const code = `
+function assertAllowedEgress(url: string, jurisdiction: string) {
+  if (!approvedJurisdictions.includes(jurisdiction)) {
+    throw new SovereigntyError("Cross-border transfer blocked");
+  }
+}
+
+export async function sendData(url: string, data: unknown) {
+  assertAllowedEgress(url, getJurisdiction(url));
+  const response = await fetch(url, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return response.json();
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const egressFindings = findings.filter((f) => /cross.?border/i.test(f.title));
+    assert.equal(egressFindings.length, 0, "Should not flag when assertAllowedEgress gate exists");
+  });
+});
+
+describe("FP Regression — SOV-007: Telemetry with kill-switch", () => {
+  it("should NOT flag telemetry references when kill-switch throws on enable", () => {
+    const code = `
+const TELEMETRY_PROVIDERS = ["sentry", "datadog", "newrelic"];
+
+// Telemetry is disabled by default and throws if someone tries to enable it
+if (process.env.ALLOW_EXTERNAL_TELEMETRY === "true") {
+  throw new Error("External telemetry is forbidden in sovereign deployments");
+}
+
+export function getProviderNames() {
+  return TELEMETRY_PROVIDERS;
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const telemetryFindings = findings.filter((f) => /telemetry/i.test(f.title));
+    assert.equal(telemetryFindings.length, 0, "Should not flag telemetry when kill-switch throws on enable");
+  });
+});
+
+describe("FP Regression — SOV-008: PII without DB ops", () => {
+  it("should NOT flag PII fields when no concrete DB mutation operations exist", () => {
+    const code = `
+interface UserProfile {
+  email: string;
+  phone: string;
+  first_name: string;
+  last_name: string;
+}
+
+export function createDisplayName(user: UserProfile): string {
+  return user.first_name + " " + user.last_name;
+}
+
+export function updateGreeting(user: UserProfile): string {
+  return "Hello, " + user.first_name;
+}
+
+export function saveSettings(user: UserProfile): void {
+  localStorage.setItem("prefs", JSON.stringify({ theme: "dark" }));
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const piiFindings = findings.filter((f) => /PII.*partition|partition.*PII/i.test(f.title));
+    assert.equal(piiFindings.length, 0, "Should not flag PII when no real DB mutations exist (just method names)");
+  });
+});
+
+describe("FP Regression — DOC-001: Non-exported functions", () => {
+  it("should NOT flag internal (non-exported) functions as undocumented", () => {
+    const code = `
+/** Exported function with docs */
+export function publicApi(input: string): string {
+  return internalHelper(input);
+}
+
+function internalHelper(input: string): string {
+  return input.trim().toLowerCase();
+}
+
+function anotherPrivateUtil(x: number): number {
+  return x * 2;
+}
+`;
+    const findings = analyzeDocumentation(code, "typescript");
+    const undocFindings = findings.filter((f) => /without documentation/i.test(f.title));
+    // Only exported functions should be flagged — the two internal ones should be skipped
+    assert.equal(undocFindings.length, 0, "Should not flag internal/non-exported functions");
+  });
+
+  it("should still flag exported functions without documentation", () => {
+    const code = `
+export function undocumentedPublic(input: string): string {
+  return input.trim();
+}
+
+export const anotherUndocumented = (x: number): number => x * 2;
+`;
+    const findings = analyzeDocumentation(code, "typescript");
+    const undocFindings = findings.filter((f) => /without documentation/i.test(f.title));
+    assert.ok(undocFindings.length > 0, "Should still flag exported functions that lack docs");
+  });
+});
+
+describe("FP Regression — A11Y: Backend file generating ARIA schemas", () => {
+  it("should NOT flag form error ARIA issues on backend files without HTML rendering", () => {
+    const code = `
+import { z } from "zod";
+
+const validationErrorMessageSchema = z.object({
+  field: z.string(),
+  errorMessage: z.string(),
+  invalidText: z.string().optional(),
+});
+
+export function buildErrorMessagePayload(field: string, msg: string) {
+  return { field, errorMessage: msg };
+}
+
+export function getValidationMessageText(errors: Record<string, string>) {
+  return Object.entries(errors).map(([k, v]) => ({ field: k, message: v }));
+}
+`;
+    const findings = analyzeAccessibility(code, "typescript");
+    const ariaFindings = findings.filter((f) => /form error.*ARIA|ARIA.*form error/i.test(f.title));
+    assert.equal(ariaFindings.length, 0, "Should not flag backend code that doesn't render HTML");
+  });
+
+  it("should still flag form errors without ARIA in JSX/HTML files", () => {
+    const code = `
+import React from "react";
+
+export function LoginForm() {
+  return (
+    <form>
+      <input id="email" type="email" />
+      <span className="error">Invalid email message text</span>
+    </form>
+  );
+}
+`;
+    const findings = analyzeAccessibility(code, "typescript");
+    const ariaFindings = findings.filter((f) => /form error.*ARIA|ARIA.*form error/i.test(f.title));
+    assert.ok(ariaFindings.length > 0, "Should still flag form errors without ARIA in JSX rendering files");
+  });
+});
+
+describe("FP Regression — SCALE-003: Async orchestration without sync I/O", () => {
+  it("should NOT flag custom functions ending in 'Sync' that are not blocking I/O", () => {
+    const code = `
+export async function runWorkerLoop() {
+  while (true) {
+    const batch = await fetchBatch();
+    await processBatch(batch);
+    await sleep(1000);
+  }
+}
+
+function ensureModelSync(model: Model): void {
+  model.validate();
+}
+
+function performDataSync(source: DataSource): Promise<void> {
+  return source.replicate();
+}
+`;
+    const findings = analyzeScalability(code, "typescript");
+    const blockingFindings = findings.filter((f) => /synchronous blocking/i.test(f.title));
+    assert.equal(blockingFindings.length, 0, "Should not flag custom Sync-named functions as blocking I/O");
+  });
+
+  it("should still flag real blocking APIs like readFileSync", () => {
+    const code = `
+import fs from "fs";
+
+export function loadConfig() {
+  const data = fs.readFileSync("config.json", "utf-8");
+  return JSON.parse(data);
+}
+`;
+    const findings = analyzeScalability(code, "typescript");
+    const blockingFindings = findings.filter((f) => /synchronous blocking/i.test(f.title));
+    assert.ok(blockingFindings.length > 0, "Should still flag known blocking APIs like readFileSync");
+  });
+});
+
+describe("FP Regression — AUTH-002: Intentionally public endpoints", () => {
+  it("should NOT flag routes when public endpoint marker exists", () => {
+    const code = `
+import express from "express";
+const app = express();
+
+// These endpoints are intentionally public (read-only)
+// @noAuth - public API
+app.get("/api/v1/status", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.get("/api/v1/health", (req, res) => {
+  res.json({ healthy: true });
+});
+
+app.get("/api/v1/version", (req, res) => {
+  res.json({ version: "1.0.0" });
+});
+
+// Public read-only product catalog
+const isPublic = true;
+app.get("/api/v1/products", (req, res) => {
+  res.json(products);
+});
+
+app.listen(3000);
+`;
+    const findings = analyzeAuthentication(code, "typescript");
+    const authFindings = findings.filter((f) => /without authentication/i.test(f.title));
+    assert.equal(authFindings.length, 0, "Should not flag routes when isPublic marker exists");
+  });
+
+  it("should NOT flag health-check-only route files", () => {
+    const code = `
+import express from "express";
+const app = express();
+
+app.get("/health", (req, res) => res.json({ ok: true }));
+app.get("/readiness", (req, res) => res.json({ ready: true }));
+app.get("/liveness", (req, res) => res.json({ live: true }));
+
+app.listen(3000);
+`;
+    const findings = analyzeAuthentication(code, "typescript");
+    const authFindings = findings.filter((f) => /without authentication/i.test(f.title));
+    assert.equal(authFindings.length, 0, "Should not flag health-check-only routes");
+  });
+});
+
+describe("FP Regression — DB-006: No transactions without DB mutations", () => {
+  it("should NOT flag transaction handling when no concrete DB mutations exist", () => {
+    const code = `
+interface Order {
+  id: string;
+  items: Item[];
+  status: string;
+}
+
+export function createOrderDTO(items: Item[]): Order {
+  return { id: generateId(), items, status: "pending" };
+}
+
+export function updateOrderStatus(order: Order, status: string): Order {
+  return { ...order, status };
+}
+
+export function deleteOldOrders(orders: Order[]): Order[] {
+  return orders.filter(o => o.status !== "archived");
+}
+`;
+    const findings = analyzeDatabase(code, "typescript");
+    const txFindings = findings.filter((f) => /transaction/i.test(f.title));
+    assert.equal(txFindings.length, 0, "Should not flag when INSERT/UPDATE/DELETE appear only in function names");
+  });
+
+  it("should still flag real DB mutations without transactions", () => {
+    const code = `
+import { db } from "./database";
+import { logger } from "./logger";
+import { validateInput } from "./validation";
+import { NotFoundError } from "./errors";
+
+interface Account {
+  id: string;
+  balance: number;
+  owner: string;
+  currency: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface TransferRecord {
+  type: string;
+  from: string;
+  to: string;
+  amount: number;
+  timestamp: Date;
+}
+
+export async function transferFunds(from: string, to: string, amount: number) {
+  validateInput(from, to, amount);
+  logger.info("Starting transfer", { from, to, amount });
+
+  const sourceAccount = await db.query("SELECT * FROM accounts WHERE id = $1", [from]);
+  if (!sourceAccount) throw new NotFoundError("Source account not found");
+
+  const targetAccount = await db.query("SELECT * FROM accounts WHERE id = $1", [to]);
+  if (!targetAccount) throw new NotFoundError("Target account not found");
+
+  if (sourceAccount.balance < amount) {
+    throw new Error("Insufficient funds");
+  }
+
+  await db.execute("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [amount, from]);
+  await db.execute("UPDATE accounts SET balance = balance + $1 WHERE id = $2", [amount, to]);
+  await db.save({ type: "transfer", from, to, amount, timestamp: new Date() });
+
+  logger.info("Transfer completed", { from, to, amount });
+}
+
+export async function createUser(name: string, email: string) {
+  logger.info("Creating user", { name, email });
+  await db.execute("INSERT INTO users (name, email) VALUES ($1, $2)", [name, email]);
+  logger.info("User created", { name, email });
+}
+`;
+    const findings = analyzeDatabase(code, "typescript");
+    const txFindings = findings.filter((f) => /transaction/i.test(f.title));
+    assert.ok(txFindings.length > 0, "Should still flag real DB mutations without transactions");
   });
 });

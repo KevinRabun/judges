@@ -2,7 +2,7 @@
   "name": "judges-panel",
   "displayName": "Judges Panel",
   "description": "35 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.13.0",
+  "version": "3.13.1",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -79,6 +79,11 @@
         "command": "judges.refineWithAI",
         "title": "Judges: Refine Findings with AI",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "judges.deepReview",
+        "title": "Judges: Deep Review (Layer 1 + Layer 2)",
+        "icon": "$(rocket)"
       }
     ],
     "mcpServerDefinitionProviders": [
@@ -153,6 +158,10 @@
         {
           "command": "judges.refineWithAI",
           "group": "judges@3"
+        },
+        {
+          "command": "judges.deepReview",
+          "group": "judges@4"
         }
       ]
     },
@@ -167,6 +176,10 @@
           {
             "name": "review",
             "description": "Review the current file with all 35 judges"
+          },
+          {
+            "name": "deepreview",
+            "description": "Combined Layer 1 + Layer 2 deep review (pattern analysis + AI contextual review)"
           },
           {
             "name": "security",
@@ -193,7 +206,8 @@
               "Do a judges review",
               "Run the judges on this file",
               "Judges evaluation of my code",
-              "Check this file with judges panel"
+              "Check this file with judges panel",
+              "Deep review this file with judges"
             ]
           },
           {

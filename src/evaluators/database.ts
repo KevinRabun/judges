@@ -134,7 +134,11 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   }
 
   // No transaction handling
-  const hasMutations = /INSERT|UPDATE|DELETE|db\.(?:create|update|delete|save|remove)/gi.test(code);
+  // Require concrete DB mutation evidence: SQL DML keywords in query context or ORM method calls
+  const hasMutations =
+    /(?:(?:query|execute|run|raw)\s*\(\s*["'`](?:INSERT|UPDATE|DELETE))|(?:\.(?:save|create|update|delete|remove|destroy|bulkCreate|insertMany|updateMany|deleteMany|insertOne|updateOne|deleteOne)\s*\()|(?:INSERT\s+INTO\b|UPDATE\s+\w+\s+SET\b|DELETE\s+FROM\b)|db\.(?:create|update|delete|save|remove)\s*\(/gi.test(
+      code,
+    );
   const hasTransactions = /transaction|BEGIN|COMMIT|ROLLBACK|startTransaction|withTransaction/gi.test(code);
   if (hasMutations && !hasTransactions && code.split("\n").length > 30) {
     findings.push({

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { evaluateWithTribunal } from "@kevinrabun/judges/api";
+import { evaluateWithTribunal, JUDGES, buildTribunalDeepReviewSection } from "@kevinrabun/judges/api";
 import type { Finding, Patch } from "@kevinrabun/judges/api";
 
 const SEVERITY_MAP: Record<string, vscode.DiagnosticSeverity> = {
@@ -344,6 +344,105 @@ export class JudgesDiagnosticProvider {
     this.publishFindings(document, refined, document.getText());
 
     return { original, refined: refined.length };
+  }
+
+  /**
+   * Run combined Layer 1 (deterministic) + Layer 2 (LLM deep review) analysis.
+   * Returns a markdown string with the full report, suitable for display in
+   * a new editor tab or output channel.
+   */
+  async deepReview(
+    document: vscode.TextDocument,
+    token: vscode.CancellationToken,
+  ): Promise<{ markdown: string; findingsCount: number }> {
+    const language = LANG_MAP[document.languageId];
+    if (!language) {
+      return { markdown: `Language **${document.languageId}** is not supported.`, findingsCount: 0 };
+    }
+
+    const code = document.getText();
+    if (!code.trim()) {
+      return { markdown: "The file is empty — nothing to evaluate.", findingsCount: 0 };
+    }
+
+    // ── Layer 1: Deterministic Evaluation ──
+    const verdict = evaluateWithTribunal(code, language);
+    const findings = verdict.evaluations.flatMap((e) => e.findings);
+    this.publishFindings(document, findings, code);
+
+    if (token.isCancellationRequested) {
+      return { markdown: "", findingsCount: findings.length };
+    }
+
+    let md = `# Judges Panel — Deep Review\n\n`;
+    md += `**File:** ${vscode.workspace.asRelativePath(document.uri)}\n\n`;
+    md += `## Layer 1 — Deterministic Analysis\n\n`;
+    md += `**Score:** ${verdict.overallScore}/100  |  **Findings:** ${findings.length}\n\n`;
+
+    if (findings.length > 0) {
+      for (const f of findings) {
+        const lineRef = f.lineNumbers?.length ? ` (line ${f.lineNumbers[0]})` : "";
+        md += `- **[${f.severity.toUpperCase()}] \`${f.ruleId}\`** ${f.title}${lineRef}\n`;
+        md += `  ${f.description}\n\n`;
+      }
+    } else {
+      md += `All ${verdict.evaluations.length} judges passed — no pattern-based findings. ✅\n\n`;
+    }
+
+    // ── Layer 2: LLM Deep Review ──
+    const findingsSummary = findings
+      .map((f, i) => {
+        const lineRef = f.lineNumbers?.length ? ` (line ${f.lineNumbers[0]})` : "";
+        return `${i + 1}. [${f.severity.toUpperCase()}] ${f.ruleId} — ${f.title}${lineRef}\n   ${f.description}`;
+      })
+      .join("\n");
+
+    const deepReviewSection = buildTribunalDeepReviewSection(JUDGES, language);
+
+    const prompt =
+      `You are performing a deep contextual code review.\n\n` +
+      `--- SOURCE CODE (${language}) ---\n${code}\n\n` +
+      `--- LAYER 1 FINDINGS (${findings.length} pattern-based) ---\n` +
+      (findings.length > 0 ? findingsSummary : "(No pattern-based findings)") +
+      `\n\n` +
+      deepReviewSection;
+
+    try {
+      const models = await vscode.lm.selectChatModels({ family: "gpt-4o" });
+      let model = models[0];
+      if (!model) {
+        const allModels = await vscode.lm.selectChatModels();
+        model = allModels[0];
+      }
+      if (!model) {
+        md += `---\n\n## ⚠️ Layer 2 Unavailable\n\n`;
+        md += `No language model is available for the AI deep review.\n`;
+        return { markdown: md, findingsCount: findings.length };
+      }
+
+      if (token.isCancellationRequested) {
+        return { markdown: md, findingsCount: findings.length };
+      }
+
+      md += `---\n\n## Layer 2 — AI Deep Contextual Review\n\n`;
+
+      const messages = [vscode.LanguageModelChatMessage.User(prompt)];
+      const response = await model.sendRequest(messages, {}, token);
+
+      for await (const chunk of response.text) {
+        if (token.isCancellationRequested) break;
+        md += chunk;
+      }
+
+      md += "\n";
+    } catch (error) {
+      if (!(error instanceof vscode.CancellationError)) {
+        md += `---\n\n## ⚠️ Layer 2 Error\n\n`;
+        md += `AI deep review failed: ${error instanceof Error ? error.message : String(error)}\n`;
+      }
+    }
+
+    return { markdown: md, findingsCount: findings.length };
   }
 
   private findingToDiagnostic(document: vscode.TextDocument, finding: Finding): vscode.Diagnostic {

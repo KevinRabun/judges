@@ -18,6 +18,8 @@ import { fileURLToPath } from "url";
 import { evaluateWithTribunal } from "../src/evaluators/index.js";
 import type { Finding, TribunalVerdict } from "../src/types.js";
 import { isTreeSitterAvailable } from "../src/ast/index.js";
+import { JUDGES } from "../src/judges/index.js";
+import { buildTribunalDeepReviewSection } from "../src/tools/deep-review.js";
 
 // ─── Tree-sitter warm-up ────────────────────────────────────────────────────
 await Promise.all([isTreeSitterAvailable("typescript"), isTreeSitterAvailable("javascript")]);
@@ -52,6 +54,7 @@ function isWorkspaceIntent(prompt: string): boolean {
 function inferCommand(prompt: string): string {
   const lower = prompt.toLowerCase();
   if (/\bfix\b/.test(lower)) return "fix";
+  if (/\bdeep\s*review\b/.test(lower)) return "deepreview";
   if (/\bsecur/.test(lower)) return "security";
   if (/\bhelp\b/.test(lower)) return "help";
   return "review";
@@ -631,5 +634,151 @@ describe("Refine with AI — Contract", () => {
     const emptyMatch = "[]".match(parseRegex);
     assert.ok(emptyMatch);
     assert.deepEqual(JSON.parse(emptyMatch![0]), []);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Deep Review (Layer 1 + Layer 2) — Contract Verification
+// ═════════════════════════════════════════════════════════════════════════════
+// Verifies the logic and contracts that the /deepreview command and
+// judges.deepReview command rely on. The VS Code LM API is unavailable in
+// Node.js tests, so these tests verify prompt construction, data flow,
+// and L1/L2 integration contracts.
+
+describe("Deep Review — Contract", () => {
+  it("inferCommand should detect 'deep review' intent", () => {
+    assert.equal(inferCommand("deep review this file"), "deepreview");
+    assert.equal(inferCommand("do a deep review"), "deepreview");
+    assert.equal(inferCommand("run deep review on my code"), "deepreview");
+    assert.equal(inferCommand("deepreview"), "deepreview");
+  });
+
+  it("inferCommand should not confuse 'deep review' with regular 'review'", () => {
+    assert.equal(inferCommand("review this file"), "review");
+    assert.equal(inferCommand(""), "review");
+    assert.equal(inferCommand("check this code"), "review");
+  });
+
+  it("inferCommand should still detect other commands correctly", () => {
+    assert.equal(inferCommand("fix this"), "fix");
+    assert.equal(inferCommand("security check"), "security");
+    assert.equal(inferCommand("help me"), "help");
+  });
+
+  it("L1 findings should feed into L2 prompt construction", () => {
+    const verdict = evaluateWithTribunal(sampleCode, "typescript");
+    const findings = verdict.evaluations.flatMap((e) => e.findings);
+
+    // Build the findings summary the same way the handler does
+    const findingsSummary = findings
+      .map((f, i) => {
+        const lineRef = f.lineNumbers?.length ? ` (line ${f.lineNumbers[0]})` : "";
+        return `${i + 1}. [${f.severity.toUpperCase()}] ${f.ruleId} — ${f.title}${lineRef}\n   ${f.description}`;
+      })
+      .join("\n");
+
+    assert.ok(findingsSummary.length > 0, "Should produce a non-empty findings summary");
+    assert.ok(findingsSummary.includes("1."), "First finding should be numbered 1");
+    // Verify severity is uppercased
+    assert.ok(/\[(CRITICAL|HIGH|MEDIUM|LOW|INFO)\]/.test(findingsSummary), "Severity should be uppercased");
+  });
+
+  it("tribunal deep review section should include all judges", () => {
+    const section = buildTribunalDeepReviewSection(JUDGES, "typescript");
+
+    assert.ok(section.includes("Deep Contextual Review Required"), "Should include deep review header");
+    assert.ok(section.includes("False Positive Review"), "Should include FP review section");
+    assert.ok(section.includes("Response Format"), "Should include response format section");
+
+    // Verify all judges are represented
+    for (const judge of JUDGES) {
+      assert.ok(section.includes(judge.name), `Should include judge: ${judge.name}`);
+      assert.ok(section.includes(judge.domain), `Should include domain: ${judge.domain}`);
+    }
+  });
+
+  it("tribunal deep review section should accept optional context", () => {
+    const context = "Production payment processing endpoint";
+    const section = buildTribunalDeepReviewSection(JUDGES, "typescript", context);
+
+    assert.ok(section.includes(context), "Should include the provided context");
+    assert.ok(section.includes("Context provided"), "Should have context label");
+  });
+
+  it("full prompt should combine code, L1 findings, and L2 instructions", () => {
+    const code = sampleCode;
+    const language = "typescript";
+    const verdict = evaluateWithTribunal(code, language);
+    const findings = verdict.evaluations.flatMap((e) => e.findings);
+
+    const findingsSummary = findings
+      .map((f, i) => {
+        const lineRef = f.lineNumbers?.length ? ` (line ${f.lineNumbers[0]})` : "";
+        return `${i + 1}. [${f.severity.toUpperCase()}] ${f.ruleId} — ${f.title}${lineRef}\n   ${f.description}`;
+      })
+      .join("\n");
+
+    const deepReviewSection = buildTribunalDeepReviewSection(JUDGES, language);
+
+    const prompt =
+      `You are performing a deep contextual code review.\n\n` +
+      `--- SOURCE CODE (${language}) ---\n${code}\n\n` +
+      `--- LAYER 1 FINDINGS (${findings.length} pattern-based) ---\n` +
+      (findings.length > 0 ? findingsSummary : "(No pattern-based findings)") +
+      `\n\n` +
+      deepReviewSection;
+
+    // Verify all three sections are present
+    assert.ok(prompt.includes("SOURCE CODE"), "Prompt should include source code section");
+    assert.ok(prompt.includes("LAYER 1 FINDINGS"), "Prompt should include L1 findings section");
+    assert.ok(prompt.includes("Deep Contextual Review Required"), "Prompt should include deep review instructions");
+    assert.ok(prompt.includes(code.substring(0, 50)), "Prompt should include actual code");
+    assert.ok(prompt.includes(findings[0].ruleId), "Prompt should include actual finding rule IDs");
+  });
+
+  it("deep review prompt should handle zero L1 findings gracefully", () => {
+    const cleanCode = "const x = 1;\n";
+    const verdict = evaluateWithTribunal(cleanCode, "typescript");
+    const findings = verdict.evaluations.flatMap((e) => e.findings);
+
+    const findingsSummary =
+      findings.length > 0
+        ? findings
+            .map((f, i) => {
+              const lineRef = f.lineNumbers?.length ? ` (line ${f.lineNumbers[0]})` : "";
+              return `${i + 1}. [${f.severity.toUpperCase()}] ${f.ruleId} — ${f.title}${lineRef}\n   ${f.description}`;
+            })
+            .join("\n")
+        : "(No pattern-based findings)";
+
+    const prompt = `--- LAYER 1 FINDINGS (${findings.length} pattern-based) ---\n` + findingsSummary;
+
+    assert.ok(prompt.includes("LAYER 1 FINDINGS (0 pattern-based)"), "Should show zero findings count");
+    assert.ok(prompt.includes("(No pattern-based findings)"), "Should include no-findings placeholder");
+  });
+
+  it("JUDGES array should be available and non-empty", () => {
+    assert.ok(Array.isArray(JUDGES), "JUDGES should be an array");
+    assert.ok(JUDGES.length >= 35, `Should have at least 35 judges, got ${JUDGES.length}`);
+    for (const j of JUDGES) {
+      assert.ok(j.id, `Judge should have an id`);
+      assert.ok(j.name, `Judge ${j.id} should have a name`);
+      assert.ok(j.domain, `Judge ${j.id} should have a domain`);
+      assert.ok(j.systemPrompt, `Judge ${j.id} should have a systemPrompt`);
+      assert.ok(j.rulePrefix, `Judge ${j.id} should have a rulePrefix`);
+    }
+  });
+
+  it("deep review exports should be accessible from the API module", async () => {
+    const api = await import("../src/api.js");
+    assert.ok(
+      typeof api.buildTribunalDeepReviewSection === "function",
+      "buildTribunalDeepReviewSection should be exported",
+    );
+    assert.ok(
+      typeof api.buildSingleJudgeDeepReviewSection === "function",
+      "buildSingleJudgeDeepReviewSection should be exported",
+    );
+    assert.ok(Array.isArray(api.JUDGES), "JUDGES should be exported from API");
   });
 });

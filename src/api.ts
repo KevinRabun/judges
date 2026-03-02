@@ -70,6 +70,9 @@ export { evaluateCodeV2, evaluateProjectV2, getSupportedPolicyProfiles } from ".
 // ─── Cross-File Taint Analysis ───────────────────────────────────────────────
 export { analyzeCrossFileTaint } from "./ast/cross-file-taint.js";
 
+// ─── Deep Review Prompts ─────────────────────────────────────────────────────
+export { buildSingleJudgeDeepReviewSection, buildTribunalDeepReviewSection } from "./tools/deep-review.js";
+
 // ─── Cache Utilities ─────────────────────────────────────────────────────────
 export { LRUCache, contentHash } from "./cache.js";
 export { clearProjectCache } from "./evaluators/project.js";

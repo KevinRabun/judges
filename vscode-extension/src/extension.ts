@@ -101,6 +101,40 @@ export function activate(context: vscode.ExtensionContext): void {
       );
     }),
 
+    vscode.commands.registerCommand("judges.deepReview", async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        vscode.window.showWarningMessage("Judges: No file is open. Open a file to deep-review.");
+        return;
+      }
+
+      const cts = new vscode.CancellationTokenSource();
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Judges: Running deep review (Layer 1 + Layer 2)…",
+          cancellable: true,
+        },
+        async (_progress, progressToken) => {
+          progressToken.onCancellationRequested(() => cts.cancel());
+
+          const result = await diagnosticProvider.deepReview(editor.document, cts.token);
+
+          if (cts.token.isCancellationRequested) return;
+
+          // Open the report in a new markdown preview tab
+          const doc = await vscode.workspace.openTextDocument({
+            content: result.markdown,
+            language: "markdown",
+          });
+          await vscode.window.showTextDocument(doc, { preview: true });
+        },
+      );
+
+      cts.dispose();
+    }),
+
     vscode.commands.registerCommand("judges.showPanel", () => {
       vscode.window.showInformationMessage("Judges: Results panel coming soon.");
     }),

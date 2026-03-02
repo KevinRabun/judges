@@ -14,6 +14,30 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   const fnLines = getLangLineNumbers(code, language, LP.FUNCTION_DEF);
   fnLines.forEach((ln) => {
     const idx = ln - 1;
+    const fnLine = lines[idx];
+
+    // Only flag exported/public functions — skip internal/private ones
+    const isExported = (() => {
+      if (LP.isJsTs(lang)) {
+        // JS/TS: must have `export` keyword on the line or on the preceding line
+        return /\bexport\b/.test(fnLine) || (idx > 0 && /^\s*export\b/.test(lines[idx - 1]));
+      }
+      if (lang === "rust") return /\bpub\b/.test(fnLine);
+      if (lang === "java" || lang === "csharp") return /\bpublic\b/.test(fnLine);
+      if (lang === "go") {
+        // Go: exported functions start with uppercase
+        const m = fnLine.match(/func\s+(?:\(\w+\s+\*?\w+\)\s+)?([A-Z]\w*)\s*\(/);
+        return !!m;
+      }
+      if (lang === "python") {
+        // Python: skip private/protected (underscore-prefixed) functions
+        return !/def\s+_/.test(fnLine);
+      }
+      return true; // unknown language — flag all
+    })();
+
+    if (!isExported) return;
+
     // Walk backwards through comment/blank/decorator lines to find doc comments
     // This handles arbitrarily long JSDoc blocks (e.g., large @returns types)
     let hasDoc = false;

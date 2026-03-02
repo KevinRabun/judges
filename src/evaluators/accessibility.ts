@@ -401,21 +401,28 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   }
 
   // Form error messages not associated with inputs
+  // Only apply to files that contain HTML/JSX rendering patterns — skip backend-only code
+  const hasRenderingPatterns =
+    /<[a-z]+[\s>]|jsx|tsx|render\s*\(|createElement|dangerouslySetInnerHTML|className\s*=|htmlFor|aria-|role\s*=|<input|<form|<select|<textarea|<button/i.test(
+      code,
+    );
   const errorMsgLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (isCommentLine(line)) return;
-    const trimmed = line.trim();
-    // Skip comment lines — doc blocks describing ARIA helpers are not violations
-    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
-    // Skip function/class declarations — definitions are not rendering patterns
-    if (/^\s*(?:export\s+)?(?:function|class|const|let|var|def|fn|func)\s/i.test(line)) return;
-    if (
-      /(?:error|invalid|validation).*(?:message|msg|text)/i.test(line) &&
-      !/aria-describedby|aria-errormessage|aria-invalid/i.test(line)
-    ) {
-      errorMsgLines.push(i + 1);
-    }
-  });
+  if (hasRenderingPatterns) {
+    lines.forEach((line, i) => {
+      if (isCommentLine(line)) return;
+      const trimmed = line.trim();
+      // Skip comment lines — doc blocks describing ARIA helpers are not violations
+      if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
+      // Skip function/class declarations — definitions are not rendering patterns
+      if (/^\s*(?:export\s+)?(?:function|class|const|let|var|def|fn|func)\s/i.test(line)) return;
+      if (
+        /(?:error|invalid|validation).*(?:message|msg|text)/i.test(line) &&
+        !/aria-describedby|aria-errormessage|aria-invalid/i.test(line)
+      ) {
+        errorMsgLines.push(i + 1);
+      }
+    });
+  }
   if (errorMsgLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

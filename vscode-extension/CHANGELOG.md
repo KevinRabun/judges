@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] — 2026-03-02
+
+### Added
+
+- **Combined Layer 1 + Layer 2 deep review** — new `/deepreview` chat sub-command and `Judges: Deep Review (Layer 1 + Layer 2)` command palette entry. Runs all 35 deterministic evaluators instantly, then sends findings + source code to GPT-4o with the full tribunal deep-review prompt for contextual AI analysis — all in a single action.
+- **`@judges /deepreview` chat command** — streams L1 findings grouped by severity with fix buttons, then streams the L2 LLM deep-review directly in Copilot Chat. Falls back to L1-only when no LLM is available.
+- **`Judges: Deep Review` command** — accessible from command palette (🚀 icon) and editor context menu. Opens the combined L1 + L2 report as a new markdown tab.
+
 ## [0.3.0] — 2026-03-02
 
 ### Added

@@ -13,6 +13,7 @@ Install one extension. Get **35 specialized judges** reviewing every file you sa
 - **Workspace evaluation** — evaluate all supported files with progress reporting
 - **Status bar** — one-click evaluation from the status bar shield icon
 - **Configurable** — choose presets, severity filters, and specific judges
+- **Combined deep review** — `/deepreview` runs Layer 1 (instant pattern analysis) and Layer 2 (LLM contextual review) in a single action, streaming results directly in chat or opening a markdown report
 - **AI-powered false-positive refinement** — right-click a file and select "Refine Findings with AI" to use GPT-4o to review pattern-matched findings and filter out false positives
 
 ## Chat Participant — `@judges`
@@ -24,6 +25,7 @@ Talk to the Judges Panel directly in Copilot Chat:
 | `@judges` | Review the active file with all 35 judges |
 | `@judges /review` | Same as above |
 | `@judges /security` | Security-focused review only |
+| `@judges /deepreview` | Combined Layer 1 + Layer 2 deep review (pattern analysis + AI contextual review) |
 | `@judges /fix` | Auto-fix all fixable findings |
 | `@judges /help` | Show available commands |
 
@@ -47,6 +49,7 @@ TypeScript, JavaScript, Python, Go, Rust, Java, C#, C++
 | `Judges: Clear Diagnostics` | Remove all Judges diagnostics |
 | `Judges: Show Results Panel` | Open the Judges results view |
 | `Judges: Refine Findings with AI` | Use GPT-4o to review findings and filter out false positives |
+| `Judges: Deep Review (Layer 1 + Layer 2)` | Run all 35 evaluators then GPT-4o contextual review — opens report as markdown tab |
 | `Judges: Configure MCP Server` | Write MCP server definition to `.vscode/mcp.json` (manual alternative to auto-config) |
 
 ## Configuration

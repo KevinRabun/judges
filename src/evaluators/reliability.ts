@@ -29,12 +29,23 @@ export function analyzeReliability(code: string, language: string): Finding[] {
   }
 
   // Detect missing timeout on network calls (multi-language)
+  // Check a broader context window (±15 lines) plus file-level AbortController/signal usage
   const noTimeoutLines: number[] = [];
   const httpClientLines = getLangLineNumbers(code, language, LP.HTTP_CLIENT);
+  const hasFileTimeoutPattern =
+    /AbortController|AbortSignal\.timeout|createTimeoutSignal|mergeSignalWithTimeout|withTimeout|timeoutSignal|signal\s*:\s*\w/i.test(
+      code,
+    );
   httpClientLines.forEach((ln) => {
     const idx = ln - 1;
-    const context = lines.slice(idx, Math.min(lines.length, idx + 5)).join("\n");
-    if (!/timeout|AbortController|signal|deadline|Duration|TimeSpan|time\.After/i.test(context)) {
+    // Scan ±15 lines (the enclosing function scope) for timeout/signal evidence
+    const ctxStart = Math.max(0, idx - 15);
+    const ctxEnd = Math.min(lines.length, idx + 15);
+    const context = lines.slice(ctxStart, ctxEnd).join("\n");
+    if (
+      !/timeout|AbortController|AbortSignal|signal\s*[,:=]|deadline|Duration|TimeSpan|time\.After/i.test(context) &&
+      !hasFileTimeoutPattern
+    ) {
       noTimeoutLines.push(ln);
     }
   });
