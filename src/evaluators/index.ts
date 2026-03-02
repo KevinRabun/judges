@@ -39,6 +39,7 @@ import {
 import { evaluateMustFixGate, clampConfidence, applyConfidenceThreshold, isAbsenceBasedFinding } from "../scoring.js";
 import { enrichWithPatches } from "../patches/index.js";
 import { crossEvaluatorDedup } from "../dedup.js";
+import { filterFalsePositiveHeuristics } from "./false-positive-review.js";
 
 // ─── Individual Analyzers ────────────────────────────────────────────────────
 // NOTE: Analyzer functions are now registered directly on each JudgeDefinition
@@ -480,7 +481,8 @@ export function evaluateWithTribunal(
 
   const rawFindings = evaluations.flatMap((e) => e.findings);
   const dedupedFindings = crossEvaluatorDedup(rawFindings);
-  const allFindings = applyConfig(dedupedFindings, options?.config);
+  const { filtered: fpFiltered } = filterFalsePositiveHeuristics(dedupedFindings, code, language);
+  const allFindings = applyConfig(fpFiltered, options?.config);
   const mustFixGate = evaluateMustFixGate(allFindings, options?.mustFixGate);
   const criticalCount = allFindings.filter((f) => f.severity === "critical").length;
   const highCount = allFindings.filter((f) => f.severity === "high").length;

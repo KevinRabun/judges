@@ -36,6 +36,7 @@ import { agentInstructionsJudge } from "./agent-instructions.js";
 import { aiCodeSafetyJudge } from "./ai-code-safety.js";
 import { frameworkSafetyJudge } from "./framework-safety.js";
 import { iacSecurityJudge } from "./iac-security.js";
+import { falsePositiveReviewJudge } from "./false-positive-review.js";
 
 // ─── Analyzer Imports ────────────────────────────────────────────────────────
 import { analyzeDataSecurity } from "../evaluators/data-security.js";
@@ -158,6 +159,7 @@ export const JUDGES: JudgeDefinition[] = [
   aiCodeSafetyJudge,
   frameworkSafetyJudge,
   iacSecurityJudge,
+  falsePositiveReviewJudge,
 ];
 
 /**

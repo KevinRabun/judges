@@ -112,8 +112,8 @@ function findingsAreWellFormed(findings: Finding[]): void {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Judge Registry", () => {
-  it("should have exactly 36 judges registered", () => {
-    assert.equal(JUDGES.length, 36);
+  it("should have exactly 37 judges registered", () => {
+    assert.equal(JUDGES.length, 37);
   });
 
   it("should allow lookup of every judge by ID", () => {
@@ -6446,7 +6446,10 @@ describe("Programmatic API", () => {
 
 describe("Registry-Based Judge Dispatch", () => {
   it("every judge should have an analyze function wired", () => {
-    for (const judge of JUDGES) {
+    // The false-positive-review meta-judge is systemPrompt-only — it has
+    // no deterministic analyze() because its purpose is agentic FP review.
+    const analyzableJudges = JUDGES.filter((j) => j.id !== "false-positive-review");
+    for (const judge of analyzableJudges) {
       assert.ok(typeof judge.analyze === "function", `Judge "${judge.id}" should have an analyze function`);
     }
   });

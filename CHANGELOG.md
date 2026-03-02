@@ -2,17 +2,30 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
-## [3.14.0] — 2026-03-02
+## [3.15.0] — 2026-03-02
+
+### Reverted
+- **Removed LLM-based false positive filter (v3.14.0)** — The external-API approach was architecturally wrong. Judges are agent prompts meant to leverage the calling model (Copilot, ChatGPT, etc.) via their `systemPrompt` fields — they should not call a separate LLM API with a separate API key. All v3.14.0 changes have been fully reverted:
+  - Deleted `src/llm-fp-filter.ts`
+  - Reverted `register-evaluation.ts`, `register-workflow.ts`, `deep-review.ts`, `api.ts`
+  - Removed 15 LLM filter tests from `subsystems.test.ts`
 
 ### Added
-- **LLM-based false positive filter** — When an OpenAI-compatible LLM is available, findings from static analysis are automatically reviewed by the LLM to identify and remove false positives before returning results. The filter is a no-op when no API key is configured and gracefully degrades on any error (network, parsing, timeout).
-  - New module `src/llm-fp-filter.ts` with `filterFalsePositivesWithLlm()`, `applyLlmFpFilterToVerdict()`, `detectLlmConfig()`, `isLlmAvailable()`, and `formatFilterResultAsMarkdown()`.
-  - Integrated into **4 MCP tool handlers**: `evaluate_code`, `evaluate_code_single_judge`, `evaluate_v2` (single-file mode), and `evaluate_diff`.
-  - Supports any OpenAI-compatible chat completion API (OpenAI, Azure OpenAI, Ollama, LM Studio, vLLM).
-  - Environment variables: `JUDGES_LLM_API_KEY` (fallback `OPENAI_API_KEY`), `JUDGES_LLM_BASE_URL`, `JUDGES_LLM_MODEL`, `JUDGES_LLM_FP_FILTER`, `JUDGES_LLM_MAX_FINDINGS`, `JUDGES_LLM_TIMEOUT_MS`.
-  - Deep review sections now indicate when LLM pre-filtering has been applied (updated `buildSingleJudgeDeepReviewSection` and `buildTribunalDeepReviewSection` with `llmFiltered` parameter).
-  - All new functions exported from the public programmatic API (`src/api.ts`).
-  - **15 new tests** covering config detection, passthrough behavior, verdict-level integration, and Markdown formatting.
+- **False-Positive Review meta-judge** (`false-positive-review`) — A new 37th judge dedicated to FP detection, following the correct hybrid architecture:
+  - **Agentic side** (`systemPrompt`): Comprehensive FP-expert persona covering a 10-category taxonomy — string literal context, comment context, test context, identifier-keyword collision, IaC gating, stdlib idiom, adjacent mitigation, import/type-only, serialization vs export, absence-based in partial code. The calling model uses this prompt in the deep review section to contextually review findings for false positives.
+  - **Deterministic side** (`src/evaluators/false-positive-review.ts`): Pipeline post-processing step in `evaluateWithTribunal` that removes findings matching known FP patterns:
+    - App-only rules (CYBER, AUTH, PERF, etc.) suppressed on IaC templates
+    - Prod-only rules (RATE, SCALE, OBS, CLOUD) suppressed on test files
+    - Findings where all target lines are comments or string literals
+    - Findings targeting import/type declarations only
+    - Keyword-in-identifier collisions (e.g. "age" in `maxAge`, "password" in `passwordField`)
+    - Safe stdlib idioms (dict.get, JSON.stringify, path.join with literals)
+    - Absence-based findings with very low confidence (<35%)
+  - **15 new tests** covering all heuristic categories
+
+## [3.14.0] — 2026-03-02 [REVERTED]
+
+_This release has been fully reverted in v3.15.0. See above for details._
 
 ## [3.13.10] — 2026-03-02
 

@@ -156,16 +156,6 @@ export { getLanguagePack, listLanguagePacks, suggestPack, LANGUAGE_PACKS } from 
 export { formatSmartOutput, formatSmartSingleJudge } from "./commands/smart-output.js";
 export type { SmartOutputOptions } from "./commands/smart-output.js";
 
-// ─── LLM False-Positive Filter ──────────────────────────────────────────────
-export {
-  detectLlmConfig,
-  isLlmAvailable,
-  filterFalsePositivesWithLlm,
-  applyLlmFpFilterToVerdict,
-  formatFilterResultAsMarkdown,
-} from "./llm-fp-filter.js";
-export type { LlmFpFilterConfig, LlmFpFilterResult } from "./llm-fp-filter.js";
-
 // ─── Convenience Aliases ─────────────────────────────────────────────────────
 
 import { evaluateWithTribunal, evaluateWithJudge } from "./evaluators/index.js";
@@ -207,3 +197,8 @@ export function evaluateCodeSingleJudge(
   }
   return evaluateWithJudge(judge, code, language, undefined, options);
 }
+
+// ─── False-Positive Heuristic Filter ─────────────────────────────────────────
+
+export { filterFalsePositiveHeuristics } from "./evaluators/false-positive-review.js";
+export type { FpFilterResult } from "./evaluators/false-positive-review.js";

@@ -7,12 +7,7 @@
 
 import type { JudgeDefinition } from "../types.js";
 
-export function buildSingleJudgeDeepReviewSection(
-  judge: JudgeDefinition,
-  language: string,
-  context?: string,
-  llmFiltered?: boolean,
-): string {
+export function buildSingleJudgeDeepReviewSection(judge: JudgeDefinition, language: string, context?: string): string {
   let md = `\n\n---\n\n`;
   md += `## 🔍 Deep Contextual Review Required\n\n`;
   md += `> **The pattern-based findings above are a starting point only.** `;
@@ -29,11 +24,6 @@ export function buildSingleJudgeDeepReviewSection(
   md += `${judge.systemPrompt}\n\n`;
 
   md += `### False Positive Review\n\n`;
-  if (llmFiltered) {
-    md += `> **Note:** An LLM-based false positive filter has already been applied to the findings above. `;
-    md += `Some static analysis false positives have been automatically removed. `;
-    md += `You should still review the remaining findings for any additional false positives the filter may have missed.\n\n`;
-  }
   md += `Before adding new findings, **review each pattern-based finding above for false positives.** `;
   md += `Static pattern matching can flag code that is actually correct — for example:\n`;
   md += `- String literals or comments that contain keywords (e.g. a regex containing "DELETE" flagged as an unaudited SQL operation)\n`;
@@ -56,12 +46,7 @@ export function buildSingleJudgeDeepReviewSection(
   return md;
 }
 
-export function buildTribunalDeepReviewSection(
-  judges: JudgeDefinition[],
-  language: string,
-  context?: string,
-  llmFiltered?: boolean,
-): string {
+export function buildTribunalDeepReviewSection(judges: JudgeDefinition[], language: string, context?: string): string {
   let md = `\n\n---\n\n`;
   md += `## 🔍 Deep Contextual Review Required\n\n`;
   md += `> **The pattern-based tribunal findings above are a starting point only.** `;
@@ -81,11 +66,6 @@ export function buildTribunalDeepReviewSection(
   }
 
   md += `### False Positive Review\n\n`;
-  if (llmFiltered) {
-    md += `> **Note:** An LLM-based false positive filter has already been applied to the findings above. `;
-    md += `Some static analysis false positives have been automatically removed (see the "LLM False Positive Filter" section above for details). `;
-    md += `You should still review the remaining findings for any additional false positives the filter may have missed.\n\n`;
-  }
   md += `Before adding new findings, **review each pattern-based finding above for false positives.** `;
   md += `Static pattern matching can flag code that is actually correct — for example:\n`;
   md += `- String literals or comments that contain keywords (e.g. a regex containing "DELETE" flagged as an unaudited SQL operation)\n`;

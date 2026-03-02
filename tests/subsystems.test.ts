@@ -33,7 +33,7 @@ import {
   detectFrameworks,
   applyFrameworkAwareness,
 } from "../src/evaluators/shared.js";
-import type { Finding, Severity, TribunalVerdict } from "../src/types.js";
+import type { Finding, Severity } from "../src/types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -1557,300 +1557,171 @@ class Outer:
   });
 });
 
-// ─── LLM FP Filter ──────────────────────────────────────────────────────────
+// ─── False-Positive Heuristic Filter ────────────────────────────────────────
 
-import {
-  detectLlmConfig,
-  isLlmAvailable,
-  filterFalsePositivesWithLlm,
-  applyLlmFpFilterToVerdict,
-  formatFilterResultAsMarkdown,
-} from "../src/llm-fp-filter.js";
+import { filterFalsePositiveHeuristics } from "../src/evaluators/false-positive-review.js";
 
-describe("LLM False Positive Filter — config detection", () => {
-  const envBackup: Record<string, string | undefined> = {};
+describe("False-Positive Heuristic Filter", () => {
+  const baseFinding: Finding = {
+    ruleId: "CYBER-001",
+    severity: "high" as Severity,
+    title: "SQL Injection",
+    description: "Potential SQL injection vulnerability",
+    recommendation: "Use parameterized queries",
+    lineNumbers: [3],
+  };
 
-  function setEnv(vars: Record<string, string | undefined>): void {
-    for (const [k, v] of Object.entries(vars)) {
-      envBackup[k] = process.env[k];
-      if (v === undefined) {
-        delete process.env[k];
-      } else {
-        process.env[k] = v;
-      }
-    }
-  }
-
-  function restoreEnv(): void {
-    for (const [k, v] of Object.entries(envBackup)) {
-      if (v === undefined) {
-        delete process.env[k];
-      } else {
-        process.env[k] = v;
-      }
-    }
-  }
-
-  it("returns null when no API key is set", () => {
-    setEnv({
-      JUDGES_LLM_API_KEY: undefined,
-      OPENAI_API_KEY: undefined,
-      JUDGES_LLM_FP_FILTER: undefined,
+  describe("IaC template gating", () => {
+    it("should remove app-only rules from IaC templates", () => {
+      const iacCode = `resource "aws_s3_bucket" "main" {\n  bucket = "my-bucket"\n  acl    = "private"\n}`;
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "CYBER-001", lineNumbers: [2] },
+        { ...baseFinding, ruleId: "AUTH-002", lineNumbers: [2] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, iacCode, "terraform");
+      assert.strictEqual(removed.length, 2, "Both app-only rules should be removed from IaC");
+      assert.strictEqual(filtered.length, 0);
     });
-    try {
-      assert.equal(detectLlmConfig(), null);
-      assert.equal(isLlmAvailable(), false);
-    } finally {
-      restoreEnv();
-    }
-  });
 
-  it("detects JUDGES_LLM_API_KEY env var", () => {
-    setEnv({
-      JUDGES_LLM_API_KEY: "test-key-123",
-      OPENAI_API_KEY: undefined,
-      JUDGES_LLM_FP_FILTER: undefined,
-      JUDGES_LLM_BASE_URL: undefined,
-      JUDGES_LLM_MODEL: undefined,
+    it("should keep IaC-relevant rules on IaC templates", () => {
+      const iacCode = `resource "aws_s3_bucket" "main" {\n  bucket = "my-bucket"\n  acl    = "private"\n}`;
+      const findings: Finding[] = [{ ...baseFinding, ruleId: "IAC-001", lineNumbers: [2] }];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, iacCode, "terraform");
+      assert.strictEqual(filtered.length, 1, "IAC rule should be kept on IaC file");
+      assert.strictEqual(removed.length, 0);
     });
-    try {
-      const config = detectLlmConfig();
-      assert.ok(config);
-      assert.equal(config.apiKey, "test-key-123");
-      assert.equal(config.baseUrl, "https://api.openai.com/v1");
-      assert.equal(config.model, "gpt-4o-mini");
-      assert.equal(isLlmAvailable(), true);
-    } finally {
-      restoreEnv();
-    }
   });
 
-  it("falls back to OPENAI_API_KEY", () => {
-    setEnv({
-      JUDGES_LLM_API_KEY: undefined,
-      OPENAI_API_KEY: "openai-key-456",
-      JUDGES_LLM_FP_FILTER: undefined,
+  describe("Test file gating", () => {
+    it("should remove prod-only rules from test files", () => {
+      // classifyFile returns "test" for files with test patterns
+      const testCode = `import { describe, it, beforeEach } from "node:test";\ndescribe("test suite", () => {\n  beforeEach(() => {});\n  it("works", () => { expect(true); });\n  it("does more", () => { assert.ok(1); });\n});`;
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "RATE-001", lineNumbers: [2] },
+        { ...baseFinding, ruleId: "SCALE-001", lineNumbers: [2] },
+        { ...baseFinding, ruleId: "OBS-001", lineNumbers: [2] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, testCode, "typescript");
+      assert.strictEqual(removed.length, 3, "All prod-only rules should be removed from test files");
+      assert.strictEqual(filtered.length, 0);
     });
-    try {
-      const config = detectLlmConfig();
-      assert.ok(config);
-      assert.equal(config.apiKey, "openai-key-456");
-    } finally {
-      restoreEnv();
-    }
-  });
 
-  it("respects JUDGES_LLM_FP_FILTER=false to disable", () => {
-    setEnv({
-      JUDGES_LLM_API_KEY: "test-key",
-      JUDGES_LLM_FP_FILTER: "false",
+    it("should keep security rules on test files", () => {
+      const testCode = `import { describe, it, beforeEach } from "node:test";\ndescribe("test suite", () => {\n  beforeEach(() => {});\n  it("works", () => { expect(true); });\n  it("does more", () => { assert.ok(1); });\n});`;
+      const findings: Finding[] = [{ ...baseFinding, ruleId: "CYBER-001", lineNumbers: [2] }];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, testCode, "typescript");
+      assert.strictEqual(filtered.length, 1, "Security rules should be kept on test files");
+      assert.strictEqual(removed.length, 0);
     });
-    try {
-      assert.equal(detectLlmConfig(), null);
-      assert.equal(isLlmAvailable(), false);
-    } finally {
-      restoreEnv();
-    }
   });
 
-  it("respects JUDGES_LLM_FP_FILTER=0 to disable", () => {
-    setEnv({
-      JUDGES_LLM_API_KEY: "test-key",
-      JUDGES_LLM_FP_FILTER: "0",
+  describe("Comment-only lines", () => {
+    it("should remove findings where all target lines are comments", () => {
+      const code = `const x = 1;\n// SELECT * FROM users WHERE id = $input\nconst y = 2;`;
+      const findings: Finding[] = [{ ...baseFinding, ruleId: "CYBER-010", lineNumbers: [2] }];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "Finding on comment line should be removed");
+      assert.ok(removed[0].description.includes("FP Heuristic"), "Should annotate with FP reason");
     });
-    try {
-      assert.equal(detectLlmConfig(), null);
-    } finally {
-      restoreEnv();
-    }
-  });
 
-  it("uses custom base URL and model", () => {
-    setEnv({
-      JUDGES_LLM_API_KEY: "key",
-      JUDGES_LLM_BASE_URL: "http://localhost:11434/v1",
-      JUDGES_LLM_MODEL: "llama3",
-      JUDGES_LLM_FP_FILTER: undefined,
+    it("should keep findings with mixed comment and code lines", () => {
+      const code = `const x = 1;\n// comment\neval(userInput);`;
+      const findings: Finding[] = [{ ...baseFinding, ruleId: "CYBER-010", lineNumbers: [2, 3] }];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(filtered.length, 1, "Finding with some code lines should be kept");
+      assert.strictEqual(removed.length, 0);
     });
-    try {
-      const config = detectLlmConfig();
-      assert.ok(config);
-      assert.equal(config.baseUrl, "http://localhost:11434/v1");
-      assert.equal(config.model, "llama3");
-    } finally {
-      restoreEnv();
-    }
   });
 
-  it("uses custom maxFindings and timeoutMs", () => {
-    setEnv({
-      JUDGES_LLM_API_KEY: "key",
-      JUDGES_LLM_MAX_FINDINGS: "25",
-      JUDGES_LLM_TIMEOUT_MS: "60000",
-      JUDGES_LLM_FP_FILTER: undefined,
+  describe("String literal lines", () => {
+    it("should remove findings where all target lines are string literals", () => {
+      const code = `const messages = [\n  "DROP TABLE users;",\n  "SELECT * FROM passwords",\n];`;
+      const findings: Finding[] = [{ ...baseFinding, ruleId: "CYBER-010", lineNumbers: [2, 3] }];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "Finding on string literal lines should be removed");
     });
-    try {
-      const config = detectLlmConfig();
-      assert.ok(config);
-      assert.equal(config.maxFindings, 25);
-      assert.equal(config.timeoutMs, 60000);
-    } finally {
-      restoreEnv();
-    }
   });
 
-  it("handles invalid numeric env vars gracefully", () => {
-    setEnv({
-      JUDGES_LLM_API_KEY: "key",
-      JUDGES_LLM_MAX_FINDINGS: "not-a-number",
-      JUDGES_LLM_TIMEOUT_MS: "-10",
-      JUDGES_LLM_FP_FILTER: undefined,
+  describe("Import/type-only lines", () => {
+    it("should remove findings on import statements", () => {
+      const code = `import crypto from "crypto";\nimport { exec } from "child_process";\nconst x = 1;`;
+      const findings: Finding[] = [{ ...baseFinding, ruleId: "CYBER-020", lineNumbers: [1, 2] }];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "Finding on import lines should be removed");
     });
-    try {
-      const config = detectLlmConfig();
-      assert.ok(config);
-      assert.equal(config.maxFindings, 50); // default
-      assert.equal(config.timeoutMs, 30000); // default
-    } finally {
-      restoreEnv();
-    }
-  });
-});
 
-describe("LLM False Positive Filter — passthrough when unavailable", () => {
-  const sampleFindings: Finding[] = [
-    {
-      ruleId: "SEC-001",
-      severity: "high",
-      title: "SQL Injection",
-      description: "Possible SQL injection",
-      recommendation: "Use parameterized queries",
-      confidence: 0.9,
-    },
-    {
-      ruleId: "PERF-001",
-      severity: "medium",
-      title: "N+1 Query",
-      description: "Potential N+1 query pattern",
-      recommendation: "Use eager loading",
-      confidence: 0.7,
-    },
-  ];
-
-  it("returns findings unchanged when no LLM config is provided", async () => {
-    const result = await filterFalsePositivesWithLlm(
-      sampleFindings,
-      "const x = 1;",
-      "typescript",
-      null, // explicitly no config
-    );
-    assert.equal(result.llmUsed, false);
-    assert.equal(result.filteredFindings.length, 2);
-    assert.equal(result.removedFindings.length, 0);
-    assert.equal(result.reviewedCount, 0);
+    it("should remove findings on type declarations", () => {
+      const code = `type Password = string;\ninterface SecretStore {\n  get(key: string): string;\n}`;
+      const findings: Finding[] = [{ ...baseFinding, ruleId: "DSEC-001", lineNumbers: [1] }];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "Finding on type declaration should be removed");
+    });
   });
 
-  it("returns empty findings unchanged", async () => {
-    const result = await filterFalsePositivesWithLlm([], "const x = 1;", "typescript", null);
-    assert.equal(result.llmUsed, false);
-    assert.equal(result.filteredFindings.length, 0);
-    assert.equal(result.removedFindings.length, 0);
-  });
-});
-
-describe("LLM False Positive Filter — verdict-level passthrough", () => {
-  it("returns verdict unchanged when no LLM is available", async () => {
-    const verdict: TribunalVerdict = {
-      overallVerdict: "warning",
-      overallScore: 65,
-      evaluations: [
+  describe("Keyword-in-identifier collision", () => {
+    it("should remove findings when keyword is part of an identifier", () => {
+      const code = `const config = {\n  maxAge: 3600,\n  cacheAge: 86400,\n};`;
+      const findings: Finding[] = [
         {
-          judgeId: "cybersecurity",
-          verdict: "warning",
-          score: 65,
-          findings: [
-            {
-              ruleId: "SEC-001",
-              severity: "high",
-              title: "Test",
-              description: "Test finding",
-              recommendation: "Fix it",
-            },
-          ],
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Age-related data exposure",
+          description: "Detected age data handling",
+          lineNumbers: [2],
         },
-      ],
-      findings: [
-        {
-          ruleId: "SEC-001",
-          severity: "high",
-          title: "Test",
-          description: "Test finding",
-          recommendation: "Fix it",
-        },
-      ],
-      criticalCount: 0,
-      highCount: 1,
-      summary: "Test summary",
-    };
-
-    const { verdict: out, filterResult } = await applyLlmFpFilterToVerdict(verdict, "const x = 1;", "typescript", null);
-    assert.equal(filterResult.llmUsed, false);
-    assert.equal(out, verdict); // same reference — untouched
-  });
-});
-
-describe("LLM False Positive Filter — markdown formatting", () => {
-  it("returns empty string when no LLM was used", () => {
-    const md = formatFilterResultAsMarkdown({
-      filteredFindings: [],
-      removedFindings: [],
-      llmUsed: false,
-      reviewedCount: 0,
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "Keyword 'age' in 'maxAge' identifier should be FP");
     });
-    assert.equal(md, "");
   });
 
-  it("returns empty string when no FPs were removed", () => {
-    const md = formatFilterResultAsMarkdown({
-      filteredFindings: [
+  describe("Absence-based low confidence", () => {
+    it("should remove absence-based findings with very low confidence", () => {
+      const code = `function add(a, b) {\n  return a + b;\n}`;
+      const findings: Finding[] = [
         {
-          ruleId: "A",
-          severity: "high",
-          title: "X",
-          description: "D",
-          recommendation: "R",
+          ...baseFinding,
+          ruleId: "OBS-001",
+          isAbsenceBased: true,
+          confidence: 0.2,
+          lineNumbers: [],
         },
-      ],
-      removedFindings: [],
-      llmUsed: true,
-      model: "gpt-4o-mini",
-      reviewedCount: 1,
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "Very low confidence absence-based finding should be removed");
     });
-    assert.equal(md, "");
+
+    it("should keep absence-based findings with moderate confidence", () => {
+      const code = `function add(a, b) {\n  return a + b;\n}`;
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "OBS-001",
+          isAbsenceBased: true,
+          confidence: 0.6,
+          lineNumbers: [],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(filtered.length, 1, "Moderate confidence absence-based finding should be kept");
+    });
   });
 
-  it("produces Markdown section when FPs are removed", () => {
-    const md = formatFilterResultAsMarkdown({
-      filteredFindings: [],
-      removedFindings: [
-        {
-          ruleId: "SEC-001",
-          severity: "medium",
-          title: "Hardcoded secret",
-          description: "Looks like a secret",
-          recommendation: "Remove it",
-          fpReason: "This is a test fixture, not a real secret",
-        },
-      ],
-      llmUsed: true,
-      model: "gpt-4o-mini",
-      reviewedCount: 5,
+  describe("Empty findings", () => {
+    it("should return empty arrays for empty input", () => {
+      const { filtered, removed } = filterFalsePositiveHeuristics([], "const x = 1;", "javascript");
+      assert.strictEqual(filtered.length, 0);
+      assert.strictEqual(removed.length, 0);
     });
-    assert.ok(md.includes("LLM False Positive Filter"));
-    assert.ok(md.includes("gpt-4o-mini"));
-    assert.ok(md.includes("SEC-001"));
-    assert.ok(md.includes("test fixture"));
-    assert.ok(md.includes("False Positives Removed:** 1"));
-    assert.ok(md.includes("Findings Reviewed:** 5"));
+  });
+
+  describe("Findings without line numbers", () => {
+    it("should keep findings without line numbers (no context to check)", () => {
+      const code = `const x = 1;\neval(input);`;
+      const findings: Finding[] = [{ ...baseFinding, ruleId: "CYBER-001", lineNumbers: undefined }];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(filtered.length, 1, "Finding without line numbers should be kept");
+      assert.strictEqual(removed.length, 0);
+    });
   });
 });

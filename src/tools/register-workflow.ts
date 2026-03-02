@@ -10,7 +10,6 @@ import { JUDGES } from "../judges/index.js";
 import { evaluateProject, evaluateDiff, analyzeDependencies, runAppBuilderWorkflow } from "../evaluators/index.js";
 import { generatePublicRepoReport } from "../reports/public-repo-report.js";
 import { configSchema, toJudgesConfig } from "./schemas.js";
-import { filterFalsePositivesWithLlm, formatFilterResultAsMarkdown } from "../llm-fp-filter.js";
 
 /**
  * Register workflow-focused tools: evaluate_public_repo_report, evaluate_project,
@@ -382,28 +381,21 @@ function registerEvaluateDiff(server: McpServer): void {
           config: toJudgesConfig(config),
         });
 
-        // Apply LLM false-positive filter when available
-        const filterResult = await filterFalsePositivesWithLlm(result.findings, code, language);
-        const activeFindings = filterResult.llmUsed ? filterResult.filteredFindings : result.findings;
-        const filterSection = formatFilterResultAsMarkdown(filterResult);
-
         let md = `# Diff Analysis\n\n`;
         md += `**Verdict:** ${result.verdict.toUpperCase()} (${result.score}/100)\n`;
         md += `**Changed lines analyzed:** ${result.linesAnalyzed}\n`;
-        md += `**Findings in changed code:** ${activeFindings.length}\n\n`;
+        md += `**Findings in changed code:** ${result.findings.length}\n\n`;
 
-        if (activeFindings.length === 0) {
+        if (result.findings.length === 0) {
           md += `No issues found in the changed lines.\n`;
         } else {
-          for (const f of activeFindings) {
+          for (const f of result.findings) {
             md += `### ${f.ruleId}: ${f.title}\n`;
             md += `**Severity:** ${f.severity} | **Lines:** ${f.lineNumbers?.join(", ") ?? "N/A"}\n\n`;
             md += `${f.description}\n\n`;
             md += `**Recommendation:** ${f.recommendation}\n\n`;
           }
         }
-
-        md += filterSection;
 
         return { content: [{ type: "text" as const, text: md }] };
       } catch (error) {
