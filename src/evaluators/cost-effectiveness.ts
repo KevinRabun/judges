@@ -8,6 +8,13 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
   const prefix = "COST";
   const lang = getLangFamily(language);
 
+  // Infrastructure-as-Code templates (Bicep, Terraform, ARM) are declarative —
+  // they have no imperative loops. Skip nested-loop detection for IaC files.
+  const isIaCTemplate =
+    /(?:^|\n)\s*(?:param\s+\w+\s+(?:string|int|bool|object|array)|resource\s+\w+\s+'[^']*@\d{4}-\d{2}-\d{2}|@(?:allowed|description|secure)\s*\(|targetScope\s*=|resource\s+"[^"]+"\s+"[^"]+"|variable\s+"|provider\s+"|terraform\s*\{|\$schema.*deploymentTemplate)/im.test(
+      code,
+    );
+
   // Nested loops (potential O(n²)) (multi-language)
   const lines = code.split("\n");
   let loopDepth = 0;
@@ -26,7 +33,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
       loopDepth--;
     }
   }
-  if (nestedLoopLines.length > 0) {
+  if (nestedLoopLines.length > 0 && !isIaCTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

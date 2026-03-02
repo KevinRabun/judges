@@ -2441,3 +2441,180 @@ describe("FP Regression — TEST-001: Single 'it(' in browser code is not test s
     assert.ok(findings.length > 0, "Test files with describe + it should still be analyzed by testing evaluator");
   });
 });
+
+// ─── IaC / Bicep Template False-Positive Regression ─────────────────────────
+// Bicep (and other IaC) templates are declarative infrastructure definitions.
+// They have no imperative loops, no age data fields, no data-export code paths,
+// and enforce jurisdiction via parameter constraints (@allowed), not imperative
+// branching. Evaluator rules designed for application code must not fire on them.
+
+/** Realistic AKS Bicep template with location, region, export-like keywords */
+const aksBicepTemplate = [
+  "@description('The Azure region for deployment')",
+  "@allowed([",
+  "  'westeurope'",
+  "  'northeurope'",
+  "  'germanywestcentral'",
+  "  'francecentral'",
+  "])",
+  "param location string",
+  "",
+  "@description('Cluster name')",
+  "param clusterName string = 'aks-prod'",
+  "",
+  "@description('Data residency policy tag')",
+  "param dataResidencyPolicy string = 'eu-only'",
+  "",
+  "@description('Kubernetes version')",
+  "param kubernetesVersion string = '1.28'",
+  "",
+  "resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-01-01' = {",
+  "  name: clusterName",
+  "  location: location",
+  "  tags: {",
+  "    environment: 'production'",
+  "    dataResidency: dataResidencyPolicy",
+  "    report: 'compliance'",
+  "  }",
+  "  properties: {",
+  "    kubernetesVersion: kubernetesVersion",
+  "    enableRBAC: true",
+  "    dnsPrefix: '${clusterName}-dns'",
+  "    apiServerAccessProfile: {",
+  "      enablePrivateCluster: true",
+  "    }",
+  "    agentPoolProfiles: [",
+  "      {",
+  "        name: 'systempool'",
+  "        count: 3",
+  "        vmSize: 'Standard_D4s_v3'",
+  "        mode: 'System'",
+  "        maxAge: 30",
+  "      }",
+  "    ]",
+  "    networkProfile: {",
+  "      networkPlugin: 'azure'",
+  "      serviceCidr: serviceCidr",
+  "      dnsServiceIP: dnsServiceIP",
+  "    }",
+  "  }",
+  "}",
+  "",
+  "output clusterName string = aksCluster.name",
+  "output controlPlaneEndpoint string = aksCluster.properties.fqdn",
+].join("\n");
+
+describe("SOV-001 FP: Bicep template — no data export path", () => {
+  it("should NOT flag export-path finding on declarative IaC template", () => {
+    const findings = analyzeDataSovereignty(aksBicepTemplate, "bicep");
+    const sov001 = findings.filter((f) => f.title.toLowerCase().includes("export path"));
+    assert.strictEqual(
+      sov001.length,
+      0,
+      "Bicep templates have no data-export code paths — SOV-001 should be suppressed",
+    );
+  });
+
+  it("should STILL flag export-path on server code with report/download endpoints", () => {
+    const serverCode = [
+      'import express from "express";',
+      "const app = express();",
+      'app.get("/api/export", (req, res) => {',
+      '  const report = generateReport("all-users");',
+      "  res.download(report);",
+      "});",
+      'app.get("/api/analytics/download", (req, res) => {',
+      "  const dump = dumpAnalytics();",
+      "  res.json(dump);",
+      "});",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(serverCode, "typescript");
+    const exportFindings = findings.filter((f) => f.title.toLowerCase().includes("export path"));
+    assert.ok(exportFindings.length > 0, "Server-side export endpoints should still be flagged");
+  });
+});
+
+describe("SOV-002 FP: Bicep template — jurisdiction via declarative constraints", () => {
+  it("should NOT flag jurisdiction-enforcement on IaC with @allowed region constraint", () => {
+    const findings = analyzeDataSovereignty(aksBicepTemplate, "bicep");
+    const sov002 = findings.filter(
+      (f) => f.title.toLowerCase().includes("jurisdiction") && f.title.toLowerCase().includes("enforcement"),
+    );
+    assert.strictEqual(sov002.length, 0, "Bicep declarative @allowed is enforcement — SOV-002 should be suppressed");
+  });
+
+  it("should STILL flag jurisdiction-enforcement on imperative code without policy enforcement", () => {
+    const serverCode = [
+      "const region = getRequestRegion(ctx);",
+      "const locale = getUserLocale(req);",
+      "const country = geoip.lookup(ip).country;",
+      "const tenantRegion = tenant.region;",
+      "// No enforcement logic whatsoever",
+      "processData(region, payload);",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(serverCode, "typescript");
+    const jurisdictionFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("jurisdiction") && f.title.toLowerCase().includes("enforcement"),
+    );
+    assert.ok(
+      jurisdictionFindings.length > 0,
+      "Imperative code with jurisdiction context but no enforcement should be flagged",
+    );
+  });
+});
+
+describe("COMP-001 FP: Bicep template — no age data in AKS infra", () => {
+  it("should NOT flag age-verification on IaC template with maxAge pool config", () => {
+    const findings = analyzeCompliance(aksBicepTemplate, "bicep");
+    const comp001 = findings.filter(
+      (f) => f.title.toLowerCase().includes("age") && f.title.toLowerCase().includes("verification"),
+    );
+    assert.strictEqual(
+      comp001.length,
+      0,
+      "Bicep infra 'maxAge' is a pool setting, not user age data — COMP-001 should be suppressed",
+    );
+  });
+
+  it("should STILL flag age-verification on application code with user age fields", () => {
+    const appCode = [
+      "function registerUser(data: UserInput) {",
+      "  const userAge = data.age;",
+      "  const dob = data.dateOfBirth;",
+      "  db.users.insert({ name: data.name, age: userAge, dob });",
+      "}",
+    ].join("\n");
+    const findings = analyzeCompliance(appCode, "typescript");
+    const ageFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("age") && f.title.toLowerCase().includes("verification"),
+    );
+    assert.ok(ageFindings.length > 0, "Application code with user age fields should still be flagged");
+  });
+});
+
+describe("COST-001 FP: Bicep template — no imperative loops in IaC", () => {
+  it("should NOT flag nested loops on declarative IaC template", () => {
+    const findings = analyzeCostEffectiveness(aksBicepTemplate, "bicep");
+    const cost001 = findings.filter((f) => f.title.toLowerCase().includes("nested loop"));
+    assert.strictEqual(cost001.length, 0, "Bicep templates have no imperative loops — COST-001 should be suppressed");
+  });
+
+  it("should STILL flag nested loops on imperative application code", () => {
+    const appCode = [
+      "function findDuplicates(users: User[], orders: Order[]) {",
+      "  const results = [];",
+      "  for (const user of users) {",
+      "    for (const order of orders) {",
+      "      if (order.userId === user.id) {",
+      "        results.push({ user, order });",
+      "      }",
+      "    }",
+      "  }",
+      "  return results;",
+      "}",
+    ].join("\n");
+    const findings = analyzeCostEffectiveness(appCode, "typescript");
+    const loopFindings = findings.filter((f) => f.title.toLowerCase().includes("nested loop"));
+    assert.ok(loopFindings.length > 0, "Imperative nested loops should still be flagged");
+  });
+});

@@ -115,6 +115,14 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       confidence: 0.85,
     });
   }
+  // Infrastructure-as-Code templates (Bicep, Terraform, ARM) are declarative
+  // infrastructure definitions — they have no data-export code paths and enforce
+  // jurisdiction via parameter constraints (@allowed, variable validation), not
+  // imperative branching. Skip export-path and jurisdiction-enforcement rules.
+  const isIaCTemplate =
+    /(?:^|\n)\s*(?:param\s+\w+\s+(?:string|int|bool|object|array)|resource\s+\w+\s+'[^']*@\d{4}-\d{2}-\d{2}|@(?:allowed|description|secure)\s*\(|targetScope\s*=|resource\s+"[^"]+"\s+"[^"]+"|variable\s+"|provider\s+"|terraform\s*\{|\$schema.*deploymentTemplate)/im.test(
+      code,
+    );
   // Frontend/browser code — keywords like analytics, report, download in UI
   // rendering or event handling are not data-export operations.
   const isFrontendCode =
@@ -149,7 +157,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       code,
     );
 
-  if (exportLines.length > 0 && !hasCentralizedSovereignResponse && !isFrontendCode) {
+  if (exportLines.length > 0 && !hasCentralizedSovereignResponse && !isFrontendCode && !isIaCTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -173,7 +181,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   // "jurisdiction" or "region" in privacy text are legal disclosures, not code
   // branches that need enforcement logic.
   const isMarkupFile = /^\s*<(!DOCTYPE|html|head|body|meta|link)/im.test(code);
-  if (regionMentionLines.length > 0 && geoRoutingSignals && !hasPolicyEnforcement && !isMarkupFile) {
+  if (regionMentionLines.length > 0 && geoRoutingSignals && !hasPolicyEnforcement && !isMarkupFile && !isIaCTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

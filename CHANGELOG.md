@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.13.8] — 2026-03-02
+
+### Fixed
+- **4 evaluator false-positive fixes** from eighth round of real-world Copilot feedback (`gdpr_aks.bicep` IaC template, persisted across 3 remediation iterations):
+  - **SOV-001** (data-sovereignty) — Export-path rule now gated on `!isIaCTemplate`. Bicep/Terraform/ARM templates are declarative infrastructure definitions with no data-export code paths.
+  - **SOV-002** (data-sovereignty) — Jurisdiction enforcement rule now gated on `!isIaCTemplate`. Bicep enforces jurisdiction via declarative `@allowed` parameter constraints, not imperative `deny`/`throw` branches.
+  - **COMP-001** (compliance) — Age-verification rule now gated on `!isIaCTemplate`. Infrastructure templates contain no age-related user data or input fields (e.g., AKS `maxAge` is a node pool setting).
+  - **COST-001** (cost-effectiveness) — Nested-loop detection now gated on `!isIaCTemplate`. Declarative IaC has no imperative loop constructs.
+
+### Added
+- **8 new regression tests** (1302 total) covering all 4 IaC FP fixes with both negative (Bicep template suppressed) and positive (imperative application code still detected) cases.
+- `isIaCTemplate` detection regex for Bicep (`param`, `resource`, `@allowed`, `targetScope`), Terraform (`resource`, `variable`, `provider`, `terraform {`), and ARM (`$schema...deploymentTemplate`) across 3 evaluators.
+
 ## [3.13.7] — 2026-03-02
 
 ### Fixed

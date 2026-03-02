@@ -304,7 +304,13 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   // Skip for HTML/markup files — privacy policy text mentioning age/COPPA/children
   // is legal disclosure, not an age-input data flow requiring verification logic.
   const isMarkup = /^\s*<(!DOCTYPE|html|head|body|meta|link|div|section|p\b|span|a\b|h[1-6])/im.test(code);
-  if (!isMarkup) {
+  // Skip for IaC templates (Bicep, Terraform, ARM) — infrastructure declarations
+  // contain no age-related user data or input fields requiring verification.
+  const isIaCTemplate =
+    /(?:^|\n)\s*(?:param\s+\w+\s+(?:string|int|bool|object|array)|resource\s+\w+\s+'[^']*@\d{4}-\d{2}-\d{2}|@(?:allowed|description|secure)\s*\(|targetScope\s*=|resource\s+"[^"]+"\s+"[^"]+"|variable\s+"|provider\s+"|terraform\s*\{|\$schema.*deploymentTemplate)/im.test(
+      code,
+    );
+  if (!isMarkup && !isIaCTemplate) {
     lines.forEach((line, i) => {
       if (isCommentLine(line)) return;
       // Use word-bounded \bage(?![a-z]) to avoid matching 'age' inside common
