@@ -13,6 +13,9 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     const trimmed = line.trim();
     // Skip comment lines — doc blocks describing sovereignty controls are not violations
     if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
+    // Skip lines where region patterns appear inside regex literals or test/match calls
+    // (analysis/evaluator code referencing patterns, not actual region usage)
+    if (/\/[^/\n]+\/[gimsuy]*/.test(line) && /\.test\s*\(|\.match\s*\(|new\s+RegExp/i.test(line)) return;
 
     if (/region|location|geo|jurisdiction|data.?residen/i.test(line)) {
       regionMentionLines.push(index + 1);
@@ -27,7 +30,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   });
 
   const hasRegionPolicy =
-    /allow(ed)?Regions|approvedRegions|regionPolicy|dataResidencyPolicy|sovereignty|approvedJurisdictions|allowedJurisdictions|jurisdictionPolicy|exportPolicy|egressPolicy|jurisdictionGuard/i.test(
+    /allow(ed)?Regions|approvedRegions|regionPolicy|dataResidencyPolicy|sovereignty|approvedJurisdictions|allowedJurisdictions|jurisdictionPolicy|exportPolicy|egressPolicy|jurisdictionGuard|regionConfig|deploymentRegion|regionConstraint|regionAllowlist|regionDenylist|dataLocality|geoFence|geoRestrict/i.test(
       code,
     );
 

@@ -9,7 +9,14 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   const _lang = getLangFamily(language);
 
   // SQL injection via string concatenation (multi-language)
-  const sqlInjectionLines = getLangLineNumbers(code, language, LP.SQL_INJECTION);
+  const rawSqlInjectionLines = getLangLineNumbers(code, language, LP.SQL_INJECTION);
+  // Filter out lines where SQL patterns appear inside regex literals or test/match calls
+  // (code analysis tools referencing SQL patterns, not real SQL queries)
+  const sqlInjectionLines = rawSqlInjectionLines.filter((ln) => {
+    const line = code.split("\n")[ln - 1] || "";
+    if (/\/[^/\n]+\/[gimsuy]*/.test(line) && /\.test\s*\(|\.match\s*\(|new\s+RegExp/i.test(line)) return false;
+    return true;
+  });
   if (sqlInjectionLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

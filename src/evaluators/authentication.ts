@@ -26,6 +26,8 @@ function getHardcodedCredentialLinesWithoutPlaceholders(code: string): number[] 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     if (isCommentLine(line)) continue;
+    // Skip lines where credential keywords appear inside regex literals or test/match calls
+    if (/\/[^/\n]+\/[gimsuy]*/.test(line) && /\.test\s*\(|\.match\s*\(|new\s+RegExp/i.test(line)) continue;
     const matches = [...line.matchAll(assignmentPattern)];
     if (matches.length === 0) continue;
 
@@ -100,7 +102,16 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
 
   // No auth middleware on routes (multi-language)
   const routeLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
-  const hasRoutes = routeLines.length > 0;
+  // Filter out route-pattern references inside regex/test calls (analysis code, not real routes)
+  const actualRouteLines = routeLines.filter((ln) => {
+    const line = lines[ln - 1] || "";
+    // Skip lines where route patterns appear inside regex literals or match/test calls
+    if (/\/[^/\n]+\/[gimsuy]*/.test(line) && /\.test\s*\(|\.match\s*\(|new\s+RegExp/i.test(line)) return false;
+    // Skip lines that are string literal patterns for code analysis (e.g. pattern maps)
+    if (/^\s*["'`].*["'`]\s*[:,]?\s*$/.test(line) && /app\\?\.(?:get|post|put|delete)/i.test(line)) return false;
+    return true;
+  });
+  const hasRoutes = actualRouteLines.length > 0;
   const hasAuthMiddleware =
     /(?:authenticate|authorize|requireAuth|ensureAuth|isAuthenticated|verifyToken|passport\.authenticate|jwt\.verify|auth\(\)|protect|guard|requireLogin|@login_required|@requires_auth|@Authorize|@PreAuthorize|@Secured)/gi.test(
       code,
@@ -111,18 +122,22 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       code,
     );
   const isHealthCheckOnly =
-    routeLines.length > 0 &&
-    routeLines.every((ln) => {
+    actualRouteLines.length > 0 &&
+    actualRouteLines.every((ln) => {
       const line = lines[ln - 1] || "";
       return /['"\/](?:health|status|metrics|ready|live|liveness|readiness|ping|version|favicon|\.well-known)/i.test(
         line,
       );
     });
+  // Suppress when the file is primarily code-analysis / evaluator logic (many regex .test() calls)
+  const regexTestCallCount = (code.match(/\.test\s*\(/g) || []).length;
+  const isLikelyAnalysisCode = regexTestCallCount >= 8;
   if (
     hasRoutes &&
     !hasAuthMiddleware &&
     !hasPublicEndpointMarker &&
     !isHealthCheckOnly &&
+    !isLikelyAnalysisCode &&
     code.split("\n").length > 20
   ) {
     findings.push({

@@ -32,10 +32,18 @@ export function analyzePortability(code: string, language: string): Finding[] {
   // Hardcoded path separators
   const pathSepPattern = /(?:['"`](?:[^'"`]*\\\\[^'"`]*){2,}['"`]|['"`](?:[^'"`]*\/[^'"`]*){3,}['"`])/g;
   const pathSepLines = getLineNumbers(code, pathSepPattern);
-  // Filter out URLs and imports
+  // Filter out URLs, imports, and route/API path literals
   const filteredPathSepLines = pathSepLines.filter((lineNum) => {
     const line = code.split("\n")[lineNum - 1] || "";
-    return !/https?:\/\/|import\s|from\s|require\s*\(/.test(line);
+    // Exclude URLs and module imports
+    if (/https?:\/\/|import\s|from\s|require\s*\(/.test(line)) return false;
+    // Exclude route/API path definitions (e.g., '/api/v1/users/:id')
+    if (/(?:app|router)\s*\.\s*(?:get|post|put|delete|patch|use|all)\s*\(/i.test(line)) return false;
+    if (/@(?:Get|Post|Put|Delete|Patch|RequestMapping)\s*\(/i.test(line)) return false;
+    if (/(?:path|route|endpoint|url)\s*[:=]/i.test(line) && /['"]\//i.test(line)) return false;
+    // Exclude strings that look like URL paths (start with / and contain only path chars)
+    if (/['"`]\/(?:api|v[0-9]|auth|users|admin|health|status|webhook|callback)\//i.test(line)) return false;
+    return true;
   });
   if (filteredPathSepLines.length > 0) {
     findings.push({

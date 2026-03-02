@@ -272,7 +272,17 @@ export function analyzeTesting(code: string, language: string): Finding[] {
       /^(?:export\s+)?(?:type|interface|enum|declare)\s+/gim.test(code) &&
       !/(function|class)\s+\w+.*\{[\s\S]{10,}\}/gi.test(code);
     const hasMinimalLogic = (code.match(/(?:if|for|while|switch|match)\s*[\s(]/g) || []).length >= 3;
-    if (hasFunctions && isLargeFile && hasMinimalLogic && !isConfigOrUtility && !isTypeDefinitionFile) {
+    // Suppress for code-analysis / evaluator modules (many regex .test() calls or regex literals)
+    const regexTestCalls = (code.match(/\.test\s*\(/g) || []).length;
+    const isAnalysisModule = regexTestCalls >= 8;
+    if (
+      hasFunctions &&
+      isLargeFile &&
+      hasMinimalLogic &&
+      !isConfigOrUtility &&
+      !isTypeDefinitionFile &&
+      !isAnalysisModule
+    ) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "medium",

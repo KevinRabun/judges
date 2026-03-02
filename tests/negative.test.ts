@@ -23,6 +23,10 @@ import { analyzeScalability } from "../src/evaluators/scalability.js";
 import { analyzeAuthentication } from "../src/evaluators/authentication.js";
 import { analyzeDatabase } from "../src/evaluators/database.js";
 import { analyzeCompliance } from "../src/evaluators/compliance.js";
+import { analyzeTesting } from "../src/evaluators/testing.js";
+import { analyzePortability } from "../src/evaluators/portability.js";
+import { analyzeSoftwarePractices } from "../src/evaluators/software-practices.js";
+import { analyzeUx } from "../src/evaluators/ux.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 
@@ -1265,5 +1269,330 @@ function processUser(user) {
     const findings = analyzeCompliance(code, "typescript");
     const ageFindings = findings.filter((f) => /age.*verification/i.test(f.title));
     assert.equal(ageFindings.length, 0, "Should suppress age finding when verifyAge/requireParentalConsent exists");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// v3.13.3 FP Regression Tests — Third Copilot Delta Report
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("FP Regression — SOV-001: Regex pattern analysis code", () => {
+  it("should NOT flag region patterns inside regex .test() calls", () => {
+    const code = `
+function analyzeRegions(code) {
+  const lines = code.split("\\n");
+  if (/(global|multi-?region|us-|asia-|ap-|worldwide)/i.test(line)) {
+    regionMentionLines.push(index + 1);
+  }
+  if (/eu-west|us-east/i.test(line) && !allowedRegionPolicy) {
+    findings.push({ severity: "high" });
+  }
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const sovFindings = findings.filter((f) => /region.*policy/i.test(f.title));
+    assert.equal(sovFindings.length, 0, "Should not flag regex analysis lines referencing region patterns");
+  });
+
+  it("should NOT flag region usage when regionConfig or geoFence exists", () => {
+    const code = `
+const regionConfig = { allowed: ["eu-west-1", "eu-central-1"] };
+
+function deployService(region) {
+  const target = "us-east-1";
+  if (!regionConfig.allowed.includes(target)) {
+    throw new Error("Region not allowed");
+  }
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const sovFindings = findings.filter((f) => /region.*policy/i.test(f.title));
+    assert.equal(sovFindings.length, 0, "Should suppress when regionConfig pattern exists");
+  });
+});
+
+describe("FP Regression — AUTH-001/002: Code analysis files with regex patterns", () => {
+  it("should NOT flag routes in analysis code with many .test() calls", () => {
+    const code = `
+function analyzeRouting(code) {
+  if (/app\\.get\\s*\\(/i.test(code)) { count++; }
+  if (/app\\.post\\s*\\(/i.test(code)) { count++; }
+  if (/router\\.use/i.test(code)) { count++; }
+  if (/express\\(\\)/i.test(code)) { count++; }
+  if (/app\\.listen/i.test(code)) { count++; }
+  if (/createServer/i.test(code)) { count++; }
+  if (/middleware/i.test(code)) { count++; }
+  if (/handler/i.test(code)) { count++; }
+  return findings;
+}
+`;
+    const findings = analyzeAuthentication(code, "typescript");
+    const authRouteFindings = findings.filter((f) => /routes.*without.*auth/i.test(f.title));
+    assert.equal(authRouteFindings.length, 0, "Should not flag analysis code that references route patterns via regex");
+  });
+
+  it("should NOT flag credential keywords inside regex patterns", () => {
+    const code = `
+function detectCredentials(code) {
+  const lines = code.split("\\n");
+  const pattern = /password\\s*[:=]\\s*["']([^"']+)["']/gi;
+  if (pattern.test(line)) {
+    flaggedLines.push(index + 1);
+  }
+  const tokenPattern = /api_key\\s*=\\s*["']([^"']+)["']/gi;
+  if (tokenPattern.test(line)) {
+    flaggedLines.push(index + 1);
+  }
+}
+`;
+    const findings = analyzeAuthentication(code, "typescript");
+    const credFindings = findings.filter((f) => /hardcoded.*credential/i.test(f.title));
+    assert.equal(credFindings.length, 0, "Should not flag credential patterns in regex analysis code");
+  });
+});
+
+describe("FP Regression — DB-001: SQL patterns in analysis/evaluator code", () => {
+  it("should NOT flag SQL injection when patterns are inside regex .test() calls", () => {
+    const code = `
+function analyzeSqlInjection(code) {
+  const sqlPattern = /SELECT.*FROM.*WHERE.*\\+|query\\(.*\\+/gi;
+  if (sqlPattern.test(line)) {
+    findings.push({ severity: "critical" });
+  }
+  if (/INSERT INTO.*\\$\\{/i.test(line)) {
+    sqlInjectionLines.push(i + 1);
+  }
+}
+`;
+    const findings = analyzeDatabase(code, "typescript");
+    const sqlFindings = findings.filter((f) => /sql.*injection/i.test(f.title));
+    assert.equal(sqlFindings.length, 0, "Should not flag SQL regex patterns in analysis code");
+  });
+});
+
+describe("FP Regression — A11Y-001: ARIA helper construction files", () => {
+  it("should NOT flag missing alt in ARIA helper utility files", () => {
+    const code = `
+export function createAccessibleImage(src, description) {
+  return \`<img src="\${src}" role="img" aria-label="\${description}">\`;
+}
+
+export function buildAriaWidget(config) {
+  const image = \`<img src="\${config.icon}">\`;
+  return addA11yProps(image, config.ariaLabel);
+}
+`;
+    const findings = analyzeAccessibility(code, "typescript");
+    const altFindings = findings.filter((f) => /image.*alt/i.test(f.title));
+    assert.equal(altFindings.length, 0, "Should suppress img-no-alt in ARIA helper files");
+  });
+
+  it("should still flag missing alt in regular component files", () => {
+    const code = `
+function ProfileCard({ user }) {
+  return (
+    <div>
+      <img src={user.avatar}>
+      <h2>{user.name}</h2>
+    </div>
+  );
+}
+`;
+    const findings = analyzeAccessibility(code, "typescript");
+    const altFindings = findings.filter((f) => /image.*alt/i.test(f.title));
+    assert.ok(altFindings.length > 0, "Should still flag missing alt in regular components");
+  });
+});
+
+describe("FP Regression — PORTA: Route literals in path separator detection", () => {
+  it("should NOT flag API route paths as hardcoded path separators", () => {
+    const code = `
+const routes = {
+  users: '/api/v1/users/:id/profile',
+  orders: '/api/v2/orders/:orderId/items',
+  webhook: '/webhook/callback/stripe/events',
+};
+
+app.get('/api/v1/users/:id', getUser);
+app.post('/api/v1/users/:id/orders', createOrder);
+`;
+    const findings = analyzePortability(code, "typescript");
+    const pathFindings = findings.filter((f) => /path.*separator/i.test(f.title));
+    assert.equal(pathFindings.length, 0, "Should not flag API route paths as hardcoded separators");
+  });
+
+  it("should still flag real OS-specific paths", () => {
+    const code = `
+const configPath = 'C:\\\\Users\\\\admin\\\\config.yml';
+const logDir = '/var/log/myapp/output.log';
+`;
+    const findings = analyzePortability(code, "typescript");
+    const pathFindings = findings.filter((f) => /OS-specific|path.*separator/i.test(f.title));
+    assert.ok(pathFindings.length > 0, "Should still flag real OS-specific paths");
+  });
+});
+
+describe("FP Regression — SWDEV-003: Threshold comparisons and const declarations", () => {
+  it("should NOT flag numeric literals in .length threshold comparisons", () => {
+    const code = `
+function validateInput(items) {
+  if (items.length > 50) {
+    throw new Error("Too many items");
+  }
+  if (items.length < 3) {
+    throw new Error("Too few items");
+  }
+  const maxRetries = items.length >= 10 ? 5 : 3;
+  return items.filter(i => i.name.length > 0);
+}
+`;
+    const findings = analyzeSoftwarePractices(code, "typescript");
+    const magicFindings = findings.filter((f) => /magic.*number/i.test(f.title));
+    assert.equal(magicFindings.length, 0, "Should not flag .length threshold comparisons as magic numbers");
+  });
+
+  it("should NOT flag named constant declarations with uppercase names", () => {
+    const code = `
+const MAX_RETRIES = 5;
+const TIMEOUT_MS = 30000;
+export const BATCH_SIZE = 100;
+static readonly PAGE_LIMIT = 25;
+`;
+    const findings = analyzeSoftwarePractices(code, "typescript");
+    const magicFindings = findings.filter((f) => /magic.*number/i.test(f.title));
+    assert.equal(magicFindings.length, 0, "Should not flag named constant declarations as magic numbers");
+  });
+});
+
+describe("FP Regression — COMP-001: Age-consent middleware downgrade", () => {
+  it("should downgrade age finding severity when age-consent middleware detected", () => {
+    const code = `
+import { ageConsentMiddleware } from './middleware/compliance';
+
+function handleSignup(req, res) {
+  const age = calculateAge(req.body.date_of_birth);
+  if (age < 13) {
+    return res.status(403).json({ error: "Under age" });
+  }
+}
+`;
+    const findings = analyzeCompliance(code, "typescript");
+    const ageFindings = findings.filter((f) => /age.*verification/i.test(f.title));
+    if (ageFindings.length > 0) {
+      assert.equal(
+        ageFindings[0].severity,
+        "low",
+        "Should downgrade to low severity when ageConsentMiddleware is present",
+      );
+    }
+  });
+});
+
+describe("FP Regression — UX-001: React/JSX synthetic event handlers", () => {
+  it("should NOT flag inline handlers in React/JSX files", () => {
+    const code = `
+import React, { useState } from 'react';
+
+function Button({ onClick }) {
+  return <button onClick="handleClick()" type="button">Click</button>;
+}
+
+function Form() {
+  const [value, setValue] = useState('');
+  return <form onSubmit="handleSubmit()"><input onChange="update()" /></form>;
+}
+`;
+    const findings = analyzeUx(code, "typescript");
+    const handlerFindings = findings.filter((f) => /inline.*event.*handler/i.test(f.title));
+    assert.equal(handlerFindings.length, 0, "Should not flag event handlers in React files");
+  });
+
+  it("should still flag inline handlers in plain HTML", () => {
+    const code = `
+<html>
+<body>
+  <button onclick="deleteAll()">Delete</button>
+  <div onmouseover="highlight()">Hover me</div>
+</body>
+</html>
+`;
+    const findings = analyzeUx(code, "html");
+    const handlerFindings = findings.filter((f) => /inline.*event.*handler/i.test(f.title));
+    assert.ok(handlerFindings.length > 0, "Should still flag inline handlers in plain HTML");
+  });
+});
+
+describe("FP Regression — UX-002: Form detection tightened", () => {
+  it("should NOT flag form loading state for non-UI code mentioning 'form' keyword", () => {
+    const code = `
+// Transform data into proper form for API submission
+function transformData(data) {
+  const formattedData = data.map(item => ({
+    id: item.id,
+    value: item.value,
+  }));
+  return formattedData;
+}
+
+function submitReport(report) {
+  console.log("Submitting report", report.id);
+  return api.post('/reports', report);
+}
+`;
+    const findings = analyzeUx(code, "typescript");
+    const formFindings = findings.filter((f) => /form.*loading|form.*disabled/i.test(f.title));
+    assert.equal(formFindings.length, 0, "Should not flag form loading for non-UI code that mentions 'form' keyword");
+  });
+
+  it("should still flag actual HTML forms without loading state", () => {
+    const code = `
+import React from 'react';
+
+function Checkout() {
+  const [card, setCard] = React.useState('');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const data = new FormData(e.target);
+    fetch('/api/checkout', { method: 'POST', body: data });
+  }
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="card" value={card} onChange={e => setCard(e.target.value)} />
+      <button type="submit">Pay Now</button>
+    </form>
+  );
+}
+`;
+    const findings = analyzeUx(code, "typescript");
+    const formFindings = findings.filter((f) => /form.*loading|form.*disabled/i.test(f.title));
+    assert.ok(formFindings.length > 0, "Should still flag actual forms without loading state");
+  });
+});
+
+describe("FP Regression — TEST-001: Analysis/evaluator modules excluded", () => {
+  it("should NOT flag 'no tests' for code-analysis modules with many regex tests", () => {
+    const code = `
+export function analyzeCode(code) {
+  const findings = [];
+  if (/pattern1/i.test(code)) { findings.push("a"); }
+  if (/pattern2/i.test(code)) { findings.push("b"); }
+  if (/pattern3/gi.test(code)) { findings.push("c"); }
+  if (/pattern4/i.test(code)) { findings.push("d"); }
+  if (/pattern5/i.test(code)) { findings.push("e"); }
+  if (/pattern6/i.test(code)) { findings.push("f"); }
+  if (/pattern7/i.test(code)) { findings.push("g"); }
+  if (/pattern8/i.test(code)) { findings.push("h"); }
+  for (let i = 0; i < code.length; i++) {
+    if (code[i] === '{') depth++;
+    if (code[i] === '}') depth--;
+    while (depth > 0 && i < code.length) { i++; }
+  }
+  return findings;
+}
+`;
+    const findings = analyzeTesting(code, "typescript");
+    const noTestFindings = findings.filter((f) => /no tests.*detected/i.test(f.title));
+    assert.equal(noTestFindings.length, 0, "Should not flag analysis modules with many .test() calls as needing tests");
   });
 });

@@ -60,7 +60,12 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
     /\b(?:200|201|204|301|302|304|400|401|403|404|405|409|422|429|500|502|503|504|80|443|8080|3000|8443|3001|5432|27017|6379|0o?[0-7]{3,4}|0x[0-9a-f]+|1000|1024|255|256|65535|1e[3-9])\b/gi;
   const filteredMagicLines = magicLines.filter((lineNum) => {
     const line = codeLines[lineNum - 1] || "";
-    return !wellKnownNumbers.test(line);
+    if (wellKnownNumbers.test(line)) return false;
+    // Skip threshold comparisons (e.g., .length > 50, count < 30) — common in config/analysis code
+    if (/\.length\s*[><=!]+\s*\d+/i.test(line)) return false;
+    // Skip enum/const/readonly declarations that define the constant inline
+    if (/^\s*(?:export\s+)?(?:const|readonly|static\s+readonly|final|#define|enum)\s+[A-Z_]/i.test(line)) return false;
+    return true;
   });
   if (filteredMagicLines.length > 0) {
     findings.push({

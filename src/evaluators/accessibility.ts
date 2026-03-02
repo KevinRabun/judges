@@ -9,13 +9,23 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   const _lang = getLangFamily(language);
 
   // Detect images without alt attributes
+  // File-level check: if the file constructs ARIA helpers or accessibility utilities,
+  // it is *building* accessible components rather than rendering inaccessible content.
+  const isAriaHelperFile =
+    /(?:createAccessible|ariaHelper|buildAria|aria.*Util|a11y.*(?:util|helper|props|component)|getAltText|accessibilityLabel|makeAccessible|addA11yProps|setAriaAttributes|withAccessibility)/i.test(
+      code,
+    );
   const imgNoAltLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (isCommentLine(line)) return;
-    if (/<img\b/i.test(line) && !/alt\s*=/i.test(line)) {
-      imgNoAltLines.push(i + 1);
-    }
-  });
+  if (!isAriaHelperFile) {
+    lines.forEach((line, i) => {
+      if (isCommentLine(line)) return;
+      // Skip lines where <img appears inside a regex or string pattern definition
+      if (/\/[^/\n]+\/[gimsuy]*/.test(line) && /\.test\s*\(|\.match\s*\(|new\s+RegExp/i.test(line)) return;
+      if (/<img\b/i.test(line) && !/alt\s*=/i.test(line)) {
+        imgNoAltLines.push(i + 1);
+      }
+    });
+  }
   if (imgNoAltLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

@@ -8,8 +8,14 @@ export function analyzeUx(code: string, language: string): Finding[] {
   const _lang = getLangFamily(language);
 
   // Inline event handlers (onClick, onSubmit in HTML)
+  // Skip for React/JSX files — synthetic event props like onClick={handler} are standard,
+  // and even onClick={"handler"} is a legitimate (if unusual) React pattern.
+  const isReactOrJsx =
+    /import\s+.*\bReact\b|from\s+['"]react['"]|jsx|tsx|React\.createElement|\buse(?:State|Effect|Ref|Memo|Callback)\b/i.test(
+      code,
+    );
   const inlineHandlerPattern = /\bon[A-Z]\w+\s*=\s*["'`]/gi;
-  const inlineHandlerLines = getLineNumbers(code, inlineHandlerPattern);
+  const inlineHandlerLines = isReactOrJsx ? [] : getLineNumbers(code, inlineHandlerPattern);
   if (inlineHandlerLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -27,7 +33,8 @@ export function analyzeUx(code: string, language: string): Finding[] {
   }
 
   // No loading/disabled state for forms
-  const hasForm = /form|submit|<button|<input.*type=["']submit/gi.test(code);
+  // Require actual HTML form elements or submit handlers, not just keyword mentions
+  const hasForm = /<form\b|<button\b|onSubmit\s*=|handleSubmit|formik|useForm|<input[^>]*type=["']submit/gi.test(code);
   const hasLoadingState = /loading|isLoading|submitting|isSubmitting|disabled|pending|spinner|skeleton/gi.test(code);
   if (hasForm && !hasLoadingState && code.split("\n").length > 15) {
     findings.push({

@@ -311,10 +311,16 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
     /age.?verif|age.?check|age.?gate|is.?minor|is.?adult|minimum.?age|verifyAge|ageCompliance|requireParentalConsent|restrictDataCollection/i.test(
       code,
     );
+  // If age-consent middleware and explicit minor-data restrictions are present, downgrade severity
+  const hasAgeConsentMiddleware =
+    /ageConsent(?:Middleware)?|parentalConsent(?:Middleware)?|coppaMiddleware|minorDataRestrict|childProtection(?:Guard|Middleware)|verifyMinorConsent|ageGate(?:Middleware)?/i.test(
+      code,
+    );
+  const ageRuleSeverity: "medium" | "low" = hasAgeConsentMiddleware ? "low" : "medium";
   if (ageRelatedLines.length > 0 && !hasAgeVerification) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
-      severity: "medium",
+      severity: ageRuleSeverity,
       title: "Age-related data without verification mechanism",
       description:
         "Code references age or date of birth but has no age verification mechanism. COPPA, GDPR (under 16), and other laws require special handling for minors.",

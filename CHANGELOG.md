@@ -2,6 +2,26 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.13.3] — 2026-03-02
+
+### Fixed
+- **12 evaluator false-positive fixes** from third round of real-world Copilot delta feedback (score improved 97→99, high findings 7→1):
+  - **SOV-001** (data-sovereignty) — region patterns inside regex `.test()` / `.match()` calls are now excluded (analysis code referencing region patterns, not actual region usage). Broadened `hasRegionPolicy` with `regionConfig`, `deploymentRegion`, `regionConstraint`, `regionAllowlist`, `regionDenylist`, `dataLocality`, `geoFence`, `geoRestrict`.
+  - **AUTH-001** (authentication) — credential keywords inside regex pattern lines are now skipped (code analysis tools defining credential-detection patterns).
+  - **AUTH-002** (authentication) — route detection now filters out regex `.test()` pattern references and regex-escaped route strings. Files with ≥8 `.test()` calls (code-analysis modules) are excluded as they are evaluator/analysis code, not actual unprotected endpoints.
+  - **DB-001** (database) — SQL injection patterns inside regex `.test()` / `.match()` calls are now excluded (analysis code, not real SQL queries).
+  - **TEST-001** (testing) — "No tests detected" rule now suppresses for code-analysis modules (≥8 regex `.test()` calls), which are analysis/evaluator modules, not undertested production code.
+  - **A11Y-001** (accessibility) — files constructing ARIA helpers or accessibility utilities (`createAccessible`, `ariaHelper`, `buildAria`, `a11yProps`, `makeAccessible`, etc.) are now recognized as building accessible infrastructure and excluded from the "image missing alt" rule. Regex pattern lines also excluded.
+  - **PORTA-002** (portability) — path separator detection now excludes route/API path definitions (`app.get('/api/v1/...')`, `@Get()` annotations), path/route/endpoint variable assignments, and URL-like path strings (`/api/`, `/v1/`, `/auth/`, etc.).
+  - **SWDEV-003** (software-practices) — magic number detection now excludes `.length` threshold comparisons (`.length > 50`, `.length < 3`) and named constant declarations with uppercase identifiers (`const MAX_RETRIES = 5`).
+  - **COMP-001** (compliance) — age-verification finding now downgrades to `low` severity (from `medium`) when age-consent middleware patterns are detected (`ageConsentMiddleware`, `parentalConsentMiddleware`, `coppaMiddleware`, `minorDataRestrict`, `childProtectionGuard`, etc.).
+  - **UX-001** (ux) — inline event handler detection now suppresses entirely for React/JSX files (imports React, uses hooks, JSX/TSX). React's synthetic event props like `onClick` are standard, not inline handlers.
+  - **UX-002** (ux) — form detection tightened to require actual HTML form elements (`<form>`, `<button>`, `onSubmit=`, `handleSubmit`, `formik`, `useForm`) rather than generic keyword mentions of "form" or "submit".
+  - **TEST-002** (testing) — no-test-detection for production code now excluded for analysis modules with heavy regex usage.
+
+### Added
+- **17 new regression tests** (1263 total) covering all 12 false-positive fixes, including both negative cases (FP suppressed) and positive cases (real issues still detected).
+
 ## [3.14.0] — 2026-03-02
 
 ### Added
