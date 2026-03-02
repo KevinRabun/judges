@@ -7,7 +7,7 @@
 
 import type { Finding, ProjectVerdict, Verdict, Severity, TribunalVerdict } from "../types.js";
 import { analyzeCrossFileTaint } from "../ast/index.js";
-import { applyConfidenceThreshold } from "../scoring.js";
+import { applyConfidenceThreshold, isAbsenceBasedFinding } from "../scoring.js";
 import { LRUCache, contentHash } from "../cache.js";
 import type { EvaluationOptions } from "./index.js";
 
@@ -427,6 +427,25 @@ export function evaluateProject(
   // Overall scores
   const allFindings = fileResults.flatMap((f) => f.findings);
 
+  // ── Project-level absence dedup ─────────────────────────────────────────
+  // Absence-based findings ("No health check", "No rate limiting", etc.) fire
+  // on every file that lacks the pattern.  At project level we only want ONE
+  // instance per rule title — the one with the highest confidence — to avoid
+  // flooding the report with duplicates.
+  const deduplicatedFindings: Finding[] = [];
+  const absenceBestByTitle = new Map<string, Finding>();
+  for (const f of allFindings) {
+    if (isAbsenceBasedFinding(f)) {
+      const existing = absenceBestByTitle.get(f.title);
+      if (!existing || (f.confidence ?? 0) > (existing.confidence ?? 0)) {
+        absenceBestByTitle.set(f.title, f);
+      }
+    } else {
+      deduplicatedFindings.push(f);
+    }
+  }
+  deduplicatedFindings.push(...absenceBestByTitle.values());
+
   // ── Cross-file taint analysis ───────────────────────────────────────────
   const crossFileTaintFlows = analyzeCrossFileTaint(files);
   const crossFileTaintFindings: Finding[] = crossFileTaintFlows.map((flow, idx) => ({
@@ -452,7 +471,7 @@ export function evaluateProject(
     confidence: flow.confidence,
   }));
 
-  const crossFindings = [...allFindings, ...filteredArchitecturalFindings, ...crossFileTaintFindings];
+  const crossFindings = [...deduplicatedFindings, ...filteredArchitecturalFindings, ...crossFileTaintFindings];
   const overallScore =
     fileResults.length > 0 ? Math.round(fileResults.reduce((sum, f) => sum + f.score, 0) / fileResults.length) : 100;
 

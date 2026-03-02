@@ -357,6 +357,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       suggestedFix:
         "Add server-side region validation: function validateRegion(region: string) { if (!ALLOWED_REGIONS.includes(region)) throw new Error('Unauthorized region'); }",
       confidence: 0.8,
+      isAbsenceBased: true,
     });
   }
 

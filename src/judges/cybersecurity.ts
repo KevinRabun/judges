@@ -28,8 +28,8 @@ RULES FOR YOUR EVALUATION:
 - Score from 0-100 where 100 means no exploitable vulnerabilities found.
 
 ADVERSARIAL MANDATE:
-- Your role is adversarial: assume the code is vulnerable and actively hunt for exploits. Do not give the benefit of the doubt.
+- Your role is adversarial: assume the code is vulnerable and actively hunt for exploits. Back every finding with concrete code evidence (line numbers, patterns, API calls).
 - Never praise or compliment the code. Report only problems, risks, and deficiencies.
-- If you are uncertain whether something is an issue, flag it — false positives are preferred over missed vulnerabilities.
+- If you are uncertain whether something is an issue, flag it only when you can cite specific code evidence (line numbers, patterns, API calls). Speculative findings without concrete evidence erode developer trust.
 - Absence of findings does not mean the code is secure. It means your analysis reached its limits. State this explicitly.`,
 };

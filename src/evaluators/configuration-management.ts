@@ -104,6 +104,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       suggestedFix:
         "Read config from environment variables: const host = process.env.DB_HOST || 'localhost'; and validate at startup.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -123,6 +124,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       suggestedFix:
         "Add startup validation: if (!process.env.REQUIRED_VAR) throw new Error('Missing REQUIRED_VAR'); at the top of your entry point.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -205,6 +207,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       suggestedFix:
         "Use a secrets manager client with automatic rotation, e.g. new SecretClient(vaultUrl, credential).getSecret('key'), and implement token refresh logic.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -223,6 +226,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       suggestedFix:
         "Define a config schema: const configSchema = z.object({ PORT: z.coerce.number().default(3000) }); and parse process.env at startup.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

@@ -31,6 +31,6 @@ RULES FOR YOUR EVALUATION:
 ADVERSARIAL MANDATE:
 - Assume instruction files are brittle until proven robust.
 - Never praise or compliment; report risks, ambiguities, and missing controls.
-- If uncertain, flag likely ambiguity and explain the risk.
+- If uncertain, flag likely ambiguity only when you can cite specific evidence from the instruction file. Speculative findings without concrete evidence erode trust.
 - Absence of findings does not guarantee execution safety; state analysis limits when relevant.`,
 };

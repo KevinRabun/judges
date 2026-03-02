@@ -71,6 +71,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
       suggestedFix:
         "Add a `GET /healthz` endpoint that returns 200 when the service is ready (e.g. `app.get('/healthz', (_, res) => res.sendStatus(200));`).",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -115,6 +116,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
       suggestedFix:
         "Add a SIGTERM handler, e.g. `process.on('SIGTERM', () => { server.close(() => process.exit(0)); });`.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -155,6 +157,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
       reference: "Docker Best Practices / Cloud-Native Packaging",
       suggestedFix: "Add a Dockerfile with a multi-stage build and a HEALTHCHECK instruction to the project root.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -287,6 +290,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
       suggestedFix:
         "Introduce a feature-flag check (e.g. `if (featureFlags.isEnabled('new-feature'))`) using a flag provider or environment variable.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

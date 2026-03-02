@@ -178,6 +178,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       suggestedFix:
         "Add circuit breaker: import CircuitBreaker from 'opossum'; const breaker = new CircuitBreaker(fetchData, { timeout: 3000, errorThresholdPercentage: 50 }); await breaker.fire();",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

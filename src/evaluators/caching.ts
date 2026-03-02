@@ -47,6 +47,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
       suggestedFix:
         "Wrap expensive DB/API calls with a cache-aside helper: check cache first, return on hit, otherwise fetch, store with a TTL, and return.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -210,6 +211,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
       suggestedFix:
         "Add a `warmCache()` function that pre-populates critical keys at startup, and call it from your init/bootstrap routine before accepting traffic.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

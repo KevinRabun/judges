@@ -333,10 +333,51 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     }
   }
 
-  // ── 8. Absence-based finding in single fragment ──
-  // Very low confidence absence-based findings are likely FPs in partial reviews
-  if (finding.isAbsenceBased && finding.confidence !== undefined && finding.confidence < 0.35) {
-    return "Absence-based finding with very low confidence — likely a false positive in partial code review.";
+  // ── 8. Absence-based finding with low confidence ──
+  // Absence-based findings with low confidence are likely FPs in partial reviews.
+  // The upstream pipeline caps absence-based confidence at 0.6, so values near
+  // or below 0.45 indicate very weak signal.
+  if (finding.isAbsenceBased && finding.confidence !== undefined && finding.confidence < 0.45) {
+    return "Absence-based finding with low confidence — likely a false positive in partial code review.";
+  }
+
+  // ── 9. Web-only rules on non-web code ──
+  // Accessibility, UX, and i18n rendering rules are only meaningful on files
+  // that contain web-facing patterns (HTML, JSX, routes, templates, CSS).
+  const WEB_ONLY_PREFIXES = ["A11Y-", "UX-"];
+  const isWebOnly = WEB_ONLY_PREFIXES.some((p) => finding.ruleId.startsWith(p));
+  if (isWebOnly) {
+    const hasWebPatterns =
+      /<\w+[\s>]|className=|style=|href=|jsx|tsx|\.html|\.css|render\s*\(|dangerouslySetInnerHTML|innerHTML|document\.|window\.|querySelector|getElementById/i.test(
+        lines.join("\n"),
+      );
+    if (!hasWebPatterns) {
+      return `Web-only rule ${finding.ruleId} does not apply — no HTML, JSX, or DOM patterns detected.`;
+    }
+  }
+
+  // ── 10. Findings targeting empty / whitespace-only lines ──
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const allBlank = finding.lineNumbers.every((ln) => {
+      const line = lines[ln - 1];
+      return line !== undefined && line.trim().length === 0;
+    });
+    if (allBlank) {
+      return "All flagged lines are empty or whitespace — no code to evaluate.";
+    }
+  }
+
+  // ── 11. Absence-based findings on trivially small files ──
+  // Files under 10 substantive lines are usually stubs, barrel exports, or
+  // minimal utilities where absence-based rules generate noise.
+  if (finding.isAbsenceBased) {
+    const substantiveLines = lines.filter((l) => {
+      const t = l.trim();
+      return t.length > 0 && !/^\s*(?:\/\/|\/\*|\*|#|$)/.test(t);
+    }).length;
+    if (substantiveLines < 10) {
+      return "Absence-based finding on trivially small file — likely a false positive.";
+    }
   }
 
   return null;

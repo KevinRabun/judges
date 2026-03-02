@@ -91,6 +91,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       suggestedFix:
         "Add a '## Validation' section: 'After every code change run `npm test` and `npm run build`. Report failures before proceeding.'",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -106,6 +107,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       suggestedFix:
         "Add a '## Scope' section listing allowed directories, file patterns, and out-of-scope areas (e.g., 'Do not modify CI configs or package.json without approval').",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -122,6 +124,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       suggestedFix:
         "Add a '## Safety' section: 'Refuse harmful, hateful, or privacy-violating requests. Never generate credentials or PII. Respond with a safe refusal message when policy is violated.'",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -138,6 +141,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       suggestedFix:
         "Structure the document with markdown headings: ## Scope, ## Hierarchy, ## Validation, ## Safety, ## Ambiguity Handling — each containing concise, actionable rules.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

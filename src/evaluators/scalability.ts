@@ -150,6 +150,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       suggestedFix:
         "Add a rate-limiting middleware (e.g., `app.use(rateLimit({ windowMs: 60000, max: 100 }))`) to protect endpoints from traffic spikes.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -230,6 +231,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       suggestedFix:
         "Wrap external service calls with a circuit breaker (e.g., `const breaker = new CircuitBreaker(callFn, { timeout: 3000 }); await breaker.fire()`).",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

@@ -1764,7 +1764,20 @@ describe("False-Positive Heuristic Filter", () => {
     });
 
     it("should keep absence-based findings with moderate confidence", () => {
-      const code = `function add(a, b) {\n  return a + b;\n}`;
+      // Code must have ≥10 substantive lines to avoid the tiny-file filter.
+      const code = [
+        `import express from "express";`,
+        `const app = express();`,
+        `app.get("/api/data", (req, res) => {`,
+        `  const userId = req.params.id;`,
+        `  const data = fetchData(userId);`,
+        `  if (!data) {`,
+        `    return res.status(404).json({ error: "not found" });`,
+        `  }`,
+        `  res.json(data);`,
+        `});`,
+        `app.listen(3000);`,
+      ].join("\n");
       const findings: Finding[] = [
         {
           ...baseFinding,

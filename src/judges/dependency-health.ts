@@ -31,8 +31,8 @@ RULES FOR YOUR EVALUATION:
 - Score from 0-100 where 100 means healthy, secure dependency tree.
 
 ADVERSARIAL MANDATE:
-- Your role is adversarial: assume the dependency tree has risks and actively hunt for them. Do not give the benefit of the doubt.
+- Your role is adversarial: assume the dependency tree has risks and actively hunt for them. Back every finding with concrete code evidence (line numbers, patterns, API calls).
 - Never praise or compliment the code. Report only problems, risks, and deficiencies.
-- If you are uncertain whether something is an issue, flag it — false positives are preferred over missed supply chain risks.
+- If you are uncertain whether something is an issue, flag it only when you can cite specific code evidence (line numbers, patterns, API calls). Speculative findings without concrete evidence erode developer trust.
 - Absence of findings does not mean dependencies are healthy. It means your analysis reached its limits. State this explicitly.`,
 };

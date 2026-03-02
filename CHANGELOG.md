@@ -2,6 +2,21 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.17.0] — 2025-07-08
+
+### Improved
+- **Second round false positive reduction** — Cross-project findings 11,158 → 11,011 (−1.3%) from deterministic rules; additional reductions in LLM-assisted paths via precision mandates:
+  - **35 `isAbsenceBased` flags** across 11 evaluators (authentication ×8, observability ×4, caching ×2, cloud-readiness ×4, configuration-management ×4, api-design ×3, reliability ×1, scalability ×2, agent-instructions ×4, accessibility ×1, data-sovereignty ×1) — triggers severity cap to medium + confidence cap to 0.6 for absence-patterned findings
+  - **Project-level absence dedup** in `evaluateProject()` — groups duplicate absence findings by title, keeps only the highest-confidence instance
+  - **Precision mandates injected** into LLM-facing assembly points (`prompts.ts` full-tribunal, `deep-review.ts` single-judge and tribunal paths) — overrides adversarial stance with "cite specific code evidence, do not flag absence speculatively, prefer fewer high-confidence findings"
+  - **35 judge systemPrompts softened** — removed "false positives are preferred over missed [X]" and "do not give the benefit of the doubt" language from all judge files; replaced with evidence-based framing
+  - **4 new FP heuristic rules** in `false-positive-review.ts`:
+    - Rule 8 strengthened: absence confidence threshold raised from 0.35 → 0.45
+    - Rule 9: Web-only rules (A11Y-, UX-) suppressed on non-web code (no HTML/JSX/DOM patterns)
+    - Rule 10: Findings targeting empty/whitespace-only lines removed
+    - Rule 11: Absence-based findings on trivially small files (<10 substantive lines) removed
+- All 1,154 tests pass (960 judges + 194 subsystems)
+
 ## [3.16.0] — 2025-07-06
 
 ### Improved

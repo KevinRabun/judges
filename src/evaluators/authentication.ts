@@ -152,6 +152,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       suggestedFix:
         "Add auth middleware: app.use(authenticateJWT) (Express), @login_required (Django/Flask), @PreAuthorize (Spring), or middleware.Auth(handler) (Go).",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -211,6 +212,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       suggestedFix:
         "Add role-based middleware: const requireRole = (role) => (req, res, next) => { if (req.user.role !== role) return res.status(403).json({ error: 'Forbidden' }); next(); };",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -273,6 +275,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       suggestedFix:
         "Set session expiry: app.use(session({ cookie: { maxAge: 30 * 60 * 1000 }, rolling: true })); and invalidate sessions on password change.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -295,6 +298,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       suggestedFix:
         "Enforce password policy: if (password.length < 12) throw new Error('Min 12 chars'); and check against breached passwords via the HaveIBeenPwned API.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -315,6 +319,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       suggestedFix:
         "Add rate limiting and lockout: after 5 failed attempts, lock the account for 15 minutes. Use express-rate-limit on the login endpoint.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -355,6 +360,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       suggestedFix:
         "Add CSRF middleware: app.use(csrf({ cookie: { sameSite: 'strict' } })); and include the token in forms: <input type='hidden' name='_csrf' value='{{csrfToken}}'>.",
       confidence: 0.8,
+      isAbsenceBased: true,
     });
   }
 
@@ -379,6 +385,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       suggestedFix:
         "Regenerate session after login: req.session.regenerate((err) => { req.session.userId = user.id; res.redirect('/dashboard'); });",
       confidence: 0.8,
+      isAbsenceBased: true,
     });
   }
 
@@ -407,6 +414,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       suggestedFix:
         "Integrate TOTP-based MFA: const verified = speakeasy.totp.verify({ secret: user.mfaSecret, token: req.body.totpCode }); and require MFA for admin and sensitive operations.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

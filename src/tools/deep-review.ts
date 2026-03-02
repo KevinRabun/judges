@@ -22,6 +22,10 @@ export function buildSingleJudgeDeepReviewSection(judge: JudgeDefinition, langua
 
   md += `### ${judge.name} — ${judge.domain}\n\n`;
   md += `${judge.systemPrompt}\n\n`;
+  md += `### Precision Mandate\n\n`;
+  md += `Every finding MUST cite specific code evidence (exact line numbers, API calls, variable names, or patterns). `;
+  md += `Do NOT flag the absence of a feature unless you can identify where it SHOULD have been implemented and why it is required for THIS code. `;
+  md += `Speculative findings erode developer trust — prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
 
   md += `### False Positive Review\n\n`;
   md += `Before adding new findings, **review each pattern-based finding above for false positives.** `;
@@ -62,6 +66,7 @@ export function buildTribunalDeepReviewSection(judges: JudgeDefinition[], langua
   for (const judge of judges) {
     md += `### ${judge.name} — ${judge.domain}\n\n`;
     md += `${judge.systemPrompt}\n\n`;
+    md += `**Precision Mandate:** Every finding MUST cite specific code evidence. Do NOT flag absent features speculatively. Prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
     md += `---\n\n`;
   }
 

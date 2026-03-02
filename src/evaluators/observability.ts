@@ -76,6 +76,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       suggestedFix:
         "Add a GET /healthz route that returns { status: 'ok' } after verifying database and cache connectivity, returning 503 on failure.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -119,6 +120,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       suggestedFix:
         "Add middleware that reads X-Request-Id from headers or generates a UUID, attaches it to req, and includes it in every log via async local storage or cls-hooked.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -169,6 +171,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       suggestedFix:
         "Install @opentelemetry/sdk-metrics and create a MeterProvider to record http_request_duration_seconds and http_requests_total counters in your request middleware.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -190,6 +193,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       suggestedFix:
         "Add @opentelemetry/sdk-trace-node with auto-instrumentations: registerInstrumentations({ instrumentations: [getNodeAutoInstrumentations()] }); and export spans to your collector.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

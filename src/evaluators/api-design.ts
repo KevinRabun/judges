@@ -239,6 +239,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       suggestedFix:
         "Install `express-rate-limit` and apply `rateLimit({ windowMs: 15*60*1000, max: 100 })` as middleware on your API router.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -276,6 +277,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       suggestedFix:
         "Install the `cors` package and add `app.use(cors({ origin: 'https://yourdomain.com' }))` with an explicit allow-list of origins.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -294,6 +296,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       suggestedFix:
         "Add a middleware that generates a UUID via `crypto.randomUUID()`, sets `res.setHeader('X-Request-ID', id)`, and attaches it to the request context for logging.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

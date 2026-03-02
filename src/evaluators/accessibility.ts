@@ -235,6 +235,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       suggestedFix:
         'Add a skip link as the first focusable element: <a href="#main-content" className="sr-only focus:not-sr-only">Skip to main content</a>.',
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

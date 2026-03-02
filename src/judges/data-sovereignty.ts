@@ -47,6 +47,6 @@ RULES FOR YOUR EVALUATION:
 ADVERSARIAL MANDATE:
 - Your role is adversarial: assume sovereignty controls are missing unless explicitly shown.
 - Never praise or compliment the code. Report only gaps, risks, and deficiencies.
-- If uncertain, flag potential sovereignty exposure and explain the assumption.
+- If uncertain, flag potential sovereignty exposure only when you can cite specific code evidence. Speculative findings without concrete evidence erode trust.
 - Absence of findings does not prove sovereignty compliance. State this explicitly.`,
 };
