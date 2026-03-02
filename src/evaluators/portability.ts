@@ -32,19 +32,24 @@ export function analyzePortability(code: string, language: string): Finding[] {
   // Hardcoded path separators
   const pathSepPattern = /(?:['"`](?:[^'"`]*\\\\[^'"`]*){2,}['"`]|['"`](?:[^'"`]*\/[^'"`]*){3,}['"`])/g;
   const pathSepLines = getLineNumbers(code, pathSepPattern);
+  // Skip entirely for HTML/markup files — forward slashes in href/src attributes
+  // are valid URL paths, not OS file-path separator misuse.
+  const isMarkupLang = /^\s*<(!DOCTYPE|html|head|body|meta|link)/im.test(code);
   // Filter out URLs, imports, and route/API path literals
-  const filteredPathSepLines = pathSepLines.filter((lineNum) => {
-    const line = code.split("\n")[lineNum - 1] || "";
-    // Exclude URLs and module imports
-    if (/https?:\/\/|import\s|from\s|require\s*\(/.test(line)) return false;
-    // Exclude route/API path definitions (e.g., '/api/v1/users/:id')
-    if (/(?:app|router)\s*\.\s*(?:get|post|put|delete|patch|use|all)\s*\(/i.test(line)) return false;
-    if (/@(?:Get|Post|Put|Delete|Patch|RequestMapping)\s*\(/i.test(line)) return false;
-    if (/(?:path|route|endpoint|url)\s*[:=]/i.test(line) && /['"]\//i.test(line)) return false;
-    // Exclude strings that look like URL paths (start with / and contain only path chars)
-    if (/['"`]\/(?:api|v[0-9]|auth|users|admin|health|status|webhook|callback)\//i.test(line)) return false;
-    return true;
-  });
+  const filteredPathSepLines = isMarkupLang
+    ? []
+    : pathSepLines.filter((lineNum) => {
+        const line = code.split("\n")[lineNum - 1] || "";
+        // Exclude URLs and module imports
+        if (/https?:\/\/|import\s|from\s|require\s*\(/.test(line)) return false;
+        // Exclude route/API path definitions (e.g., '/api/v1/users/:id')
+        if (/(?:app|router)\s*\.\s*(?:get|post|put|delete|patch|use|all)\s*\(/i.test(line)) return false;
+        if (/@(?:Get|Post|Put|Delete|Patch|RequestMapping)\s*\(/i.test(line)) return false;
+        if (/(?:path|route|endpoint|url)\s*[:=]/i.test(line) && /['"]\//i.test(line)) return false;
+        // Exclude strings that look like URL paths (start with / and contain only path chars)
+        if (/['"`]\/(?:api|v[0-9]|auth|users|admin|health|status|webhook|callback)\//i.test(line)) return false;
+        return true;
+      });
   if (filteredPathSepLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

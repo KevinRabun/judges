@@ -164,7 +164,11 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   const geoRoutingSignals = /(country|locale|region|jurisdiction|tenantRegion|dataBoundary)/i.test(code);
   const hasPolicyEnforcement = /(deny|reject|throw|forbidden|policyViolation|residencyViolation)/i.test(code);
 
-  if (regionMentionLines.length > 0 && geoRoutingSignals && !hasPolicyEnforcement) {
+  // Skip jurisdiction enforcement for HTML/markup files — mentions of
+  // "jurisdiction" or "region" in privacy text are legal disclosures, not code
+  // branches that need enforcement logic.
+  const isMarkupFile = /^\s*<(!DOCTYPE|html|head|body|meta|link)/im.test(code);
+  if (regionMentionLines.length > 0 && geoRoutingSignals && !hasPolicyEnforcement && !isMarkupFile) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

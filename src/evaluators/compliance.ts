@@ -301,12 +301,17 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
 
   // Detect age verification gaps
   const ageRelatedLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (isCommentLine(line)) return;
-    if (/(?:age|date.?of.?birth|dob|birthdate|birth_date|minor|child|under.?13|under.?16|coppa)/i.test(line)) {
-      ageRelatedLines.push(i + 1);
-    }
-  });
+  // Skip for HTML/markup files — privacy policy text mentioning age/COPPA/children
+  // is legal disclosure, not an age-input data flow requiring verification logic.
+  const isMarkup = /^\s*<(!DOCTYPE|html|head|body|meta|link|div|section|p\b|span|a\b|h[1-6])/im.test(code);
+  if (!isMarkup) {
+    lines.forEach((line, i) => {
+      if (isCommentLine(line)) return;
+      if (/(?:age|date.?of.?birth|dob|birthdate|birth_date|minor|child|under.?13|under.?16|coppa)/i.test(line)) {
+        ageRelatedLines.push(i + 1);
+      }
+    });
+  }
   const hasAgeVerification =
     /age.?verif|age.?check|age.?gate|is.?minor|is.?adult|minimum.?age|verifyAge|ageCompliance|requireParentalConsent|restrictDataCollection/i.test(
       code,

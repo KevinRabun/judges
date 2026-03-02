@@ -30,6 +30,7 @@ import { analyzeUx } from "../src/evaluators/ux.js";
 import { analyzeInternationalization } from "../src/evaluators/internationalization.js";
 import { analyzeCloudReadiness } from "../src/evaluators/cloud-readiness.js";
 import { analyzeCostEffectiveness } from "../src/evaluators/cost-effectiveness.js";
+import { analyzeCiCd } from "../src/evaluators/ci-cd.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 
@@ -2011,5 +2012,212 @@ describe("COST caching rule — utility module suppression", () => {
     const findings = analyzeCostEffectiveness(code, "javascript");
     const cachingFindings = findings.filter((f) => /caching/i.test(f.title));
     assert.ok(cachingFindings.length > 0, "Data-fetching modules should still be flagged for missing caching");
+  });
+});
+
+// ─── v3.13.6 — HTML markup FP suppression ────────────────────────────────────
+
+/** Shared static HTML sample resembling a privacy-policy landing page */
+const staticHtmlPage = [
+  "<!DOCTYPE html>",
+  '<html lang="en">',
+  "<head>",
+  '  <meta charset="UTF-8">',
+  '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
+  "  <title>Privacy Policy | Acme Corp</title>",
+  '  <link rel="stylesheet" href="/assets/css/main.css">',
+  '  <link rel="icon" href="/assets/img/favicon.ico">',
+  "</head>",
+  "<body>",
+  '  <header class="site-header">',
+  '    <nav class="nav-bar">',
+  '      <a href="/" class="logo">Acme Corp</a>',
+  '      <a href="/about">About</a>',
+  '      <a href="/contact">Contact</a>',
+  "    </nav>",
+  "  </header>",
+  '  <main class="content">',
+  "    <h1>Privacy Policy</h1>",
+  "    <p>Last updated: January 1, 2024</p>",
+  '    <section id="data-collection">',
+  "      <h2>Data Collection</h2>",
+  "      <p>We collect information you provide directly, including your name, email,",
+  "      and date of birth when you create an account.</p>",
+  "    </section>",
+  '    <section id="children">',
+  "      <h2>Children&apos;s Privacy (COPPA)</h2>",
+  "      <p>Our services are not directed to children under 13 years of age.",
+  "      We do not knowingly collect personal information from minors.</p>",
+  "    </section>",
+  '    <section id="jurisdiction">',
+  "      <h2>Jurisdiction &amp; Data Sovereignty</h2>",
+  "      <p>Data is processed in the region where our servers are located.",
+  "      Users in the European Economic Area are subject to GDPR protections.",
+  "      We comply with local data residency requirements in each jurisdiction.</p>",
+  "    </section>",
+  '    <section id="analytics">',
+  "      <h2>Analytics &amp; Cookies</h2>",
+  "      <p>We use analytics to fetch aggregated usage data. This data helps us",
+  "      improve user experience. You can opt out of analytics at any time.</p>",
+  "    </section>",
+  "  </main>",
+  '  <footer class="site-footer">',
+  "    <p>&copy; 2024 Acme Corp. All rights reserved.</p>",
+  '    <a href="/privacy">Privacy</a> | <a href="/terms">Terms</a>',
+  "  </footer>",
+  "</body>",
+  "</html>",
+].join("\n");
+
+describe("FP Regression — COMP-001: HTML age/COPPA text is not age-verification code", () => {
+  it("should NOT flag static HTML mentioning COPPA / children / age for age verification", () => {
+    const findings = analyzeCompliance(staticHtmlPage, "html");
+    const ageFindings = findings.filter((f) => /age.related|coppa|minor|child/i.test(f.title));
+    assert.equal(ageFindings.length, 0, "Static HTML privacy text should not trigger age-verification findings");
+  });
+
+  it("should STILL flag real code collecting date-of-birth without age verification", () => {
+    const lines = [
+      'import express from "express";',
+      "const app = express();",
+      "",
+      'app.post("/register", (req, res) => {',
+      "  const { name, email, dateOfBirth } = req.body;",
+      "  const age = calculateAge(dateOfBirth);",
+      "  // Missing: COPPA check for children under 13",
+      "  db.users.insert({ name, email, dateOfBirth, age });",
+      "  res.json({ success: true });",
+      "});",
+    ];
+    while (lines.length <= 55) lines.push("// reg line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeCompliance(code, "javascript");
+    const ageFindings = findings.filter((f) => /age.related|coppa|minor|child/i.test(f.title));
+    assert.ok(ageFindings.length > 0, "Real registration code with DOB should still require age verification");
+  });
+});
+
+describe("FP Regression — SOV-001: HTML jurisdiction text is not enforcement gap", () => {
+  it("should NOT flag static HTML mentioning jurisdiction for missing enforcement", () => {
+    const findings = analyzeDataSovereignty(staticHtmlPage, "html");
+    const jurisdictionFindings = findings.filter((f) => /jurisdiction|enforcement/i.test(f.title));
+    assert.equal(
+      jurisdictionFindings.length,
+      0,
+      "Static HTML legal text should not trigger jurisdiction enforcement findings",
+    );
+  });
+
+  it("should STILL flag real code with region signals but no enforcement", () => {
+    const lines = [
+      "export async function processData(user, payload) {",
+      "  const region = user.locale || 'us-east';",
+      "  const geoRoute = determineGeoRoute(region);",
+      "  // Missing: jurisdiction enforcement branch",
+      "  return await storeData(payload, geoRoute);",
+      "}",
+      "",
+      "function determineGeoRoute(country) {",
+      "  return routeMap[country] || 'default';",
+      "}",
+    ];
+    while (lines.length <= 55) lines.push("// sov line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeDataSovereignty(code, "javascript");
+    const jurisdictionFindings = findings.filter((f) => /jurisdiction|enforcement/i.test(f.title));
+    assert.ok(jurisdictionFindings.length > 0, "Code with region signals should still need enforcement");
+  });
+});
+
+describe("FP Regression — PORTA-001: HTML href/src slashes are not path-separator misuse", () => {
+  it("should NOT flag URL paths in HTML attributes for path separator hardcoding", () => {
+    const findings = analyzePortability(staticHtmlPage, "html");
+    const pathFindings = findings.filter((f) => /path.?sep|separator/i.test(f.title));
+    assert.equal(pathFindings.length, 0, "HTML href/src URL paths should not trigger path-separator findings");
+  });
+
+  it("should STILL flag real code with hardcoded path separators", () => {
+    const lines = [
+      "import fs from 'fs';",
+      "",
+      "function loadConfig(env) {",
+      "  const configPath = '/etc/app/config/' + env + '/settings.json';",
+      "  return fs.readFileSync(configPath, 'utf-8');",
+      "}",
+      "",
+      "function resolveTemplate(name) {",
+      "  return '/usr/share/templates/' + name + '/index.html';",
+      "}",
+    ];
+    while (lines.length <= 55) lines.push("// path line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzePortability(code, "javascript");
+    const pathFindings = findings.filter((f) => /path.?sep|separator/i.test(f.title));
+    assert.ok(pathFindings.length > 0, "Hardcoded Unix paths in code should still flag path-separator issues");
+  });
+});
+
+describe("FP Regression — CICD-001: HTML class= attributes are not source code", () => {
+  it("should NOT flag static HTML for missing test infrastructure", () => {
+    const findings = analyzeCiCd(staticHtmlPage, "html");
+    const testFindings = findings.filter((f) => /test.?infra|no.?test/i.test(f.title));
+    assert.equal(testFindings.length, 0, "HTML markup should not be flagged for missing test infrastructure");
+  });
+
+  it("should STILL flag real source code files without test infrastructure", () => {
+    const lines = [
+      'import express from "express";',
+      "const app = express();",
+      "",
+      "class UserController {",
+      "  async getUser(req, res) {",
+      "    const user = await db.findById(req.params.id);",
+      "    res.json(user);",
+      "  }",
+      "",
+      "  async createUser(req, res) {",
+      "    const user = await db.create(req.body);",
+      "    res.status(201).json(user);",
+      "  }",
+      "}",
+      "",
+      "export default UserController;",
+    ];
+    while (lines.length <= 55) lines.push("// src line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeCiCd(code, "javascript");
+    const testFindings = findings.filter((f) => /test.?infra|no.?test/i.test(f.title));
+    assert.ok(testFindings.length > 0, "Real source code should still be flagged for missing test infrastructure");
+  });
+});
+
+describe("FP Regression — COST-001: HTML text with 'fetch' is not data-fetching code", () => {
+  it("should NOT flag static HTML for missing caching strategy", () => {
+    const findings = analyzeCostEffectiveness(staticHtmlPage, "html");
+    const cachingFindings = findings.filter((f) => /caching/i.test(f.title));
+    assert.equal(cachingFindings.length, 0, "Static HTML pages should not trigger caching findings");
+  });
+
+  it("should STILL flag real data-fetching code without caching", () => {
+    const lines = [
+      "export async function getProducts() {",
+      '  const response = await fetch("https://api.example.com/products");',
+      "  return response.json();",
+      "}",
+      "",
+      "export async function getUser(id) {",
+      "  const response = await fetch(`https://api.example.com/users/${id}`);",
+      "  return response.json();",
+      "}",
+      "",
+      "export async function getOrders(userId) {",
+      '  return db.query("SELECT * FROM orders WHERE user_id = $1", [userId]);',
+      "}",
+    ];
+    while (lines.length <= 55) lines.push("// fetch line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeCostEffectiveness(code, "javascript");
+    const cachingFindings = findings.filter((f) => /caching/i.test(f.title));
+    assert.ok(cachingFindings.length > 0, "Real data-fetching code should still be flagged for missing caching");
   });
 });

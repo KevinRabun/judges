@@ -140,7 +140,10 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
   );
   // Only suggest caching when the file performs I/O, data-fetching, or serves
   // requests — pure utility/transformation modules don't need caching.
+  // Also skip for HTML/markup files — static markup doesn't need in-code caching.
+  const isMarkupFile = /^\s*<(!DOCTYPE|html|head|body|meta|link)/im.test(code);
   const hasDataFetchOrServe =
+    !isMarkupFile &&
     /fetch\s*\(|axios\.|\.query\s*\(|\.findOne|\.findMany|\.aggregate|SELECT\s+.*FROM|INSERT\s+INTO|\.execute\s*\(|database|db\.|app\.(listen|use|get|post)\s*\(|createServer|express\(\)/i.test(
       code,
     );

@@ -14,7 +14,10 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
     getLangLineNumbers(code, language, LP.TEST_FUNCTION).length > 0 ||
     /jest|mocha|vitest|unittest|pytest|xunit|nunit/gi.test(code);
   const isSourceCode = /(?:function|class|const|let|var|import|export|def |public\s+class)/gi.test(code);
-  if (isSourceCode && !hasTestScript && code.split("\n").length > 40) {
+  // HTML/markup files are not application source code — skip CI/CD rules
+  // that assume testable imperative logic.
+  const isMarkupFile = /^\s*<(!DOCTYPE|html|head|body|meta|link)/im.test(code);
+  if (isSourceCode && !isMarkupFile && !hasTestScript && code.split("\n").length > 40) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

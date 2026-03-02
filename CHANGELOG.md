@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.13.6] — 2026-03-02
+
+### Fixed
+- **5 evaluator false-positive fixes** from sixth round of real-world Copilot feedback (`public/index.html` static HTML page, score 98→99):
+  - **COMP-001** (compliance) — Age-verification rule now skipped for HTML/markup files. Privacy policy text mentioning “COPPA”, “children”, “under 13” is legal disclosure, not an age-input data flow.
+  - **SOV-001** (data-sovereignty) — Jurisdiction enforcement rule now gated on `!isMarkupFile`. Legal/privacy text mentioning “jurisdiction” in static HTML is not code that needs enforcement branches.
+  - **PORTA-001** (portability) — Path separator rule short-circuits for markup files. Forward slashes in HTML `href`/`src` attributes are valid URL paths, not OS file-path separator misuse.
+  - **CICD-001** (ci-cd) — “No test infrastructure” rule now checks `!isMarkupFile`. HTML `class=` attributes matching the `class` keyword no longer trigger source-code detection.
+  - **COST-001** (cost-effectiveness) — `hasDataFetchOrServe` gated on `!isMarkupFile`. Text content mentioning “fetch” in static HTML does not need in-code caching.
+
+### Added
+- **10 new regression tests** (1286 total) covering all 5 FP fixes with both negative (HTML suppressed) and positive (real source code still detected) cases.
+
 ## [3.13.5] — 2026-03-02
 
 ### Fixed
