@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeDependencyHealth(code: string, language: string): Finding[] {
@@ -12,6 +12,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   // Detect wildcard version ranges
   const wildcardLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/["']\s*\*\s*["']|["']\s*latest\s*["']/i.test(line) && /["']\w+["']\s*:/i.test(line)) {
       wildcardLines.push(i + 1);
     }
@@ -38,6 +39,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   const riskyPackages =
     /require\s*\(\s*["'](request|moment|underscore|bower|left-pad|event-stream)["']\)|from\s+["'](request|moment|underscore|bower|left-pad|event-stream)["']/i;
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (riskyPkgLines.length < 10 && riskyPackages.test(line)) {
       riskyPkgLines.push(i + 1);
     }
@@ -61,6 +63,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   // Detect excessive dependencies for simple tasks
   const importLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/^import\s|^const\s.*=\s*require\s*\(/i.test(line.trim())) {
       importLines.push(i + 1);
     }
@@ -84,6 +87,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   // Detect relative import depth issues
   const deepImportLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/from\s+["']\.\.\/.+\.\.\/.+\.\.\//i.test(line) || /require\s*\(\s*["']\.\.\/.+\.\.\/.+\.\.\//i.test(line)) {
       deepImportLines.push(i + 1);
     }
@@ -109,6 +113,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   const httpClients = new Set<string>();
   const httpClientLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     const clients = ["axios", "node-fetch", "got", "request", "superagent", "undici"];
     for (const client of clients) {
       if (new RegExp(`["']${client}["']`).test(line)) {
@@ -136,6 +141,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   // Detect too-broad version ranges
   const broadVersionLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/["']\s*>=?\s*\d/i.test(line) && /["']\w+["']\s*:/i.test(line)) {
       broadVersionLines.push(i + 1);
     }
@@ -180,6 +186,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   const barrelImportLines: number[] = [];
   const wildcardImportLines = getLangLineNumbers(code, language, LP.WILDCARD_IMPORT);
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/import\s+\{[^}]{100,}\}\s+from/i.test(line)) {
       barrelImportLines.push(i + 1);
     }
@@ -205,6 +212,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   // Detect dev dependencies in production code paths
   const devDepLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /require\s*\(\s*["'](?:jest|mocha|chai|sinon|enzyme|@testing-library|nyc|istanbul|prettier|eslint)["']\)/i.test(
         line,
@@ -235,6 +243,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   // Detect packages with known supply chain risks
   const supplyChainLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /postinstall|preinstall|install.*script/i.test(line) &&
       /["']scripts["']/i.test(lines.slice(Math.max(0, i - 5), i).join("\n"))
@@ -277,6 +286,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   const typosquatLines: number[] = [];
   const typosquatNames: string[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     const match = line.match(/(?:require\s*\(\s*["']|from\s+["'])([^"'/]+)["']/);
     if (match) {
       const pkg = match[1].toLowerCase();
@@ -491,6 +501,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
       const depsLines = depsRegion[0].split("\n");
       const startLine = code.substring(0, depsStart).split("\n").length;
       depsLines.forEach((line, i) => {
+        if (isCommentLine(line)) return;
         if (/["']\d+\.\d+\.\d+-(alpha|beta|rc|canary|next|dev|pre|snapshot)/i.test(line)) {
           prereleaseLines.push(startLine + i);
         }

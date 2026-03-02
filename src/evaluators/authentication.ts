@@ -1,5 +1,11 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, looksLikeRealCredentialValue } from "./shared.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  looksLikeRealCredentialValue,
+  isCommentLine,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 function getHardcodedCredentialLinesWithoutPlaceholders(code: string): number[] {
@@ -19,6 +25,7 @@ function getHardcodedCredentialLinesWithoutPlaceholders(code: string): number[] 
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
+    if (isCommentLine(line)) continue;
     const matches = [...line.matchAll(assignmentPattern)];
     if (matches.length === 0) continue;
 

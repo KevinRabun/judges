@@ -67,7 +67,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   }
 
   // Static analysis suppression comments (multi-language)
-  const tsNoCheckLines = getLangLineNumbers(code, language, LP.LINTER_DISABLE);
+  const tsNoCheckLines = getLangLineNumbers(code, language, LP.LINTER_DISABLE, { skipComments: false });
   if (tsNoCheckLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

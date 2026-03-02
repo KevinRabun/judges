@@ -108,7 +108,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
 
   // Renamed or removed exports
   const commentedExportPattern = /\/\/\s*export\s+(?:function|class|const|let|type|interface)\s+\w+/g;
-  const commentedExportLines = getLineNumbers(code, commentedExportPattern);
+  const commentedExportLines = getLineNumbers(code, commentedExportPattern, { skipComments: false });
   if (commentedExportLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -187,7 +187,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
 
   // Breaking serialization changes (renaming JSON fields)
   const fieldRenamePattern = /\/\/\s*(?:renamed|was|previously|old name|formerly)\s*[:=]?\s*\w+/gi;
-  const fieldRenameLines = getLineNumbers(code, fieldRenamePattern);
+  const fieldRenameLines = getLineNumbers(code, fieldRenamePattern, { skipComments: false });
   if (fieldRenameLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

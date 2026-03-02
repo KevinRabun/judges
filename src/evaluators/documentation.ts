@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeDocumentation(code: string, language: string): Finding[] {
@@ -52,6 +52,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   // Detect magic numbers
   const magicNumberLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     // Match numeric literals that aren't 0 or 1, not in imports, not in type definitions
     if (
       /(?<![.\w])(?:[2-9]\d{2,}|\d+\.\d+)(?![.\w])/i.test(line) &&
@@ -209,6 +210,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   // Detect missing type documentation for complex types
   const complexTypeLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/(?:interface|type)\s+\w+\s*(?:=\s*)?{/i.test(line.trim())) {
       const typeBody = lines.slice(i, Math.min(lines.length, i + 20)).join("\n");
       const propCount = (typeBody.match(/\w+\s*[:?]/g) || []).length;
@@ -238,6 +240,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   // Detect missing error message documentation (multi-language)
   const throwLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /throw\s+new\s+\w*Error\s*\(\s*["'`]?$/i.test(line.trim()) ||
       /throw\s+new\s+\w*Error\s*\(\s*\)/i.test(line.trim())
@@ -269,6 +272,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   // Detect missing changelog/deprecation notices
   const deprecatedLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/@deprecated/i.test(line)) {
       const nextLines = lines.slice(i, Math.min(lines.length, i + 3)).join("\n");
       if (!/since|use\s+\w+|replaced\s+by|migrate\s+to|version/i.test(nextLines)) {
@@ -295,6 +299,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   // Detect missing return type documentation
   const noReturnDocLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/^(?:export\s+)?(?:async\s+)?function\s+\w+/i.test(line.trim())) {
       const prevLines = lines.slice(Math.max(0, i - 5), i).join("\n");
       if (/\/\*\*/i.test(prevLines) && !/@returns|@return/i.test(prevLines)) {

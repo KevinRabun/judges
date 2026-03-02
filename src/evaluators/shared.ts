@@ -247,12 +247,34 @@ export function applyFrameworkAwareness(findings: Finding[], code: string): Find
 // ──────────────────────────────────────────────────────────────────────────────
 
 /**
- * Find line numbers in source code that match a given regex pattern.
+ * Regex that matches lines that are purely comments (single-line, block,
+ * JSDoc body, Python/Shell hash, Python docstrings, HTML comments).
+ * Used by getLineNumbers / getLangLineNumbers to auto-skip comments and by
+ * evaluators that iterate lines manually via forEach / for-loops.
  */
-export function getLineNumbers(code: string, pattern: RegExp): number[] {
+const COMMENT_LINE_RE = /^\s*(?:\/\/|\/\*|\*[\s/]|\*$|#(?![!\[])|"""|'''|<!--)/;
+
+/**
+ * Returns true when `line` is a comment (or JSDoc / docstring delimiter).
+ * Evaluators that iterate lines manually should call this at the top of
+ * the loop body and `return` / `continue` when it returns true.
+ */
+export function isCommentLine(line: string): boolean {
+  return COMMENT_LINE_RE.test(line);
+}
+
+/**
+ * Find line numbers in source code that match a given regex pattern.
+ * By default, comment lines are skipped to avoid false positives.
+ * Pass `{ skipComments: false }` for checks that intentionally inspect
+ * comments (TODO/FIXME, linter-disable, commented-out code, etc.).
+ */
+export function getLineNumbers(code: string, pattern: RegExp, opts?: { skipComments?: boolean }): number[] {
+  const skip = opts?.skipComments !== false; // default true
   const lines = code.split("\n");
   const matches: number[] = [];
   for (let i = 0; i < lines.length; i++) {
+    if (skip && COMMENT_LINE_RE.test(lines[i])) continue;
     pattern.lastIndex = 0;
     if (pattern.test(lines[i])) {
       matches.push(i + 1);
@@ -265,16 +287,18 @@ export function getLineNumbers(code: string, pattern: RegExp): number[] {
  * Find line numbers using a language-aware pattern map.
  * Takes the raw language string, normalises it, and builds the right regex.
  * Returns empty array if no pattern exists for the language.
+ * Comment lines are skipped by default (see getLineNumbers).
  */
 export function getLangLineNumbers(
   code: string,
   language: string,
   patterns: Partial<Record<LangFamily | "jsts" | "all", string>>,
+  opts?: { skipComments?: boolean },
 ): number[] {
   const lang = normalizeLanguage(language);
   const re = langPattern(lang, patterns);
   if (!re) return [];
-  return getLineNumbers(code, re);
+  return getLineNumbers(code, re, opts);
 }
 
 /**

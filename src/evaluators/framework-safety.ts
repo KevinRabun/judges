@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 
 /**
  * Framework-specific deep safety rules.
@@ -27,6 +27,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
   let inConditional = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    if (isCommentLine(line)) continue;
     if (/\bif\s*\(|\bswitch\s*\(|\?\s*$/.test(line)) inConditional++;
     if (
       inConditional > 0 &&
@@ -60,6 +61,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
   let inLoop = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    if (isCommentLine(line)) continue;
     if (/\bfor\s*\(|\bwhile\s*\(|\.forEach\s*\(|\.map\s*\(/.test(line)) inLoop++;
     if (inLoop > 0 && /\buse(?:State|Effect|Memo|Callback|Ref|Context|Reducer)\s*\(/i.test(line)) {
       hookInLoopLines.push(i + 1);
@@ -84,6 +86,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
   // useEffect with missing cleanup for subscriptions/timers
   const effectNoCleanupLines: number[] = [];
   for (let i = 0; i < lines.length; i++) {
+    if (isCommentLine(lines[i])) continue;
     if (/\buseEffect\s*\(\s*\(\s*\)\s*=>\s*\{/.test(lines[i])) {
       const effectBody = lines.slice(i, Math.min(lines.length, i + 20)).join("\n");
       const hasSubscription =
@@ -119,6 +122,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
   // useEffect with object/array literal as dependency → infinite re-render
   const effectObjDepLines: number[] = [];
   for (let i = 0; i < lines.length; i++) {
+    if (isCommentLine(lines[i])) continue;
     if (/\buseEffect\s*\(/.test(lines[i]) || /\buseMemo\s*\(/.test(lines[i]) || /\buseCallback\s*\(/.test(lines[i])) {
       const ctx = lines.slice(i, Math.min(lines.length, i + 5)).join(" ");
       // Matches dep arrays containing inline object/array literals: [{ ... }] or [[ ... ]]
@@ -145,6 +149,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
   // setState in useEffect without dependency guard → infinite loop
   const setStateInEffectLines: number[] = [];
   for (let i = 0; i < lines.length; i++) {
+    if (isCommentLine(lines[i])) continue;
     if (/\buseEffect\s*\(\s*\(\s*\)\s*=>\s*\{/.test(lines[i])) {
       const effectCtx = lines.slice(i, Math.min(lines.length, i + 15)).join("\n");
       const hasSetState = /\bset\w+\s*\(/.test(effectCtx);
@@ -178,6 +183,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
     let lastErrorMw = -1;
     let hasRouteAfterErrorMw = false;
     for (let i = 0; i < lines.length; i++) {
+      if (isCommentLine(lines[i])) continue;
       // Express error middleware: app.use((err, req, res, next) => {})
       if (
         /app\.use\s*\(\s*(?:function\s*\(\s*err|(?:\(\s*err\s*,\s*req\s*,\s*res\s*,\s*next\s*\))|(?:\(\s*error\s*,\s*req\s*,\s*res\s*,\s*next\s*\)))/i.test(
@@ -213,6 +219,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
     let corsLine = -1;
     let authLine = -1;
     for (let i = 0; i < lines.length; i++) {
+      if (isCommentLine(lines[i])) continue;
       if (/app\.use\s*\(\s*cors\s*\(/i.test(lines[i]) && corsLine < 0) corsLine = i;
       if (/app\.use\s*\(.*(?:passport|auth|jwt|bearer|session)\b/i.test(lines[i]) && authLine < 0) authLine = i;
     }
@@ -220,6 +227,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
     // Body parser without size limit
     const bodyParserNoLimitLines: number[] = [];
     for (let i = 0; i < lines.length; i++) {
+      if (isCommentLine(lines[i])) continue;
       if (/(?:express\.json|bodyParser\.json|express\.urlencoded|bodyParser\.urlencoded)\s*\(\s*\)/i.test(lines[i])) {
         bodyParserNoLimitLines.push(i + 1);
       }
@@ -307,6 +315,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
   if (gssp.test(code)) {
     const serverPropLines: number[] = [];
     for (let i = 0; i < lines.length; i++) {
+      if (isCommentLine(lines[i])) continue;
       if (gssp.test(lines[i])) {
         const fnBody = lines.slice(i, Math.min(lines.length, i + 30)).join("\n");
         // Checks if secrets/env vars are returned in props without filtering
@@ -416,6 +425,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
   // Inline arrow functions in JSX event handlers (re-render performance)
   const inlineHandlerLines: number[] = [];
   for (let i = 0; i < lines.length; i++) {
+    if (isCommentLine(lines[i])) continue;
     if (/\bon\w+=\{(?:\(\)\s*=>|\(\w+\)\s*=>|function\s*\()/.test(lines[i])) {
       inlineHandlerLines.push(i + 1);
     }
@@ -437,6 +447,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
   // React key prop using array index in dynamic lists
   const keyIndexLines: number[] = [];
   for (let i = 0; i < lines.length; i++) {
+    if (isCommentLine(lines[i])) continue;
     if (
       /key\s*=\s*\{\s*(?:index|i|idx|key)\s*\}/.test(lines[i]) &&
       /\.map\s*\(/.test(lines[Math.max(0, i - 5)] + lines.slice(Math.max(0, i - 5), i).join(" "))
@@ -463,6 +474,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
   const stateMutationLines: number[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    if (isCommentLine(line)) continue;
     // Detect patterns like: state.items.push(...), state.count++, state.obj.field = ...
     if (
       /\bstate\.\w+\.(?:push|pop|shift|unshift|splice|sort|reverse)\s*\(/.test(line) ||

@@ -147,7 +147,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
   }
 
   // Disabled linter/type-checker rules (multi-language)
-  const disableLines = getLangLineNumbers(code, language, LP.LINTER_DISABLE);
+  const disableLines = getLangLineNumbers(code, language, LP.LINTER_DISABLE, { skipComments: false });
   if (disableLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

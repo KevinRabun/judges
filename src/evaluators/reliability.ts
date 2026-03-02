@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeReliability(code: string, language: string): Finding[] {
@@ -80,6 +80,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
   // Detect single point of failure patterns
   const singleConnLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/new\s+(?:Client|Connection|Database)\s*\(/i.test(line) && !/pool|Pool/i.test(line)) {
       singleConnLines.push(i + 1);
     }
@@ -104,6 +105,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
   // Detect unchecked null/undefined access
   const unsafeAccessLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/\w+\.\w+\.\w+\.\w+/.test(line) && !/\?\./g.test(line) && !/import|require|from\s/i.test(line)) {
       unsafeAccessLines.push(i + 1);
     }
@@ -164,6 +166,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
   // Missing fallback / degraded mode
   const criticalCallLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/await\s+(?:fetch|axios|http)/i.test(line)) {
       const context = lines.slice(i, Math.min(lines.length, i + 10)).join("\n");
       if (!/fallback|default|cached|stale|degraded/i.test(context) && /catch/i.test(context)) {
@@ -190,6 +193,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
   // Missing idempotency for write operations
   const writeEndpointLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/\.(post|put|patch)\s*\(\s*["'`]/i.test(line) || /app\.post|router\.post/i.test(line)) {
       writeEndpointLines.push(i + 1);
     }
@@ -218,6 +222,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
   // Unhandled promise rejection
   const unhandledPromiseLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/new\s+Promise\s*\(/i.test(line)) {
       const context = lines.slice(i, Math.min(lines.length, i + 15)).join("\n");
       if (!/reject|\.catch|try\s*\{/i.test(context)) {

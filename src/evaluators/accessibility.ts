@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangFamily } from "./shared.js";
+import { getLangFamily, isCommentLine } from "./shared.js";
 
 export function analyzeAccessibility(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
@@ -11,6 +11,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Detect images without alt attributes
   const imgNoAltLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/<img\b/i.test(line) && !/alt\s*=/i.test(line)) {
       imgNoAltLines.push(i + 1);
     }
@@ -34,6 +35,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Detect click handlers without keyboard equivalents
   const clickNoKeyLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/onClick/i.test(line) && !/onKeyDown|onKeyUp|onKeyPress/i.test(line)) {
       clickNoKeyLines.push(i + 1);
     }
@@ -58,6 +60,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Detect non-semantic elements used for structure
   const nonSemanticLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/<div\b/i.test(line) && /role\s*=\s*["'](button|link|heading|navigation|main)/i.test(line)) {
       nonSemanticLines.push(i + 1);
     }
@@ -81,6 +84,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Detect missing form labels
   const inputNoLabelLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /<input\b/i.test(line) &&
       !/aria-label|aria-labelledby|id\s*=/i.test(line) &&
@@ -107,6 +111,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Detect tabIndex > 0
   const tabIndexLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/tabIndex\s*=\s*{?\s*[1-9]/i.test(line) || /tabindex\s*=\s*["'][1-9]/i.test(line)) {
       tabIndexLines.push(i + 1);
     }
@@ -131,6 +136,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Detect color-only status indicators
   const colorOnlyLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     const trimmed = line.trim();
     if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (
@@ -159,6 +165,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Detect autoplay media
   const autoplayLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/autoplay|autoPlay/i.test(line)) {
       autoplayLines.push(i + 1);
     }
@@ -182,6 +189,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Missing lang attribute on html element
   const htmlNoLangLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/<html\b/i.test(line) && !/lang\s*=/i.test(line)) {
       htmlNoLangLines.push(i + 1);
     }
@@ -223,6 +231,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Focus management — outline:none without replacement
   const outlineNoneLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/outline\s*:\s*(?:none|0)\b/i.test(line)) {
       const context = lines.slice(i, Math.min(lines.length, i + 5)).join("\n");
       if (!/focus-visible|box-shadow|border.*focus|ring/i.test(context)) {
@@ -250,6 +259,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Missing ARIA live regions for dynamic content
   const dynamicUpdateLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     const trimmed = line.trim();
     if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     if (
@@ -279,6 +289,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Heading hierarchy issues
   const headingLevels: { level: number; line: number }[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     const match = line.match(/<h([1-6])\b/i);
     if (match) {
       headingLevels.push({ level: parseInt(match[1]), line: i + 1 });
@@ -310,6 +321,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Touch target size too small
   const smallTargetLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /(?:width|height|size)\s*[:=]\s*(?:['"]?\d{1,2}(?:px)?['"]?|{\s*\d{1,2}\s*})/i.test(line) &&
       /(?:button|btn|icon|close|toggle|checkbox|radio)/i.test(line)
@@ -337,6 +349,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Motion/animation without reduced-motion support
   const animationLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/animation\s*:|transition\s*:|@keyframes|animate\s*\(|gsap|framer-motion|spring/i.test(line)) {
       animationLines.push(i + 1);
     }
@@ -362,6 +375,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Video/audio without captions/transcript
   const mediaLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/<video\b|<audio\b|<iframe.*(?:youtube|vimeo)/i.test(line)) {
       const context = lines.slice(i, Math.min(lines.length, i + 5)).join("\n");
       if (!/track\b|caption|subtitle|transcript/i.test(context)) {
@@ -389,6 +403,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Form error messages not associated with inputs
   const errorMsgLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     const trimmed = line.trim();
     // Skip comment lines — doc blocks describing ARIA helpers are not violations
     if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;

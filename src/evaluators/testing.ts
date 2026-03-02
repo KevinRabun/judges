@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeTesting(code: string, language: string): Finding[] {
@@ -20,6 +20,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
 
     const testBlockLines: number[] = [];
     lines.forEach((line, i) => {
+      if (isCommentLine(line)) return;
       if (
         /\b(?:it|test)\s*\(\s*["'`]/i.test(line) ||
         /def\s+test_/i.test(line) ||
@@ -52,6 +53,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // Detect overly broad test names
     const vagueTestLines: number[] = [];
     lines.forEach((line, i) => {
+      if (isCommentLine(line)) return;
       if (/(?:it|test)\s*\(\s*["'`](test\s+\w+|works|it works|should work|test \d+|basic test)["'`]/i.test(line)) {
         vagueTestLines.push(i + 1);
       }
@@ -76,6 +78,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // Detect hardcoded test data that might be brittle
     const hardcodedDateLines: number[] = [];
     lines.forEach((line, i) => {
+      if (isCommentLine(line)) return;
       if (/["'`]20[2-3]\d-[01]\d-[0-3]\d/i.test(line) && !/mock|stub|fixture/i.test(line)) {
         hardcodedDateLines.push(i + 1);
       }
@@ -99,6 +102,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // Detect tests with external dependencies (multi-language)
     const externalDepLines: number[] = [];
     lines.forEach((line, i) => {
+      if (isCommentLine(line)) return;
       const trimmed = line.trim();
       // Skip comment lines — doc blocks mentioning HttpClient/database are not real calls
       if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
@@ -139,6 +143,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // Detect tests with shared mutable state
     const sharedStateLines: number[] = [];
     lines.forEach((line, i) => {
+      if (isCommentLine(line)) return;
       if (
         /(?:let|var)\s+\w+\s*=/i.test(line.trim()) &&
         !/(?:const|it\s*\(|test\s*\(|describe\s*\()/i.test(line.trim())
@@ -188,6 +193,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // Detect sleep/wait in tests (multi-language)
     const sleepLines: number[] = [];
     lines.forEach((line, i) => {
+      if (isCommentLine(line)) return;
       if (
         /(?:sleep|setTimeout|Thread\.sleep|time\.sleep|delay|tokio::time::sleep|std::thread::sleep|Task\.Delay)\s*\(\s*\d/i.test(
           line,
@@ -232,6 +238,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // Detect snapshot overuse
     const snapshotLines: number[] = [];
     lines.forEach((line, i) => {
+      if (isCommentLine(line)) return;
       if (/toMatchSnapshot|toMatchInlineSnapshot/i.test(line)) {
         snapshotLines.push(i + 1);
       }

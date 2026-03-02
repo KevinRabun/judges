@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeDatabase(code: string, language: string): Finding[] {
@@ -54,6 +54,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   let loopDepth = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    if (isCommentLine(line)) continue;
     if (loopLines.has(i + 1) || /\b(?:for|while|forEach|\.map|\.each)\b/.test(line)) {
       inLoop = true;
       loopDepth++;

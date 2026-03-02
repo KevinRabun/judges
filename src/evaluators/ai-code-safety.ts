@@ -87,7 +87,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
   // ── AICS-003  Placeholder security comments left by AI ─────────────────────
   const placeholderSecurityPattern =
     /(?:\/\/|#|\/\*)\s*(?:TODO|FIXME|HACK|XXX|TEMP)[\s:]*(?:add\s+(?:auth|authentication|authorization|validation|sanitization|encryption|rate.?limit|csrf|xss|input.?check|security|error.?handling|logging|audit)|implement\s+(?:auth|authentication|authorization|validation|security|encryption|rate.?limit)|fix\s+(?:security|auth|validation|injection)|need\s+(?:auth|validation|security|encryption)|replace\s+(?:with|before)\s+(?:prod|production))/gi;
-  const placeholderLines = getLineNumbers(code, placeholderSecurityPattern);
+  const placeholderLines = getLineNumbers(code, placeholderSecurityPattern, { skipComments: false });
   if (placeholderLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

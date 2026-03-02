@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeConcurrency(code: string, language: string): Finding[] {
@@ -12,6 +12,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
   // Detect unbounded Promise.all
   const promiseAllLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/Promise\.all\s*\(\s*\w+\.map/i.test(line)) {
       const context = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 5)).join("\n");
       if (!/chunk|batch|limit|throttle|pLimit|p-limit|concurrency|pool/i.test(context)) {
@@ -71,6 +72,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
   // Detect missing await
   const missingAwaitLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     // Detect promise-returning calls without await in async context
     if (
       /^\s*\w+\.(save|update|delete|insert|remove|send|post|put|fetch)\s*\(/i.test(line) &&
@@ -103,6 +105,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
   // Detect async operations in loops without understanding of ordering
   const awaitInLoopLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/for\s*\(|for\s+await|while\s*\(/.test(line)) {
       const loopBody = lines.slice(i + 1, Math.min(lines.length, i + 15)).join("\n");
       const awaitCount = (loopBody.match(/await\s/g) || []).length;
@@ -131,6 +134,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
   // Detect setInterval without cleanup
   const setIntervalLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/setInterval\s*\(/i.test(line)) {
       setIntervalLines.push(i + 1);
     }
@@ -155,6 +159,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
   // Detect race condition patterns with read-modify-write
   const readModifyWriteLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/await\s+\w+\.(get|find|read|load)\s*\(/i.test(line)) {
       const nextLines = lines.slice(i + 1, Math.min(lines.length, i + 10)).join("\n");
       if (/await\s+\w+\.(save|update|set|write|put)\s*\(/i.test(nextLines)) {
@@ -182,6 +187,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
   // Detect worker/thread creation without pool (multi-language)
   const workerLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /new\s+Worker\s*\(|new\s+Thread\s*\(|threading\.Thread\s*\(|Thread\.start|std::thread::spawn|thread::spawn|go\s+func|Task\.Run|Task\.Factory/i.test(
         line,
@@ -211,6 +217,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
   // Detect callback-based async mixed with promises
   const mixedAsyncLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/function\s*\(\s*(?:err|error)\s*,\s*(?:data|result|res)\s*\)/i.test(line)) {
       const context = lines.slice(Math.max(0, i - 10), i).join("\n");
       if (/async\s|Promise|\.then\s*\(/i.test(context)) {
@@ -238,6 +245,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
   // Detect mutex/lock-free concurrent data access (multi-language)
   const concurrentDataLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /(?:Map|Set|Array|Object|HashMap|Vec|Dictionary|List)\s*(?:\(|<|::new)/i.test(line) &&
       /shared|global|cache|store|registry|static/i.test(line)
@@ -273,6 +281,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
   // Detect deadlock-prone patterns (nested locks/awaits)
   const nestedAwaitLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/await\s+.*lock|acquire\s*\(/i.test(line)) {
       const innerBlock = lines.slice(i + 1, Math.min(lines.length, i + 20)).join("\n");
       if (/await\s+.*lock|acquire\s*\(/i.test(innerBlock)) {

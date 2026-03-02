@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangFamily } from "./shared.js";
+import { getLangFamily, isCommentLine } from "./shared.js";
 
 export function analyzeInternationalization(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
@@ -11,6 +11,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   // Detect hardcoded user-facing strings in UI code
   const hardcodedStringLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     // Look for JSX text content or UI labels
     if (/>[\s]*[A-Z][a-z]+[\s\w]+<\//i.test(line) && !/translate|t\(|i18n|intl|formatMessage/i.test(line)) {
       hardcodedStringLines.push(i + 1);
@@ -42,6 +43,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   // Detect string concatenation for user messages
   const concatMsgLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /["'][^"']*["']\s*\+\s*\w+\s*\+\s*["']/i.test(line) &&
       /(?:message|msg|text|label|title|error|warning|alert|toast)/i.test(line)
@@ -69,6 +71,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   // Detect locale-sensitive operations without locale
   const localeSensitiveLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/\.toLocaleDateString\s*\(\s*\)|\.toLocaleString\s*\(\s*\)|new\s+Date\(\)\.toString\(\)/i.test(line)) {
       localeSensitiveLines.push(i + 1);
     }
@@ -96,6 +99,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   // Detect hardcoded currency symbols
   const currencyLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/[`"']\s*\$\s*\$?\{|["']\$\d|["`']\s*€|["`']\s*£|["`']\s*¥/i.test(line)) {
       currencyLines.push(i + 1);
     }
@@ -119,6 +123,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   // Detect text direction assumptions
   const ltrAssumptionLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /text-align\s*:\s*left|padding-left|margin-left:\s*auto|float\s*:\s*left/i.test(line) &&
       /header|nav|menu|sidebar/i.test(lines.slice(Math.max(0, i - 3), i + 1).join("\n"))
@@ -146,6 +151,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   // Detect hardcoded pluralization
   const pluralLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /count\s*===?\s*1\s*\?\s*["'`].*["'`]\s*:\s*["'`].*s["'`]/i.test(line) ||
       /\+\s*["'`]\s*items?["'`]/i.test(line)
@@ -172,6 +178,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   // Detect hardcoded date/number formats
   const formatLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/\.toFixed\s*\(\s*2\s*\)/.test(line) && /price|amount|cost|total/i.test(line)) {
       formatLines.push(i + 1);
     }
@@ -198,6 +205,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   // Detect hardcoded phone/address formats
   const phoneFormatLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/\(\d{3}\)\s*\d{3}-\d{4}|phone.*format|zip.*code.*\d{5}/i.test(line)) {
       phoneFormatLines.push(i + 1);
     }
@@ -241,6 +249,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   // Detect raw number formatting without locale awareness
   const rawNumberLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     // Detect Number().toString(), String(number), or template literals with numeric variables without Intl
     if (
       /(?:\.toString\(\)|String\(\w+\)|\$\{\w+\})\s*/.test(line) &&

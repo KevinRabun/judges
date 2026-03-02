@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeApiDesign(code: string, language: string): Finding[] {
@@ -12,6 +12,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   // Detect inconsistent HTTP methods
   const verbInUrlLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/["'`]\/(?:api\/)?(?:get|fetch|create|delete|remove|update|add|set)[A-Z]/i.test(line)) {
       verbInUrlLines.push(i + 1);
     }
@@ -35,6 +36,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   // Detect missing error response handling
   const noErrorHandlingLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/res\.(?:json|send)\s*\(/i.test(line)) {
       // Check surrounding lines for status code setting
       const context = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 3)).join("\n");
@@ -63,6 +65,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   // Detect overly broad API responses (returning everything)
   const selectAllLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /SELECT\s+\*/i.test(line) &&
       /api|route|endpoint|handler|controller/i.test(lines.slice(Math.max(0, i - 10), i).join("\n"))
@@ -90,6 +93,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   // Detect missing pagination
   const listEndpointLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/\.get\s*\(\s*["'`]\/.*s["'`]/i.test(line) || /router\.get.*(?:list|all|index)/i.test(line)) {
       const fnBody = lines.slice(i, Math.min(lines.length, i + 20)).join("\n");
       if (!/page|limit|offset|cursor|skip|take|per_page|pageSize/i.test(fnBody)) {
@@ -134,6 +138,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   // Detect inconsistent response format
   const jsonFormats: { line: number; hasData: boolean; hasError: boolean }[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/res\.json\s*\(\s*\{/i.test(line)) {
       const context = lines.slice(i, Math.min(lines.length, i + 5)).join("\n");
       jsonFormats.push({
@@ -164,6 +169,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   // Missing content-type validation
   const bodyParsingLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/req\.body|request\.body|ctx\.request\.body/i.test(line)) {
       bodyParsingLines.push(i + 1);
     }
@@ -189,6 +195,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   // Sensitive data in URL/query parameters
   const sensitiveInUrlLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/req\.(?:params|query)\s*\.\s*(?:password|token|secret|apiKey|api_key|ssn|credit)/i.test(line)) {
       sensitiveInUrlLines.push(i + 1);
     }

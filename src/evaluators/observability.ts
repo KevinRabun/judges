@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeObservability(code: string, language: string): Finding[] {
@@ -31,6 +31,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
   // Detect missing error context in catch blocks
   const catchNoContextLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/catch\s*\(\s*(\w+)\s*\)/.test(line)) {
       const varName = line.match(/catch\s*\(\s*(\w+)\s*\)/)?.[1];
       const catchBody = lines.slice(i + 1, Math.min(lines.length, i + 8)).join("\n");
@@ -81,6 +82,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
   // Detect string concatenation in log statements
   const concatLogLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/(?:console|logger)\.\w+\s*\(\s*.*\+\s*/i.test(line)) {
       concatLogLines.push(i + 1);
     }
@@ -123,6 +125,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
   // Sensitive data in logs (multi-language)
   const sensitiveLogLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     const executableLine = line.replace(/(["'`])(?:\\.|(?!\1).)*\1/g, "");
     if (
       /(?:console|logger|log|logging|println|print|eprintln|fmt\.Print|Debug\.Log)\s*[.(]/i.test(executableLine) &&
@@ -193,6 +196,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
   // Inconsistent log levels
   const logLevelCounts: Record<string, number> = {};
   lines.forEach((line) => {
+    if (isCommentLine(line)) return;
     const match = line.match(/(?:console|logger)\.(debug|info|warn|error|trace|fatal)\s*\(/i);
     if (match) {
       logLevelCounts[match[1].toLowerCase()] = (logLevelCounts[match[1].toLowerCase()] || 0) + 1;
@@ -217,6 +221,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
   // Missing audit logging for important operations
   const securityOpLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /(?:login|logout|signIn|signOut|createUser|deleteUser|changePassword|updateRole|grant|revoke)\s*[=(]/i.test(line)
     ) {

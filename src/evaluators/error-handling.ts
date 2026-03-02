@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeErrorHandling(code: string, language: string): Finding[] {
@@ -252,6 +252,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   const thenWithoutCatch: number[] = [];
   const cLines = code.split("\n");
   cLines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/\.then\s*\(/i.test(line) && thenWithoutCatch.length < 10) {
       const context = cLines.slice(i, Math.min(cLines.length, i + 6)).join("\n");
       if (!/\.catch\s*\(|\.finally\s*\(/.test(context)) {

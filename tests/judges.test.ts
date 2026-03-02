@@ -47,6 +47,20 @@ import { analyzeIacSecurity } from "../src/evaluators/iac-security.js";
 import { analyzeMaintainability } from "../src/evaluators/maintainability.js";
 import { analyzeSoftwarePractices } from "../src/evaluators/software-practices.js";
 import { analyzePerformance } from "../src/evaluators/performance.js";
+import { analyzeAuthentication } from "../src/evaluators/authentication.js";
+import { analyzeApiDesign } from "../src/evaluators/api-design.js";
+import { analyzeConcurrency } from "../src/evaluators/concurrency.js";
+import { analyzeErrorHandling } from "../src/evaluators/error-handling.js";
+import { analyzeAccessibility } from "../src/evaluators/accessibility.js";
+import { analyzeFrameworkSafety } from "../src/evaluators/framework-safety.js";
+import { analyzeDependencyHealth } from "../src/evaluators/dependency-health.js";
+import { analyzeCompliance } from "../src/evaluators/compliance.js";
+import { analyzeReliability } from "../src/evaluators/reliability.js";
+import { analyzeObservability } from "../src/evaluators/observability.js";
+import { analyzeTesting } from "../src/evaluators/testing.js";
+import { analyzeInternationalization } from "../src/evaluators/internationalization.js";
+import { analyzeDocumentation } from "../src/evaluators/documentation.js";
+import { analyzeEthicsBias } from "../src/evaluators/ethics-bias.js";
 
 // ─── Tree-sitter warm-up ────────────────────────────────────────────────────
 // Must happen BEFORE any describe/it blocks so that tree-sitter grammars are
@@ -8658,5 +8672,189 @@ function processFormEntries(entries) {
       0,
       "Should not flag validateDobEntry as recursive when called by a neighboring function",
     );
+  });
+});
+
+// ── Regression: comments containing code-like patterns should NOT trigger findings ──
+describe("False-positive: code-like patterns inside comments must be ignored", () => {
+  // This code snippet has ONLY comments with patterns that would false-positive
+  // across many evaluators. No actual code triggers should exist.
+  const commentOnlyCode = `
+// Performance review comments left by the team during code audit:
+// TODO: consider adding eval() call for dynamic config — rejected as unsafe
+// The old code used dangerouslySetInnerHTML for the widget
+// We replaced innerHTML = userInput with proper sanitization
+// Note: used to have SELECT * FROM users WHERE id = \${input}
+// Legacy: app.use(express.json()) was the default without limit
+// See ticket: password was stored with md5() before migration
+// async function fetchData() { return await fetch(url); }
+// The exec(command) call was removed in favor of spawn()
+// Previously: require('child_process').exec(userInput)
+// Old approach: document.write(data) — now uses textContent
+// axios.get(url, { timeout: 0 }) was the insecure default
+// app.listen(3000) without helmet() caused header issues
+// The setInterval(fn, 100) in useEffect had no cleanup
+// var oldConfig = {} was refactored to const
+// key={index} was replaced with key={item.id}
+// bypassSecurityTrustHtml(input) was another XSS vector
+// v-html="rawData" template without DOMPurify
+/* 
+ * Block comment with patterns:
+ * mutex.lock() / mutex.unlock() without defer
+ * goroutine leak: go func() { for { select {} } }()
+ * console.log(password) was a debug leftover
+ * new Date().toLocaleString() had i18n issues
+ * process.env.SECRET_KEY leaked to client props
+ * app.use(cors()) before auth middleware
+ */
+/**
+ * JSDoc describing legacy patterns:
+ * @example
+ * // was: res.send(500) with no error object
+ * // was: catch(e) {} — empty catch swallowing errors
+ * @deprecated The old API used http:// without TLS
+ */
+export function safeFunction(): string {
+  const name = "hello";
+  return name;
+}
+`;
+
+  it("should NOT produce performance false positives from comments", () => {
+    const findings = analyzePerformance(commentOnlyCode, "typescript");
+    // eval(), setInterval, recursive call patterns are all in comments
+    const fpFindings = findings.filter(
+      (f) =>
+        f.title.toLowerCase().includes("eval") ||
+        f.title.toLowerCase().includes("interval") ||
+        f.title.toLowerCase().includes("recursive"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Performance FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce maintainability false positives for 'var' in comments", () => {
+    const findings = analyzeMaintainability(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("var") && f.title.toLowerCase().includes("declaration"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Maintainability FP for 'var' in comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce software-practices false positives for code patterns in comments", () => {
+    const findings = analyzeSoftwarePractices(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) =>
+        f.title.toLowerCase().includes("var ") ||
+        f.title.toLowerCase().includes("console.log") ||
+        f.title.toLowerCase().includes("innerhtml"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Software-practices FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce error-handling false positives for catch/error patterns in comments", () => {
+    const findings = analyzeErrorHandling(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("empty catch") || f.title.toLowerCase().includes("swallow"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Error-handling FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce concurrency false positives from mutex/goroutine in comments", () => {
+    const findings = analyzeConcurrency(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("mutex") || f.title.toLowerCase().includes("goroutine"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Concurrency FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce framework-safety false positives from JSX/Express patterns in comments", () => {
+    const findings = analyzeFrameworkSafety(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) =>
+        f.title.toLowerCase().includes("dangerously") ||
+        f.title.toLowerCase().includes("v-html") ||
+        f.title.toLowerCase().includes("bypass") ||
+        f.title.toLowerCase().includes("body parser") ||
+        f.title.toLowerCase().includes("useeffect") ||
+        f.title.toLowerCase().includes("key prop"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Framework-safety FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce accessibility false positives from patterns in comments", () => {
+    const findings = analyzeAccessibility(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("innerhtml") || f.title.toLowerCase().includes("document.write"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Accessibility FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce reliability false positives from patterns in comments", () => {
+    const findings = analyzeReliability(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("timeout: 0") || f.title.toLowerCase().includes("exec("),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Reliability FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  // Verify that intentional comment checks STILL work
+  it("should STILL flag TODO/FIXME patterns in comments (intentional check)", () => {
+    const codeWithTodo = `
+// TODO: fix this security issue before release
+function process(): void {
+  const x = 1;
+}
+`;
+    const findings = analyzeMaintainability(codeWithTodo, "typescript");
+    const todoFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("todo") || f.title.toLowerCase().includes("fixme"),
+    );
+    assert.ok(todoFindings.length > 0, "TODO/FIXME check should still flag comments — it's intentional");
+  });
+
+  it("should STILL flag linter-disable comments (intentional check)", () => {
+    const codeWithDisable = `
+// eslint-disable-next-line no-unused-vars
+function unusedHelper(): void {
+  const y = 2;
+}
+`;
+    const findings = analyzeSoftwarePractices(codeWithDisable, "typescript");
+    const disableFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("linter") || f.title.toLowerCase().includes("suppress"),
+    );
+    assert.ok(disableFindings.length > 0, "Linter-disable check should still flag comments — it's intentional");
   });
 });

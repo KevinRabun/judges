@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzePerformance(code: string, language: string): Finding[] {
@@ -43,6 +43,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // Detect synchronous file I/O (multi-language)
   const syncIOLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     // JS/TS sync I/O, Python blocking I/O, Rust std::fs blocking, C# synchronous I/O, Java blocking I/O, Go blocking I/O
     if (
       /readFileSync|writeFileSync|appendFileSync|existsSync|mkdirSync|readdirSync|statSync/i.test(line) ||
@@ -76,6 +77,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   const repeatedFetchLines: number[] = [];
   const fetchCalls: { line: number; url: string }[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     const urlMatch = line.match(/(?:fetch|get|request)\s*\(\s*["'`]([^"'`]+)["'`]/i);
     if (urlMatch) {
       const existing = fetchCalls.find((f) => f.url === urlMatch[1]);
@@ -106,6 +108,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // Detect unnecessary re-renders (React)
   const inlineHandlerLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/onClick\s*=\s*\{?\s*\(\s*\)\s*=>/i.test(line) || /onChange\s*=\s*\{?\s*\(\s*\w*\s*\)\s*=>/i.test(line)) {
       inlineHandlerLines.push(i + 1);
     }
@@ -129,6 +132,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // Detect unbounded array/string operations
   const unboundedOpLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /\.sort\s*\(\s*\)/.test(line) ||
       /\.reverse\s*\(\s*\)/.test(line) ||
@@ -182,6 +186,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // Detect memory leak patterns (event listeners not cleaned up)
   const addListenerLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/addEventListener\s*\(|\.on\s*\(\s*["']/i.test(line)) {
       addListenerLines.push(i + 1);
     }
@@ -208,6 +213,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // Detect missing lazy loading / code splitting
   const heavyImportLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /^import\s+.*from\s+["'](?:lodash|moment|rxjs|d3|three|chart\.js|plotly|tensorflow|pandas|numpy)["']/i.test(
         line.trim(),
@@ -235,6 +241,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // Detect missing debounce/throttle on high-frequency events
   const highFreqEventLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /(?:onScroll|onResize|onMouseMove|onInput|onKeyUp|onKeyDown|scroll|resize|mousemove|input|keyup)\s*[=:]/i.test(
         line,
@@ -264,6 +271,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // Detect large DOM manipulation in loops
   const domInLoopLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/for\s*\(|\.forEach|\.map|while\s*\(/.test(line)) {
       const body = lines.slice(i + 1, Math.min(lines.length, i + 8)).join("\n");
       if (/\.appendChild|\.insertBefore|\.innerHTML|\.createElement|document\.write/i.test(body)) {
@@ -291,6 +299,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // Detect unoptimized images
   const imgLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/<img\s/i.test(line) && !/loading\s*=\s*["']lazy["']/i.test(line)) {
       imgLines.push(i + 1);
     }
@@ -315,6 +324,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // Detect blocking script tags
   const blockingScriptLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/<script\s/i.test(line) && !/async|defer|type\s*=\s*["']module["']/i.test(line) && /src\s*=/i.test(line)) {
       blockingScriptLines.push(i + 1);
     }
@@ -364,6 +374,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // Detect missing pagination for large data (multi-language)
   const bulkFetchLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /\.find\s*\(\s*\{\s*\}\s*\)|\.find\s*\(\s*\)|findAll\s*\(\s*\)|SELECT\s+\*\s+FROM|\.all\s*\(\s*\)|objects\.all\s*\(|cursor\.execute\s*\(.*SELECT\s+\*/i.test(
         line,
@@ -399,6 +410,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // Detect computation in render path (React)
   const computeInRenderLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/return\s*\(\s*</.test(line)) {
       const preReturn = lines.slice(Math.max(0, i - 15), i).join("\n");
       if (
@@ -505,6 +517,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // ── setInterval Without clearInterval ─────────────────────────────────────
   const setIntervalLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/setInterval\s*\(/i.test(line)) {
       setIntervalLines.push(i + 1);
     }
@@ -609,6 +622,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   // ── Expensive Operations in Promise.all Without Error Boundaries ──────────
   const promiseAllLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/Promise\.all\s*\(\s*\[/i.test(line) || /Promise\.all\s*\(/i.test(line)) {
       const context = lines.slice(i, Math.min(lines.length, i + 5)).join("\n");
       if (!/Promise\.allSettled|\.catch|try\s*\{/i.test(context)) {

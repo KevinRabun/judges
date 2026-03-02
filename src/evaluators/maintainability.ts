@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeMaintainability(code: string, language: string): Finding[] {
@@ -32,6 +32,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   const magicLines: number[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    if (isCommentLine(line)) continue;
     // Skip imports, comments, and obvious non-magic contexts
     if (/^\s*\/\/|^\s*\*|^\s*import|^\s*#|\.padStart|\.padEnd|\.slice|ruleNum|ruleId|String\(/.test(line)) continue;
     if (/(?<![.\w"'`])(?:86400|3600|1000|5000|8080|3000|4200|8000|1024|2048|4096)\b/.test(line)) {
@@ -55,7 +56,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   }
 
   // TODO / FIXME / HACK / XXX comments (multi-language comment styles)
-  const todoLines = getLangLineNumbers(code, language, LP.TODO_FIXME);
+  const todoLines = getLangLineNumbers(code, language, LP.TODO_FIXME, { skipComments: false });
   if (todoLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -147,7 +148,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   // Commented-out code
   const commentedCodePattern =
     /\/\/\s*(?:const|let|var|function|class|import|export|if|for|while|return|app\.|router\.)\s/g;
-  const commentedCodeLines = getLineNumbers(code, commentedCodePattern);
+  const commentedCodeLines = getLineNumbers(code, commentedCodePattern, { skipComments: false });
   if (commentedCodeLines.length > 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -222,6 +223,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   const singleLetterLines: number[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    if (isCommentLine(line)) continue;
     if (/\b(?:for|while)\s*\(/.test(line)) continue; // skip loop counters
     if (
       /(?:const|let|var)\s+[a-zA-Z]\s*[:=]/.test(line) &&

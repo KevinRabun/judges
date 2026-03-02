@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangFamily } from "./shared.js";
+import { getLangFamily, isCommentLine } from "./shared.js";
 
 export function analyzeEthicsBias(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
@@ -54,6 +54,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
   // Detect scoring/ranking without explainability
   const scoringLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /(?:score|rank|rating|risk)\s*(?:\+|=|-|\*|\/)/i.test(line) &&
       /(?:user|customer|applicant|candidate|patient)/i.test(
@@ -84,6 +85,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
   // Detect automated decision-making without human review
   const autoDecisionLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/(?:approve|reject|deny|block|suspend|terminate|ban)\s*\(/i.test(line)) {
       const context = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 5)).join("\n");
       if (
@@ -114,6 +116,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
   // Detect dark patterns in UI code
   const darkPatternLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     // Pre-checked checkboxes for marketing
     if (
       /(?:checked|defaultChecked|selected)\s*[=:]\s*(?:true|{true})/i.test(line) &&
@@ -169,6 +172,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
   // Detect biased training data or model references
   const biasedDataLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /(?:train|dataset|corpus|sample)\s*(?:=|\.)/i.test(line) &&
       !/(?:balanced|stratified|representative|fairness|bias.?check|debiased)/i.test(
@@ -202,6 +206,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
   // Detect manipulative UI urgency patterns
   const urgencyLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /(?:only\s+\d+\s+left|limited\s+time|act\s+now|hurry|countdown|expires?\s+in|last\s+chance|selling\s+fast)/i.test(
         line,
@@ -230,6 +235,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
   // Detect data collection beyond stated purpose
   const excessiveCollectionLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /(?:navigator\.geolocation|getBattery|deviceMemory|connection\.effectiveType|screen\.orientation|Accelerometer|Gyroscope)/i.test(
         line,
@@ -261,6 +267,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
   // Detect price discrimination patterns
   const pricingLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /(?:price|cost|fee|rate)\s*(?:\*|=|\+)/i.test(line) &&
       /(?:location|region|country|device|platform|userAgent|browser)/i.test(line)
@@ -288,6 +295,7 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
   // Detect accessibility barriers as ethics issue
   const accessBarrierLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/captcha|recaptcha/i.test(line)) {
       const context = lines.slice(i, Math.min(lines.length, i + 10)).join("\n");
       if (!/audio|alternative|accessible|aria/i.test(context)) {

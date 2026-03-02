@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCompliance(code: string, language: string): Finding[] {
@@ -55,6 +55,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   // Detect missing consent/opt-in checks
   const trackingLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/analytics|tracking|telemetry|gtag|fbq|pixel|ga\s*\(/i.test(line)) {
       trackingLines.push(i + 1);
     }
@@ -80,6 +81,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   // Detect data retention issues
   const storeForeverLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /(?:save|store|insert|persist|write)\s*\(/i.test(line) &&
       /(?:user|personal|customer|patient|email|phone)/i.test(line)
@@ -114,6 +116,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
     ...getLangLineNumbers(code, language, LP.STRUCTURED_LOG),
   ]);
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (logLineSet.has(i + 1) && /(?:password|token|secret|ssn|credit.?card|api.?key|auth)/i.test(line)) {
       logSensitiveLines.push(i + 1);
     }
@@ -139,6 +142,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   const dataModelLines: number[] = [];
   const classDefLineSet = new Set(getLangLineNumbers(code, language, LP.CLASS_DEF));
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     const isClassDef =
       classDefLineSet.has(i + 1) ||
       /(?:interface|class|type|schema|model)\s+\w*(?:User|Customer|Patient|Employee|Person)/i.test(line);
@@ -214,6 +218,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   // Detect HIPAA-relevant health data
   const healthDataLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (
       /(?:diagnosis|medical_record|health_condition|prescription|treatment|patient_id|medical_history|lab_result)/i.test(
         line,
@@ -263,6 +268,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   // Detect cookie handling without SameSite/Secure flags
   const cookieLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/set-cookie|setCookie|cookie\s*\(/i.test(line) && !/sameSite|secure|httpOnly/i.test(line)) {
       cookieLines.push(i + 1);
     }
@@ -287,6 +293,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   // Detect age verification gaps
   const ageRelatedLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/(?:age|date.?of.?birth|dob|birthdate|birth_date|minor|child|under.?13|under.?16|coppa)/i.test(line)) {
       ageRelatedLines.push(i + 1);
     }
@@ -312,6 +319,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   // Detect audit trail gaps for regulated operations
   const regulatedOpLines: number[] = [];
   lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/(?:transfer|payment|withdrawal|approve|sign|certify|authorize|attest)\s*[=(]/i.test(line)) {
       regulatedOpLines.push(i + 1);
     }

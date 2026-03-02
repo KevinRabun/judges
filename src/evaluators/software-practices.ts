@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeSoftwarePractices(code: string, language: string): Finding[] {
@@ -36,7 +36,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   }
 
   // Linter / type-checker suppression (multi-language)
-  const suppressLines = getLangLineNumbers(code, language, LP.LINTER_DISABLE);
+  const suppressLines = getLangLineNumbers(code, language, LP.LINTER_DISABLE, { skipComments: false });
   if (suppressLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -126,7 +126,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   }
 
   // TODO/FIXME/HACK comments (multi-language)
-  const todoLines = getLangLineNumbers(code, language, LP.TODO_FIXME);
+  const todoLines = getLangLineNumbers(code, language, LP.TODO_FIXME, { skipComments: false });
   if (todoLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -207,6 +207,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   // Deep nesting (>4 levels)
   const deepNestLines: number[] = [];
   codeLines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     const leadingSpaces = line.search(/\S/);
     if (leadingSpaces >= 16 && !/^\s*[/*#]/.test(line) && !/^\s*$/.test(line)) {
       deepNestLines.push(i + 1);
@@ -334,6 +335,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   // Callback hell / deeply nested callbacks
   const callbackHellLines: number[] = [];
   codeLines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
     if (/\bfunction\s*\(|=>\s*\{/.test(line)) {
       const context = codeLines.slice(i, Math.min(codeLines.length, i + 5)).join("\n");
       const nestedCallbacks = (context.match(/function\s*\(|=>\s*\{/g) || []).length;
