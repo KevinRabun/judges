@@ -156,7 +156,14 @@ export function analyzeUx(code: string, language: string): Finding[] {
   const hasEmptyCheck =
     /(?:\.length\s*===?\s*0|isEmpty|no\s*(?:results|data|items)|empty.?state|emptyState|NoData|NoResults)/gi.test(code);
   const hasListRendering = /\.map\s*\(|\.forEach\s*\(|v-for|ngFor|\*ngFor|\.render\s*\(/gi.test(code);
-  if (hasListRendering && !hasEmptyCheck && code.split("\n").length > 30) {
+  // Only flag when the file has UI rendering context — pure backend modules
+  // use .map()/.forEach() for data processing, not list rendering.
+  const hasUIRenderingContext =
+    isReactOrJsx ||
+    /<[a-z][a-z0-9]*[\s>]/i.test(code) || // HTML/JSX tags
+    /innerHTML|appendChild|createElement|document\.|window\.|\$\(|v-for|ngFor|template\s*:/i.test(code) ||
+    /from\s+['"](?:vue|@angular|svelte|lit|preact|solid)/i.test(code);
+  if (hasListRendering && hasUIRenderingContext && !hasEmptyCheck && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

@@ -232,7 +232,13 @@ export function analyzeInternationalization(code: string, language: string): Fin
   // Detect missing text encoding considerations
   const hasEncoding = /utf-8|utf8|encoding|charset/i.test(code);
   const handlesText = /readFile|writeFile|fetch|response\.text|Buffer\.from/i.test(code);
-  if (handlesText && !hasEncoding && lines.length > 50) {
+  // Suppress for directory / module-loader files — readdir, dynamic imports,
+  // and require() are filesystem navigation, not text-content I/O.
+  const isDirOrModuleLoader =
+    /readdir|readdirSync|opendir|scandir|glob|walkDir|import\s*\(|require\s*\(|require\.resolve|__dirname|path\.(?:join|resolve|dirname)/i.test(
+      code,
+    );
+  if (handlesText && !hasEncoding && !isDirOrModuleLoader && lines.length > 50) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

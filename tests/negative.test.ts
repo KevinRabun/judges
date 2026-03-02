@@ -27,6 +27,7 @@ import { analyzeTesting } from "../src/evaluators/testing.js";
 import { analyzePortability } from "../src/evaluators/portability.js";
 import { analyzeSoftwarePractices } from "../src/evaluators/software-practices.js";
 import { analyzeUx } from "../src/evaluators/ux.js";
+import { analyzeInternationalization } from "../src/evaluators/internationalization.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 
@@ -1594,5 +1595,182 @@ export function analyzeCode(code) {
     const findings = analyzeTesting(code, "typescript");
     const noTestFindings = findings.filter((f) => /no tests.*detected/i.test(f.title));
     assert.equal(noTestFindings.length, 0, "Should not flag analysis modules with many .test() calls as needing tests");
+  });
+});
+
+// ─── I18N-001 FP: directory / module-loader files ─────────────────────────
+describe("I18N encoding rule — directory / module-loader suppression", () => {
+  it("should NOT flag a source-registry module that uses readFile for metadata but primarily does directory reads and dynamic imports", () => {
+    const code = `
+import fs from "fs";
+import path from "path";
+
+const REGISTRY_DIR = path.join(__dirname, "sources");
+
+export async function loadSources() {
+  const dirs = await fs.promises.readdir(REGISTRY_DIR, { withFileTypes: true });
+  const sources = [];
+
+  for (const entry of dirs) {
+    if (!entry.isDirectory()) continue;
+    const modulePath = path.resolve(REGISTRY_DIR, entry.name, "index.js");
+    const meta = JSON.parse(await fs.promises.readFile(path.join(REGISTRY_DIR, entry.name, "meta.json"), "utf-8"));
+    const mod = await import(modulePath);
+    sources.push({ name: entry.name, ...meta, handler: mod.default });
+  }
+
+  return sources;
+}
+
+export function getSourceById(id) {
+  const dir = path.join(REGISTRY_DIR, id);
+  if (!fs.existsSync(dir)) return null;
+  const entries = fs.readdirSync(dir);
+  return entries;
+}
+
+export async function scanPlugins(baseDir) {
+  const items = await fs.promises.readdir(baseDir);
+  const plugins = [];
+  for (const item of items) {
+    const full = path.resolve(baseDir, item);
+    const stat = await fs.promises.stat(full);
+    if (stat.isDirectory()) {
+      const pkg = path.join(full, "package.json");
+      if (fs.existsSync(pkg)) {
+        const raw = fs.readFileSync(pkg, "utf-8");
+        plugins.push(JSON.parse(raw));
+      }
+    }
+  }
+  return plugins;
+}
+
+export function resolveModule(name) {
+  return require.resolve(name);
+}
+`;
+    const findings = analyzeInternationalization(code, "javascript");
+    const encodingFindings = findings.filter((f) => /encoding/i.test(f.title));
+    assert.equal(encodingFindings.length, 0, "Should not flag directory/module-loader files for missing text encoding");
+  });
+
+  it("should STILL flag a text-processing module that reads files without encoding and has no dir-loading patterns", () => {
+    // Generate 55+ lines of code that reads files without encoding and processes text
+    const lines = [
+      'import fs from "fs";',
+      "",
+      "export function processDocuments(files) {",
+      "  const results = [];",
+      "  for (const file of files) {",
+      "    const content = fs.readFileSync(file);",
+      "    const text = content.toString();",
+      "    const parsed = parseMarkdown(text);",
+      "    results.push(parsed);",
+      "  }",
+      "  return results;",
+      "}",
+      "",
+      "function parseMarkdown(text) {",
+      "  const lines = text.split('\\n');",
+      "  const headings = lines.filter(l => l.startsWith('#'));",
+      "  const body = lines.filter(l => !l.startsWith('#')).join('\\n');",
+      "  return { headings, body };",
+      "}",
+      "",
+      "export function writeOutput(path, data) {",
+      "  const content = JSON.stringify(data);",
+      "  fs.writeFileSync(path, content);",
+      "}",
+    ];
+    // Pad to > 50 lines
+    while (lines.length <= 55) lines.push("// processing line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeInternationalization(code, "javascript");
+    const encodingFindings = findings.filter((f) => /encoding/i.test(f.title));
+    assert.ok(encodingFindings.length > 0, "Should still flag text-processing files that lack encoding");
+  });
+});
+
+// ─── UX-001 FP: backend modules with .map()/.forEach() ───────────────────
+describe("UX empty-state rule — backend module suppression", () => {
+  it("should NOT flag a backend source-loader module using .map()/.forEach() with no UI rendering", () => {
+    const code = `
+import fs from "fs";
+import path from "path";
+
+const CONFIG_DIR = "./configs";
+
+export async function loadAllConfigs() {
+  const entries = await fs.promises.readdir(CONFIG_DIR);
+  const configs = entries
+    .filter(e => e.endsWith(".json"))
+    .map(e => {
+      const raw = fs.readFileSync(path.join(CONFIG_DIR, e), "utf-8");
+      return JSON.parse(raw);
+    });
+
+  configs.forEach(cfg => {
+    validateConfig(cfg);
+    applyDefaults(cfg);
+  });
+
+  return configs;
+}
+
+function validateConfig(cfg) {
+  if (!cfg.name) throw new Error("Config missing name");
+  if (!cfg.version) throw new Error("Config missing version");
+}
+
+function applyDefaults(cfg) {
+  cfg.timeout = cfg.timeout || 30000;
+  cfg.retries = cfg.retries || 3;
+}
+
+export function mergeConfigs(configs) {
+  return configs.reduce((merged, cfg) => ({ ...merged, ...cfg }), {});
+}
+`;
+    const findings = analyzeUx(code, "javascript");
+    const emptyStateFindings = findings.filter((f) => /empty.?state/i.test(f.title));
+    assert.equal(emptyStateFindings.length, 0, "Should not flag backend modules for missing empty-state handling");
+  });
+
+  it("should STILL flag a React component using .map() without empty-state handling", () => {
+    const lines = [
+      'import React, { useState, useEffect } from "react";',
+      "",
+      "export function UserList() {",
+      "  const [users, setUsers] = useState([]);",
+      "",
+      "  useEffect(() => {",
+      '    fetch("/api/users")',
+      "      .then(r => r.json())",
+      "      .then(data => setUsers(data));",
+      "  }, []);",
+      "",
+      "  return (",
+      '    <div className="user-list">',
+      "      <h1>Users</h1>",
+      "      {users.map(u => (",
+      "        <div key={u.id}>",
+      "          <span>{u.name}</span>",
+      "          <span>{u.email}</span>",
+      "        </div>",
+      "      ))}",
+      "    </div>",
+      "  );",
+      "}",
+    ];
+    // Pad to > 30 lines
+    while (lines.length <= 35) lines.push("// component line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeUx(code, "javascript");
+    const emptyStateFindings = findings.filter((f) => /empty.?state/i.test(f.title));
+    assert.ok(
+      emptyStateFindings.length > 0,
+      "Should still flag UI components that render lists without empty-state handling",
+    );
   });
 });

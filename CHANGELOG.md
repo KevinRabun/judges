@@ -2,6 +2,16 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.13.4] — 2026-03-02
+
+### Fixed
+- **2 evaluator false-positive fixes** from fourth round of real-world Copilot feedback:
+  - **I18N-001** (internationalization) — "No text encoding specification" rule now suppressed for directory/module-loader files that use `readdir`, `readdirSync`, `opendir`, `scandir`, `glob`, `import()`, `require()`, `require.resolve`, `__dirname`, or `path.join`/`path.resolve`. These files perform filesystem navigation, not text-content I/O.
+  - **UX-001** (ux) — "List rendering without empty state" rule now requires UI rendering context (JSX/HTML tags, DOM manipulation, React/Vue/Angular/Svelte imports) before firing. Backend modules using `.map()`/`.forEach()` for data processing are no longer flagged.
+
+### Added
+- **4 new regression tests** (1267 total) covering both FP fixes with negative (FP suppressed) and positive (real issues still detected) cases.
+
 ## [3.13.3] — 2026-03-02
 
 ### Fixed
