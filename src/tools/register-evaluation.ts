@@ -15,6 +15,11 @@ import {
 import { evaluateCodeV2, evaluateProjectV2, getSupportedPolicyProfiles } from "../evaluators/v2.js";
 import { configSchema, toJudgesConfig } from "./schemas.js";
 import { buildSingleJudgeDeepReviewSection, buildTribunalDeepReviewSection } from "./deep-review.js";
+import {
+  applyLlmFpFilterToVerdict,
+  filterFalsePositivesWithLlm,
+  formatFilterResultAsMarkdown,
+} from "../llm-fp-filter.js";
 
 /**
  * Register evaluation-focused tools: get_judges, evaluate_code,
@@ -82,19 +87,24 @@ function registerEvaluateCode(server: McpServer): void {
     },
     async ({ code, language, context, includeAstFindings, minConfidence, config }) => {
       try {
-        const verdict = evaluateWithTribunal(code, language, context, {
+        const rawVerdict = evaluateWithTribunal(code, language, context, {
           includeAstFindings,
           minConfidence,
           config: toJudgesConfig(config),
         });
+
+        // Apply LLM-based false positive filtering if an LLM is available
+        const { verdict, filterResult } = await applyLlmFpFilterToVerdict(rawVerdict, code, language);
+
         const patternResults = formatVerdictAsMarkdown(verdict);
-        const deepReview = buildTribunalDeepReviewSection(JUDGES, language, context);
+        const filterSection = formatFilterResultAsMarkdown(filterResult);
+        const deepReview = buildTribunalDeepReviewSection(JUDGES, language, context, filterResult.llmUsed);
 
         return {
           content: [
             {
               type: "text" as const,
-              text: patternResults + deepReview,
+              text: patternResults + filterSection + deepReview,
             },
           ],
         };
@@ -162,14 +172,23 @@ function registerEvaluateSingleJudge(server: McpServer): void {
           minConfidence,
           config: toJudgesConfig(config),
         });
-        const patternResults = formatEvaluationAsMarkdown(evaluation);
-        const deepReview = buildSingleJudgeDeepReviewSection(judge, language, context);
+
+        // Apply LLM-based false positive filtering if an LLM is available
+        const filterResult = await filterFalsePositivesWithLlm(evaluation.findings, code, language);
+        const filteredEvaluation =
+          filterResult.llmUsed && filterResult.removedFindings.length > 0
+            ? { ...evaluation, findings: filterResult.filteredFindings }
+            : evaluation;
+
+        const patternResults = formatEvaluationAsMarkdown(filteredEvaluation);
+        const filterSection = formatFilterResultAsMarkdown(filterResult);
+        const deepReview = buildSingleJudgeDeepReviewSection(judge, language, context, filterResult.llmUsed);
 
         return {
           content: [
             {
               type: "text" as const,
-              text: patternResults + deepReview,
+              text: patternResults + filterSection + deepReview,
             },
           ],
         };
@@ -281,7 +300,7 @@ function registerEvaluateV2(server: McpServer): void {
         }
 
         const supportedProfiles = getSupportedPolicyProfiles();
-        const result =
+        let result =
           files && files.length > 0
             ? evaluateProjectV2({
                 files,
@@ -302,6 +321,17 @@ function registerEvaluateV2(server: McpServer): void {
                 evaluationContext,
                 evidence,
               });
+
+        // Apply LLM-based false positive filtering for single-file mode
+        if (code && language && result.findings.length > 0) {
+          const filterResult = await filterFalsePositivesWithLlm(result.findings, code, language);
+          if (filterResult.llmUsed && filterResult.removedFindings.length > 0) {
+            result = {
+              ...result,
+              findings: filterResult.filteredFindings as typeof result.findings,
+            };
+          }
+        }
 
         let md = `# V2 Tribunal Evaluation\n\n`;
         md += `**Policy Profile:** ${result.policyProfile}\n`;

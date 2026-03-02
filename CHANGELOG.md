@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.14.0] — 2026-03-02
+
+### Added
+- **LLM-based false positive filter** — When an OpenAI-compatible LLM is available, findings from static analysis are automatically reviewed by the LLM to identify and remove false positives before returning results. The filter is a no-op when no API key is configured and gracefully degrades on any error (network, parsing, timeout).
+  - New module `src/llm-fp-filter.ts` with `filterFalsePositivesWithLlm()`, `applyLlmFpFilterToVerdict()`, `detectLlmConfig()`, `isLlmAvailable()`, and `formatFilterResultAsMarkdown()`.
+  - Integrated into **4 MCP tool handlers**: `evaluate_code`, `evaluate_code_single_judge`, `evaluate_v2` (single-file mode), and `evaluate_diff`.
+  - Supports any OpenAI-compatible chat completion API (OpenAI, Azure OpenAI, Ollama, LM Studio, vLLM).
+  - Environment variables: `JUDGES_LLM_API_KEY` (fallback `OPENAI_API_KEY`), `JUDGES_LLM_BASE_URL`, `JUDGES_LLM_MODEL`, `JUDGES_LLM_FP_FILTER`, `JUDGES_LLM_MAX_FINDINGS`, `JUDGES_LLM_TIMEOUT_MS`.
+  - Deep review sections now indicate when LLM pre-filtering has been applied (updated `buildSingleJudgeDeepReviewSection` and `buildTribunalDeepReviewSection` with `llmFiltered` parameter).
+  - All new functions exported from the public programmatic API (`src/api.ts`).
+  - **15 new tests** covering config detection, passthrough behavior, verdict-level integration, and Markdown formatting.
+
 ## [3.13.10] — 2026-03-02
 
 ### Fixed

@@ -156,6 +156,16 @@ export { getLanguagePack, listLanguagePacks, suggestPack, LANGUAGE_PACKS } from 
 export { formatSmartOutput, formatSmartSingleJudge } from "./commands/smart-output.js";
 export type { SmartOutputOptions } from "./commands/smart-output.js";
 
+// ─── LLM False-Positive Filter ──────────────────────────────────────────────
+export {
+  detectLlmConfig,
+  isLlmAvailable,
+  filterFalsePositivesWithLlm,
+  applyLlmFpFilterToVerdict,
+  formatFilterResultAsMarkdown,
+} from "./llm-fp-filter.js";
+export type { LlmFpFilterConfig, LlmFpFilterResult } from "./llm-fp-filter.js";
+
 // ─── Convenience Aliases ─────────────────────────────────────────────────────
 
 import { evaluateWithTribunal, evaluateWithJudge } from "./evaluators/index.js";

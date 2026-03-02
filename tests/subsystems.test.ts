@@ -33,7 +33,7 @@ import {
   detectFrameworks,
   applyFrameworkAwareness,
 } from "../src/evaluators/shared.js";
-import type { Finding, Severity } from "../src/types.js";
+import type { Finding, Severity, TribunalVerdict } from "../src/types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -1554,5 +1554,303 @@ class Outer:
     assert.ok(result.classes?.includes("Outer"));
     assert.ok(result.classes?.includes("Inner"));
     assert.ok(result.functions.length >= 2, "Should extract methods from nested classes");
+  });
+});
+
+// ─── LLM FP Filter ──────────────────────────────────────────────────────────
+
+import {
+  detectLlmConfig,
+  isLlmAvailable,
+  filterFalsePositivesWithLlm,
+  applyLlmFpFilterToVerdict,
+  formatFilterResultAsMarkdown,
+} from "../src/llm-fp-filter.js";
+
+describe("LLM False Positive Filter — config detection", () => {
+  const envBackup: Record<string, string | undefined> = {};
+
+  function setEnv(vars: Record<string, string | undefined>): void {
+    for (const [k, v] of Object.entries(vars)) {
+      envBackup[k] = process.env[k];
+      if (v === undefined) {
+        delete process.env[k];
+      } else {
+        process.env[k] = v;
+      }
+    }
+  }
+
+  function restoreEnv(): void {
+    for (const [k, v] of Object.entries(envBackup)) {
+      if (v === undefined) {
+        delete process.env[k];
+      } else {
+        process.env[k] = v;
+      }
+    }
+  }
+
+  it("returns null when no API key is set", () => {
+    setEnv({
+      JUDGES_LLM_API_KEY: undefined,
+      OPENAI_API_KEY: undefined,
+      JUDGES_LLM_FP_FILTER: undefined,
+    });
+    try {
+      assert.equal(detectLlmConfig(), null);
+      assert.equal(isLlmAvailable(), false);
+    } finally {
+      restoreEnv();
+    }
+  });
+
+  it("detects JUDGES_LLM_API_KEY env var", () => {
+    setEnv({
+      JUDGES_LLM_API_KEY: "test-key-123",
+      OPENAI_API_KEY: undefined,
+      JUDGES_LLM_FP_FILTER: undefined,
+      JUDGES_LLM_BASE_URL: undefined,
+      JUDGES_LLM_MODEL: undefined,
+    });
+    try {
+      const config = detectLlmConfig();
+      assert.ok(config);
+      assert.equal(config.apiKey, "test-key-123");
+      assert.equal(config.baseUrl, "https://api.openai.com/v1");
+      assert.equal(config.model, "gpt-4o-mini");
+      assert.equal(isLlmAvailable(), true);
+    } finally {
+      restoreEnv();
+    }
+  });
+
+  it("falls back to OPENAI_API_KEY", () => {
+    setEnv({
+      JUDGES_LLM_API_KEY: undefined,
+      OPENAI_API_KEY: "openai-key-456",
+      JUDGES_LLM_FP_FILTER: undefined,
+    });
+    try {
+      const config = detectLlmConfig();
+      assert.ok(config);
+      assert.equal(config.apiKey, "openai-key-456");
+    } finally {
+      restoreEnv();
+    }
+  });
+
+  it("respects JUDGES_LLM_FP_FILTER=false to disable", () => {
+    setEnv({
+      JUDGES_LLM_API_KEY: "test-key",
+      JUDGES_LLM_FP_FILTER: "false",
+    });
+    try {
+      assert.equal(detectLlmConfig(), null);
+      assert.equal(isLlmAvailable(), false);
+    } finally {
+      restoreEnv();
+    }
+  });
+
+  it("respects JUDGES_LLM_FP_FILTER=0 to disable", () => {
+    setEnv({
+      JUDGES_LLM_API_KEY: "test-key",
+      JUDGES_LLM_FP_FILTER: "0",
+    });
+    try {
+      assert.equal(detectLlmConfig(), null);
+    } finally {
+      restoreEnv();
+    }
+  });
+
+  it("uses custom base URL and model", () => {
+    setEnv({
+      JUDGES_LLM_API_KEY: "key",
+      JUDGES_LLM_BASE_URL: "http://localhost:11434/v1",
+      JUDGES_LLM_MODEL: "llama3",
+      JUDGES_LLM_FP_FILTER: undefined,
+    });
+    try {
+      const config = detectLlmConfig();
+      assert.ok(config);
+      assert.equal(config.baseUrl, "http://localhost:11434/v1");
+      assert.equal(config.model, "llama3");
+    } finally {
+      restoreEnv();
+    }
+  });
+
+  it("uses custom maxFindings and timeoutMs", () => {
+    setEnv({
+      JUDGES_LLM_API_KEY: "key",
+      JUDGES_LLM_MAX_FINDINGS: "25",
+      JUDGES_LLM_TIMEOUT_MS: "60000",
+      JUDGES_LLM_FP_FILTER: undefined,
+    });
+    try {
+      const config = detectLlmConfig();
+      assert.ok(config);
+      assert.equal(config.maxFindings, 25);
+      assert.equal(config.timeoutMs, 60000);
+    } finally {
+      restoreEnv();
+    }
+  });
+
+  it("handles invalid numeric env vars gracefully", () => {
+    setEnv({
+      JUDGES_LLM_API_KEY: "key",
+      JUDGES_LLM_MAX_FINDINGS: "not-a-number",
+      JUDGES_LLM_TIMEOUT_MS: "-10",
+      JUDGES_LLM_FP_FILTER: undefined,
+    });
+    try {
+      const config = detectLlmConfig();
+      assert.ok(config);
+      assert.equal(config.maxFindings, 50); // default
+      assert.equal(config.timeoutMs, 30000); // default
+    } finally {
+      restoreEnv();
+    }
+  });
+});
+
+describe("LLM False Positive Filter — passthrough when unavailable", () => {
+  const sampleFindings: Finding[] = [
+    {
+      ruleId: "SEC-001",
+      severity: "high",
+      title: "SQL Injection",
+      description: "Possible SQL injection",
+      recommendation: "Use parameterized queries",
+      confidence: 0.9,
+    },
+    {
+      ruleId: "PERF-001",
+      severity: "medium",
+      title: "N+1 Query",
+      description: "Potential N+1 query pattern",
+      recommendation: "Use eager loading",
+      confidence: 0.7,
+    },
+  ];
+
+  it("returns findings unchanged when no LLM config is provided", async () => {
+    const result = await filterFalsePositivesWithLlm(
+      sampleFindings,
+      "const x = 1;",
+      "typescript",
+      null, // explicitly no config
+    );
+    assert.equal(result.llmUsed, false);
+    assert.equal(result.filteredFindings.length, 2);
+    assert.equal(result.removedFindings.length, 0);
+    assert.equal(result.reviewedCount, 0);
+  });
+
+  it("returns empty findings unchanged", async () => {
+    const result = await filterFalsePositivesWithLlm([], "const x = 1;", "typescript", null);
+    assert.equal(result.llmUsed, false);
+    assert.equal(result.filteredFindings.length, 0);
+    assert.equal(result.removedFindings.length, 0);
+  });
+});
+
+describe("LLM False Positive Filter — verdict-level passthrough", () => {
+  it("returns verdict unchanged when no LLM is available", async () => {
+    const verdict: TribunalVerdict = {
+      overallVerdict: "warning",
+      overallScore: 65,
+      evaluations: [
+        {
+          judgeId: "cybersecurity",
+          verdict: "warning",
+          score: 65,
+          findings: [
+            {
+              ruleId: "SEC-001",
+              severity: "high",
+              title: "Test",
+              description: "Test finding",
+              recommendation: "Fix it",
+            },
+          ],
+        },
+      ],
+      findings: [
+        {
+          ruleId: "SEC-001",
+          severity: "high",
+          title: "Test",
+          description: "Test finding",
+          recommendation: "Fix it",
+        },
+      ],
+      criticalCount: 0,
+      highCount: 1,
+      summary: "Test summary",
+    };
+
+    const { verdict: out, filterResult } = await applyLlmFpFilterToVerdict(verdict, "const x = 1;", "typescript", null);
+    assert.equal(filterResult.llmUsed, false);
+    assert.equal(out, verdict); // same reference — untouched
+  });
+});
+
+describe("LLM False Positive Filter — markdown formatting", () => {
+  it("returns empty string when no LLM was used", () => {
+    const md = formatFilterResultAsMarkdown({
+      filteredFindings: [],
+      removedFindings: [],
+      llmUsed: false,
+      reviewedCount: 0,
+    });
+    assert.equal(md, "");
+  });
+
+  it("returns empty string when no FPs were removed", () => {
+    const md = formatFilterResultAsMarkdown({
+      filteredFindings: [
+        {
+          ruleId: "A",
+          severity: "high",
+          title: "X",
+          description: "D",
+          recommendation: "R",
+        },
+      ],
+      removedFindings: [],
+      llmUsed: true,
+      model: "gpt-4o-mini",
+      reviewedCount: 1,
+    });
+    assert.equal(md, "");
+  });
+
+  it("produces Markdown section when FPs are removed", () => {
+    const md = formatFilterResultAsMarkdown({
+      filteredFindings: [],
+      removedFindings: [
+        {
+          ruleId: "SEC-001",
+          severity: "medium",
+          title: "Hardcoded secret",
+          description: "Looks like a secret",
+          recommendation: "Remove it",
+          fpReason: "This is a test fixture, not a real secret",
+        },
+      ],
+      llmUsed: true,
+      model: "gpt-4o-mini",
+      reviewedCount: 5,
+    });
+    assert.ok(md.includes("LLM False Positive Filter"));
+    assert.ok(md.includes("gpt-4o-mini"));
+    assert.ok(md.includes("SEC-001"));
+    assert.ok(md.includes("test fixture"));
+    assert.ok(md.includes("False Positives Removed:** 1"));
+    assert.ok(md.includes("Findings Reviewed:** 5"));
   });
 });
