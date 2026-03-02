@@ -1646,7 +1646,7 @@ describe("False-Positive Heuristic Filter", () => {
       assert.strictEqual(removed.length, 0);
     });
 
-    it("should remove extended prod-only rules (SOV, DOC, MAINT) from test files", () => {
+    it("should remove extended prod-only rules (SOV, DOC, MAINT, AGENT, etc.) from test files", () => {
       const testCode = `import { describe, it, beforeEach } from "node:test";\ndescribe("test suite", () => {\n  beforeEach(() => {});\n  it("works", () => { expect(true); });\n  it("does more", () => { assert.ok(1); });\n});`;
       const findings: Finding[] = [
         { ...baseFinding, ruleId: "SOV-001", lineNumbers: [2] },
@@ -1654,9 +1654,12 @@ describe("False-Positive Heuristic Filter", () => {
         { ...baseFinding, ruleId: "MAINT-001", lineNumbers: [2] },
         { ...baseFinding, ruleId: "CICD-001", lineNumbers: [2] },
         { ...baseFinding, ruleId: "COST-001", lineNumbers: [2] },
+        { ...baseFinding, ruleId: "AGENT-001", lineNumbers: [2] },
+        { ...baseFinding, ruleId: "AICS-001", lineNumbers: [2] },
+        { ...baseFinding, ruleId: "PERF-001", lineNumbers: [2] },
       ];
       const { filtered, removed } = filterFalsePositiveHeuristics(findings, testCode, "typescript");
-      assert.strictEqual(removed.length, 5, "All extended prod-only rules should be removed from test files");
+      assert.strictEqual(removed.length, 8, "All extended prod-only rules should be removed from test files");
       assert.strictEqual(filtered.length, 0);
     });
   });

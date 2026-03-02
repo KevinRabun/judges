@@ -54,6 +54,17 @@ const PROD_ONLY_RULE_PREFIXES: string[] = [
   "CICD-", // CI/CD infrastructure not relevant in tests
   "COST-", // cost optimization not relevant in tests
   "SWDEV-", // software dev practices not relevant in tests
+  "AGENT-", // agent instructions not relevant to test code
+  "AICS-", // AI code safety not relevant to test code
+  "PERF-", // performance optimization noise in test code
+  "PORTA-", // portability not relevant to test code
+  "UX-", // user experience not relevant to test code
+  "I18N-", // internationalization not relevant to test code
+  "A11Y-", // accessibility not relevant to test code
+  "LOGPRIV-", // logging privacy not relevant to test code
+  "CACHE-", // caching strategy not relevant to test code
+  "DATA-", // data security patterns noise in test assertions
+  "API-", // API design not relevant in test code
 ];
 
 /**
@@ -82,6 +93,16 @@ const CODE_ONLY_RULE_PREFIXES = [
   "CICD-", // CI/CD infra — not a code concern on data files
   "COST-", // cost — not applicable to data files
   "COMP-", // compliance — not code-level concern on data files
+  "CLOUD-", // cloud readiness — not applicable to data files
+  "PORTA-", // portability — not applicable to data files
+  "DATA-", // data security — no data flow in config
+  "OBS-", // observability — no runtime in config
+  "AICS-", // AI code safety — no executable code in config
+  "REL-", // reliability — no runtime in config
+  "LOGPRIV-", // logging privacy — no logging in config
+  "API-", // API design — no endpoints in config
+  "DEPS-", // dependency health — package files handled separately
+  "AGENT-", // agent instructions — not applicable to data files
 ];
 
 /**
