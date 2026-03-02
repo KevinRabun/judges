@@ -67,8 +67,13 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   // Synchronous blocking in hot paths (multi-language)
   // Only match known blocking APIs — not arbitrary functions that end in "Sync"
   const blockingPattern =
-    /(?:readFileSync|writeFileSync|readSync|writeSync|execSync|execFileSync|spawnSync|accessSync|statSync|lstatSync|readdirSync|mkdirSync|rmdirSync|unlinkSync|renameSync|copyFileSync|openSync|closeSync|appendFileSync|existsSync|realpathSync|chmodSync|chownSync|linkSync|symlinkSync|ftruncateSync|truncateSync|createReadStream|createWriteStream|pbkdf2Sync|scryptSync|randomFillSync|hashSync|compareSync|genSaltSync)\s*\(|\.sleep\s*\(|Thread\.sleep|time\.sleep|threading\.Event\(\)\.wait|Task\.Delay.*\.Wait\(\)|\.Result\b|std::thread::sleep|tokio::task::block_in_place/gi;
-  const blockingLines = getLineNumbers(code, blockingPattern);
+    /(?:readFileSync|writeFileSync|readSync|writeSync|execSync|execFileSync|spawnSync|accessSync|statSync|lstatSync|readdirSync|mkdirSync|rmdirSync|unlinkSync|renameSync|copyFileSync|openSync|closeSync|appendFileSync|existsSync|realpathSync|chmodSync|chownSync|linkSync|symlinkSync|ftruncateSync|truncateSync|createReadStream|createWriteStream|pbkdf2Sync|scryptSync|randomFillSync|hashSync|compareSync|genSaltSync)\s*\(|Thread\.sleep\s*\(|time\.sleep\s*\(|threading\.Event\(\)\.wait|Task\.Delay.*\.Wait\(\)|\.Result\b|std::thread::sleep|tokio::task::block_in_place/gi;
+  const rawBlockingLines = getLineNumbers(code, blockingPattern);
+  // Exclude lines containing 'await' — those are async and non-blocking
+  const blockingLines = rawBlockingLines.filter((ln) => {
+    const lineText = lines[ln - 1] || "";
+    return !/\bawait\b/i.test(lineText);
+  });
   if (blockingLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

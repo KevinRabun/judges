@@ -26,7 +26,10 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     }
   });
 
-  const hasRegionPolicy = /allow(ed)?Regions|approvedRegions|regionPolicy|dataResidencyPolicy|sovereignty/i.test(code);
+  const hasRegionPolicy =
+    /allow(ed)?Regions|approvedRegions|regionPolicy|dataResidencyPolicy|sovereignty|approvedJurisdictions|allowedJurisdictions|jurisdictionPolicy|exportPolicy|egressPolicy|jurisdictionGuard/i.test(
+      code,
+    );
 
   if (hardcodedGlobalOrForeignLines.length > 0 && !hasRegionPolicy) {
     findings.push({
@@ -223,7 +226,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   if (telemetryLines.length > 0) {
     // Check for kill-switch / negative guard: code that explicitly disables or throws on telemetry enablement
     const hasTelemetryKillSwitch =
-      /(?:throw.*telemetry|telemetry.*(?:disabled|disallow|forbidden|blocked|throw)|ALLOW_EXTERNAL_TELEMETRY.*(?:throw|false|disabled)|disable.*telemetry|telemetry.*kill.?switch|no.?external.?telemetry)/i.test(
+      /(?:throw.*telemetry|telemetry.*(?:disabled|disallow|forbidden|blocked|throw)|ALLOW_EXTERNAL_TELEMETRY|disable.*telemetry|telemetry.*kill.?switch|no.?external.?telemetry|SovereigntyError.*telemetry|telemetry.*SovereigntyError|telemetry.*policy.?gate|policy.?gate.*telemetry)/i.test(
         code,
       );
     if (!hasTelemetryKillSwitch) {

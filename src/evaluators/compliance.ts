@@ -22,19 +22,28 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
 
   // Detect PII handling without encryption
   const piiFieldLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (isCommentLikeLine(line)) return;
+  // File-level check: if the code has compliance infrastructure (age verification,
+  // parental consent, data restriction controls), PII protection is likely handled
+  // at a middleware / wrapper layer rather than inline on every field reference.
+  const hasComplianceInfra =
+    /verifyAgeCompliance|requireParentalConsent|restrictDataCollection|ageCompliance|complianceGuard|dataProtectionOfficer|gdprCompliant|piiProtect|complianceMiddleware|privacyShield|dataClassification/i.test(
+      code,
+    );
+  if (!hasComplianceInfra) {
+    lines.forEach((line, i) => {
+      if (isCommentLikeLine(line)) return;
 
-    if (
-      /(?:ssn|social_security|tax_id|passport|national_id|driver_license)/i.test(line) &&
-      !/encrypt|hash|mask|redact/i.test(line)
-    ) {
-      const context = lines.slice(Math.max(0, i - 4), Math.min(lines.length, i + 5)).join("\n");
-      if (/(?:save|store|insert|persist|write|log|send|post|request|payload|body|db\.)/i.test(context)) {
-        piiFieldLines.push(i + 1);
+      if (
+        /(?:ssn|social_security|tax_id|passport|national_id|driver_license)/i.test(line) &&
+        !/encrypt|hash|mask|redact/i.test(line)
+      ) {
+        const context = lines.slice(Math.max(0, i - 4), Math.min(lines.length, i + 5)).join("\n");
+        if (/(?:save|store|insert|persist|write|log|send|post|request|payload|body|db\.)/i.test(context)) {
+          piiFieldLines.push(i + 1);
+        }
       }
-    }
-  });
+    });
+  }
   if (piiFieldLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -298,7 +307,10 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       ageRelatedLines.push(i + 1);
     }
   });
-  const hasAgeVerification = /age.?verif|age.?check|age.?gate|is.?minor|is.?adult|minimum.?age/i.test(code);
+  const hasAgeVerification =
+    /age.?verif|age.?check|age.?gate|is.?minor|is.?adult|minimum.?age|verifyAge|ageCompliance|requireParentalConsent|restrictDataCollection/i.test(
+      code,
+    );
   if (ageRelatedLines.length > 0 && !hasAgeVerification) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

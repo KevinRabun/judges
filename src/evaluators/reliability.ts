@@ -11,7 +11,14 @@ export function analyzeReliability(code: string, language: string): Finding[] {
 
   // Detect empty catch blocks (multi-language)
   const emptyCatchLines = getLangLineNumbers(code, language, LP.EMPTY_CATCH);
-  if (emptyCatchLines.length > 0) {
+  // Suppress when the file has resilience infrastructure (circuit-breaker, retry
+  // wrappers, abort-signal helpers) — empty catches are typically intentional in
+  // those patterns (errors handled at a higher abstraction layer).
+  const hasResilienceInfra =
+    /circuit.?breaker|opossum|cockatiel|retry|backoff|createTimeoutSignal|mergeSignalWithTimeout|createEgressAwareHttpClient|AbortController|AbortSignal\.timeout|withRetry|retryWith|exponentialBackoff/i.test(
+      code,
+    );
+  if (emptyCatchLines.length > 0 && !hasResilienceInfra) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

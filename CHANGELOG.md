@@ -11,6 +11,19 @@ All notable changes to **@kevinrabun/judges** are documented here.
 - **Deep-review prompt builders exported from public API** — `buildSingleJudgeDeepReviewSection` and `buildTribunalDeepReviewSection` are now available via `@kevinrabun/judges/api`.
 - **10 new tests** (1220 total): deep-review intent detection (3), L1→L2 prompt construction (3), tribunal section validation (2), JUDGES array contract (1), API export accessibility (1).
 
+## [3.13.2] — 2026-03-02
+
+### Fixed
+- **5 evaluator false-positive fixes** from second round of real-world Copilot review feedback:
+  - **REL-001** (reliability) — empty catch blocks now suppressed when the file contains resilience infrastructure (circuit-breaker, retry wrappers, abort-signal helpers) indicating errors are intentionally handled at a higher abstraction layer.
+  - **SOV-001** (data-sovereignty) — broadened `hasRegionPolicy` detection to recognize `approvedJurisdictions`, `allowedJurisdictions`, `jurisdictionPolicy`, `exportPolicy`, `egressPolicy`, and `jurisdictionGuard` patterns.
+  - **SOV-003/telemetry** (data-sovereignty) — relaxed telemetry kill-switch regex: `ALLOW_EXTERNAL_TELEMETRY` is now a standalone match (no longer requires `throw|false|disabled` on the same line). Added `SovereigntyError.*telemetry` and `policy.?gate.*telemetry` patterns.
+  - **SCALE-003** (scalability) — removed generic `.sleep()` from blocking-call detection (matched async sleep helpers in retry/backoff code). Now only matches language-specific blocking sleeps (`Thread.sleep`, `time.sleep`). Lines containing `await` are also excluded.
+  - **COMP-001** (compliance) — PII-without-encryption rule now suppressed when the file has compliance infrastructure (`verifyAgeCompliance`, `requireParentalConsent`, `restrictDataCollection`, etc.). Age-verification regex also expanded to recognize `verifyAge`, `ageCompliance`, `requireParentalConsent`, `restrictDataCollection`.
+
+### Added
+- **11 new regression tests** (1246 total) covering all 5 false-positive fixes, including both negative cases (FP suppressed) and positive cases (real issues still detected).
+
 ## [3.13.1] — 2026-03-02
 
 ### Fixed

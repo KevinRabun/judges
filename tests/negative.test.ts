@@ -22,6 +22,7 @@ import { analyzeAccessibility } from "../src/evaluators/accessibility.js";
 import { analyzeScalability } from "../src/evaluators/scalability.js";
 import { analyzeAuthentication } from "../src/evaluators/authentication.js";
 import { analyzeDatabase } from "../src/evaluators/database.js";
+import { analyzeCompliance } from "../src/evaluators/compliance.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 
@@ -1050,5 +1051,219 @@ export async function createUser(name: string, email: string) {
     const findings = analyzeDatabase(code, "typescript");
     const txFindings = findings.filter((f) => /transaction/i.test(f.title));
     assert.ok(txFindings.length > 0, "Should still flag real DB mutations without transactions");
+  });
+});
+
+// ─── Round 2 FP Regression Tests ─────────────────────────────────────────────
+
+describe("FP Regression — REL-001: Empty catch with resilience infra", () => {
+  it("should NOT flag empty catch when circuit-breaker/retry infrastructure exists", () => {
+    const code = `
+import { CircuitBreaker } from "opossum";
+import { createTimeoutSignal, mergeSignalWithTimeout } from "./signals";
+
+const breaker = new CircuitBreaker(callService, { timeout: 3000 });
+
+export async function fetchWithResilience(url) {
+  const signal = mergeSignalWithTimeout(createTimeoutSignal(5000));
+  try {
+    return await breaker.fire(url, { signal });
+  } catch (e) { }
+}
+`;
+    const findings = analyzeReliability(code, "typescript");
+    const emptyCatch = findings.filter((f) => /empty catch/i.test(f.title));
+    assert.equal(emptyCatch.length, 0, "Should suppress empty catch when resilience infra exists");
+  });
+
+  it("should still flag empty catch in code without resilience infra", () => {
+    const code = `
+function readConfig() {
+  try {
+    const data = JSON.parse(raw);
+  } catch (e) { }
+  return {};
+}
+`;
+    const findings = analyzeReliability(code, "typescript");
+    const emptyCatch = findings.filter((f) => /empty catch/i.test(f.title));
+    assert.ok(emptyCatch.length > 0, "Should still flag empty catch without resilience infra");
+  });
+});
+
+describe("FP Regression — SOV-001: Region policy with approvedJurisdictions", () => {
+  it("should NOT flag region usage when approvedJurisdictions exists", () => {
+    const code = `
+const config = {
+  region: "us-east-1",
+  deploymentTarget: "multi-region"
+};
+
+const approvedJurisdictions = ["eu-west-1", "eu-central-1"];
+
+function assertAllowedEgress(destination) {
+  if (!approvedJurisdictions.includes(destination)) {
+    throw new Error("Egress to unapproved jurisdiction");
+  }
+}
+
+export function processRequest(req) {
+  assertAllowedEgress(req.region);
+  return handleData(req.body);
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const regionFindings = findings.filter((f) => /region usage/i.test(f.title));
+    assert.equal(regionFindings.length, 0, "Should suppress when approvedJurisdictions exists");
+  });
+
+  it("should NOT flag region usage when exportPolicy exists", () => {
+    const code = `
+const target = "us-west-2";
+const globalDeployment = true;
+
+const exportPolicy = {
+  isAllowed(region) { return allowedRegions.includes(region); }
+};
+
+function route(req) {
+  if (!exportPolicy.isAllowed(req.destinationRegion)) {
+    throw new Error("Transfer blocked by export policy");
+  }
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const regionFindings = findings.filter((f) => /region usage/i.test(f.title));
+    assert.equal(regionFindings.length, 0, "Should suppress when exportPolicy exists");
+  });
+});
+
+describe("FP Regression — SOV telemetry kill-switch across lines", () => {
+  it("should suppress telemetry finding when ALLOW_EXTERNAL_TELEMETRY guard exists", () => {
+    const code = `
+import analytics from "segment";
+import { SovereigntyError } from "./errors";
+
+const ALLOW_EXTERNAL_TELEMETRY = false;
+
+function enableTelemetry() {
+  if (!ALLOW_EXTERNAL_TELEMETRY) {
+    throw new SovereigntyError("External telemetry is blocked by policy");
+  }
+  analytics.init(key);
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const telFindings = findings.filter((f) => /telemetry/i.test(f.title));
+    assert.equal(telFindings.length, 0, "Should suppress when ALLOW_EXTERNAL_TELEMETRY guard exists");
+  });
+
+  it("should suppress telemetry when SovereigntyError + telemetry pattern exists", () => {
+    const code = `
+import { mixpanel } from "mixpanel";
+
+export function initTracking() {
+  // Telemetry blocked by sovereignty policy gate
+  throw new SovereigntyError("Cannot enable telemetry in sovereign mode");
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const telFindings = findings.filter((f) => /telemetry/i.test(f.title));
+    assert.equal(telFindings.length, 0, "Should suppress when SovereigntyError + telemetry pattern exists");
+  });
+});
+
+describe("FP Regression — SCALE blocking: async sleep not blocking", () => {
+  it("should NOT flag async sleep patterns in circuit-breaker code", () => {
+    const code = `
+async function retryWithBackoff(fn, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      await delay.sleep(1000 * Math.pow(2, i));
+    }
+  }
+}
+
+async function circuitBreakerSleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+`;
+    const findings = analyzeScalability(code, "typescript");
+    const blockingFindings = findings.filter((f) => /synchronous blocking/i.test(f.title));
+    assert.equal(blockingFindings.length, 0, "Should not flag async sleep in retry/circuit-breaker patterns");
+  });
+
+  it("should still flag Thread.sleep (Java blocking)", () => {
+    const code = `
+public class Worker {
+  public void process() {
+    Thread.sleep(5000);
+    doWork();
+  }
+}
+`;
+    const findings = analyzeScalability(code, "java");
+    const blockingFindings = findings.filter((f) => /synchronous blocking/i.test(f.title));
+    assert.ok(blockingFindings.length > 0, "Should still flag Thread.sleep() as blocking");
+  });
+});
+
+describe("FP Regression — COMP-001: PII with compliance infrastructure", () => {
+  it("should NOT flag PII when verifyAgeCompliance and parental consent exist", () => {
+    const code = `
+import { db } from "./database";
+
+function verifyAgeCompliance(user) {
+  if (user.age < 13) {
+    requireParentalConsent(user.parentEmail);
+    restrictDataCollection(user.id);
+  }
+}
+
+async function saveUser(user) {
+  const ssn = user.social_security;
+  await db.save({ ...user, ssn });
+}
+`;
+    const findings = analyzeCompliance(code, "typescript");
+    const piiFindings = findings.filter((f) => /PII field/i.test(f.title));
+    assert.equal(piiFindings.length, 0, "Should suppress PII finding when compliance infra exists");
+  });
+
+  it("should still flag PII without compliance infrastructure", () => {
+    const code = `
+import { db } from "./database";
+
+async function saveUser(user) {
+  const ssn = user.social_security;
+  await db.save({ ...user, ssn });
+}
+`;
+    const findings = analyzeCompliance(code, "typescript");
+    const piiFindings = findings.filter((f) => /PII field/i.test(f.title));
+    assert.ok(piiFindings.length > 0, "Should still flag PII without compliance infra");
+  });
+
+  it("should suppress COMP age rule when verifyAge pattern exists", () => {
+    const code = `
+function verifyAgeCompliance(user) {
+  if (calculateAge(user.dob) < 13) {
+    requireParentalConsent(user.id);
+    restrictDataCollection(user.id);
+  }
+}
+
+function processUser(user) {
+  const age = calculateAge(user.date_of_birth);
+  if (age < 16) {
+    applyMinorRestrictions(user);
+  }
+}
+`;
+    const findings = analyzeCompliance(code, "typescript");
+    const ageFindings = findings.filter((f) => /age.*verification/i.test(f.title));
+    assert.equal(ageFindings.length, 0, "Should suppress age finding when verifyAge/requireParentalConsent exists");
   });
 });
