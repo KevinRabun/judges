@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCostEffectiveness(code: string, language: string): Finding[] {
@@ -10,10 +10,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
 
   // Infrastructure-as-Code templates (Bicep, Terraform, ARM) are declarative —
   // they have no imperative loops. Skip nested-loop detection for IaC files.
-  const isIaCTemplate =
-    /(?:^|\n)\s*(?:param\s+\w+\s+(?:string|int|bool|object|array)|resource\s+\w+\s+'[^']*@\d{4}-\d{2}-\d{2}|@(?:allowed|description|secure)\s*\(|targetScope\s*=|resource\s+"[^"]+"\s+"[^"]+"|variable\s+"|provider\s+"|terraform\s*\{|\$schema.*deploymentTemplate)/im.test(
-      code,
-    );
+  const iacTemplate = isIaCTemplate(code);
 
   // Nested loops (potential O(n²)) (multi-language)
   const lines = code.split("\n");
@@ -33,7 +30,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
       loopDepth--;
     }
   }
-  if (nestedLoopLines.length > 0 && !isIaCTemplate) {
+  if (nestedLoopLines.length > 0 && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCybersecurity(code: string, language: string): Finding[] {
@@ -425,7 +425,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
   // Missing rate limiting on auth endpoints
   const authEndpoints = getLineNumbers(code, /(?:login|signin|sign-in|authenticate|auth|password|token)\s*['",:]/gi);
   const hasRateLimit = /rate.?limit|throttle|limiter|brute/gi.test(code);
-  if (authEndpoints.length > 0 && !hasRateLimit) {
+  if (authEndpoints.length > 0 && !hasRateLimit && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

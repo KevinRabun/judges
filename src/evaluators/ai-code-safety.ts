@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 /**
@@ -247,7 +247,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
 
   const allHardcodedEndpointLines = [...new Set([...urlLines, ...filteredIpLines])].sort((a, b) => a - b);
 
-  if (allHardcodedEndpointLines.length > 0) {
+  if (allHardcodedEndpointLines.length > 0 && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

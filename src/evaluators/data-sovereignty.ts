@@ -1,11 +1,17 @@
 import type { Finding } from "../types.js";
-import { isCommentLine } from "./shared.js";
+import { isCommentLine, isIaCTemplate } from "./shared.js";
 
 export function analyzeDataSovereignty(code: string, _language: string): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "SOV";
   let ruleNum = 1;
+
+  // Infrastructure-as-Code templates (Bicep, Terraform, ARM) are declarative
+  // infrastructure definitions — they enforce jurisdiction via parameter
+  // constraints (@allowed, variable validation), not imperative branching.
+  // Skip application-code rules that produce false positives on IaC.
+  const iacTemplate = isIaCTemplate(code);
 
   const regionMentionLines: number[] = [];
   const hardcodedGlobalOrForeignLines: number[] = [];
@@ -34,7 +40,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       code,
     );
 
-  if (hardcodedGlobalOrForeignLines.length > 0 && !hasRegionPolicy) {
+  if (hardcodedGlobalOrForeignLines.length > 0 && !hasRegionPolicy && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -99,7 +105,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     }
   });
 
-  if (replicationLines.length > 0) {
+  if (replicationLines.length > 0 && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -115,14 +121,6 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       confidence: 0.85,
     });
   }
-  // Infrastructure-as-Code templates (Bicep, Terraform, ARM) are declarative
-  // infrastructure definitions — they have no data-export code paths and enforce
-  // jurisdiction via parameter constraints (@allowed, variable validation), not
-  // imperative branching. Skip export-path and jurisdiction-enforcement rules.
-  const isIaCTemplate =
-    /(?:^|\n)\s*(?:param\s+\w+\s+(?:string|int|bool|object|array)|resource\s+\w+\s+'[^']*@\d{4}-\d{2}-\d{2}|@(?:allowed|description|secure)\s*\(|targetScope\s*=|resource\s+"[^"]+"\s+"[^"]+"|variable\s+"|provider\s+"|terraform\s*\{|\$schema.*deploymentTemplate)/im.test(
-      code,
-    );
   // Frontend/browser code — keywords like analytics, report, download in UI
   // rendering or event handling are not data-export operations.
   const isFrontendCode =
@@ -157,7 +155,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       code,
     );
 
-  if (exportLines.length > 0 && !hasCentralizedSovereignResponse && !isFrontendCode && !isIaCTemplate) {
+  if (exportLines.length > 0 && !hasCentralizedSovereignResponse && !isFrontendCode && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -181,7 +179,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   // "jurisdiction" or "region" in privacy text are legal disclosures, not code
   // branches that need enforcement logic.
   const isMarkupFile = /^\s*<(!DOCTYPE|html|head|body|meta|link)/im.test(code);
-  if (regionMentionLines.length > 0 && geoRoutingSignals && !hasPolicyEnforcement && !isMarkupFile && !isIaCTemplate) {
+  if (regionMentionLines.length > 0 && geoRoutingSignals && !hasPolicyEnforcement && !isMarkupFile && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -251,7 +249,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       /(?:throw.*telemetry|telemetry.*(?:disabled|disallow|forbidden|blocked|throw)|ALLOW_EXTERNAL_TELEMETRY|disable.*telemetry|telemetry.*kill.?switch|no.?external.?telemetry|SovereigntyError.*telemetry|telemetry.*SovereigntyError|telemetry.*policy.?gate|policy.?gate.*telemetry)/i.test(
         code,
       );
-    if (!hasTelemetryKillSwitch) {
+    if (!hasTelemetryKillSwitch && !iacTemplate) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "high",
@@ -306,7 +304,13 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       code,
     );
 
-  if (hasClientRegionConfig && !hasServerValidation && !hasPolicyEnforcement && code.split("\n").length > 15) {
+  if (
+    hasClientRegionConfig &&
+    !hasServerValidation &&
+    !hasPolicyEnforcement &&
+    !iacTemplate &&
+    code.split("\n").length > 15
+  ) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -345,7 +349,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     }
   });
 
-  if (kmsLines.length > 0) {
+  if (kmsLines.length > 0 && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

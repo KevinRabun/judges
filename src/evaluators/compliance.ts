@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, isIaCTemplate } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCompliance(code: string, language: string): Finding[] {
@@ -70,7 +70,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
     }
   });
   const hasConsent = /consent|opt.?in|cookie.?banner|gdpr|accept.*cookie/i.test(code);
-  if (trackingLines.length > 0 && !hasConsent) {
+  if (trackingLines.length > 0 && !hasConsent && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -306,11 +306,8 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   const isMarkup = /^\s*<(!DOCTYPE|html|head|body|meta|link|div|section|p\b|span|a\b|h[1-6])/im.test(code);
   // Skip for IaC templates (Bicep, Terraform, ARM) — infrastructure declarations
   // contain no age-related user data or input fields requiring verification.
-  const isIaCTemplate =
-    /(?:^|\n)\s*(?:param\s+\w+\s+(?:string|int|bool|object|array)|resource\s+\w+\s+'[^']*@\d{4}-\d{2}-\d{2}|@(?:allowed|description|secure)\s*\(|targetScope\s*=|resource\s+"[^"]+"\s+"[^"]+"|variable\s+"|provider\s+"|terraform\s*\{|\$schema.*deploymentTemplate)/im.test(
-      code,
-    );
-  if (!isMarkup && !isIaCTemplate) {
+  const iacTemplate = isIaCTemplate(code);
+  if (!isMarkup && !iacTemplate) {
     lines.forEach((line, i) => {
       if (isCommentLine(line)) return;
       // Use word-bounded \bage(?![a-z]) to avoid matching 'age' inside common

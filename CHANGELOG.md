@@ -2,6 +2,28 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.13.9] — 2026-03-02
+
+### Fixed
+- **Broad IaC awareness sweep** — 11 additional rules across 7 evaluators now suppress false positives on Bicep, Terraform, and ARM templates:
+  - **SOV-001** (data-sovereignty) — Region-without-policy rule gated with `!isIaCTemplate`. Bicep `@allowed` location params are policy-compliant by design.
+  - **SOV-003** (data-sovereignty) — Replication/backup localization rule gated. IaC GRS/geo-redundant config is declarative infrastructure.
+  - **SOV-007** (data-sovereignty) — Telemetry sovereignty rule gated. App Insights resource declarations are not telemetry data flows.
+  - **SOV-009** (data-sovereignty) — Region-without-enforcement rule gated. Bicep location parameters enforce region declaratively.
+  - **SOV-011** (data-sovereignty) — KMS/key sovereignty rule gated. KeyVault resource definitions are infrastructure.
+  - **COMP-002** (compliance) — Tracking/analytics without consent rule gated. IaC monitoring resources are not user-tracking code.
+  - **CYBER** (cybersecurity) — Auth rate-limiting rule gated. `@secure()` password/token params are not auth endpoints.
+  - **AICS-008** (ai-code-safety) — Hardcoded URL rule gated. Container image references and endpoint configs in IaC are declarative.
+  - **CFG-**** (configuration-management) — Full evaluator early-return for IaC templates. All CFG rules are designed for imperative code.
+  - **CLOUD** (cloud-readiness) — Connection string detection gated. ARM/Bicep `connectionStrings` blocks are infrastructure wiring.
+  - **CLOUD** (cloud-readiness) — Config-without-env-vars rule gated. IaC `appSettings` are declarative configuration.
+
+### Improved
+- **Extracted `isIaCTemplate` to `shared.ts`** — Centralized IaC content-detection regex (previously duplicated in 3 evaluators) into a single shared function. Detects Bicep, Terraform, and ARM template patterns.
+
+### Added
+- **11 new regression tests** (1313 total) covering all newly guarded IaC FP rules with targeted Bicep, Terraform, and ARM template fixtures, plus positive tests validating imperative app code is still flagged.
+
 ## [3.13.8] — 2026-03-02
 
 ### Fixed

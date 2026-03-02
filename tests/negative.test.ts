@@ -31,6 +31,9 @@ import { analyzeInternationalization } from "../src/evaluators/internationalizat
 import { analyzeCloudReadiness } from "../src/evaluators/cloud-readiness.js";
 import { analyzeCostEffectiveness } from "../src/evaluators/cost-effectiveness.js";
 import { analyzeCiCd } from "../src/evaluators/ci-cd.js";
+import { analyzeCybersecurity } from "../src/evaluators/cybersecurity.js";
+import { analyzeAiCodeSafety } from "../src/evaluators/ai-code-safety.js";
+import { analyzeConfigurationManagement } from "../src/evaluators/configuration-management.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 
@@ -2616,5 +2619,281 @@ describe("COST-001 FP: Bicep template — no imperative loops in IaC", () => {
     const findings = analyzeCostEffectiveness(appCode, "typescript");
     const loopFindings = findings.filter((f) => f.title.toLowerCase().includes("nested loop"));
     assert.ok(loopFindings.length > 0, "Imperative nested loops should still be flagged");
+  });
+});
+
+// ─── v3.13.9 — Broad IaC Awareness Sweep ────────────────────────────────────
+// Additional IaC false-positive regression tests for rules across multiple
+// evaluators that were firing on Bicep / Terraform / ARM templates.
+
+describe("SOV-001 FP: Bicep template — region without policy (IaC)", () => {
+  it("should NOT flag region-without-policy on declarative IaC template", () => {
+    const findings = analyzeDataSovereignty(aksBicepTemplate, "bicep");
+    const regionPolicy = findings.filter(
+      (f) => f.title.toLowerCase().includes("region") && f.title.toLowerCase().includes("policy"),
+    );
+    assert.strictEqual(
+      regionPolicy.length,
+      0,
+      "Bicep @allowed constrains regions declaratively — SOV region-policy rule should be suppressed",
+    );
+  });
+});
+
+describe("SOV-003 FP: Bicep template — replication/backup (IaC)", () => {
+  it("should NOT flag replication-localization on IaC storage template", () => {
+    const bicepStorage = [
+      "param location string",
+      "resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {",
+      "  name: 'stgprod'",
+      "  location: location",
+      "  kind: 'StorageV2'",
+      "  sku: { name: 'Standard_GRS' }",
+      "  properties: {",
+      "    replication: { type: 'geo-redundant' }",
+      "  }",
+      "}",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(bicepStorage, "bicep");
+    const replicationFindings = findings.filter((f) => f.title.toLowerCase().includes("replication"));
+    assert.strictEqual(
+      replicationFindings.length,
+      0,
+      "Bicep storage GRS/replication config is declarative infra — should be suppressed",
+    );
+  });
+});
+
+describe("SOV-007 FP: Bicep template — telemetry resource declaration (IaC)", () => {
+  it("should NOT flag telemetry-sovereignty on IaC App Insights resource", () => {
+    const bicepAppInsights = [
+      "param location string",
+      "resource appInsights 'Microsoft.Insights/components@2020-02-02' = {",
+      "  name: 'ai-prod'",
+      "  location: location",
+      "  kind: 'web'",
+      "  properties: {",
+      "    Application_Type: 'web'",
+      "    WorkspaceResourceId: logAnalyticsWorkspace.id",
+      "  }",
+      "}",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(bicepAppInsights, "bicep");
+    const telemetryFindings = findings.filter((f) => f.title.toLowerCase().includes("telemetry"));
+    assert.strictEqual(
+      telemetryFindings.length,
+      0,
+      "Bicep App Insights resource declaration is not telemetry code — should be suppressed",
+    );
+  });
+});
+
+describe("SOV-009 FP: Bicep template — region config (IaC)", () => {
+  it("should NOT flag region-without-enforcement on IaC with location param", () => {
+    const findings = analyzeDataSovereignty(aksBicepTemplate, "bicep");
+    const regionConfig = findings.filter((f) => f.title.toLowerCase().includes("region configuration"));
+    assert.strictEqual(
+      regionConfig.length,
+      0,
+      "Bicep location params are declarative — region-enforcement rule should be suppressed",
+    );
+  });
+});
+
+describe("SOV-011 FP: Bicep template — KeyVault resource declaration (IaC)", () => {
+  it("should NOT flag KMS-sovereignty on IaC KeyVault resource", () => {
+    const bicepKeyVault = [
+      "param location string",
+      "@secure()",
+      "param adminObjectId string",
+      "resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {",
+      "  name: 'kv-prod'",
+      "  location: location",
+      "  properties: {",
+      "    sku: { family: 'A', name: 'standard' }",
+      "    tenantId: subscription().tenantId",
+      "    accessPolicies: [",
+      "      {",
+      "        objectId: adminObjectId",
+      "        permissions: { keys: ['get', 'create', 'import'] }",
+      "      }",
+      "    ]",
+      "  }",
+      "}",
+    ].join("\n");
+    const findings = analyzeDataSovereignty(bicepKeyVault, "bicep");
+    const kmsFindings = findings.filter((f) => f.title.toLowerCase().includes("key sovereignty"));
+    assert.strictEqual(
+      kmsFindings.length,
+      0,
+      "Bicep KeyVault resource declaration is infrastructure — KMS-sovereignty rule should be suppressed",
+    );
+  });
+});
+
+describe("COMP-002 FP: Bicep template — telemetry without consent (IaC)", () => {
+  it("should NOT flag tracking-without-consent on IaC App Insights resource", () => {
+    const bicepTelemetry = [
+      "param location string",
+      "resource appInsights 'Microsoft.Insights/components@2020-02-02' = {",
+      "  name: 'ai-analytics'",
+      "  location: location",
+      "  kind: 'web'",
+      "  properties: {",
+      "    Application_Type: 'web'",
+      "  }",
+      "}",
+    ].join("\n");
+    const findings = analyzeCompliance(bicepTelemetry, "bicep");
+    const trackingFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("tracking") || f.title.toLowerCase().includes("consent"),
+    );
+    assert.strictEqual(
+      trackingFindings.length,
+      0,
+      "Bicep App Insights declaration is not tracking code — consent rule should be suppressed",
+    );
+  });
+});
+
+describe("CYBER FP: Bicep template — auth rate limiting (IaC)", () => {
+  it("should NOT flag auth-rate-limiting on IaC with password/token params", () => {
+    const bicepAuth = [
+      "@secure()",
+      "param adminPassword string",
+      "param tokenName string = 'access-token'",
+      "resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {",
+      "  name: 'vm-prod'",
+      "  location: 'westeurope'",
+      "  properties: {",
+      "    osProfile: {",
+      "      adminUsername: 'azureuser'",
+      "      adminPassword: adminPassword",
+      "    }",
+      "  }",
+      "}",
+    ].join("\n");
+    const findings = analyzeCybersecurity(bicepAuth, "bicep");
+    const rateLimitFindings = findings.filter((f) => f.title.toLowerCase().includes("rate limit"));
+    assert.strictEqual(
+      rateLimitFindings.length,
+      0,
+      "Bicep param declarations with 'password'/'token' are not auth endpoints — rate-limit rule should be suppressed",
+    );
+  });
+});
+
+describe("AICS-008 FP: Terraform template — hardcoded URLs (IaC)", () => {
+  it("should NOT flag hardcoded-URLs on IaC container image/endpoint config", () => {
+    const terraformCode = [
+      "terraform {",
+      "  required_providers {",
+      "    azurerm = {",
+      '      source  = "hashicorp/azurerm"',
+      '      version = "~> 3.0"',
+      "    }",
+      "  }",
+      "}",
+      "",
+      'resource "azurerm_container_group" "app" {',
+      '  name                = "app-container"',
+      "  location            = var.location",
+      "  resource_group_name = var.resource_group_name",
+      '  os_type             = "Linux"',
+      "",
+      "  container {",
+      '    name   = "app"',
+      '    image  = "mcr.microsoft.com/azuredocs/aci-helloworld:latest"',
+      "    cpu    = 1",
+      "    memory = 1.5",
+      "  }",
+      "}",
+    ].join("\n");
+    const findings = analyzeAiCodeSafety(terraformCode, "terraform");
+    const urlFindings = findings.filter((f) => f.title.toLowerCase().includes("hardcoded url"));
+    assert.strictEqual(
+      urlFindings.length,
+      0,
+      "Terraform container image URLs are declarative config — hardcoded-URL rule should be suppressed",
+    );
+  });
+});
+
+describe("CFG FP: Bicep template — configuration management (IaC)", () => {
+  it("should NOT flag any CFG rules on IaC template", () => {
+    const findings = analyzeConfigurationManagement(aksBicepTemplate, "bicep");
+    assert.strictEqual(findings.length, 0, "Bicep templates should not trigger any configuration-management rules");
+  });
+
+  it("should STILL flag CFG rules on imperative application code", () => {
+    const appCode = [
+      "const PORT = 3000;",
+      "const HOST = 'localhost';",
+      "const DATABASE = 'mongodb://localhost:27017/mydb';",
+      "const REDIS = 'redis://localhost:6379';",
+      "const password = 'supersecretpassword123';",
+      "const api_key = 'sk-live-abc123def456';",
+      "const token = 'ghp_xxxxxxxxxxxxxxxxxxxx';",
+      "",
+      "function startServer() {",
+      "  const app = express();",
+      "  app.listen(PORT, HOST);",
+      "  connectToDatabase(DATABASE);",
+      "  connectToRedis(REDIS);",
+      "}",
+    ].join("\n");
+    const findings = analyzeConfigurationManagement(appCode, "javascript");
+    assert.ok(findings.length > 0, "Imperative code with hardcoded config should still be flagged");
+  });
+});
+
+describe("CLOUD FP: Bicep template — connection strings & config (IaC)", () => {
+  it("should NOT flag connection-string or hardcoded-config on IaC template", () => {
+    const armTemplate = [
+      "{",
+      '  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",',
+      '  "contentVersion": "1.0.0.0",',
+      '  "resources": [',
+      "    {",
+      '      "type": "Microsoft.Web/sites",',
+      '      "apiVersion": "2022-03-01",',
+      '      "name": "my-web-app",',
+      '      "location": "[resourceGroup().location]",',
+      '      "properties": {',
+      '        "siteConfig": {',
+      '          "connectionStrings": [',
+      "            {",
+      '              "name": "Database",',
+      "              \"connectionString\": \"[listKeys(variables('storageId'), '2022-05-01').keys[0].value]\",",
+      '              "type": "Custom"',
+      "            }",
+      "          ],",
+      '          "appSettings": [',
+      '            { "name": "port", "value": "8080" },',
+      '            { "name": "host", "value": "[reference(variables(\'appId\')).hostNames[0]]" },',
+      '            { "name": "database", "value": "[parameters(\'dbName\')]" },',
+      '            { "name": "redis", "value": "[parameters(\'redisHost\')]" }',
+      "          ]",
+      "        }",
+      "      }",
+      "    }",
+      "  ]",
+      "}",
+    ].join("\n");
+    const findings = analyzeCloudReadiness(armTemplate, "json");
+    const connStringFindings = findings.filter((f) => f.title.toLowerCase().includes("connection string"));
+    const configFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("hardcoded") && f.title.toLowerCase().includes("environment"),
+    );
+    assert.strictEqual(
+      connStringFindings.length,
+      0,
+      "ARM template connection string references are infrastructure — should be suppressed",
+    );
+    assert.strictEqual(
+      configFindings.length,
+      0,
+      "ARM template config values are infrastructure — should be suppressed",
+    );
   });
 });

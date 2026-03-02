@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeConfigurationManagement(code: string, language: string): Finding[] {
@@ -7,6 +7,13 @@ export function analyzeConfigurationManagement(code: string, language: string): 
   let ruleNum = 1;
   const prefix = "CFG";
   const _lang = getLangFamily(language);
+
+  // Infrastructure-as-Code templates (Bicep, Terraform, ARM) are declarative
+  // infrastructure definitions — they legitimately contain secrets as Key Vault
+  // references, parameters, and config values.  CFG rules designed for
+  // application code (env-var usage, rotation, schema validation) produce
+  // false positives on IaC.
+  if (isIaCTemplate(code)) return findings;
 
   // Hardcoded secrets / credentials
   const secretPattern = /(?:password|passwd|secret|api_?key|token|private_?key)\s*[:=]\s*["'`][^"'`]{3,}/gi;

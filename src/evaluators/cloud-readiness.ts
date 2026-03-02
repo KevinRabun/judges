@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCloudReadiness(code: string, language: string): Finding[] {
@@ -161,7 +161,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   // Hardcoded credentials / connection strings
   const hardcodedCredsPattern = /(?:connectionString|DATABASE_URL|REDIS_URL|MONGO_URI)\s*[:=]\s*["'`][^"'`]{10,}/gi;
   const hardcodedCredsLines = getLineNumbers(code, hardcodedCredsPattern);
-  if (hardcodedCredsLines.length > 0) {
+  if (hardcodedCredsLines.length > 0 && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
@@ -185,7 +185,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
     code,
     /(?:port|host|database|redis|mongo)\s*[:=]\s*["'`](?!process|os\.|ENV)/gi,
   );
-  if (hasHardcodedConfig.length > 2 && !hasEnvConfig) {
+  if (hasHardcodedConfig.length > 2 && !hasEnvConfig && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

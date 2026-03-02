@@ -13,6 +13,25 @@ import { normalizeLanguage, langPattern, isIaC } from "../language-patterns.js";
 // ─── Re-export language utilities for convenience ────────────────────────────
 export { normalizeLanguage, langPattern };
 
+// ─── Infrastructure-as-Code Detection ────────────────────────────────────────
+// Content-based detection of IaC templates (Bicep, Terraform, ARM).
+// Complements the language-family-based `isIaC()` from language-patterns.ts
+// by detecting IaC content regardless of the language label passed in.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const IAC_TEMPLATE_PATTERN =
+  /(?:^|\n)\s*(?:param\s+\w+\s+(?:string|int|bool|object|array)|resource\s+\w+\s+'[^']*@\d{4}-\d{2}-\d{2}|@(?:allowed|description|secure)\s*\(|targetScope\s*=|resource\s+"[^"]+"\s+"[^"]+"|variable\s+"|provider\s+"|terraform\s*\{|\$schema.*deploymentTemplate)/im;
+
+/**
+ * Detect whether `code` is an Infrastructure-as-Code template (Bicep,
+ * Terraform, or ARM) based on content patterns.  This is intentionally
+ * separate from `isIaC(lang)` which only checks the language family name —
+ * content-based detection works even when the language is mis-classified.
+ */
+export function isIaCTemplate(code: string): boolean {
+  return IAC_TEMPLATE_PATTERN.test(code);
+}
+
 // ─── File Classification ─────────────────────────────────────────────────────
 // Classify a source file so absence-based rules can be skipped on files where
 // they would only produce false positives (tests, configs, pure type defs, etc.).
