@@ -88,6 +88,10 @@ export function classifyFile(code: string, language: string, filePath?: string):
     if (/\.(?:tf|tfvars|bicep)$/i.test(lowerPath)) {
       return "config";
     }
+    // Data / config files by extension (YAML, JSON, TOML, INI, ENV, properties)
+    if (/\.(?:ya?ml|json|jsonc|toml|ini|env|properties|cfg|conf)$/i.test(lowerPath)) {
+      return "config";
+    }
   }
 
   // ── Content-based classification ─────────────────────────────────────────

@@ -195,6 +195,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
         suggestedFix:
           "Add a `/** @module <name> — <one-line purpose> */` or `/** @fileoverview ... */` block at the top of the file before any imports.",
         confidence: 0.7,
+        isAbsenceBased: true,
       });
     }
   }

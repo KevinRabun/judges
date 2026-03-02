@@ -164,6 +164,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
       suggestedFix:
         "Add an in-memory cache for frequent lookups, e.g. `const cache = new Map(); function getCached(key) { if (!cache.has(key)) cache.set(key, compute(key)); return cache.get(key); }`.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -277,6 +278,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
       suggestedFix:
         "Add compression middleware, e.g. `import compression from 'compression'; app.use(compression());` for Express or `MIDDLEWARE += ['django.middleware.gzip.GZipMiddleware']` for Django.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -299,6 +301,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
       suggestedFix:
         "Replace `new Client()` with a pool: `const pool = new Pool({ max: 10 }); const client = await pool.connect();` and release after use with `client.release()`.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

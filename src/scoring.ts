@@ -187,6 +187,13 @@ const ABSENCE_GATED_PREFIXES = [
   "SCALE-",
   "REL-",
   "ERR-",
+  "SOV-", // sovereignty — "no sovereignty evidence" is project-level, not per-file
+  "DOC-", // documentation — "no docs" is project-level
+  "MAINT-", // maintainability — "no linting" is project-level
+  "SWDEV-", // software dev practices — "no build script" is project-level
+  "COST-", // cost — "no cost controls" is project-level
+  "COMP-", // compliance — absence of compliance is project-level
+  "TEST-", // testing — "no tests" is project-level
 ];
 
 export function isAbsenceBasedFinding(finding: Finding): boolean {
@@ -207,10 +214,10 @@ export function isAbsenceBasedFinding(finding: Finding): boolean {
     );
   if (!hasAbsenceTitle) return false;
 
-  const projectLevelKeywords = /\b(?:ci[\s/]cd|pipeline|deployment|infrastructure|monitoring|alerting|backup)\b/i;
-  if (projectLevelKeywords.test(finding.title)) {
-    return false;
-  }
+  // Project-level findings (CI/CD, pipeline, monitoring, etc.) ARE absence-based.
+  // They should be gated on non-server files just like other absence findings.
+  // Previously excluded, but cross-project analysis showed this caused massive
+  // noise: e.g. "No test infrastructure detected" firing 618 times per-file.
 
   return true;
 }

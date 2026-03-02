@@ -481,7 +481,12 @@ export function evaluateWithTribunal(
 
   const rawFindings = evaluations.flatMap((e) => e.findings);
   const dedupedFindings = crossEvaluatorDedup(rawFindings);
-  const { filtered: fpFiltered } = filterFalsePositiveHeuristics(dedupedFindings, code, language);
+  const { filtered: fpFiltered } = filterFalsePositiveHeuristics(
+    dedupedFindings,
+    code,
+    language,
+    enrichedOptions?.filePath,
+  );
   const allFindings = applyConfig(fpFiltered, options?.config);
   const mustFixGate = evaluateMustFixGate(allFindings, options?.mustFixGate);
   const criticalCount = allFindings.filter((f) => f.severity === "critical").length;

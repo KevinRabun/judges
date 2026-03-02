@@ -42,11 +42,46 @@ const APP_ONLY_RULE_PREFIXES = [
  * Rule prefixes that target production-runtime concerns and should NOT fire
  * on test files (test_*, *.test.ts, spec/**, etc.).
  */
-const PROD_ONLY_RULE_PREFIXES = [
+const PROD_ONLY_RULE_PREFIXES: string[] = [
   "RATE-", // rate limiting not expected in tests
   "SCALE-", // scalability not expected in tests
   "OBS-", // observability not expected in tests
   "CLOUD-", // cloud readiness not expected in tests
+  "SOV-", // data sovereignty not relevant to tests
+  "DOC-", // documentation quality not relevant in tests
+  "MAINT-", // maintainability patterns not relevant in tests
+  "COMP-", // compliance checks not relevant in tests
+  "CICD-", // CI/CD infrastructure not relevant in tests
+  "COST-", // cost optimization not relevant in tests
+  "SWDEV-", // software dev practices not relevant in tests
+];
+
+/**
+ * Rule IDs that target executable code and should NOT fire on configuration
+ * or data files (YAML, JSON, TOML, INI, .env, etc.). These files contain
+ * no executable logic, so code-quality rules produce false positives.
+ */
+const CODE_ONLY_RULE_PREFIXES = [
+  "CYBER-", // injection, XSS — no executable code in config
+  "AUTH-", // authentication flow — no executable code in config
+  "PERF-", // runtime performance — no runtime in config
+  "RATE-", // rate limiting — no middleware in config
+  "CACHE-", // caching strategy — no runtime in config
+  "ERR-", // error handling — no try/catch in config
+  "UX-", // user experience — not applicable to config
+  "A11Y-", // accessibility — not applicable to config
+  "I18N-", // internationalization — not applicable to config
+  "DB-", // database queries — no SQL in config
+  "CONC-", // concurrency — no threads in config
+  "SOV-", // sovereignty — declarative config, no data flow
+  "MAINT-", // maintainability — not applicable to data files
+  "SWDEV-", // software practices — not applicable to data files
+  "DOC-", // documentation — not applicable to data files
+  "TEST-", // testing — not applicable to data files
+  "SCALE-", // scalability — no runtime in config
+  "CICD-", // CI/CD infra — not a code concern on data files
+  "COST-", // cost — not applicable to data files
+  "COMP-", // compliance — not code-level concern on data files
 ];
 
 /**
@@ -145,14 +180,19 @@ const SAFE_IDIOM_PATTERNS: Array<{
  * @param language – The programming language
  * @returns Filtered findings and removed findings
  */
-export function filterFalsePositiveHeuristics(findings: Finding[], code: string, language: string): FpFilterResult {
+export function filterFalsePositiveHeuristics(
+  findings: Finding[],
+  code: string,
+  language: string,
+  filePath?: string,
+): FpFilterResult {
   if (findings.length === 0) {
     return { filtered: [], removed: [] };
   }
 
   const lines = code.split("\n");
   const isIaC = isIaCTemplate(code);
-  const fileCategory = classifyFile(code, language);
+  const fileCategory = classifyFile(code, language, filePath);
 
   const filtered: Finding[] = [];
   const removed: Finding[] = [];
@@ -189,6 +229,14 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     const isProdOnly = PROD_ONLY_RULE_PREFIXES.some((p) => finding.ruleId.startsWith(p));
     if (isProdOnly) {
       return `Production-only rule ${finding.ruleId} does not apply to test files.`;
+    }
+  }
+
+  // ── 2b. Config/data file gating: code-quality rules on YAML/JSON/config ──
+  if (fileCategory === "config") {
+    const isCodeOnly = CODE_ONLY_RULE_PREFIXES.some((p) => finding.ruleId.startsWith(p));
+    if (isCodeOnly) {
+      return `Code-quality rule ${finding.ruleId} does not apply to configuration/data files.`;
     }
   }
 

@@ -286,8 +286,20 @@ describe("Confidence — isAbsenceBasedFinding", () => {
     assert.ok(!isAbsenceBasedFinding(makeFinding({ ruleId: "PERF-001", title: "No cache detected" })));
   });
 
-  it("should NOT flag project-level keywords like CI/CD", () => {
-    assert.ok(!isAbsenceBasedFinding(makeFinding({ ruleId: "CICD-001", title: "No CI/CD pipeline detected" })));
+  it("should flag project-level keywords like CI/CD as absence-based", () => {
+    assert.ok(isAbsenceBasedFinding(makeFinding({ ruleId: "CICD-001", title: "No CI/CD pipeline detected" })));
+  });
+
+  it("should detect SOV- prefix absence patterns", () => {
+    assert.ok(isAbsenceBasedFinding(makeFinding({ ruleId: "SOV-001", title: "No sovereignty evidence detected" })));
+  });
+
+  it("should detect DOC- prefix absence patterns", () => {
+    assert.ok(isAbsenceBasedFinding(makeFinding({ ruleId: "DOC-001", title: "No documentation detected" })));
+  });
+
+  it("should detect MAINT- prefix absence patterns", () => {
+    assert.ok(isAbsenceBasedFinding(makeFinding({ ruleId: "MAINT-001", title: "No linting detected" })));
   });
 });
 
@@ -658,6 +670,26 @@ export function multiply(a: number, b: number): number {
 }
 `;
     assert.equal(classifyFile(code, "typescript"), "utility");
+  });
+
+  it("should classify .yaml files as config by extension", () => {
+    assert.equal(classifyFile("name: my-app\nversion: 1.0", "unknown", "config/app.yaml"), "config");
+  });
+
+  it("should classify .yml files as config by extension", () => {
+    assert.equal(classifyFile("key: value", "unknown", "deploy/service.yml"), "config");
+  });
+
+  it("should classify .json files as config by extension", () => {
+    assert.equal(classifyFile("{}", "json", "data/settings.json"), "config");
+  });
+
+  it("should classify .toml files as config by extension", () => {
+    assert.equal(classifyFile("[package]\\nname = 'x'", "unknown", "Cargo.toml"), "config");
+  });
+
+  it("should classify .env files as config by extension", () => {
+    assert.equal(classifyFile("PORT=3000", "unknown", "config/.env"), "config");
   });
 });
 
@@ -1611,6 +1643,43 @@ describe("False-Positive Heuristic Filter", () => {
       const findings: Finding[] = [{ ...baseFinding, ruleId: "CYBER-001", lineNumbers: [2] }];
       const { filtered, removed } = filterFalsePositiveHeuristics(findings, testCode, "typescript");
       assert.strictEqual(filtered.length, 1, "Security rules should be kept on test files");
+      assert.strictEqual(removed.length, 0);
+    });
+
+    it("should remove extended prod-only rules (SOV, DOC, MAINT) from test files", () => {
+      const testCode = `import { describe, it, beforeEach } from "node:test";\ndescribe("test suite", () => {\n  beforeEach(() => {});\n  it("works", () => { expect(true); });\n  it("does more", () => { assert.ok(1); });\n});`;
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "SOV-001", lineNumbers: [2] },
+        { ...baseFinding, ruleId: "DOC-001", lineNumbers: [2] },
+        { ...baseFinding, ruleId: "MAINT-001", lineNumbers: [2] },
+        { ...baseFinding, ruleId: "CICD-001", lineNumbers: [2] },
+        { ...baseFinding, ruleId: "COST-001", lineNumbers: [2] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, testCode, "typescript");
+      assert.strictEqual(removed.length, 5, "All extended prod-only rules should be removed from test files");
+      assert.strictEqual(filtered.length, 0);
+    });
+  });
+
+  describe("Config/data file gating", () => {
+    it("should remove code-quality rules from YAML config files", () => {
+      const yamlCode = `name: my-app\nversion: 1.0.0\ndependencies:\n  express: ^4.18.0\n  cors: ^2.8.5`;
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "CYBER-001", lineNumbers: [2] },
+        { ...baseFinding, ruleId: "SOV-001", lineNumbers: [3] },
+        { ...baseFinding, ruleId: "MAINT-001", lineNumbers: [4] },
+      ];
+      // classifyFile with .yaml extension should return "config"
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, yamlCode, "unknown", "config/app.yaml");
+      assert.strictEqual(removed.length, 3, "Code-quality rules should be removed from YAML files");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep IaC-relevant rules on config files", () => {
+      const yamlCode = `name: my-app\nversion: 1.0.0\nconfig:\n  port: 8080`;
+      const findings: Finding[] = [{ ...baseFinding, ruleId: "IAC-001", lineNumbers: [2] }];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, yamlCode, "unknown", "config/app.yaml");
+      assert.strictEqual(filtered.length, 1, "IAC rules should be kept on config files");
       assert.strictEqual(removed.length, 0);
     });
   });

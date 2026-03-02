@@ -302,12 +302,19 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     /(?:partition|shard|region.*key|tenant.*region|geo.*route|data.*boundary|residency.*tag|region.*id)/i.test(code);
   // Require concrete DB mutation evidence: ORM method calls (.save(), .create(), etc.)
   // or SQL DML keywords (INSERT INTO, UPDATE...SET, DELETE FROM) — not just generic words
-  const hasDbOps =
-    /(?:\.(?:save|create|insertOne|insertMany|updateOne|updateMany|deleteOne|deleteMany|bulkWrite|persist|upsert)\s*\(|(?:INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b|cursor\.execute|\.execute\s*\(\s*["'`](?:INSERT|UPDATE|DELETE))/i.test(
-      code,
-    );
+  const dbOpsPattern =
+    /(?:\.(?:save|create|insertOne|insertMany|updateOne|updateMany|deleteOne|deleteMany|bulkWrite|persist|upsert)\s*\(|(?:INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b|cursor\.execute|\.execute\s*\(\s*["'`](?:INSERT|UPDATE|DELETE))/i;
+  const hasDbOps = dbOpsPattern.test(code);
 
   if (hasPiiFields && hasDbOps && !hasGeoPartitioning && code.split("\n").length > 20) {
+    // Collect line numbers where DB operations with PII occur
+    const piiDbLines: number[] = [];
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      if (dbOpsPattern.test(codeLines[i])) {
+        piiDbLines.push(i + 1);
+      }
+    }
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -320,6 +327,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       suggestedFix:
         "Add region tagging to PII records: { ...userData, _region: tenantRegion } and partition storage by jurisdiction.",
       confidence: 0.8,
+      lineNumbers: piiDbLines.length > 0 ? piiDbLines : undefined,
     });
   }
 
@@ -613,6 +621,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
         suggestedFix:
           "Add explicit sovereignty annotations: // @sovereignty: compliant, region=eu-west-1, policy=gdpr-ch5 — and link to auditable policy artifacts.",
         confidence: 0.7,
+        isAbsenceBased: true,
       });
     }
   }

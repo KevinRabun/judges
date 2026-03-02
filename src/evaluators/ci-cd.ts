@@ -30,6 +30,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       suggestedFix:
         'Add a `"test": "jest"` (or equivalent) script to `package.json` and create a first test file, e.g., `src/__tests__/example.test.ts`.',
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -48,6 +49,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       suggestedFix:
         'Add a `"lint": "eslint ."` script to `package.json` and create an `.eslintrc` (or `eslint.config.js`) configuration file.',
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -104,6 +106,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       suggestedFix:
         'Add a `"build": "tsc"` (or `vite build`, `webpack`, etc.) script to `package.json` so CI can run `npm run build`.',
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -161,6 +164,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       suggestedFix:
         "Add `HEALTHCHECK --interval=30s CMD curl -f http://localhost:3000/health || exit 1` before the final `CMD` instruction in the Dockerfile.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -180,6 +184,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       suggestedFix:
         'Add `--coverage` to the test script (e.g., `"test": "jest --coverage"`) and set a `coverageThreshold` in the Jest/Vitest config.',
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
@@ -220,6 +225,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
       suggestedFix:
         "Add `RUN addgroup -S app && adduser -S app -G app` then `USER app` before the `CMD` instruction in the Dockerfile.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

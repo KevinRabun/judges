@@ -185,6 +185,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       reference: "OWASP Input Validation — Defense in Depth",
       suggestedFix: "Add schema validation for all external inputs using a library like Zod, Joi, or Pydantic.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
