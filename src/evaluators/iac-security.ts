@@ -351,7 +351,7 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
         return code.slice(0, idx).split("\n").length;
       });
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "critical",
         title: "ARM template secret parameter has default value",
         description:

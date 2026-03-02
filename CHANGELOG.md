@@ -2,6 +2,101 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.11.4] — 2026-03-01
+
+### Fixed
+- **Zero lint errors** — resolved all remaining PROBLEMS across `daily-popular-repo-autofix.ts` (unused `RepoTimeoutError` class), `judges.test.ts` (9 unused imports), and `iac-security.ts` (unused post-increment value).
+- **9 new comment-skipping regression tests** — authentication, API design, dependency health, compliance, observability, testing, internationalization, documentation, and ethics-bias evaluators now have dedicated false-positive regression tests (912 total tests, 188 suites).
+
+### Changed
+- **CHANGELOG** — added missing entries for v3.8.5 through v3.11.3 with link references.
+- **README** — test badge updated from 842 to 912.
+- **CONTRIBUTING** — test count updated from 700+ to 900+.
+- **SECURITY** — supported versions table updated to reflect 3.11.x as current.
+
+## [3.11.3] — 2026-03-01
+
+### Fixed
+- **Systemic comment-skipping across all evaluators** — added `isCommentLine()` helper to `shared.ts` with `COMMENT_LINE_RE` regex. `getLineNumbers()` and `getLangLineNumbers()` now skip comment lines by default. Added 123 individual `isCommentLine` guards to `forEach`/`for` loops across 20 evaluators. 9 intentional comment checks (TODO/FIXME, linter-disable, etc.) opted out with `{ skipComments: false }`.
+- Added 10 regression tests for comment-skipping false positives (903 total tests, 188 suites).
+
+## [3.11.2] — 2026-03-01
+
+### Fixed
+- **Recursion detector** limited body scan to actual function boundaries — previously could false-positive on identically named functions elsewhere in the file.
+- **`var` in comments** no longer triggers maintainability or software-practices findings (`var oldConfig = {}` in a comment is not a code issue).
+
+## [3.11.1] — 2026-03-01
+
+### Fixed
+- **Testing evaluator** — `describe`/`it` labels and word boundaries for `HttpClient` no longer produce false positives.
+- **Data-sovereignty evaluator** — `export` embedded in identifiers and env vars no longer triggers; added word boundaries to `dr` and `replica` checks.
+- **Documentation evaluator** — walks backwards through comment body for long JSDoc blocks to avoid false-positive "missing documentation" findings.
+
+## [3.11.0] — 2026-03-01
+
+### Fixed
+- **N+1 query check** now scans actual loop bodies instead of the entire file — eliminates false positives when queries exist outside loops.
+- **Retry detection** recognizes `p-retry` and `backoff` libraries.
+- **Cost-effectiveness** skips comment lines in loop detection.
+- **Accessibility** skips comment and declaration lines.
+- **Data-sovereignty** skips comment lines.
+- **External dependency** detection skips comment lines.
+- **API doc check** no longer false-positives on large JSDoc blocks.
+
+## [3.10.1] — 2026-03-01
+
+### Fixed
+- **Auto-fix button** no longer falsely reports code changed when no patches were applied.
+
+## [3.10.0] — 2026-03-01
+
+### Added
+- **IaC Security judge** (`IAC-*` rules) — Infrastructure-as-Code analysis for Terraform (`.tf`), Bicep (`.bicep`), and ARM templates (`.json`). Checks for overly permissive network rules, missing encryption, public access, hardcoded secrets in IaC definitions, and 15 other IaC-specific anti-patterns.
+
+## [3.9.3] — 2026-03-01
+
+### Improved
+- **VS Code extension** — "Re-Evaluate" is now a chat followup that streams updated findings into chat (previously showed only a toast). Context-aware followups for `/security` and workspace reviews. Post-fix followup after `/fix`.
+- **Auto-fix clarity** — each finding tagged with 🔧 (auto-fixable) or 📝 (manual review). Fixability summary in header. Dynamic button label ("Auto-Fix N of M Findings"). Button hidden when no findings are auto-fixable.
+
+## [3.9.2] — 2026-03-01
+
+### Fixed
+- **VS Code extension** — populated findings cache directly from chat review results; fixed Auto-Fix All and Re-Evaluate buttons not working after chat review.
+
+## [3.9.1] — 2026-03-01
+
+### Added
+- **Workspace-wide review** — `@judges /review` in Copilot Chat can now evaluate all supported files in the workspace with progress reporting.
+
+### Fixed
+- **Tree-sitter AST** — made `tree-sitter-ast.ts` work in both ESM and CJS bundles.
+- Added missing `toolReferenceName` to `languageModelTools` manifest.
+
+## [3.9.0] — 2026-03-01
+
+### Added
+- **`@judges` chat participant** — type `@judges` in Copilot Chat to review, security-check, or auto-fix files. Slash commands: `/review`, `/security`, `/fix`, `/help`.
+- **`judges_evaluate` Language Model tool** — registered via `vscode.lm.registerTool` so Copilot auto-discovers and invokes Judges evaluation.
+- Disambiguation routing: Copilot auto-routes "judges panel review", "judges evaluation" queries.
+- Domain-focused reviews and action buttons in chat responses.
+
+## [3.8.7] — 2026-03-01
+
+### Fixed
+- Daily popular-repo autofix timeout and performance improvements.
+
+## [3.8.6] — 2026-03-01
+
+### Fixed
+- Added `onChatParticipant` activation event for `@judges` in VS Code extension.
+
+## [3.8.5] — 2026-03-01
+
+### Security
+- Replaced ReDoS-prone regex with `indexOf` in `project.ts` (CodeQL alert 35).
+
 ## [3.8.4] — 2026-03-01
 
 ### Security
@@ -266,6 +361,28 @@ All notable changes to **@kevinrabun/judges** are documented here.
 
 ---
 
+[3.11.4]: https://github.com/KevinRabun/judges/compare/v3.11.3...v3.11.4
+[3.11.3]: https://github.com/KevinRabun/judges/compare/v3.11.2...v3.11.3
+[3.11.2]: https://github.com/KevinRabun/judges/compare/v3.11.1...v3.11.2
+[3.11.1]: https://github.com/KevinRabun/judges/compare/v3.11.0...v3.11.1
+[3.11.0]: https://github.com/KevinRabun/judges/compare/v3.10.1...v3.11.0
+[3.10.1]: https://github.com/KevinRabun/judges/compare/v3.10.0...v3.10.1
+[3.10.0]: https://github.com/KevinRabun/judges/compare/v3.9.3...v3.10.0
+[3.9.3]: https://github.com/KevinRabun/judges/compare/v3.9.2...v3.9.3
+[3.9.2]: https://github.com/KevinRabun/judges/compare/v3.9.1...v3.9.2
+[3.9.1]: https://github.com/KevinRabun/judges/compare/v3.9.0...v3.9.1
+[3.9.0]: https://github.com/KevinRabun/judges/compare/v3.8.7...v3.9.0
+[3.8.7]: https://github.com/KevinRabun/judges/compare/v3.8.6...v3.8.7
+[3.8.6]: https://github.com/KevinRabun/judges/compare/v3.8.5...v3.8.6
+[3.8.5]: https://github.com/KevinRabun/judges/compare/v3.8.4...v3.8.5
+[3.8.4]: https://github.com/KevinRabun/judges/compare/v3.8.3...v3.8.4
+[3.8.3]: https://github.com/KevinRabun/judges/compare/v3.8.2...v3.8.3
+[3.8.2]: https://github.com/KevinRabun/judges/compare/v3.8.1...v3.8.2
+[3.8.1]: https://github.com/KevinRabun/judges/compare/v3.8.0...v3.8.1
+[3.8.0]: https://github.com/KevinRabun/judges/compare/v3.7.3...v3.8.0
+[3.7.3]: https://github.com/KevinRabun/judges/compare/v3.7.2...v3.7.3
+[3.7.2]: https://github.com/KevinRabun/judges/compare/v3.7.1...v3.7.2
+[3.7.1]: https://github.com/KevinRabun/judges/compare/v3.7.0...v3.7.1
 [3.7.0]: https://github.com/KevinRabun/judges/compare/v3.6.0...v3.7.0
 [3.6.0]: https://github.com/KevinRabun/judges/compare/v3.5.0...v3.6.0
 [3.5.0]: https://github.com/KevinRabun/judges/compare/v3.4.0...v3.5.0

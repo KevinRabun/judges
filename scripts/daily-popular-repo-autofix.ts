@@ -95,7 +95,7 @@ const DEFAULT_PER_REPO_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes per repo
 const MAX_SOURCE_FILES_PER_REPO = 500;
 const MAX_FILE_SIZE_BYTES = 100 * 1024; // 100 KB
 
-class RepoTimeoutError extends Error {
+class _RepoTimeoutError extends Error {
   constructor(repoUrl: string, timeoutMs: number) {
     super(`Repository ${repoUrl} exceeded ${Math.round(timeoutMs / 60_000)}m timeout`);
     this.name = "RepoTimeoutError";

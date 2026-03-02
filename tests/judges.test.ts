@@ -8857,4 +8857,135 @@ function unusedHelper(): void {
     );
     assert.ok(disableFindings.length > 0, "Linter-disable check should still flag comments — it's intentional");
   });
+
+  it("should NOT produce authentication false positives from credential patterns in comments", () => {
+    const findings = analyzeAuthentication(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) =>
+        f.title.toLowerCase().includes("password") ||
+        f.title.toLowerCase().includes("md5") ||
+        f.title.toLowerCase().includes("hardcoded"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Authentication FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce api-design false positives from REST patterns in comments", () => {
+    const findings = analyzeApiDesign(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) =>
+        f.title.toLowerCase().includes("res.send") ||
+        f.title.toLowerCase().includes("express") ||
+        f.title.toLowerCase().includes("cors"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `API-design FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce dependency-health false positives from require patterns in comments", () => {
+    const findings = analyzeDependencyHealth(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) =>
+        f.title.toLowerCase().includes("require") ||
+        f.title.toLowerCase().includes("child_process") ||
+        f.title.toLowerCase().includes("deprecated"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Dependency-health FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce compliance false positives from data patterns in comments", () => {
+    const findings = analyzeCompliance(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) =>
+        f.title.toLowerCase().includes("pii") ||
+        f.title.toLowerCase().includes("gdpr") ||
+        f.title.toLowerCase().includes("password"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Compliance FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce observability false positives from logging patterns in comments", () => {
+    const findings = analyzeObservability(commentOnlyCode, "typescript");
+    // "No health check endpoint detected" is a missing-code check, not a comment FP — exclude it
+    const fpFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("console.log") || f.title.toLowerCase().includes("structured log"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Observability FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce testing false positives from test patterns in comments", () => {
+    const findings = analyzeTesting(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) =>
+        f.title.toLowerCase().includes("assert") ||
+        f.title.toLowerCase().includes("test coverage") ||
+        f.title.toLowerCase().includes("mock"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Testing FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce internationalization false positives from locale patterns in comments", () => {
+    const findings = analyzeInternationalization(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) =>
+        f.title.toLowerCase().includes("locale") ||
+        f.title.toLowerCase().includes("tolocalestring") ||
+        f.title.toLowerCase().includes("i18n"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Internationalization FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce documentation false positives from doc patterns in comments", () => {
+    const findings = analyzeDocumentation(commentOnlyCode, "typescript");
+    // TODO/FIXME detection is an intentional comment check — exclude it from FP filter
+    const fpFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("deprecated") || f.title.toLowerCase().includes("jsdoc"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Documentation FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+
+  it("should NOT produce ethics-bias false positives from patterns in comments", () => {
+    const findings = analyzeEthicsBias(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) =>
+        f.title.toLowerCase().includes("dark pattern") ||
+        f.title.toLowerCase().includes("demographic") ||
+        f.title.toLowerCase().includes("bias"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Ethics-bias FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
 });

@@ -11,7 +11,7 @@ An MCP (Model Context Protocol) server that provides a panel of **35 specialized
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![npm downloads](https://img.shields.io/npm/dw/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-842-brightgreen)](https://github.com/KevinRabun/judges/actions)
+[![Tests](https://img.shields.io/badge/tests-912-brightgreen)](https://github.com/KevinRabun/judges/actions)
 
 ---
 
