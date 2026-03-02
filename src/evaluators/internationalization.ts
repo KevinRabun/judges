@@ -235,7 +235,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   // Suppress for directory / module-loader files — readdir, dynamic imports,
   // and require() are filesystem navigation, not text-content I/O.
   const isDirOrModuleLoader =
-    /readdir|readdirSync|opendir|scandir|glob|walkDir|import\s*\(|require\s*\(|require\.resolve|__dirname|path\.(?:join|resolve|dirname)/i.test(
+    /readdir|readdirSync|opendir|scandir|glob|walkDir|import\s*\(|require\s*\(|require\.resolve|__dirname|path\.(?:join|resolve|dirname)|export\s*\{[^}]*\}\s*from\s/i.test(
       code,
     );
   if (handlesText && !hasEncoding && !isDirOrModuleLoader && lines.length > 50) {

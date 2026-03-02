@@ -8,6 +8,14 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   const prefix = "CLOUD";
   const _lang = getLangFamily(language);
 
+  // Shared: detect whether the file contains server/application bootstrap code.
+  // Used to suppress operational rules (health check, graceful shutdown, feature flags)
+  // that are irrelevant for utility/helper modules.
+  const hasServerCode =
+    /app\.(listen|use)|createServer|express\(\)|Flask\(|Django|WebApplication|actix_web|rocket::|gin\.|fiber\.|http\.ListenAndServe|SpringBoot/i.test(
+      code,
+    );
+
   // Hardcoded hosts/ports
   const hardcodedHostPattern = /(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d{4,5}(?!.*(?:test|spec|mock|example))/gi;
   const hardcodedLines = getLineNumbers(code, hardcodedHostPattern);
@@ -50,7 +58,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
 
   // No health check endpoint
   const hasHealthCheck = /health|healthz|readyz|readiness|liveness|\/ready|\/live|\/status/gi.test(code);
-  if (!hasHealthCheck && code.split("\n").length > 30) {
+  if (!hasHealthCheck && hasServerCode && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -94,7 +102,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
     /SIGTERM|SIGINT|graceful.*shutdown|process\.on\s*\(\s*['"](?:SIGTERM|SIGINT)['"]|signal\.Notify|tokio::signal|ctrlc::|CancellationToken|Runtime\.getRuntime\(\)\.addShutdownHook/gi.test(
       code,
     );
-  if (!hasGracefulShutdown && code.split("\n").length > 30) {
+  if (!hasGracefulShutdown && hasServerCode && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -134,10 +142,6 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   // Missing Dockerfile / container support indicators
   const hasContainerSupport =
     /Dockerfile|docker|containerPort|EXPOSE|FROM\s+node|FROM\s+python|FROM\s+mcr|FROM\s+golang|FROM\s+rust|FROM\s+openjdk/gi.test(
-      code,
-    );
-  const hasServerCode =
-    /app\.(listen|use)|createServer|express\(\)|Flask\(|Django|WebApplication|actix_web|rocket::|gin\.|fiber\.|http\.ListenAndServe|SpringBoot/gi.test(
       code,
     );
   if (hasServerCode && !hasContainerSupport && code.split("\n").length > 50) {
@@ -270,7 +274,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   const hasFeatureFlags = /feature.?flag|launch.?darkly|unleash|flagsmith|ConfigCat|featureToggle|FEATURE_/gi.test(
     code,
   );
-  if (!hasFeatureFlags && code.split("\n").length > 100) {
+  if (!hasFeatureFlags && hasServerCode && code.split("\n").length > 100) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "info",

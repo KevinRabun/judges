@@ -28,6 +28,8 @@ import { analyzePortability } from "../src/evaluators/portability.js";
 import { analyzeSoftwarePractices } from "../src/evaluators/software-practices.js";
 import { analyzeUx } from "../src/evaluators/ux.js";
 import { analyzeInternationalization } from "../src/evaluators/internationalization.js";
+import { analyzeCloudReadiness } from "../src/evaluators/cloud-readiness.js";
+import { analyzeCostEffectiveness } from "../src/evaluators/cost-effectiveness.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 
@@ -1772,5 +1774,242 @@ export function mergeConfigs(configs) {
       emptyStateFindings.length > 0,
       "Should still flag UI components that render lists without empty-state handling",
     );
+  });
+});
+
+// ─── v3.13.5 — SOV-001 re-export skip ───────────────────────────────────────
+describe("SOV export-path rule — re-export barrel suppression", () => {
+  it("should NOT flag export { } from re-exports as sovereignty export paths", () => {
+    const code = `
+// utils.js — barrel re-export module
+import { formatDate } from './date.js';
+import { slugify } from './string.js';
+export { formatDate } from './date.js';
+export { slugify, capitalize } from './string.js';
+export { default as logger } from './logger.js';
+
+export function identity(x) {
+  return x;
+}
+`;
+    const findings = analyzeDataSovereignty(code, "javascript");
+    const exportFindings = findings.filter((f) => /export.*sovereignty|sovereignty.*export/i.test(f.title));
+    assert.equal(exportFindings.length, 0, "Re-export barrels should not trigger sovereignty export warnings");
+  });
+
+  it("should STILL flag actual data export flows without sovereignty controls", () => {
+    const code = `
+import { db } from './database.js';
+
+async function exportUserData(userId) {
+  const user = await db.findOne({ id: userId });
+  const report = generateReport(user);
+  const dump = JSON.stringify(report);
+  await sendToAnalytics(dump);
+  return dump;
+}
+`;
+    const findings = analyzeDataSovereignty(code, "javascript");
+    const exportFindings = findings.filter((f) => /export.*sovereignty|export path/i.test(f.title));
+    assert.ok(exportFindings.length > 0, "Actual data export flows should still be flagged");
+  });
+});
+
+// ─── v3.13.5 — TEST-001 word boundary fix ────────────────────────────────────
+describe("TEST hasTestStructure — word boundary fix", () => {
+  it("should NOT misdetect emit()/submit()/split() as test structure", () => {
+    const code = Array.from({ length: 60 }, (_, i) => {
+      if (i === 0) return 'import { EventEmitter } from "events";';
+      if (i === 2) return "export class MessageBus {";
+      if (i === 3) return "  constructor() { this.emitter = new EventEmitter(); }";
+      if (i === 5) return "  emit(event, data) {";
+      if (i === 6) return "    this.emitter.emit(event, data);";
+      if (i === 7) return "  }";
+      if (i === 9) return "  submit(form) {";
+      if (i === 10) return "    const parts = form.name.split('-');";
+      if (i === 11) return "    if (parts.length < 2) throw new Error('Invalid format');";
+      if (i === 12) return "    return this.emit('submit', { form, parts });";
+      if (i === 13) return "  }";
+      if (i === 15) return "  transmit(payload) {";
+      if (i === 16) return "    if (!payload) throw new Error('Empty payload');";
+      if (i === 17) return "    return this.emit('transmit', payload);";
+      if (i === 18) return "  }";
+      if (i === 19) return "}";
+      return "// bus utility line " + i;
+    }).join("\\n");
+    const findings = analyzeTesting(code, "javascript");
+    const noTestFindings = findings.filter((f) => /no tests|no assertion/i.test(f.title));
+    assert.equal(noTestFindings.length, 0, "emit()/submit()/split() should not be misdetected as test structure");
+  });
+
+  it("should STILL detect actual test files with it()/test() calls", () => {
+    const code = `
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+
+describe('math', () => {
+  it('should add numbers', () => {
+    assert.equal(1 + 1, 2);
+  });
+
+  test('should subtract', () => {
+    assert.equal(5 - 3, 2);
+  });
+});
+`;
+    const findings = analyzeTesting(code, "javascript");
+    // This file HAS test structure with assertions — should NOT fire "no assertions"
+    const noAssertionFindings = findings.filter((f) => /no assertions/i.test(f.title));
+    assert.equal(noAssertionFindings.length, 0, "Test file with assertions should not be flagged");
+  });
+});
+
+// ─── v3.13.5 — CLOUD-001/002/003 server-code gating ─────────────────────────
+describe("CLOUD rules — utility module suppression", () => {
+  it("should NOT flag utility modules for missing health check, shutdown, or feature flags", () => {
+    const lines = [
+      "// utils.js — pure helper module",
+      "export function clamp(val, min, max) {",
+      "  return Math.min(Math.max(val, min), max);",
+      "}",
+      "",
+      "export function debounce(fn, ms) {",
+      "  let timer;",
+      "  return (...args) => {",
+      "    clearTimeout(timer);",
+      "    timer = setTimeout(() => fn(...args), ms);",
+      "  };",
+      "}",
+      "",
+      "export function deepMerge(target, source) {",
+      "  for (const key of Object.keys(source)) {",
+      "    if (source[key] instanceof Object && key in target) {",
+      "      Object.assign(source[key], deepMerge(target[key], source[key]));",
+      "    }",
+      "  }",
+      "  Object.assign(target, source);",
+      "  return target;",
+      "}",
+    ];
+    // Pad to > 110 lines to exceed all thresholds
+    while (lines.length <= 115) lines.push("// util line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeCloudReadiness(code, "javascript");
+    const healthFindings = findings.filter((f) => /health.?check/i.test(f.title));
+    const shutdownFindings = findings.filter((f) => /graceful.*shutdown/i.test(f.title));
+    const featureFlagFindings = findings.filter((f) => /feature.?flag/i.test(f.title));
+    assert.equal(healthFindings.length, 0, "Utility modules should not require health check endpoints");
+    assert.equal(shutdownFindings.length, 0, "Utility modules should not require graceful shutdown");
+    assert.equal(featureFlagFindings.length, 0, "Utility modules should not require feature flags");
+  });
+
+  it("should STILL flag a server file missing health check and graceful shutdown", () => {
+    const lines = [
+      'import express from "express";',
+      "const app = express();",
+      "",
+      "app.use(express.json());",
+      "",
+      'app.get("/api/users", (req, res) => {',
+      '  res.json([{ id: 1, name: "Alice" }]);',
+      "});",
+      "",
+      "app.listen(3000, () => {",
+      '  console.log("Server running on port 3000");',
+      "});",
+    ];
+    while (lines.length <= 35) lines.push("// server line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeCloudReadiness(code, "javascript");
+    const healthFindings = findings.filter((f) => /health.?check/i.test(f.title));
+    const shutdownFindings = findings.filter((f) => /graceful.*shutdown/i.test(f.title));
+    assert.ok(healthFindings.length > 0, "Server files should still require health check endpoints");
+    assert.ok(shutdownFindings.length > 0, "Server files should still require graceful shutdown");
+  });
+});
+
+// ─── v3.13.5 — I18N-001 re-export barrel suppression ────────────────────────
+describe("I18N encoding rule — re-export barrel suppression", () => {
+  it("should NOT flag re-export barrel modules with fetch for missing encoding", () => {
+    const lines = [
+      "// utils.js — post-split barrel module",
+      "export { formatResponse } from './format.js';",
+      "export { parseQuery } from './query.js';",
+      "export { fetchWrapper } from './fetch.js';",
+      "",
+      "export function buildUrl(base, params) {",
+      "  const url = new URL(base);",
+      "  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));",
+      "  return url.toString();",
+      "}",
+      "",
+      "export async function fetchJson(url) {",
+      "  const response = await fetch(url);",
+      "  return response.json();",
+      "}",
+    ];
+    while (lines.length <= 55) lines.push("// barrel line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeInternationalization(code, "javascript");
+    const encodingFindings = findings.filter((f) => /encoding/i.test(f.title));
+    assert.equal(encodingFindings.length, 0, "Re-export barrel modules should not trigger encoding warnings");
+  });
+});
+
+// ─── v3.13.5 — COST-001 data-fetching gating ────────────────────────────────
+describe("COST caching rule — utility module suppression", () => {
+  it("should NOT flag pure utility modules for missing caching", () => {
+    const lines = [
+      "// transform.js — pure data transformations",
+      "export function normalize(data) {",
+      "  return data.map(item => ({",
+      "    ...item,",
+      "    name: item.name.trim().toLowerCase(),",
+      "    createdAt: new Date(item.createdAt),",
+      "  }));",
+      "}",
+      "",
+      "export function groupBy(items, key) {",
+      "  return items.reduce((groups, item) => {",
+      "    const group = item[key];",
+      "    groups[group] = groups[group] || [];",
+      "    groups[group].push(item);",
+      "    return groups;",
+      "  }, {});",
+      "}",
+      "",
+      "export function unique(arr) {",
+      "  return [...new Set(arr)];",
+      "}",
+    ];
+    while (lines.length <= 55) lines.push("// transform line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeCostEffectiveness(code, "javascript");
+    const cachingFindings = findings.filter((f) => /caching/i.test(f.title));
+    assert.equal(cachingFindings.length, 0, "Pure utility modules should not require caching strategies");
+  });
+
+  it("should STILL flag data-fetching modules without caching", () => {
+    const lines = [
+      'import { db } from "./database.js";',
+      "",
+      "export async function getUser(id) {",
+      '  return db.query("SELECT * FROM users WHERE id = $1", [id]);',
+      "}",
+      "",
+      "export async function listProducts() {",
+      '  const response = await fetch("https://api.example.com/products");',
+      "  return response.json();",
+      "}",
+      "",
+      "export async function getOrderHistory(userId) {",
+      "  return db.findOne({ userId });",
+      "}",
+    ];
+    while (lines.length <= 55) lines.push("// data line " + lines.length);
+    const code = lines.join("\n");
+    const findings = analyzeCostEffectiveness(code, "javascript");
+    const cachingFindings = findings.filter((f) => /caching/i.test(f.title));
+    assert.ok(cachingFindings.length > 0, "Data-fetching modules should still be flagged for missing caching");
   });
 });

@@ -138,7 +138,13 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
   const hasCaching = /cache|redis|memcached|lru|memoize|Cache-Control|@Cacheable|functools\.lru_cache|@cache/gi.test(
     code,
   );
-  if (!hasCaching && code.split("\n").length > 50) {
+  // Only suggest caching when the file performs I/O, data-fetching, or serves
+  // requests — pure utility/transformation modules don't need caching.
+  const hasDataFetchOrServe =
+    /fetch\s*\(|axios\.|\.query\s*\(|\.findOne|\.findMany|\.aggregate|SELECT\s+.*FROM|INSERT\s+INTO|\.execute\s*\(|database|db\.|app\.(listen|use|get|post)\s*\(|createServer|express\(\)/i.test(
+      code,
+    );
+  if (!hasCaching && hasDataFetchOrServe && code.split("\n").length > 50) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "info",

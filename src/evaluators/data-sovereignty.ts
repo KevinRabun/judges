@@ -124,6 +124,8 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     // Skip JS/TS export keyword declarations (export const, export function, etc.)
     if (/^\s*export\s+(default\s+)?(const|let|var|function|class|interface|type|enum|abstract|async)\b/i.test(line))
       return;
+    // Skip JS/TS named re-exports and barrel aggregations (export { ... } from '...')
+    if (/^\s*export\s*\{/.test(line)) return;
     // Skip env-var / config references that merely name a region or setting
     if (/process\.env\.|import\s|require\s*\(|getenv|os\.environ/i.test(line)) return;
     // Skip lines where 'export' only appears as part of an identifier (e.g., getExportRegion, isExportAllowed)

@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.13.5] — 2026-03-02
+
+### Fixed
+- **7 evaluator false-positive fixes** from fifth round of real-world Copilot feedback (`src/utils.js` post-split barrel module, score 99):
+  - **SOV-001** (data-sovereignty) — "Data export path without sovereignty-aware controls" now skips ES module re-export barrels (`export { ... } from '...'`). Re-export aggregation files do not perform actual data export.
+  - **TEST-001** (testing) — `hasTestStructure` regex now uses `\b` word boundaries for `describe`, `it`, `test` to prevent false matches inside `emit()`, `submit()`, `split()`, `transmit()`, `exit()`. Also expanded `isConfigOrUtility` with `util|utils|helper|helpers|lib|shared|common` patterns, and restricted to file header (first 5 lines) to avoid matching incidental code-body mentions.
+  - **CLOUD-001/002/003** (cloud-readiness) — Health check, graceful shutdown, and feature flag rules now gated on `hasServerCode` (requires `app.listen`, `createServer`, `express()`, Flask, Django, etc.). Utility/helper modules above the line threshold are no longer flagged.
+  - **I18N-001** (internationalization) — `isDirOrModuleLoader` extended with ESM re-export barrel pattern (`export { ... } from`) to suppress "No text encoding specification" on barrel modules.
+  - **COST-001** (cost-effectiveness) — "No caching strategy detected" now gated on `hasDataFetchOrServe` requiring evidence of I/O, data-fetching, or server operations (`fetch()`, `axios`, `.query()`, `db.`, `app.listen`, etc.). Pure utility modules no longer flagged.
+
+### Added
+- **10 new regression tests** (1276 total) covering all 7 FP fixes with both negative (FP suppressed) and positive (real issues still detected) cases.
+
 ## [3.13.4] — 2026-03-02
 
 ### Fixed

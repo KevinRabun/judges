@@ -11,7 +11,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
 
   // Detect test files with no assertions (multi-language)
   const hasTestStructure =
-    /describe\s*\(|it\s*\(|test\s*\(|def\s+test_|@Test|#\[test\]|#\[cfg\(test\)\]|func\s+Test[A-Z]|\[Fact\]|\[Theory\]|@pytest/i.test(
+    /\bdescribe\s*\(|\bit\s*\(|\btest\s*\(|def\s+test_|@Test|#\[test\]|#\[cfg\(test\)\]|func\s+Test[A-Z]|\[Fact\]|\[Theory\]|@pytest/i.test(
       code,
     );
   if (hasTestStructure) {
@@ -264,9 +264,12 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // Exclude config files, type definitions, constants, and utility barrel files
     const hasFunctions = getLangLineNumbers(code, language, LP.FUNCTION_DEF).length > 0;
     const isLargeFile = lines.length > 50;
+    // Check only the file header (first 5 lines) for module-purpose indicators
+    // to avoid matching incidental mentions like `const config = ...` in code body
+    const headerText = lines.slice(0, 5).join("\n");
     const isConfigOrUtility =
-      /(?:config|configuration|settings|constants|types|interfaces|models|schema|migration|seed|fixture|mock|stub|setup|index|barrel)\b/gi.test(
-        code,
+      /(?:config|configuration|settings|constants|types|interfaces|models|schema|migration|seed|fixture|mock|stub|setup|index|barrel|util|utils|helper|helpers|lib|shared|common)\b/gi.test(
+        headerText,
       );
     const isTypeDefinitionFile =
       /^(?:export\s+)?(?:type|interface|enum|declare)\s+/gim.test(code) &&
