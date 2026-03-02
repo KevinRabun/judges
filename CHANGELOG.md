@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.16.0] — 2025-07-06
+
+### Improved
+- **20% false positive reduction** — Comprehensive cross-project analysis (13,981 findings across 30 projects / 1,149 files) identified and fixed 5 root cause gaps in the FP filtering pipeline, reducing findings to 11,158:
+  - **Config file gating** — YAML/JSON/TOML/INI/ENV files now classified as "config" by `classifyFile()`, suppressing 30 code-only rule prefixes. YAML file findings: 891 → 0 (100% elimination)
+  - **Test file suppression** — Extended `PROD_ONLY_RULE_PREFIXES` from 4 to 22 prefixes (added AGENT/AICS/PERF/PORTA/UX/I18N/A11Y/LOGPRIV/CACHE/DATA/API/SOV/DOC/MAINT/COMP/CICD/COST/SWDEV). Test file findings: 1,500 → 306 (80% reduction)
+  - **Absence-based gating** — Extended `ABSENCE_GATED_PREFIXES` with 7 new prefixes (SOV/DOC/MAINT/SWDEV/COST/COMP/TEST); removed counterproductive `projectLevelKeywords` exclusion that prevented CI/CD, pipeline, and infrastructure findings from being gated on non-server files
+  - **Evaluator `isAbsenceBased` flags** — Added explicit flags to 12 findings across 5 evaluators (ci-cd ×6, data-sovereignty ×1, documentation ×1, software-practices ×1, cost-effectiveness ×3)
+  - **PII geo-partitioning precision** — Added line-number collection to PII storage finding in data-sovereignty evaluator, making it presence-based (specific DB operation lines) rather than falsely gated as absence-based
+- **11 new subsystem tests** covering all FP improvements (194 total, was 183)
+- All 1,154 tests pass (960 judges + 194 subsystems)
+
 ## [3.15.1] — 2025-07-06
 
 ### Fixed
