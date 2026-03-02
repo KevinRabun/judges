@@ -113,7 +113,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
 
   // Single-threaded heavy computation
   // Detect nested loops, known CPU-intensive operations, and blocking patterns
-  const heavyCompPattern = /(?:for|while)\s*\(.*(?:length|size|count).*\)[\s\S]{0,200}(?:for|while)\s*\(/gi;
+  // Use [^)]* instead of .* to avoid O(n²) backtracking between wildcards and \)
+  const heavyCompPattern = /(?:for|while)\s*\([^)]*(?:length|size|count)[^)]*\)[\s\S]{0,200}(?:for|while)\s*\(/gi;
   const cpuIntensiveOps =
     /crypto\.pbkdf2Sync|crypto\.scryptSync|bcrypt\.hashSync|JSON\.parse\s*\(\s*JSON\.stringify|structuredClone|zlib\.[^a-z]*Sync|(?:sort|reduce|map|filter)\s*\([^)]*(?:sort|reduce|map|filter)\s*\(/gi;
   const hasNestedLoops = heavyCompPattern.test(code);

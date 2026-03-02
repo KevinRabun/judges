@@ -18,7 +18,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
   const promptConcatPattern =
     /(?:system|user|assistant|prompt|messages)\s*[:=[{].*(?:req\.|request\.|params\.|query\.|body\.|input|user[Ii]nput|message|content)/gi;
   const promptTemplatePattern =
-    /(?:`[^`]*\$\{[^}]*(?:req|request|params|query|body|input|user|message)[^}]*\}[^`]*`|f["'].*\{.*(?:request|input|user|message).*\})/gi;
+    /(?:`[^`]*\$\{[^}]*(?:req|request|params|query|body|input|user|message)[^}]*\}[^`]*`|f["'][^{]*\{[^}]*(?:request|input|user|message)[^}]*\})/gi;
   const llmCallPattern =
     /(?:openai|anthropic|cohere|azure.*openai|bedrock|gemini|palm|groq|ollama|mistral|replicate|together|chat\.completions|messages\.create|generate|invoke)\s*[.(]/gi;
 

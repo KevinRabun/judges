@@ -281,7 +281,8 @@ function analyzeTaintedExports(code: string, _filePath: string): TaintedExport[]
             let foundReturn = false;
             // Check if return statement directly contains a taint source
             for (const src of SOURCE_PATTERNS) {
-              const returnSourceMatch = body.match(new RegExp(`return\\s+(.*${src.pattern.source}.*)`, "im"));
+              // Use [^\n]* instead of .* to avoid O(n²) backtracking between two adjacent wildcards
+              const returnSourceMatch = body.match(new RegExp(`return\\s+([^\\n]*${src.pattern.source}[^\\n]*)`, "im"));
               if (returnSourceMatch) {
                 exports.push({
                   exportedName: fnName,
@@ -438,7 +439,8 @@ function analyzeTaintedExports(code: string, _filePath: string): TaintedExport[]
           // Check if return directly contains a source
           if (/\breturn\b/.test(body)) {
             for (const src of SOURCE_PATTERNS) {
-              const returnSourceMatch = body.match(new RegExp(`return\\s+(.*${src.pattern.source}.*)`, "im"));
+              // Use [^\n]* instead of .* to avoid O(n²) backtracking between two adjacent wildcards
+              const returnSourceMatch = body.match(new RegExp(`return\\s+([^\\n]*${src.pattern.source}[^\\n]*)`, "im"));
               if (returnSourceMatch) {
                 exports.push({
                   exportedName: "default",

@@ -126,7 +126,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
   const sensitiveLogLines: number[] = [];
   lines.forEach((line, i) => {
     if (isCommentLine(line)) return;
-    const executableLine = line.replace(/(["'`])(?:\\.|(?!\1).)*\1/g, "");
+    const executableLine = line.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g, "");
     if (
       /(?:console|logger|log|logging|println|print|eprintln|fmt\.Print|Debug\.Log)\s*[.(]/i.test(executableLine) &&
       /\b(?:password|secret|token|apiKey|api_key|ssn|creditCard|credit_card|authorization)\b/i.test(executableLine)

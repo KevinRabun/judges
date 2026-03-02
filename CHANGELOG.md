@@ -2,6 +2,20 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.15.1] — 2025-07-06
+
+### Fixed
+- **ReDoS (catastrophic backtracking) in 8 evaluator/AST files** — Comprehensive audit and fix of regex patterns that could cause exponential or polynomial backtracking on adversarial or large inputs:
+  - `observability.ts` — String-stripping regex `(["'\`])(?:\\.|(?!\1).)*\1` replaced with safe per-quote-type pattern
+  - `ethics-bias.ts` — Same string-stripping regex fix
+  - `portability.ts` — `pathSepPattern` restructured: trailing `[^...]*` moved outside the repeated `{2,}`/`{3,}` groups to eliminate NFA ambiguity between iterations
+  - `cross-file-taint.ts` — `.*SOURCE.*` dynamic regex replaced with `[^\n]*SOURCE[^\n]*` to avoid O(n²) between adjacent wildcards (2 instances)
+  - `software-practices.ts` — `(?:.*,\s*)?` in boolean-param detection replaced with `(?:[^,)]*,\s*)*` to eliminate `.*`/`,` overlap
+  - `cybersecurity.ts` — Same `(?:.*,\s*)?` fix in mass-assignment detection
+  - `scalability.ts` — `\(.*(?:length|size|count).*\)` replaced with `\([^)]*...[^)]*\)` to prevent O(n²) between adjacent wildcards
+  - `ai-code-safety.ts` — Triple `.*` in f-string prompt injection pattern replaced with `[^{]*` and `[^}]*` to prevent O(n³) backtracking
+- All 1143 tests pass (960 judges + 183 subsystems)
+
 ## [3.15.0] — 2026-03-02
 
 ### Reverted

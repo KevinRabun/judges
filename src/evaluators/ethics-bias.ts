@@ -19,7 +19,8 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
     );
   };
 
-  const stripStringLiterals = (line: string): string => line.replace(/(["'`])(?:\\.|(?!\1).)*\1/g, "");
+  const stripStringLiterals = (line: string): string =>
+    line.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g, "");
 
   // Detect demographic-based filtering or scoring
   const demographicLines: number[] = [];

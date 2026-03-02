@@ -30,7 +30,10 @@ export function analyzePortability(code: string, language: string): Finding[] {
   }
 
   // Hardcoded path separators
-  const pathSepPattern = /(?:['"`](?:[^'"`]*\\\\[^'"`]*){2,}['"`]|['"`](?:[^'"`]*\/[^'"`]*){3,}['"`])/g;
+  // Move the trailing [^...]* OUTSIDE the repeated group so each iteration is
+  // just [^...]*<sep> — no ambiguity between adjacent iterations' boundaries.
+  // This prevents exponential NFA backtracking (CodeQL js/polynomial-redos).
+  const pathSepPattern = /(?:['"`](?:[^'"`\\]*\\\\){2,}[^'"`\\]*['"`]|['"`](?:[^'"`/]*\/){3,}[^'"`/]*['"`])/g;
   const pathSepLines = getLineNumbers(code, pathSepPattern);
   // Skip entirely for HTML/markup files — forward slashes in href/src attributes
   // are valid URL paths, not OS file-path separator misuse.
