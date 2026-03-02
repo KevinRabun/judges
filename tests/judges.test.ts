@@ -61,6 +61,7 @@ import { analyzeTesting } from "../src/evaluators/testing.js";
 import { analyzeInternationalization } from "../src/evaluators/internationalization.js";
 import { analyzeDocumentation } from "../src/evaluators/documentation.js";
 import { analyzeEthicsBias } from "../src/evaluators/ethics-bias.js";
+import { analyzeDataSovereignty } from "../src/evaluators/data-sovereignty.js";
 
 // ─── Tree-sitter warm-up ────────────────────────────────────────────────────
 // Must happen BEFORE any describe/it blocks so that tree-sitter grammars are
@@ -8986,6 +8987,428 @@ function unusedHelper(): void {
       fpFindings.length,
       0,
       `Ethics-bias FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Sovereignty — Technological Sovereignty Rules (SOV-011..013)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Sovereignty — Technological Sovereignty", () => {
+  it("should detect vendor-managed KMS without key sovereignty", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const kmsCode = `
+import { KMSClient, EncryptCommand } from "@aws-sdk/client-kms";
+
+const kmsClient = new KMSClient({ region: "us-east-1" });
+
+async function encryptData(plaintext: string) {
+  const command = new EncryptCommand({
+    KeyId: "alias/my-key",
+    Plaintext: Buffer.from(plaintext),
+  });
+  const result = await kmsClient.send(command);
+  return result.CiphertextBlob;
+}
+
+async function decryptData(ciphertext: Uint8Array) {
+  return kms.decrypt({ CiphertextBlob: ciphertext });
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, kmsCode, "typescript");
+    const kmsFindings = evaluation.findings.filter(
+      (f) => f.title.includes("key sovereignty") || f.title.includes("encryption"),
+    );
+    assert.ok(kmsFindings.length > 0, "Expected finding for vendor-managed KMS without BYOK/CMK");
+  });
+
+  it("should NOT flag KMS usage with BYOK/CMK patterns", () => {
+    const kmsWithByokCode = `
+import { KMSClient, ImportKeyMaterialCommand } from "@aws-sdk/client-kms";
+
+// BYOK: import customer-managed key material from on-premises HSM
+async function importKeyMaterial(keyId: string, keyMaterial: Uint8Array) {
+  const client = new KMSClient({ region: "eu-west-1" });
+  return client.send(new ImportKeyMaterialCommand({
+    KeyId: keyId,
+    ImportToken: importToken,
+    KeyMaterial: keyMaterial,  // bring your own key material from HSM
+    ExpirationModel: "KEY_MATERIAL_DOES_NOT_EXPIRE"
+  }));
+}
+`;
+    const findings = analyzeDataSovereignty(kmsWithByokCode, "typescript");
+    const kmsFindings = findings.filter((f) => f.title.includes("key sovereignty"));
+    assert.strictEqual(kmsFindings.length, 0, "Should NOT flag KMS with BYOK/import-key patterns as insecure");
+  });
+
+  it("should detect proprietary AI/ML dependency without model abstraction", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const aiVendorCode = `
+import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock";
+
+const client = new BedrockRuntimeClient({ region: "us-east-1" });
+
+async function generateText(prompt: string) {
+  const command = new InvokeModelCommand({
+    modelId: "anthropic.claude-v2",
+    body: JSON.stringify({ prompt }),
+  });
+  const response = await client.send(command);
+  return JSON.parse(new TextDecoder().decode(response.body));
+}
+
+async function analyzeImage(imageBytes: Uint8Array) {
+  const command = new InvokeModelCommand({
+    modelId: "amazon.titan-image-generator-v1",
+    body: JSON.stringify({ image: imageBytes }),
+  });
+  return client.send(command);
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, aiVendorCode, "typescript");
+    const aiFindings = evaluation.findings.filter(
+      (f) => f.title.includes("AI/ML") || f.title.includes("model portability"),
+    );
+    assert.ok(aiFindings.length > 0, "Expected finding for proprietary AI/ML dependency without abstraction");
+  });
+
+  it("should NOT flag AI SDK usage when abstraction layer exists", () => {
+    const aiWithAbstractionCode = `
+import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock";
+
+interface IModelProvider {
+  complete(prompt: string): Promise<string>;
+  embed(text: string): Promise<number[]>;
+}
+
+class BedrockProvider implements IModelProvider {
+  private client = new BedrockRuntimeClient({ region: "us-east-1" });
+
+  async complete(prompt: string): Promise<string> {
+    const command = new InvokeModelCommand({ modelId: "claude-v2", body: JSON.stringify({ prompt }) });
+    const response = await this.client.send(command);
+    return JSON.parse(new TextDecoder().decode(response.body)).completion;
+  }
+
+  async embed(text: string): Promise<number[]> {
+    return [];
+  }
+}
+`;
+    const findings = analyzeDataSovereignty(aiWithAbstractionCode, "typescript");
+    const aiFindings = findings.filter((f) => f.title.includes("AI/ML") || f.title.includes("model portability"));
+    assert.strictEqual(aiFindings.length, 0, "Should NOT flag AI SDK when provider abstraction interface exists");
+  });
+
+  it("should detect single identity provider coupling without federation", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const singleIdpCode = `
+import { ConfidentialClientApplication } from "@azure/msal-node";
+
+const msalConfig = {
+  auth: {
+    clientId: "my-app-id",
+    authority: "https://login.microsoftonline.com/my-tenant",
+    clientSecret: process.env.CLIENT_SECRET,
+  },
+};
+
+const cca = new ConfidentialClientApplication(msalConfig);
+
+async function getToken(scopes: string[]) {
+  const result = await cca.acquireTokenByClientCredential({ scopes });
+  return result?.accessToken;
+}
+
+async function validateToken(token: string) {
+  return cca.acquireTokenOnBehalfOf({ oboAssertion: token, scopes: ["user.read"] });
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, singleIdpCode, "typescript");
+    const idpFindings = evaluation.findings.filter(
+      (f) => f.title.includes("identity provider") || f.title.includes("federation"),
+    );
+    assert.ok(idpFindings.length > 0, "Expected finding for single IdP coupling without federation");
+  });
+
+  it("should NOT flag IdP usage when OIDC/federation abstraction exists", () => {
+    const federatedIdpCode = `
+import { ConfidentialClientApplication } from "@azure/msal-node";
+import { Issuer, Strategy as OidcStrategy } from "openid-client";
+
+// Multi-provider federation via OIDC discovery
+const azureIssuer = await Issuer.discover("https://login.microsoftonline.com/my-tenant/v2.0");
+const googleIssuer = await Issuer.discover("https://accounts.google.com");
+
+// OIDC-based multi-provider strategy
+function createOidcStrategy(issuer: typeof azureIssuer) {
+  const client = new issuer.Client({ client_id: "id", client_secret: "secret" });
+  return new OidcStrategy({ client }, (tokenSet: unknown, done: Function) => done(null, tokenSet));
+}
+`;
+    const findings = analyzeDataSovereignty(federatedIdpCode, "typescript");
+    const idpFindings = findings.filter((f) => f.title.includes("identity provider") || f.title.includes("federation"));
+    assert.strictEqual(idpFindings.length, 0, "Should NOT flag IdP when OIDC federation abstraction is present");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Sovereignty — Operational Sovereignty Rules (SOV-014..016)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Sovereignty — Operational Sovereignty", () => {
+  it("should detect external API calls without circuit breaker patterns", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const noResilienceCode = `
+async function fetchUserProfile(userId: string) {
+  const response = await fetch("https://external-api.example.com/users/" + userId);
+  return response.json();
+}
+
+async function fetchOrders(userId: string) {
+  const response = await fetch("https://orders-api.example.com/orders?user=" + userId);
+  return response.json();
+}
+
+async function fetchInventory(productId: string) {
+  const response = await fetch("https://inventory.example.com/stock/" + productId);
+  return response.json();
+}
+
+async function fetchRecommendations(userId: string) {
+  const data = await axios.get("https://recommendations.example.com/recs/" + userId);
+  return data;
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, noResilienceCode, "typescript");
+    const resilienceFindings = evaluation.findings.filter(
+      (f) => f.title.includes("circuit breaker") || f.title.includes("resilience"),
+    );
+    assert.ok(resilienceFindings.length > 0, "Expected finding for external calls without circuit breaker");
+  });
+
+  it("should NOT flag external calls when circuit breaker is present", () => {
+    const resilientCode = `
+import CircuitBreaker from "opossum";
+
+const breaker = new CircuitBreaker(fetchExternal, {
+  timeout: 5000,
+  errorThresholdPercentage: 50,
+  resetTimeout: 30000,
+});
+
+breaker.fallback(() => ({ status: "degraded", data: cachedResponse }));
+
+async function fetchUserProfile(userId: string) {
+  const response = await fetch("https://external-api.example.com/users/" + userId, {
+    signal: AbortSignal.timeout(5000),
+  });
+  return response.json();
+}
+
+async function fetchOrders(userId: string) {
+  return breaker.fire("https://orders-api.example.com/orders?user=" + userId);
+}
+
+async function fetchInventory(productId: string) {
+  return breaker.fire("https://inventory.example.com/stock/" + productId);
+}
+`;
+    const findings = analyzeDataSovereignty(resilientCode, "typescript");
+    const resilienceFindings = findings.filter(
+      (f) => f.title.includes("circuit breaker") || f.title.includes("resilience"),
+    );
+    assert.strictEqual(
+      resilienceFindings.length,
+      0,
+      "Should NOT flag external calls when circuit breaker patterns are present",
+    );
+  });
+
+  it("should detect administrative operations without audit trail", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    const noAuditCode = `
+async function deleteUser(userId: string) {
+  await db.collection("users").delete({ _id: userId });
+}
+
+async function dropTemporaryTable(tableName: string) {
+  await db.dropCollection(tableName);
+}
+
+async function revokeApiKey(keyId: string) {
+  await apiKeys.revoke(keyId);
+}
+
+async function resetPassword(userId: string, newPassword: string) {
+  await users.resetPassword(userId, newPassword);
+}
+
+async function suspendAccount(accountId: string) {
+  await accounts.suspend(accountId);
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, noAuditCode, "typescript");
+    const auditFindings = evaluation.findings.filter(
+      (f) => f.title.includes("audit") || f.title.includes("Administrative"),
+    );
+    assert.ok(auditFindings.length > 0, "Expected finding for admin operations without audit trail");
+  });
+
+  it("should NOT flag admin operations when audit logging is present", () => {
+    const auditedCode = `
+import { AuditLogger } from "./audit";
+
+const auditLogger = new AuditLogger();
+
+async function deleteUser(userId: string, actorId: string) {
+  auditLogger.log({ actor: actorId, action: "DELETE_USER", resource: userId, timestamp: new Date() });
+  await db.collection("users").delete({ _id: userId });
+  auditLogger.log({ actor: actorId, action: "DELETE_USER_COMPLETE", resource: userId, outcome: "success" });
+}
+
+async function revokeApiKey(keyId: string, actorId: string) {
+  await createAuditEntry({ actor: actorId, action: "REVOKE_KEY", resource: keyId });
+  await apiKeys.revoke(keyId);
+}
+`;
+    const findings = analyzeDataSovereignty(auditedCode, "typescript");
+    const auditFindings = findings.filter((f) => f.title.includes("audit") || f.title.includes("Administrative"));
+    assert.strictEqual(auditFindings.length, 0, "Should NOT flag admin operations when audit trail is present");
+  });
+
+  it("should detect data storage without export/portability mechanism", () => {
+    const judge = getJudge("data-sovereignty");
+    assert.ok(judge, "data-sovereignty judge should exist");
+
+    // 30+ lines of data storage without any export mechanism
+    const noExportCode = `
+import { Repository } from "typeorm";
+
+class UserService {
+  constructor(private repo: Repository<User>) {}
+
+  async createUser(data: CreateUserDto) {
+    const user = this.repo.create(data);
+    return this.repo.save(user);
+  }
+
+  async updateUser(id: string, data: UpdateUserDto) {
+    return this.repo.save({ id, ...data });
+  }
+
+  async findById(id: string) {
+    return this.repo.findOne({ where: { id } });
+  }
+
+  async search(query: string) {
+    return this.repo.find({ where: { name: query } });
+  }
+
+  async deactivate(id: string) {
+    return this.repo.save({ id, active: false });
+  }
+
+  async getStats() {
+    return this.repo.count();
+  }
+
+  async validate(id: string) {
+    const user = await this.repo.findOne({ where: { id } });
+    return !!user;
+  }
+}
+`;
+    const evaluation = evaluateWithJudge(judge!, noExportCode, "typescript");
+    const exportFindings = evaluation.findings.filter(
+      (f) => f.title.includes("portability") || f.title.includes("export"),
+    );
+    assert.ok(exportFindings.length > 0, "Expected finding for data storage without export mechanism");
+  });
+
+  it("should NOT flag data storage when export API endpoint is present", () => {
+    const withExportCode = `
+import { Repository } from "typeorm";
+
+class UserService {
+  constructor(private repo: Repository<User>) {}
+
+  async createUser(data: CreateUserDto) {
+    const user = this.repo.create(data);
+    return this.repo.save(user);
+  }
+
+  async updateUser(id: string, data: UpdateUserDto) {
+    return this.repo.save({ id, ...data });
+  }
+
+  // Data portability: export all user data in standard JSON format
+  async exportAllUsers() {
+    return this.repo.findAll();
+  }
+
+  // GDPR Art. 20: right to data portability
+  async exportUserData(userId: string) {
+    const userData = await this.repo.findOne({ where: { id: userId } });
+    return { format: "json", data: userData };
+  }
+
+  async bulkExport(format: "json" | "csv") {
+    const cursor = this.repo.createQueryBuilder("user").stream();
+    return cursor;
+  }
+}
+`;
+    const findings = analyzeDataSovereignty(withExportCode, "typescript");
+    const exportFindings = findings.filter((f) => f.title === "Data storage without export or portability mechanism");
+    assert.strictEqual(exportFindings.length, 0, "Should NOT flag data storage when export mechanism exists");
+  });
+
+  it("should NOT produce sovereignty false positives from patterns in comments", () => {
+    const commentOnlyCode = `
+// This module handles KMS encryption via kms.encrypt and kms.decrypt for all storage.
+// Uses AWS BedrockRuntimeClient for AI inference without any abstraction layer.
+// Auth via ConfidentialClientApplication (MSAL) — single identity provider.
+// External API calls via fetch() and axios.get() without circuit breakers.
+// Admin operations: db.delete(), apiKeys.revoke(), accounts.suspend() without audit logging.
+/* Global region with geo-redundant replication and cross-region backup */
+// Telemetry sent to google-analytics, mixpanel, and sentry for monitoring.
+# CDN assets from cdn.jsdelivr.net and cdnjs.cloudflare.com without integrity checks.
+
+function cleanFunction() {
+  const x = 1;
+  return x + 1;
+}
+`;
+    const findings = analyzeDataSovereignty(commentOnlyCode, "typescript");
+    const fpFindings = findings.filter(
+      (f) =>
+        f.title.includes("key sovereignty") ||
+        f.title.includes("AI/ML") ||
+        f.title.includes("identity provider") ||
+        f.title.includes("circuit breaker") ||
+        f.title.includes("audit") ||
+        f.title.includes("CDN") ||
+        f.title.includes("Telemetry") ||
+        f.title.includes("Region usage") ||
+        f.title.includes("Replication"),
+    );
+    assert.strictEqual(
+      fpFindings.length,
+      0,
+      `Sovereignty FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
     );
   });
 });

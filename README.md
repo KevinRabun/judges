@@ -11,7 +11,7 @@ An MCP (Model Context Protocol) server that provides a panel of **35 specialized
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![npm downloads](https://img.shields.io/npm/dw/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-912-brightgreen)](https://github.com/KevinRabun/judges/actions)
+[![Tests](https://img.shields.io/badge/tests-925-brightgreen)](https://github.com/KevinRabun/judges/actions)
 
 ---
 
@@ -633,7 +633,7 @@ const svg2 = generateBadgeSvg(75, "quality"); // custom label
 | **Observability** | Observability & Monitoring | `OBS-` | Structured logging, health checks, metrics, tracing |
 | **Performance** | Performance & Efficiency | `PERF-` | N+1 queries, sync I/O, caching, memory leaks |
 | **Compliance** | Regulatory Compliance | `COMP-` | GDPR/CCPA, PII protection, consent, data retention, audit trails |
-| **Data Sovereignty** | Data Sovereignty & Jurisdictional Controls | `SOV-` | Data residency, cross-border transfer controls, jurisdiction-aware routing, sovereignty guardrails |
+| **Data Sovereignty** | Data, Technological & Operational Sovereignty | `SOV-` | Data residency, cross-border transfers, vendor key management, AI model portability, identity federation, circuit breakers, audit trails, data export |
 | **Testing** | Testing & Quality Assurance | `TEST-` | Test coverage, assertions, test isolation, naming |
 | **Documentation** | Documentation & Readability | `DOC-` | JSDoc/docstrings, magic numbers, TODOs, code comments |
 | **Internationalization** | Internationalization (i18n) | `I18N-` | Hardcoded strings, locale handling, currency formatting |
@@ -956,7 +956,7 @@ Each judge has a corresponding prompt for LLM-powered deep analysis:
 | `judge-observability` | Deep observability & monitoring review |
 | `judge-performance` | Deep performance optimization review |
 | `judge-compliance` | Deep regulatory compliance review |
-| `judge-data-sovereignty` | Deep data sovereignty and jurisdictional controls review |
+| `judge-data-sovereignty` | Deep data, technological & operational sovereignty review |
 | `judge-testing` | Deep testing quality review |
 | `judge-documentation` | Deep documentation quality review |
 | `judge-internationalization` | Deep i18n review |

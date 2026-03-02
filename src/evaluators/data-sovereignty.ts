@@ -1,4 +1,5 @@
 import type { Finding } from "../types.js";
+import { isCommentLine } from "./shared.js";
 
 export function analyzeDataSovereignty(code: string, _language: string): Finding[] {
   const findings: Finding[] = [];
@@ -270,6 +271,239 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       confidence: 0.8,
     });
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TECHNOLOGICAL SOVEREIGNTY
+  // Detect vendor lock-in, proprietary dependency risk, and lack of
+  // technology-stack independence that undermines sovereign control.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ── SOV-011: Vendor-managed encryption without key sovereignty ──────────
+  const kmsLines: number[] = [];
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (isCommentLine(trimmed)) return;
+    if (
+      /(?:aws\.?kms|kms\.encrypt|kms\.decrypt|kms\.generateDataKey|@aws-sdk\/client-kms|Azure\.KeyVault|CryptographyClient|keyVaultClient|google\.cloud\.kms|CloudKMS|KmsKeyRing)/i.test(
+        line,
+      ) &&
+      !/byok|bring.?your.?own.?key|hsm|import.?key|customer.?managed|cmk|external.?key|key.?wrap|key.?import/i.test(
+        line,
+      )
+    ) {
+      kmsLines.push(index + 1);
+    }
+  });
+
+  if (kmsLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Vendor-managed encryption without key sovereignty",
+      description:
+        "Code uses cloud-provider key management services (KMS) without visible BYOK (Bring Your Own Key), customer-managed key (CMK), or HSM key-import patterns. Provider-managed keys mean the cloud vendor retains ultimate control over cryptographic material, undermining technological sovereignty.",
+      lineNumbers: kmsLines.slice(0, 10),
+      recommendation:
+        "Use customer-managed keys (CMK) or import keys via BYOK/HSM to retain cryptographic sovereignty. Document key lifecycle ownership and ensure keys can be rotated independently of the cloud provider.",
+      reference: "Cloud Key Sovereignty / BYOK Best Practices",
+      suggestedFix:
+        "Import your own key material: const key = await kmsClient.importKey({ keyMaterial: localHsmKey, wrappingAlgorithm: 'RSA_AES_KEY_WRAP_SHA_256' }); — or configure customer-managed keys (CMK) for all encryption-at-rest resources.",
+      confidence: 0.8,
+    });
+  }
+
+  // ── SOV-012: Proprietary AI/ML model dependency without abstraction ─────
+  const aiVendorLines: number[] = [];
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (isCommentLine(trimmed)) return;
+    if (
+      /(?:@aws-sdk\/client-bedrock|BedrockRuntimeClient|InvokeModelCommand|@azure\/openai|AzureOpenAI|OpenAIClient|@google-cloud\/aiplatform|PredictionServiceClient|@google-cloud\/vertexai|VertexAI|@aws-sdk\/client-rekognition|@aws-sdk\/client-textract|@aws-sdk\/client-comprehend|CognitiveServicesCredentials|TextAnalyticsClient|ComputerVisionClient|google\.cloud\.vision|google\.cloud\.language|google\.cloud\.speech)/i.test(
+        line,
+      ) &&
+      !/interface\s+\w*(?:AI|Model|LLM|Inference|Predict)\w*|abstract\s+class|implements\s+\w*(?:AI|Model|LLM)\w*|adapter|provider.?pattern|strategy.?pattern/i.test(
+        line,
+      )
+    ) {
+      aiVendorLines.push(index + 1);
+    }
+  });
+
+  const hasAiAbstraction =
+    /interface\s+\w*(?:AI|Model|LLM|Inference|Predict|Embedding|Completion)\w*/i.test(code) ||
+    /(?:adapter|provider|strategy).*(?:AI|Model|LLM)/i.test(code) ||
+    /(?:openai|ollama|huggingface|transformers|vllm|litellm|langchain)/i.test(code);
+
+  if (aiVendorLines.length > 0 && !hasAiAbstraction) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Proprietary AI/ML service dependency without model portability",
+      description:
+        "Code directly imports vendor-specific AI/ML SDKs (AWS Bedrock, Azure OpenAI, Google Vertex AI, or vendor cognitive services) without an abstraction layer. This creates tight coupling to a single vendor's AI platform, limiting model portability and technological sovereignty.",
+      lineNumbers: aiVendorLines.slice(0, 10),
+      recommendation:
+        "Introduce an AI provider abstraction (interface/adapter) that decouples business logic from the specific vendor SDK. Consider open-source model runners (Ollama, vLLM, HuggingFace Transformers) or multi-provider libraries (LiteLLM, LangChain) for model portability.",
+      reference: "Technological Sovereignty / AI Model Portability",
+      suggestedFix:
+        "Define a provider-agnostic interface: interface IModelProvider { complete(prompt: string): Promise<string>; } — and wrap each vendor SDK in an adapter implementing this interface.",
+      confidence: 0.75,
+    });
+  }
+
+  // ── SOV-013: Single identity provider coupling ──────────────────────────
+  const idpLines: number[] = [];
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (isCommentLine(trimmed)) return;
+    if (
+      /(?:@aws-sdk\/client-cognito|CognitoIdentityProviderClient|CognitoUserPool|@azure\/msal|ConfidentialClientApplication|PublicClientApplication|@azure\/identity|google-auth-library|GoogleAuth|firebase\/auth|signInWithGoogle|Auth0Client|@auth0\/auth0-react)/i.test(
+        line,
+      ) &&
+      !/oidc|openid|saml|federation|multi.?provider|identity.?broker|passport|next-?auth|keycloak|casdoor/i.test(line)
+    ) {
+      idpLines.push(index + 1);
+    }
+  });
+
+  const hasIdpAbstraction =
+    /(?:oidc|openid.?connect|saml|federation|identity.?broker|passport\.use|NextAuth|next-?auth|keycloak|multi.?provider)/i.test(
+      code,
+    );
+
+  if (idpLines.length > 0 && !hasIdpAbstraction) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Single identity provider coupling without federation",
+      description:
+        "Authentication is tightly coupled to a single vendor-specific identity provider (Cognito, MSAL/Entra ID, Google Auth, Auth0, Firebase Auth) without visible OIDC/SAML federation or multi-provider abstraction. Single-vendor identity dependency creates operational risk and limits sovereignty over user authentication flows.",
+      lineNumbers: idpLines.slice(0, 10),
+      recommendation:
+        "Implement identity federation using standard protocols (OpenID Connect, SAML 2.0). Use an identity broker (Keycloak, NextAuth, Passport.js with multiple strategies) that supports multiple upstream providers. This ensures authentication sovereignty and provider portability.",
+      reference: "Technological Sovereignty / Identity Federation",
+      suggestedFix:
+        "Use an identity abstraction layer: configure Passport.js with multiple strategies (passport.use('oidc', new OidcStrategy(...))), or use NextAuth with pluggable providers to avoid single-vendor lock-in.",
+      confidence: 0.75,
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // OPERATIONAL SOVEREIGNTY
+  // Detect patterns that undermine an organization's ability to operate
+  // independently — missing resilience, audit trails, and data portability.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ── SOV-014: External API calls without circuit breaker / resilience ────
+  const externalCallLines: number[] = [];
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (isCommentLine(trimmed)) return;
+    if (
+      /(?:fetch\(|axios\.|got\(|superagent|request\(|httpClient|HttpClient|http\.(?:get|post|put|delete)|urllib|requests\.(?:get|post|put|delete)|reqwest|hyper::Client)/i.test(
+        line,
+      ) &&
+      !/circuit.?breaker|fallback|retry|timeout|AbortController|signal|AbortSignal|deadline|backoff|resilience|polly|cockatiel|opossum/i.test(
+        line,
+      )
+    ) {
+      externalCallLines.push(index + 1);
+    }
+  });
+
+  const hasResiliencePattern =
+    /(?:circuit.?breaker|CircuitBreaker|opossum|cockatiel|polly|resilience4j|Hystrix|retry.?policy|exponential.?backoff|fallback.?handler|AbortController|timeout.*fetch|fetch.*timeout)/i.test(
+      code,
+    );
+
+  if (externalCallLines.length > 2 && !hasResiliencePattern && code.split("\n").length > 20) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "External API calls without circuit breaker or resilience pattern",
+      description:
+        "Multiple external HTTP calls are made without visible circuit breaker, retry/backoff, or timeout patterns. This creates operational dependency on external services — if they degrade or become unavailable, your system has no autonomy to gracefully degrade or fail fast.",
+      lineNumbers: externalCallLines.slice(0, 10),
+      recommendation:
+        "Wrap external API calls with circuit breaker patterns (opossum, cockatiel, Polly, resilience4j). Add timeouts via AbortController/AbortSignal. Implement fallback responses for degraded-mode operation to maintain operational sovereignty.",
+      reference: "Operational Sovereignty / Resilience Patterns",
+      suggestedFix:
+        "Add a circuit breaker: const breaker = new CircuitBreaker(fetchExternal, { timeout: 5000, errorThresholdPercentage: 50 }); breaker.fallback(() => cachedResponse); — and use AbortController for request-level timeouts.",
+      confidence: 0.75,
+    });
+  }
+
+  // ── SOV-015: Administrative operations without audit trail ──────────────
+  const adminOpLines: number[] = [];
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (isCommentLine(trimmed)) return;
+    if (
+      /(?:\.delete\(|\.destroy\(|\.drop\(|\.truncate\(|\.revoke\(|\.disable\(|\.suspend\(|\.terminate\(|\.purge\(|\.wipe\(|\.removeAll\(|\.deleteMany\(|\.dropTable|\.dropDatabase|\.dropCollection|admin\.(?:create|delete|update|grant|revoke)|setRole|assignRole|revokeRole|changePassword|resetPassword)/i.test(
+        line,
+      ) &&
+      !/audit|log\.|logger\.|console\.|track|record|emit.*event|chronicle|journal/i.test(line)
+    ) {
+      adminOpLines.push(index + 1);
+    }
+  });
+
+  const hasAuditPattern =
+    /(?:audit.?log|audit.?trail|audit.?event|audit.?record|AuditLogger|createAuditEntry|logAuditEvent|emitAuditEvent|chronicle|compliance.?log)/i.test(
+      code,
+    );
+
+  if (adminOpLines.length > 0 && !hasAuditPattern && code.split("\n").length > 15) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Administrative operations without audit trail",
+      description:
+        "Destructive or privileged operations (delete, destroy, drop, revoke, role changes, password resets) are performed without visible audit logging. Without audit trails, the organization loses operational sovereignty — the ability to independently verify who did what, when, and why.",
+      lineNumbers: adminOpLines.slice(0, 10),
+      recommendation:
+        "Log all administrative and destructive operations to a tamper-evident audit trail. Include actor identity, timestamp, operation type, affected resource, and outcome. Store audit logs in a separate, append-only store with retention policies.",
+      reference: "Operational Sovereignty / Audit Trail Requirements",
+      suggestedFix:
+        "Add audit logging before each destructive operation: auditLogger.log({ actor: ctx.userId, action: 'DELETE', resource: resourceId, timestamp: new Date().toISOString(), outcome: 'success' });",
+      confidence: 0.8,
+    });
+  }
+
+  // ── SOV-016: No data export or portability mechanism ────────────────────
+  const hasDataStorage =
+    /(?:\.save\(|\.insert\(|\.create\(|\.put\(|\.store\(|\.persist\(|\.upsert\(|\.bulkWrite\(|Model\.create|Repository\.save|database|collection\(|table\()/i.test(
+      code,
+    );
+  const hasDataExport =
+    /(?:export.*data|data.*export|download|dump|backup|migrate|portability|transfer.*out|extract|bulk.*read|getAll|findAll|cursor|stream.*all|paginate.*all|data.?portability|right.?to.?data)/i.test(
+      code,
+    );
+  const hasExportApi =
+    /(?:\/export|\/download|\/dump|\/backup|\/migrate|\/extract|\/portability|api.*export|export.*endpoint|bulk.*export)/i.test(
+      code,
+    );
+
+  if (hasDataStorage && !hasDataExport && !hasExportApi && code.split("\n").length > 30) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Data storage without export or portability mechanism",
+      description:
+        "Code stores data but has no visible data export, bulk extraction, or portability mechanism. Without data portability, the organization risks vendor lock-in at the data layer — inability to migrate, audit, or exercise sovereignty over stored data.",
+      recommendation:
+        "Implement data export APIs (bulk read, streaming export, backup endpoints). Support standard portable formats (JSON, CSV, Parquet). This satisfies both GDPR Article 20 (right to data portability) and operational sovereignty — the ability to migrate data between systems independently.",
+      reference: "Operational Sovereignty / Data Portability / GDPR Art. 20",
+      suggestedFix:
+        "Add a data export endpoint: app.get('/api/export/:entity', async (req, res) => { const data = await repository.findAll(); res.json(data); }); — and support CSV/JSON format options.",
+      confidence: 0.7,
+      isAbsenceBased: true,
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CATCH-ALL: Sovereignty evidence not explicit
+  // ═══════════════════════════════════════════════════════════════════════════
 
   if (findings.length === 0 && code.length > 0) {
     const hasDataHandling = /(user|customer|personal|profile|account|email|phone|pii|data)/i.test(code);

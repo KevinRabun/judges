@@ -2,6 +2,25 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.12.0] — 2026-03-01
+
+### Added
+- **Technological sovereignty rules** — 3 new evaluator rules:
+  - **SOV-011**: Vendor-managed encryption without key sovereignty (BYOK/CMK/HSM).
+  - **SOV-012**: Proprietary AI/ML model dependency without abstraction layer.
+  - **SOV-013**: Single identity provider coupling without OIDC/SAML federation.
+- **Operational sovereignty rules** — 3 new evaluator rules:
+  - **SOV-014**: External API calls without circuit breaker / resilience patterns.
+  - **SOV-015**: Administrative operations without structured audit trail.
+  - **SOV-016**: Data storage without export / portability mechanism.
+- **3-pillar sovereignty systemPrompt** — judge definition expanded with 20 evaluation criteria across Data, Technological & Operational sovereignty pillars.
+- **13 new tests** for technological and operational sovereignty rules including comment-skipping regression (925 total tests, 190 suites).
+
+### Changed
+- **Judge name** — "Judge Data Sovereignty" → "Judge Sovereignty".
+- **Judge domain** — "Data Sovereignty & Jurisdictional Controls" → "Data, Technological & Operational Sovereignty".
+- **README** — test badge 912 → 925; Data Sovereignty row and MCP prompt expanded.
+
 ## [3.11.4] — 2026-03-01
 
 ### Fixed
