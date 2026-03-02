@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] — 2026-03-02
+
+### Added
+
+- **Refine Findings with AI** — new `Judges: Refine Findings with AI` command (available via command palette and editor context menu). Uses GPT-4o to review pattern-matched findings against the file's source code, automatically filtering out false positives. Reports how many findings were dismissed vs confirmed.
+- **Deep-review false-positive review** — single-judge and tribunal deep-review prompts now include explicit instructions to identify and dismiss false positives from string literals, function-scoped variables, nearby mitigation code, and test/example code.
+
 ## [0.2.2] — 2025-07-17
 
 ### Improved

@@ -435,6 +435,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
 
   // ── SOV-015: Administrative operations without audit trail ──────────────
   const adminOpLines: number[] = [];
+  const auditLinePattern = /audit|log\.|logger\.|console\.|track|record|emit.*event|chronicle|journal/i;
   lines.forEach((line, index) => {
     const trimmed = line.trim();
     if (isCommentLine(trimmed)) return;
@@ -442,9 +443,21 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       /(?:\.delete\(|\.destroy\(|\.drop\(|\.truncate\(|\.revoke\(|\.disable\(|\.suspend\(|\.terminate\(|\.purge\(|\.wipe\(|\.removeAll\(|\.deleteMany\(|\.dropTable|\.dropDatabase|\.dropCollection|admin\.(?:create|delete|update|grant|revoke)|setRole|assignRole|revokeRole|changePassword|resetPassword)/i.test(
         line,
       ) &&
-      !/audit|log\.|logger\.|console\.|track|record|emit.*event|chronicle|journal/i.test(line)
+      !auditLinePattern.test(line)
     ) {
-      adminOpLines.push(index + 1);
+      // Check a small window of surrounding lines (±2) for nearby audit/log calls
+      const windowStart = Math.max(0, index - 2);
+      const windowEnd = Math.min(lines.length - 1, index + 2);
+      let hasNearbyAudit = false;
+      for (let i = windowStart; i <= windowEnd; i++) {
+        if (i !== index && auditLinePattern.test(lines[i])) {
+          hasNearbyAudit = true;
+          break;
+        }
+      }
+      if (!hasNearbyAudit) {
+        adminOpLines.push(index + 1);
+      }
     }
   });
 

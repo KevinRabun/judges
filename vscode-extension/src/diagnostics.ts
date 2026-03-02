@@ -244,6 +244,108 @@ export class JudgesDiagnosticProvider {
     return this.findingsMap.get(uri) || [];
   }
 
+  /**
+   * Send current deterministic findings to the VS Code Language Model API
+   * for false-positive review. The LLM examines each finding against the
+   * actual code context and removes those it identifies as false positives.
+   * Remaining findings are re-published as diagnostics.
+   */
+  async refineWithAI(document: vscode.TextDocument): Promise<{ original: number; refined: number }> {
+    const key = document.uri.toString();
+    const findings = this.findingsMap.get(key);
+    if (!findings || findings.length === 0) {
+      return { original: 0, refined: 0 };
+    }
+
+    const code = document.getText();
+    const original = findings.length;
+
+    // Build a prompt asking the LLM to identify false positives
+    const findingsList = findings
+      .map((f, i) => {
+        const lineRef = f.lineNumbers?.length ? ` (line ${f.lineNumbers[0]})` : "";
+        const lineContext =
+          f.lineNumbers?.length && f.lineNumbers[0] > 0
+            ? `\n   Code: ${document.lineAt(Math.min(f.lineNumbers[0] - 1, document.lineCount - 1)).text.trim()}`
+            : "";
+        return `${i + 1}. [${f.ruleId}] ${f.title}${lineRef}\n   ${f.description}${lineContext}`;
+      })
+      .join("\n");
+
+    const prompt =
+      `You are a false-positive reviewer for a static analysis tool called Judges Panel.\n` +
+      `Below is the source code followed by ${original} deterministic findings.\n` +
+      `Review each finding against the actual code and determine if it is a TRUE positive or FALSE positive.\n\n` +
+      `A finding is a FALSE POSITIVE if:\n` +
+      `- The flagged pattern appears inside a string literal, comment, or example code\n` +
+      `- The issue is already mitigated by nearby code (e.g. logging near an admin operation)\n` +
+      `- The variable is function-scoped but flagged as global state\n` +
+      `- The code is a static analysis rule definition that contains example patterns\n` +
+      `- The template literal or regex was misinterpreted as a hardcoded value\n\n` +
+      `Respond with ONLY a JSON array of the finding numbers (1-based) that are TRUE positives.\n` +
+      `Example: [1, 3, 5] means findings 1, 3, and 5 are real issues; all others are false positives.\n` +
+      `If ALL findings are true positives, return all numbers.\n` +
+      `If ALL are false positives, return [].\n` +
+      `Return ONLY the JSON array, no other text.\n\n` +
+      `--- SOURCE CODE ---\n${code}\n\n` +
+      `--- FINDINGS ---\n${findingsList}`;
+
+    try {
+      // Use VS Code Language Model API
+      const models = await vscode.lm.selectChatModels({ family: "gpt-4o" });
+      const model = models[0];
+      if (!model) {
+        // Fallback: try any available model
+        const allModels = await vscode.lm.selectChatModels();
+        if (!allModels.length) {
+          vscode.window.showWarningMessage("Judges: No language model available for AI refinement.");
+          return { original, refined: original };
+        }
+        return await this.runLmRefinement(allModels[0], prompt, document, findings, original);
+      }
+      return await this.runLmRefinement(model, prompt, document, findings, original);
+    } catch (error) {
+      console.error("Judges: AI refinement error:", error);
+      vscode.window.showWarningMessage(
+        `Judges: AI refinement failed — ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return { original, refined: original };
+    }
+  }
+
+  private async runLmRefinement(
+    model: vscode.LanguageModelChat,
+    prompt: string,
+    document: vscode.TextDocument,
+    findings: FindingWithPatch[],
+    original: number,
+  ): Promise<{ original: number; refined: number }> {
+    const messages = [vscode.LanguageModelChatMessage.User(prompt)];
+    const response = await model.sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
+
+    // Collect streamed response
+    let responseText = "";
+    for await (const chunk of response.text) {
+      responseText += chunk;
+    }
+
+    // Parse the JSON array of true-positive indices
+    const jsonMatch = responseText.match(/\[[\d\s,]*\]/);
+    if (!jsonMatch) {
+      vscode.window.showWarningMessage("Judges: Could not parse AI refinement response.");
+      return { original, refined: original };
+    }
+
+    const truePositiveIndices: number[] = JSON.parse(jsonMatch[0]);
+    const truePositiveSet = new Set(truePositiveIndices);
+
+    // Filter to only true positives (1-based indices from the LLM)
+    const refined = findings.filter((_, i) => truePositiveSet.has(i + 1));
+    this.publishFindings(document, refined, document.getText());
+
+    return { original, refined: refined.length };
+  }
+
   private findingToDiagnostic(document: vscode.TextDocument, finding: Finding): vscode.Diagnostic {
     const line = (finding.lineNumbers?.[0] ?? 1) - 1;
     const safeLine = Math.min(line, document.lineCount - 1);

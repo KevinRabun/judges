@@ -551,3 +551,85 @@ describe("Finding Well-Formedness for Chat Rendering", () => {
     }
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Refine with AI — Contract Verification
+// ═════════════════════════════════════════════════════════════════════════════
+// Verifies the logic and contracts that the refineWithAI command relies on,
+// since the VS Code LM API is unavailable in Node.js tests.
+
+describe("Refine with AI — Contract", () => {
+  it("findings should be enumerable for AI prompt building", () => {
+    const verdict = evaluateWithTribunal(sampleCode, "typescript");
+    const findings = verdict.evaluations.flatMap((e) => e.findings);
+    const enumerated = findings.map((f, i) => {
+      const lineRef = f.lineNumbers?.length ? ` (line ${f.lineNumbers[0]})` : "";
+      return `${i + 1}. [${f.ruleId}] ${f.title}${lineRef}`;
+    });
+    assert.ok(enumerated.length > 0, "Should produce enumerated findings list");
+    assert.ok(enumerated[0].startsWith("1."), "First finding should be numbered 1");
+    for (const line of enumerated) {
+      assert.ok(/^\d+\. \[.+\] .+/.test(line), `Finding line should match format: ${line}`);
+    }
+  });
+
+  it("true-positive index filtering should work correctly", () => {
+    const verdict = evaluateWithTribunal(sampleCode, "typescript");
+    const findings = verdict.evaluations.flatMap((e) => e.findings);
+
+    // Simulate LLM returning only odd-numbered findings as true positives
+    const truePositiveIndices = findings.map((_, i) => i + 1).filter((n) => n % 2 === 1);
+    const truePositiveSet = new Set(truePositiveIndices);
+    const refined = findings.filter((_, i) => truePositiveSet.has(i + 1));
+
+    assert.ok(refined.length < findings.length, "Refined should have fewer findings");
+    assert.ok(refined.length > 0, "Refined should have at least some findings");
+    assert.equal(refined.length, Math.ceil(findings.length / 2), "Should keep odd-indexed findings");
+  });
+
+  it("empty true-positive set should remove all findings", () => {
+    const verdict = evaluateWithTribunal(sampleCode, "typescript");
+    const findings = verdict.evaluations.flatMap((e) => e.findings);
+
+    const truePositiveSet = new Set<number>();
+    const refined = findings.filter((_, i) => truePositiveSet.has(i + 1));
+    assert.equal(refined.length, 0, "Empty TP set should result in zero findings");
+  });
+
+  it("full true-positive set should keep all findings", () => {
+    const verdict = evaluateWithTribunal(sampleCode, "typescript");
+    const findings = verdict.evaluations.flatMap((e) => e.findings);
+
+    const truePositiveSet = new Set(findings.map((_, i) => i + 1));
+    const refined = findings.filter((_, i) => truePositiveSet.has(i + 1));
+    assert.equal(refined.length, findings.length, "Full TP set should keep all findings");
+  });
+
+  it("JSON array parsing regex should match valid LLM responses", () => {
+    const validResponses = [
+      "[1, 3, 5]",
+      "[]",
+      "[1]",
+      "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]",
+      "Here are the true positives: [1, 3, 5]",
+      "Based on my review:\n[2, 4]\nThese are the real issues.",
+    ];
+    const parseRegex = /\[[\d\s,]*\]/;
+    for (const response of validResponses) {
+      const match = response.match(parseRegex);
+      assert.ok(match, `Should parse: ${response}`);
+      const parsed: number[] = JSON.parse(match[0]);
+      assert.ok(Array.isArray(parsed), `Should parse to array: ${response}`);
+    }
+  });
+
+  it("JSON array parsing regex should handle edge cases", () => {
+    const parseRegex = /\[[\d\s,]*\]/;
+    // Response with no valid JSON
+    assert.ok(!"no findings here".match(parseRegex), "Should not match non-JSON text");
+    // Empty array
+    const emptyMatch = "[]".match(parseRegex);
+    assert.ok(emptyMatch);
+    assert.deepEqual(JSON.parse(emptyMatch![0]), []);
+  });
+});

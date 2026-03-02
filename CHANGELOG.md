@@ -2,6 +2,33 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.13.0] — 2026-03-02
+
+### Added
+- **AI-assisted false-positive refinement** — new `Judges: Refine Findings with AI` VS Code command (context menu + command palette). Uses GPT-4o to review pattern-matched findings against source code and filter out false positives. Reports how many findings were dismissed vs confirmed.
+- **Deep-review false-positive instructions** — both single-judge and tribunal deep-review prompt builders now include a "False Positive Review" section instructing the LLM to identify and dismiss pattern findings that match string literals, function-scoped variables, nearby mitigation code, or test/example code. Dismissed findings are listed in a dedicated section and excluded from the verdict.
+- **`isStringLiteralLine()` helper** — new helper in `shared.ts` that detects lines whose content is purely a string literal value (object properties, descriptions, examples). Used by `getLineNumbers` / `getLangLineNumbers` to auto-skip string-literal lines by default, preventing false positives from example text in strings.
+- **String literal skipping in `getLineNumbers` / `getLangLineNumbers`** — both functions now skip string-literal-only lines by default (opt out with `{ skipStringLiterals: false }`). IaC languages (ARM/Terraform/Bicep) automatically opt out since their content is structured data where quoted values are meaningful.
+- **34 new tests** (1210 total across 4 test files):
+  - Deep-review single-judge prompt (8 tests) and tribunal prompt (7 tests).
+  - `isStringLiteralLine` helper (7 tests).
+  - `getLineNumbers` / `getLangLineNumbers` string literal skipping (4 tests).
+  - String literal false-positive regressions for logging-privacy and performance evaluators (2 tests).
+  - `refineWithAI` contract verification (6 tests): prompt building, index filtering, JSON array parsing.
+
+### Fixed
+- **7 evaluator false-positive fixes**:
+  - **logging-privacy** — SQL regex no longer matches `SELECT` inside string literal values.
+  - **data-sovereignty** — audit trail window scoped to function bodies instead of matching globally.
+  - **performance** — unbounded collection scope limited to actual code context; event handler and pagination checks now skip string literal lines.
+  - **internationalization** — currency regex anchored to avoid matching partial identifiers.
+  - **scalability** — global mutable state scoping improved (function-local `let`/`var` no longer flagged).
+- **IaC evaluator preserves detection in ARM templates** — `getLangLineNumbers` auto-disables string literal skipping for IaC languages so JSON key-value pairs aren't incorrectly filtered.
+
+### Changed
+- **README** — test badge updated from 925 to 1210; documented AI refinement capability.
+- **VS Code extension README** — added `Judges: Refine Findings with AI` to commands table and features list.
+
 ## [3.12.0] — 2026-03-01
 
 ### Added

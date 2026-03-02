@@ -62,6 +62,8 @@ import { analyzeInternationalization } from "../src/evaluators/internationalizat
 import { analyzeDocumentation } from "../src/evaluators/documentation.js";
 import { analyzeEthicsBias } from "../src/evaluators/ethics-bias.js";
 import { analyzeDataSovereignty } from "../src/evaluators/data-sovereignty.js";
+import { buildSingleJudgeDeepReviewSection, buildTribunalDeepReviewSection } from "../src/tools/deep-review.js";
+import { isStringLiteralLine, isCommentLine, getLineNumbers, getLangLineNumbers } from "../src/evaluators/shared.js";
 
 // ─── Tree-sitter warm-up ────────────────────────────────────────────────────
 // Must happen BEFORE any describe/it blocks so that tree-sitter grammars are
@@ -9409,6 +9411,243 @@ function cleanFunction() {
       fpFindings.length,
       0,
       `Sovereignty FP from comments: ${JSON.stringify(fpFindings.map((f) => f.title))}`,
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Deep Review Prompt Builders — False Positive Review Section
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Deep Review — Single Judge Prompt", () => {
+  const mockJudge = {
+    id: "test-judge",
+    name: "Judge Test",
+    domain: "Test Domain",
+    description: "A test judge",
+    rulePrefix: "TST",
+    systemPrompt: "You are a test judge.",
+  };
+
+  it("should include 'False Positive Review' section", () => {
+    const prompt = buildSingleJudgeDeepReviewSection(mockJudge, "typescript");
+    assert.ok(prompt.includes("### False Positive Review"), "Should contain False Positive Review heading");
+  });
+
+  it("should mention string literals as false-positive source", () => {
+    const prompt = buildSingleJudgeDeepReviewSection(mockJudge, "typescript");
+    assert.ok(prompt.includes("String literals"), "Should mention string literals");
+  });
+
+  it("should mention function-scoped variables", () => {
+    const prompt = buildSingleJudgeDeepReviewSection(mockJudge, "typescript");
+    assert.ok(prompt.includes("Function-scoped variables"), "Should mention function-scoped variables");
+  });
+
+  it("should mention nearby mitigation code", () => {
+    const prompt = buildSingleJudgeDeepReviewSection(mockJudge, "typescript");
+    assert.ok(prompt.includes("mitigation"), "Should mention mitigation code");
+  });
+
+  it("should mention Dismissed Findings section", () => {
+    const prompt = buildSingleJudgeDeepReviewSection(mockJudge, "typescript");
+    assert.ok(prompt.includes("Dismissed Findings"), "Should instruct LLM to produce Dismissed Findings section");
+  });
+
+  it("should include context when provided", () => {
+    const prompt = buildSingleJudgeDeepReviewSection(mockJudge, "typescript", "Production API handler");
+    assert.ok(prompt.includes("Production API handler"), "Should include context in prompt");
+  });
+
+  it("should include judge rule prefix", () => {
+    const prompt = buildSingleJudgeDeepReviewSection(mockJudge, "typescript");
+    assert.ok(prompt.includes("`TST-`"), "Should include rule prefix TST-");
+  });
+
+  it("should instruct verdict to account for dismissals", () => {
+    const prompt = buildSingleJudgeDeepReviewSection(mockJudge, "typescript");
+    assert.ok(prompt.includes("minus any dismissed false positives"), "Should instruct verdict to subtract dismissals");
+  });
+});
+
+describe("Deep Review — Tribunal Prompt", () => {
+  const mockJudges = [
+    {
+      id: "judge-a",
+      name: "Judge A",
+      domain: "Domain A",
+      description: "First judge",
+      rulePrefix: "A",
+      systemPrompt: "You are judge A.",
+    },
+    {
+      id: "judge-b",
+      name: "Judge B",
+      domain: "Domain B",
+      description: "Second judge",
+      rulePrefix: "B",
+      systemPrompt: "You are judge B.",
+    },
+  ];
+
+  it("should include 'False Positive Review' section", () => {
+    const prompt = buildTribunalDeepReviewSection(mockJudges, "typescript");
+    assert.ok(prompt.includes("### False Positive Review"), "Should contain False Positive Review heading");
+  });
+
+  it("should list all judges with their system prompts", () => {
+    const prompt = buildTribunalDeepReviewSection(mockJudges, "typescript");
+    assert.ok(prompt.includes("Judge A — Domain A"), "Should include Judge A heading");
+    assert.ok(prompt.includes("Judge B — Domain B"), "Should include Judge B heading");
+    assert.ok(prompt.includes("You are judge A."), "Should include Judge A system prompt");
+    assert.ok(prompt.includes("You are judge B."), "Should include Judge B system prompt");
+  });
+
+  it("should reference the number of judges", () => {
+    const prompt = buildTribunalDeepReviewSection(mockJudges, "typescript");
+    assert.ok(prompt.includes("ALL 2 judges"), "Should reference judge count");
+  });
+
+  it("should mention dismissals grouped by judge", () => {
+    const prompt = buildTribunalDeepReviewSection(mockJudges, "typescript");
+    assert.ok(prompt.includes("grouped by judge"), "Should instruct grouping dismissals by judge");
+  });
+
+  it("should instruct OVERALL UPDATED TRIBUNAL VERDICT", () => {
+    const prompt = buildTribunalDeepReviewSection(mockJudges, "typescript");
+    assert.ok(prompt.includes("OVERALL UPDATED TRIBUNAL VERDICT"), "Should instruct overall verdict update");
+  });
+
+  it("should include context when provided", () => {
+    const prompt = buildTribunalDeepReviewSection(mockJudges, "typescript", "Healthcare app audit");
+    assert.ok(prompt.includes("Healthcare app audit"), "Should include context in prompt");
+  });
+
+  it("should mention example/test code false positives", () => {
+    const prompt = buildTribunalDeepReviewSection(mockJudges, "typescript");
+    assert.ok(prompt.includes("Example/test code"), "Should mention example/test code FP source");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// String Literal Line Detection
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("isStringLiteralLine", () => {
+  it("should detect double-quoted string literal line", () => {
+    assert.ok(isStringLiteralLine('  "This is a description with DELETE keyword",'));
+  });
+
+  it("should detect single-quoted string literal line", () => {
+    assert.ok(isStringLiteralLine("  'Some example code: const x = eval(input);',"));
+  });
+
+  it("should detect backtick template string literal line", () => {
+    assert.ok(isStringLiteralLine("  `Template string content`,"));
+  });
+
+  it("should NOT detect code lines with strings in them", () => {
+    assert.ok(!isStringLiteralLine('const name = "hello";'));
+  });
+
+  it("should NOT detect plain code lines", () => {
+    assert.ok(!isStringLiteralLine("  const x = 1;"));
+  });
+
+  it("should NOT detect empty lines", () => {
+    assert.ok(!isStringLiteralLine(""));
+  });
+
+  it("should detect indented string-only lines without trailing comma", () => {
+    assert.ok(isStringLiteralLine('    "A string without comma"'));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// getLineNumbers / getLangLineNumbers — String Literal Skipping
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("getLineNumbers — string literal skipping", () => {
+  const codeWithStringLiterals = `
+const description = "Hardcoded password example";
+function login() {
+  "Use SELECT * FROM users WHERE id = $1";
+  const query = db.query("SELECT * FROM users");
+  return result;
+}
+`;
+
+  it("should skip string-literal lines by default", () => {
+    const matches = getLineNumbers(codeWithStringLiterals, /SELECT/i);
+    // Line 4 is a pure string literal line — should be skipped
+    // Line 5 is code with a string — should match
+    assert.ok(matches.includes(5), "Should match code line containing SELECT");
+    assert.ok(!matches.includes(4), "Should skip pure string literal line");
+  });
+
+  it("should include string-literal lines when skipStringLiterals is false", () => {
+    const matches = getLineNumbers(codeWithStringLiterals, /SELECT/i, { skipStringLiterals: false });
+    assert.ok(matches.includes(4), "Should include pure string literal line when opt-in");
+    assert.ok(matches.includes(5), "Should still match code line");
+  });
+
+  it("should still skip comment lines by default", () => {
+    const codeWithComments = `
+// SELECT * FROM users
+const query = db.query("SELECT * FROM users");
+`;
+    const matches = getLineNumbers(codeWithComments, /SELECT/i);
+    assert.ok(!matches.includes(2), "Should skip comment line");
+    assert.ok(matches.includes(3), "Should match code line");
+  });
+});
+
+describe("getLangLineNumbers — string literal skipping", () => {
+  it("should skip string literal lines for TypeScript patterns", () => {
+    const code = `
+  "eval(userInput) is dangerous",
+  const result = eval(userInput);
+`;
+    const matches = getLangLineNumbers(code, "typescript", { jsts: "\\beval\\(" });
+    assert.ok(matches.includes(3), "Should match code line with eval");
+    assert.ok(!matches.includes(2), "Should skip string literal line with eval text");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// False-positive regressions: string literal lines across evaluators
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("False-positive: patterns in string literals must be ignored", () => {
+  // Code that has SQL keywords, eval patterns, etc. ONLY inside string literal values
+  const stringLiteralOnlyCode = `
+const rules = {
+  "description": "Detects DELETE FROM queries without parameterization",
+  "pattern": "eval(userInput) should be flagged",
+  "example": "SELECT * FROM users WHERE admin = true",
+  "recommendation": "Use bcrypt.compare instead of password === input",
+};
+
+function safeFunction(data: string): string {
+  return data.trim();
+}
+`;
+
+  it("should NOT produce logging-privacy false positives from string literals", async () => {
+    const { analyzeLoggingPrivacy } = await import("../src/evaluators/logging-privacy.js");
+    const findings = analyzeLoggingPrivacy(stringLiteralOnlyCode, "typescript");
+    const sqlFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("database") || f.title.toLowerCase().includes("sql"),
+    );
+    assert.strictEqual(sqlFindings.length, 0, `String literal FP: ${JSON.stringify(sqlFindings.map((f) => f.title))}`);
+  });
+
+  it("should NOT produce performance false positives from string literals", () => {
+    const findings = analyzePerformance(stringLiteralOnlyCode, "typescript");
+    assert.strictEqual(
+      findings.length,
+      0,
+      `Performance FP from strings: ${JSON.stringify(findings.map((f) => f.title))}`,
     );
   });
 });

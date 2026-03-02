@@ -97,10 +97,12 @@ export function analyzeInternationalization(code: string, language: string): Fin
   }
 
   // Detect hardcoded currency symbols
+  // Avoid matching plain template literals like `${var}` — require a dollar sign
+  // followed by a digit or by an interpolation that itself is preceded by another dollar sign (e.g. `$${amount}`)
   const currencyLines: number[] = [];
   lines.forEach((line, i) => {
     if (isCommentLine(line)) return;
-    if (/[`"']\s*\$\s*\$?\{|["']\$\d|["`']\s*€|["`']\s*£|["`']\s*¥/i.test(line)) {
+    if (/["']\$\d|`\s*\$\s*\$\{|["`']\s*€|["`']\s*£|["`']\s*¥/i.test(line)) {
       currencyLines.push(i + 1);
     }
   });

@@ -23,13 +23,25 @@ export function buildSingleJudgeDeepReviewSection(judge: JudgeDefinition, langua
   md += `### ${judge.name} — ${judge.domain}\n\n`;
   md += `${judge.systemPrompt}\n\n`;
 
+  md += `### False Positive Review\n\n`;
+  md += `Before adding new findings, **review each pattern-based finding above for false positives.** `;
+  md += `Static pattern matching can flag code that is actually correct — for example:\n`;
+  md += `- String literals or comments that contain keywords (e.g. a regex containing "DELETE" flagged as an unaudited SQL operation)\n`;
+  md += `- Function-scoped variables mistakenly flagged as global state\n`;
+  md += `- Nearby mitigation code (logging, guards) that the pattern scanner didn't see\n`;
+  md += `- Example/test code that intentionally contains the flagged pattern\n\n`;
+  md += `For each pattern finding you believe is a false positive, include it in a **"Dismissed Findings"** section with:\n`;
+  md += `- The original rule ID\n`;
+  md += `- A brief explanation of why it is a false positive\n\n`;
+
   md += `### Response Format\n\n`;
   md += `Provide your deep review as additional findings using the same format:\n`;
   md += `- Rule ID prefix: \`${judge.rulePrefix}-\`\n`;
   md += `- Severity levels: critical / high / medium / low / info\n`;
   md += `- Include: title, description, affected lines, recommendation, and reference\n`;
+  md += `- Include a **Dismissed Findings** section listing any pattern-based findings you identified as false positives\n`;
   md += `- After all findings, provide an updated score (0-100) and final verdict (PASS/WARNING/FAIL)\n`;
-  md += `- The final verdict must account for BOTH the pattern findings AND your contextual findings\n`;
+  md += `- The final verdict must account for BOTH the pattern findings AND your contextual findings, minus any dismissed false positives\n`;
 
   return md;
 }
@@ -53,12 +65,24 @@ export function buildTribunalDeepReviewSection(judges: JudgeDefinition[], langua
     md += `---\n\n`;
   }
 
+  md += `### False Positive Review\n\n`;
+  md += `Before adding new findings, **review each pattern-based finding above for false positives.** `;
+  md += `Static pattern matching can flag code that is actually correct — for example:\n`;
+  md += `- String literals or comments that contain keywords (e.g. a regex containing "DELETE" flagged as an unaudited SQL operation)\n`;
+  md += `- Function-scoped variables mistakenly flagged as global state\n`;
+  md += `- Nearby mitigation code (logging, guards) that the pattern scanner didn't see\n`;
+  md += `- Example/test code that intentionally contains the flagged pattern\n\n`;
+  md += `For each pattern finding you believe is a false positive, include it in a **"Dismissed Findings"** section with:\n`;
+  md += `- The original rule ID\n`;
+  md += `- A brief explanation of why it is a false positive\n\n`;
+
   md += `### Response Format\n\n`;
   md += `For each judge, provide any additional findings your contextual analysis uncovers using:\n`;
   md += `- The judge's rule ID prefix\n`;
   md += `- Severity levels: critical / high / medium / low / info\n`;
   md += `- Include: title, description, affected lines, recommendation, and reference\n\n`;
-  md += `Then provide an **OVERALL UPDATED TRIBUNAL VERDICT** that accounts for BOTH the pattern findings AND your contextual findings:\n`;
+  md += `Include a **Dismissed Findings** section listing any pattern-based findings you identified as false positives, grouped by judge.\n\n`;
+  md += `Then provide an **OVERALL UPDATED TRIBUNAL VERDICT** that accounts for BOTH the pattern findings AND your contextual findings, minus any dismissed false positives:\n`;
   md += `- Per-judge scores (0-100) and verdicts\n`;
   md += `- Overall score and verdict (PASS/WARNING/FAIL)\n`;
   md += `- Executive summary of the most critical issues\n`;

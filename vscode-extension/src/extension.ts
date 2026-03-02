@@ -74,6 +74,33 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.window.showInformationMessage("Judges: Diagnostics cleared.");
     }),
 
+    vscode.commands.registerCommand("judges.refineWithAI", async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        vscode.window.showWarningMessage("Judges: No file is open. Open a file to refine.");
+        return;
+      }
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Judges: Reviewing findings with AI…",
+          cancellable: false,
+        },
+        async () => {
+          const result = await diagnosticProvider.refineWithAI(editor.document);
+          if (result.original === 0) {
+            vscode.window.showInformationMessage("Judges: No findings to refine.");
+          } else {
+            const removed = result.original - result.refined;
+            vscode.window.showInformationMessage(
+              `Judges: AI review complete — ${removed} false positive(s) removed, ${result.refined} finding(s) confirmed.`,
+            );
+          }
+        },
+      );
+    }),
+
     vscode.commands.registerCommand("judges.showPanel", () => {
       vscode.window.showInformationMessage("Judges: Results panel coming soon.");
     }),

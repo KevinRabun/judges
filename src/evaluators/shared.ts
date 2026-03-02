@@ -8,7 +8,7 @@ import type {
   JudgesConfig,
   LangFamily,
 } from "../types.js";
-import { normalizeLanguage, langPattern } from "../language-patterns.js";
+import { normalizeLanguage, langPattern, isIaC } from "../language-patterns.js";
 
 // ─── Re-export language utilities for convenience ────────────────────────────
 export { normalizeLanguage, langPattern };
@@ -262,19 +262,46 @@ const COMMENT_LINE_RE = /^\s*(?:\/\/|\/\*|\*[\s/]|\*$|#(?![!\[])|"""|'''|<!--)/;
 export function isCommentLine(line: string): boolean {
   return COMMENT_LINE_RE.test(line);
 }
+/**
+ * Regex that matches lines whose primary content is a string literal value.
+ * These appear in object properties (description, suggestedFix, recommendation)
+ * and should not be pattern-matched as executable code.
+ *
+ * Matches lines like:
+ *   "Some example code: const x = 1;",
+ *   'Another example',
+ *   `Template string content`,
+ *   "use strict";
+ */
+const STRING_LITERAL_LINE_RE = /^\s*["'`].*["'`][,;]?\s*$/;
 
 /**
- * Find line numbers in source code that match a given regex pattern.
- * By default, comment lines are skipped to avoid false positives.
- * Pass `{ skipComments: false }` for checks that intentionally inspect
- * comments (TODO/FIXME, linter-disable, commented-out code, etc.).
+ * Returns true when `line` is primarily a string literal value (e.g. an object
+ * property value containing description or example text). Evaluators should
+ * skip these lines to avoid false positives from example code in strings.
  */
-export function getLineNumbers(code: string, pattern: RegExp, opts?: { skipComments?: boolean }): number[] {
-  const skip = opts?.skipComments !== false; // default true
+export function isStringLiteralLine(line: string): boolean {
+  return STRING_LITERAL_LINE_RE.test(line);
+}
+/**
+ * Find line numbers in source code that match a given regex pattern.
+ * By default, comment lines and string-literal-only lines are skipped
+ * to avoid false positives from documentation/example text.
+ * Pass `{ skipComments: false }` to include comments.
+ * Pass `{ skipStringLiterals: false }` to include string-literal lines.
+ */
+export function getLineNumbers(
+  code: string,
+  pattern: RegExp,
+  opts?: { skipComments?: boolean; skipStringLiterals?: boolean },
+): number[] {
+  const skipComments = opts?.skipComments !== false; // default true
+  const skipStrings = opts?.skipStringLiterals !== false; // default true
   const lines = code.split("\n");
   const matches: number[] = [];
   for (let i = 0; i < lines.length; i++) {
-    if (skip && COMMENT_LINE_RE.test(lines[i])) continue;
+    if (skipComments && COMMENT_LINE_RE.test(lines[i])) continue;
+    if (skipStrings && STRING_LITERAL_LINE_RE.test(lines[i])) continue;
     pattern.lastIndex = 0;
     if (pattern.test(lines[i])) {
       matches.push(i + 1);
@@ -288,17 +315,23 @@ export function getLineNumbers(code: string, pattern: RegExp, opts?: { skipComme
  * Takes the raw language string, normalises it, and builds the right regex.
  * Returns empty array if no pattern exists for the language.
  * Comment lines are skipped by default (see getLineNumbers).
+ * String-literal skipping is automatically disabled for IaC languages
+ * (ARM/Terraform/Bicep) since their content is structured data where
+ * quoted values ARE the meaningful code.
  */
 export function getLangLineNumbers(
   code: string,
   language: string,
   patterns: Partial<Record<LangFamily | "jsts" | "all", string>>,
-  opts?: { skipComments?: boolean },
+  opts?: { skipComments?: boolean; skipStringLiterals?: boolean },
 ): number[] {
   const lang = normalizeLanguage(language);
   const re = langPattern(lang, patterns);
   if (!re) return [];
-  return getLineNumbers(code, re, opts);
+  // IaC content (JSON/HCL/Bicep) is structured data — don't skip "string" lines
+  const effectiveOpts =
+    isIaC(lang) && opts?.skipStringLiterals === undefined ? { ...opts, skipStringLiterals: false } : opts;
+  return getLineNumbers(code, re, effectiveOpts);
 }
 
 /**

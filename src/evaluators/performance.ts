@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, isStringLiteralLine } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzePerformance(code: string, language: string): Finding[] {
@@ -242,6 +242,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   const highFreqEventLines: number[] = [];
   lines.forEach((line, i) => {
     if (isCommentLine(line)) return;
+    if (isStringLiteralLine(line)) return;
     if (
       /(?:onScroll|onResize|onMouseMove|onInput|onKeyUp|onKeyDown|scroll|resize|mousemove|input|keyup)\s*[=:]/i.test(
         line,
@@ -375,6 +376,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   const bulkFetchLines: number[] = [];
   lines.forEach((line, i) => {
     if (isCommentLine(line)) return;
+    if (isStringLiteralLine(line)) return;
     if (
       /\.find\s*\(\s*\{\s*\}\s*\)|\.find\s*\(\s*\)|findAll\s*\(\s*\)|SELECT\s+\*\s+FROM|\.all\s*\(\s*\)|objects\.all\s*\(|cursor\.execute\s*\(.*SELECT\s+\*/i.test(
         line,
@@ -476,8 +478,17 @@ export function analyzePerformance(code: string, language: string): Finding[] {
   const unboundedGrowthLines: number[] = [];
   const globalArrayPush = /(?:const|let|var)\s+\w+\s*(?::\s*\w+(?:\[\]|<[^>]+>))?\s*=\s*\[\s*\]/;
   const moduleScope: number[] = [];
+  // Track brace depth to distinguish module-level arrays from function-scoped locals
+  let braceDepth = 0;
   for (let i = 0; i < lines.length; i++) {
-    if (globalArrayPush.test(lines[i])) {
+    const line = lines[i];
+    for (const ch of line) {
+      if (ch === "{") braceDepth++;
+      else if (ch === "}") braceDepth--;
+    }
+    // Only flag arrays at module/top-level scope (braceDepth 0) — local variables
+    // inside functions are garbage-collected when the function returns
+    if (braceDepth === 0 && globalArrayPush.test(line)) {
       moduleScope.push(i);
     }
   }
@@ -552,13 +563,23 @@ export function analyzePerformance(code: string, language: string): Finding[] {
     }
   }
   for (const fn of funcDefs) {
-    // Find where the body actually ends: stop at the next function definition
-    // or after 30 lines, whichever comes first.
-    const nextFuncLine = funcDefs
-      .filter((other) => other.line > fn.line)
-      .map((other) => other.line)
-      .sort((a, b) => a - b)[0];
-    const bodyEnd = Math.min(lines.length, fn.line + 30, nextFuncLine ?? Infinity);
+    // Find the actual end of this function's body by tracking brace depth
+    // starting from the definition line. This avoids false positives for
+    // nested functions whose calls from the outer scope would otherwise
+    // fall within a naive 30-line window.
+    let braceDepth = 0;
+    let foundOpen = false;
+    let bodyEnd = Math.min(lines.length, fn.line + 30); // fallback
+    for (let j = fn.line; j < lines.length; j++) {
+      const opens = (lines[j].match(/{/g) || []).length;
+      const closes = (lines[j].match(/}/g) || []).length;
+      braceDepth += opens - closes;
+      if (opens > 0) foundOpen = true;
+      if (foundOpen && braceDepth <= 0) {
+        bodyEnd = j + 1; // exclusive end, right after closing brace
+        break;
+      }
+    }
     const body = lines.slice(fn.line + 1, bodyEnd).join("\n");
     const selfCallRe = new RegExp(`\\b${fn.name}\\s*\\(`);
     if (selfCallRe.test(body)) {

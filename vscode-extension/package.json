@@ -2,7 +2,7 @@
   "name": "judges-panel",
   "displayName": "Judges Panel",
   "description": "35 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.12.0",
+  "version": "3.13.0",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -74,6 +74,11 @@
       {
         "command": "judges.configureMcp",
         "title": "Judges: Configure MCP Server"
+      },
+      {
+        "command": "judges.refineWithAI",
+        "title": "Judges: Refine Findings with AI",
+        "icon": "$(sparkle)"
       }
     ],
     "mcpServerDefinitionProviders": [
@@ -144,6 +149,10 @@
         {
           "command": "judges.fixFile",
           "group": "judges@2"
+        },
+        {
+          "command": "judges.refineWithAI",
+          "group": "judges@3"
         }
       ]
     },

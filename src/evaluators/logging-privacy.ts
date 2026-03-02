@@ -189,7 +189,10 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
   }
 
   // Logging database queries with parameters (multi-language)
-  const logQueryLines = getLogLinesMatching(/(?:query|sql|SELECT|INSERT|UPDATE|DELETE)/i);
+  // Require SQL-specific context to avoid false positives on generic action labels like { action: "DELETE" }
+  const logQueryLines = getLogLinesMatching(
+    /(?:query|sql|SELECT\s+.+\s+FROM|INSERT\s+INTO|UPDATE\s+.+\s+SET|DELETE\s+FROM)/i,
+  );
   if (logQueryLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

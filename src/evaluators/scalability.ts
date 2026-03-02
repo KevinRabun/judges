@@ -9,7 +9,23 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   const _lang = getLangFamily(language);
 
   // Global mutable state (multi-language)
-  const globalStateLines = getLangLineNumbers(code, language, LP.SHARED_MUTABLE);
+  // Only flag variables at module/top-level scope — function-local variables
+  // are GC'd when the function returns and don't create shared state.
+  const candidateLines = getLangLineNumbers(code, language, LP.SHARED_MUTABLE);
+  const lines = code.split("\n");
+  const globalStateLines: number[] = [];
+  for (const lineNum of candidateLines) {
+    let braceDepth = 0;
+    for (let i = 0; i < lineNum - 1; i++) {
+      for (const ch of lines[i]) {
+        if (ch === "{") braceDepth++;
+        else if (ch === "}") braceDepth--;
+      }
+    }
+    if (braceDepth === 0) {
+      globalStateLines.push(lineNum);
+    }
+  }
   if (globalStateLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

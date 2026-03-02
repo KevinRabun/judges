@@ -13,6 +13,7 @@ Install one extension. Get **35 specialized judges** reviewing every file you sa
 - **Workspace evaluation** — evaluate all supported files with progress reporting
 - **Status bar** — one-click evaluation from the status bar shield icon
 - **Configurable** — choose presets, severity filters, and specific judges
+- **AI-powered false-positive refinement** — right-click a file and select "Refine Findings with AI" to use GPT-4o to review pattern-matched findings and filter out false positives
 
 ## Chat Participant — `@judges`
 
@@ -45,6 +46,7 @@ TypeScript, JavaScript, Python, Go, Rust, Java, C#, C++
 | `Judges: Evaluate Workspace` | Evaluate all supported files in the workspace |
 | `Judges: Clear Diagnostics` | Remove all Judges diagnostics |
 | `Judges: Show Results Panel` | Open the Judges results view |
+| `Judges: Refine Findings with AI` | Use GPT-4o to review findings and filter out false positives |
 | `Judges: Configure MCP Server` | Write MCP server definition to `.vscode/mcp.json` (manual alternative to auto-config) |
 
 ## Configuration
