@@ -301,16 +301,12 @@ export class JudgesDiagnosticProvider {
 
     try {
       // Use VS Code Language Model API
-      const models = await vscode.lm.selectChatModels({ family: "gpt-4o" });
+      // Use any available model (no hardcoded preference)
+      const models = await vscode.lm.selectChatModels();
       const model = models[0];
       if (!model) {
-        // Fallback: try any available model
-        const allModels = await vscode.lm.selectChatModels();
-        if (!allModels.length) {
-          vscode.window.showWarningMessage("Judges: No language model available for AI refinement.");
-          return { original, refined: original };
-        }
-        return await this.runLmRefinement(allModels[0], prompt, document, findings, original);
+        vscode.window.showWarningMessage("Judges: No language model available for AI refinement.");
+        return { original, refined: original };
       }
       return await this.runLmRefinement(model, prompt, document, findings, original);
     } catch (error) {
@@ -417,12 +413,9 @@ export class JudgesDiagnosticProvider {
     const prompt = DEEP_REVIEW_PROMPT_INTRO + codeAndFindings + deepReviewSection;
 
     try {
-      const models = await vscode.lm.selectChatModels({ family: "gpt-4o" });
+      // Use any available model (no hardcoded preference)
+      const models = await vscode.lm.selectChatModels();
       let model = models[0];
-      if (!model) {
-        const allModels = await vscode.lm.selectChatModels();
-        model = allModels[0];
-      }
       if (!model) {
         md += `---\n\n## ⚠️ Layer 2 Unavailable\n\n`;
         md += `No language model is available for the AI deep review.\n`;

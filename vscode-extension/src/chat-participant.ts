@@ -592,12 +592,8 @@ async function handleDeepReview(
   const prompt = DEEP_REVIEW_PROMPT_INTRO + codeAndFindings + deepReviewSection;
 
   try {
-    const models = await vscode.lm.selectChatModels({ family: "gpt-4o" });
-    let model = models[0];
-    if (!model) {
-      const allModels = await vscode.lm.selectChatModels();
-      model = allModels[0];
-    }
+    // Use whatever model the user selected in Copilot Chat
+    const model = request.model;
     if (!model) {
       stream.markdown(
         `\n\n---\n\n### ⚠️ Layer 2 Unavailable\n\n` +
@@ -637,8 +633,9 @@ async function handleDeepReview(
       const retryPrompt = DEEP_REVIEW_PROMPT_INTRO + codeAndFindings + simplifiedSection;
 
       // Try a different model family if available, otherwise retry with same model
+      // Try a different model family for the retry
       const altModels = await vscode.lm.selectChatModels();
-      const altModel = altModels.find((m) => m.id !== model!.id) ?? model;
+      const altModel = altModels.find((m) => m.id !== model.id) ?? model;
 
       const retryMessages = [identityMsg, vscode.LanguageModelChatMessage.User(retryPrompt)];
       const retryResponse = await altModel.sendRequest(retryMessages, {}, token);
