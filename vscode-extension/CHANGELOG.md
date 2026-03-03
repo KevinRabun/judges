@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.19.3] — 2026-03-03
+
+### Fixed
+- **Tool routing fix** — Improved MCP tool descriptions so prompts mentioning sovereignty, IaC, Bicep, Terraform, or deployment configuration correctly route to evaluation tools instead of `analyze_dependencies`
+
+### Added
+- **Tool routing test suite** — 43 automated tests verifying correct MCP tool selection for natural-language prompts
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.19.3 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.19.2] — 2026-03-03
 
 ### Fixed

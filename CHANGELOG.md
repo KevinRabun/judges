@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.19.3] — 2026-03-03
+
+### Fixed
+- **MCP tool description improvements to prevent LLM misrouting** — User prompts mentioning sovereignty, IaC, or deployment configuration were incorrectly routed to `analyze_dependencies` instead of `evaluate_code_single_judge`. Root cause: (1) `evaluate_code` and `evaluate_code_single_judge` descriptions didn't mention infrastructure-as-code file types; (2) `analyze_dependencies` description contained "supply-chain risks" which overlapped with sovereignty judge's supply chain pillar; (3) "deployment configuration" matched manifest file concepts. Fixed all three tool descriptions: evaluation tools now explicitly list Bicep/Terraform/ARM/CloudFormation support and key judge domains; `analyze_dependencies` now clarifies it only accepts package manager manifests (package.json, requirements.txt, etc.) and explicitly excludes IaC files.
+
+### Added
+- **Tool routing test suite** (`tests/tool-routing.test.ts`) — 43 automated tests using a TF-IDF scoring engine that simulates LLM tool selection against MCP tool descriptions. Includes 30 positive tests (prompt routes to correct tool across all 9 tools), 11 negative tests (IaC/sovereignty prompts must NOT route to `analyze_dependencies`, package manager prompts must NOT route to evaluation tools), and 2 regression tests reproducing the exact misrouting bug.
+
+### Tests
+- 43 new tool routing tests
+- All 1,422 tests pass (963 judges + 43 routing + 207 negative + 209 subsystems)
+
 ## [3.19.2] — 2026-03-03
 
 ### Fixed
