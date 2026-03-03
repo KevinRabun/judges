@@ -508,9 +508,9 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
   }
 
   // Mass assignment / over-posting — passing raw request body to ORM create/update
-  // Use [^,)]* instead of .* to avoid O(n²) backtracking when , and \s overlap
+  // Use [^,)]* instead of .* to avoid O(n²) backtracking; drop \s* after , to avoid overlap with [^,)]*
   const massAssignPattern =
-    /(?:\.create|\.update|\.findOneAndUpdate|\.findByIdAndUpdate|\.insertOne|Object\.assign)\s*\(\s*(?:[^,)]*,\s*)*(?:req\.body|request\.body|request\.data|request\.json)/gi;
+    /(?:\.create|\.update|\.findOneAndUpdate|\.findByIdAndUpdate|\.insertOne|Object\.assign)\s*\(\s*(?:[^,)]*,)*(?:req\.body|request\.body|request\.data|request\.json)/gi;
   const massAssignLines = getLineNumbers(code, massAssignPattern);
   if (massAssignLines.length > 0) {
     const hasFieldWhitelist = testCode(

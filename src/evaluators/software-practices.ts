@@ -382,8 +382,8 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   }
 
   // Hardcoded boolean parameters
-  // Use [^,)]* instead of .* to avoid O(n²) backtracking when , and \s overlap
-  const boolParamPattern = /\w+\s*\(\s*(?:[^,)]*,\s*)*(?:true|false)\s*(?:,\s*(?:true|false)\s*)+\)/gi;
+  // Use [^,)]* instead of .* to avoid O(n²) backtracking; drop \s* after , to avoid overlap with [^,)]*
+  const boolParamPattern = /\w+\s*\(\s*(?:[^,)]*,)*(?:true|false)\s*(?:,\s*(?:true|false)\s*)+\)/gi;
   const boolParamLines = getLineNumbers(code, boolParamPattern);
   if (boolParamLines.length > 0) {
     findings.push({
