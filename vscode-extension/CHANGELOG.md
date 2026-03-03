@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.3] — 2026-03-03
+
+### Fixed
+- **Azure resource ID false positive** — Layer 2 no longer flags Azure policy definition IDs or other platform identifiers as "invalid GUIDs" even when they contain non-hex characters.
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.20.3 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.20.2] — 2026-03-03
 
 ### Fixed

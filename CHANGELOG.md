@@ -2,6 +2,11 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.3] — 2026-03-03
+
+### Fixed
+- **Azure resource ID false positive** — Layer 2 deep review no longer flags Azure resource identifiers (policy definition IDs, role definition IDs, tenant IDs, subscription GUIDs) as "invalid GUIDs" when they contain characters outside the hex range. All three deep-review builders (single-judge, tribunal, simplified) now include explicit guidance that Azure resource IDs are opaque platform constants and must not be validated for strict UUID compliance.
+
 ## [3.20.2] — 2026-03-03
 
 ### Fixed
