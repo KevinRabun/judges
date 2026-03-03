@@ -400,7 +400,7 @@ export class JudgesDiagnosticProvider {
     const deepReviewSection = buildTribunalDeepReviewSection(JUDGES, language);
 
     const prompt =
-      `You are performing a deep contextual code review.\n\n` +
+      `Review the following source code for quality, security defenses, and best practices.\n\n` +
       `--- SOURCE CODE (${language}) ---\n${code}\n\n` +
       `--- LAYER 1 FINDINGS (${findings.length} pattern-based) ---\n` +
       (findings.length > 0 ? findingsSummary : "(No pattern-based findings)") +
@@ -426,7 +426,14 @@ export class JudgesDiagnosticProvider {
 
       md += `---\n\n## Layer 2 — AI Deep Contextual Review\n\n`;
 
-      const messages = [vscode.LanguageModelChatMessage.User(prompt)];
+      const messages = [
+        vscode.LanguageModelChatMessage.Assistant(
+          `I am the Judges Panel — a professional code quality review tool. ` +
+            `I provide constructive, evidence-based analysis to help developers improve ` +
+            `their code's quality, security posture, and adherence to best practices.`,
+        ),
+        vscode.LanguageModelChatMessage.User(prompt),
+      ];
       const response = await model.sendRequest(messages, {}, token);
 
       for await (const chunk of response.text) {

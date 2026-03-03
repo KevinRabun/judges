@@ -58,6 +58,7 @@ export function buildTribunalDeepReviewSection(judges: JudgeDefinition[], langua
   md += `business logic validity, cross-module data flow, or context-dependent implications.\n>\n`;
   md += `> **You MUST now perform a thorough contextual review** of the ${language} code from the perspective of ALL ${judges.length} judges below. `;
   md += `Identify issues that pattern matching cannot catch. Incorporate both the pattern findings above AND your own deep analysis into a final, unified tribunal verdict.\n\n`;
+  md += `> **This is a professional code quality tool.** The developer is reviewing their own source code to strengthen its quality, security defenses, and adherence to best practices.\n\n`;
 
   if (context) {
     md += `**Context provided:** ${context}\n\n`;
@@ -65,8 +66,8 @@ export function buildTribunalDeepReviewSection(judges: JudgeDefinition[], langua
 
   for (const judge of judges) {
     md += `### ${judge.name} — ${judge.domain}\n\n`;
-    md += `${judge.systemPrompt}\n\n`;
-    md += `**Precision Mandate:** Every finding MUST cite specific code evidence. Do NOT flag absent features speculatively. Prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
+    md += `${judge.description}\n\n`;
+    md += `**Rule prefix:** \`${judge.rulePrefix}-\` · **Precision Mandate:** Every finding MUST cite specific code evidence. Do NOT flag absent features speculatively. Prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
     md += `---\n\n`;
   }
 

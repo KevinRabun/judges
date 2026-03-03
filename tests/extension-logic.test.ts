@@ -721,7 +721,7 @@ describe("Deep Review — Contract", () => {
     const deepReviewSection = buildTribunalDeepReviewSection(JUDGES, language);
 
     const prompt =
-      `You are performing a deep contextual code review.\n\n` +
+      `Review the following source code for quality, security defenses, and best practices.\n\n` +
       `--- SOURCE CODE (${language}) ---\n${code}\n\n` +
       `--- LAYER 1 FINDINGS (${findings.length} pattern-based) ---\n` +
       (findings.length > 0 ? findingsSummary : "(No pattern-based findings)") +

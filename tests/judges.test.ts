@@ -9580,12 +9580,16 @@ describe("Deep Review — Tribunal Prompt", () => {
     assert.ok(prompt.includes("### False Positive Review"), "Should contain False Positive Review heading");
   });
 
-  it("should list all judges with their system prompts", () => {
+  it("should list all judges with their descriptions and rule prefixes", () => {
     const prompt = buildTribunalDeepReviewSection(mockJudges, "typescript");
     assert.ok(prompt.includes("Judge A — Domain A"), "Should include Judge A heading");
     assert.ok(prompt.includes("Judge B — Domain B"), "Should include Judge B heading");
-    assert.ok(prompt.includes("You are judge A."), "Should include Judge A system prompt");
-    assert.ok(prompt.includes("You are judge B."), "Should include Judge B system prompt");
+    assert.ok(prompt.includes("First judge"), "Should include Judge A description");
+    assert.ok(prompt.includes("Second judge"), "Should include Judge B description");
+    assert.ok(prompt.includes("`A-`"), "Should include Judge A rule prefix");
+    assert.ok(prompt.includes("`B-`"), "Should include Judge B rule prefix");
+    // Tribunal mode uses condensed descriptions, not full systemPrompts
+    assert.ok(!prompt.includes("You are judge A."), "Should NOT include full systemPrompt in tribunal mode");
   });
 
   it("should reference the number of judges", () => {
