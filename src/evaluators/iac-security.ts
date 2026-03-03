@@ -320,6 +320,12 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
     for (let i = 0; i < paramLines.length; i++) {
       const line = paramLines[i];
       if (/param\s+\w*(?:password|secret|key|token|connectionString)\w*\s+string/i.test(line)) {
+        // Skip resource-name parameters where "key"/"secret"/"token" is part of a
+        // compound resource name (e.g., keyVaultName, keyVaultUri, secretName,
+        // tokenServiceUrl) — these hold identifiers, not secrets.
+        if (/param\s+\w*(?:Name|Uri|Url|Endpoint|Id|ResourceGroup|Location|Sku|Region|Type)\s+string/i.test(line)) {
+          continue;
+        }
         // Check if the preceding line has @secure()
         const prevLine = i > 0 ? paramLines[i - 1] : "";
         if (!/@secure\(\)/.test(prevLine)) {

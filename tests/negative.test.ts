@@ -42,6 +42,7 @@ import { analyzeRateLimiting } from "../src/evaluators/rate-limiting.js";
 import { analyzeFrameworkSafety } from "../src/evaluators/framework-safety.js";
 import { analyzeErrorHandling } from "../src/evaluators/error-handling.js";
 import { analyzeMaintainability } from "../src/evaluators/maintainability.js";
+import { analyzeIacSecurity } from "../src/evaluators/iac-security.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 
@@ -4995,5 +4996,40 @@ describe("Magic numbers — Rust string literal port", () => {
     const findings = analyzeMaintainability(code, "rust");
     const magicFindings = findings.filter((f) => /magic/i.test(f.title));
     assert.strictEqual(magicFindings.length, 0, "Port in Rust string literal should not be flagged");
+  });
+});
+
+// ── IaC Security: resource-name parameters should not require @secure() ──────
+describe("IaC Security — Bicep resource-name parameters", () => {
+  it("should not flag keyVaultName as needing @secure()", () => {
+    const code = [
+      "param keyVaultName string",
+      "param location string = resourceGroup().location",
+      "",
+      "resource kv 'Microsoft.KeyVault/vaults@2023-07-01' = {",
+      "  name: keyVaultName",
+      "  location: location",
+      "}",
+    ].join("\n");
+    const findings = analyzeIacSecurity(code, "bicep");
+    const secureFindings = findings.filter((f) => /secure.*decorator/i.test(f.title));
+    assert.strictEqual(secureFindings.length, 0, "keyVaultName is a resource name, not a secret");
+  });
+
+  it("should not flag secretName, tokenEndpointUrl, keyName as needing @secure()", () => {
+    const code = ["param secretName string", "param tokenEndpointUrl string", "param keyName string"].join("\n");
+    const findings = analyzeIacSecurity(code, "bicep");
+    const secureFindings = findings.filter((f) => /secure.*decorator/i.test(f.title));
+    assert.strictEqual(secureFindings.length, 0, "Resource-name params should not be flagged");
+  });
+
+  it("should still flag actual secret parameters without @secure()", () => {
+    const code = ["param adminPassword string", "param apiKey string"].join("\n");
+    const findings = analyzeIacSecurity(code, "bicep");
+    const secureFindings = findings.filter((f) => /secure.*decorator/i.test(f.title));
+    assert.ok(
+      secureFindings.length >= 2,
+      `Expected >=2 secure findings for actual secrets, got ${secureFindings.length}`,
+    );
   });
 });
