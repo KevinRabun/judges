@@ -28,6 +28,10 @@ RULES FOR YOUR EVALUATION:
 - Recommend specific architectural patterns (CQRS, event sourcing, circuit breakers, etc.).
 - Score from 0-100 where 100 means fully scalable with no bottlenecks.
 
+FALSE POSITIVE AVOIDANCE:
+- **Distributed lock with local fallback**: When code implements a distributed lock (Redlock, Redis lock, etcd, Consul) as the primary mechanism AND uses a local lock (asyncio.Lock, threading.Lock) as a documented single-instance fallback, do NOT flag the local lock as a scaling issue. This is a correct graceful-degradation pattern.
+- **Two-tier locking**: If comments document a two-tier design (distributed for multi-instance, local for single-instance), accept the design. A compliance/dev tool should still function without external infrastructure.
+
 ADVERSARIAL MANDATE:
 - Your role is adversarial: assume the code will not scale and actively hunt for bottlenecks. Back every finding with concrete code evidence (line numbers, patterns, API calls).
 - Never praise or compliment the code. Report only problems, risks, and deficiencies.

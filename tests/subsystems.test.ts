@@ -1814,6 +1814,281 @@ describe("False-Positive Heuristic Filter", () => {
       assert.strictEqual(removed.length, 0);
     });
   });
+
+  describe("I18N web-only gating", () => {
+    it("should remove I18N findings on non-web code (MCP server)", () => {
+      const code = `import json\ndef load_data():\n    with open("data.json") as f:\n        return json.load(f)\nresult = load_data()\nprint(result)`;
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "I18N-001", title: "Hardcoded user-facing strings", lineNumbers: [2] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "I18N on non-web code should be removed");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep I18N findings on web code with JSX", () => {
+      const code = `import React from "react";\nconst App = () => <div className="app">Hello</div>;\nexport default App;`;
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "I18N-001", title: "Hardcoded user-facing strings", lineNumbers: [2] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(filtered.length, 1, "I18N on web code should be kept");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  describe("Distributed lock suppresses SCALE local-lock findings", () => {
+    it("should remove SCALE finding when Redlock is present", () => {
+      const code = [
+        `import asyncio`,
+        `from redlock import Redlock`,
+        `lock = asyncio.Lock()  # local fallback`,
+        `distributed = Redlock([{"host": "redis"}])`,
+        `async def process():`,
+        `    async with lock:`,
+        `        pass`,
+      ].join("\n");
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "SCALE-001", title: "Local process lock won't work at scale", lineNumbers: [3] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "SCALE finding should be removed when distributed lock exists");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep SCALE finding when no distributed lock is present", () => {
+      const code = `import asyncio\nlock = asyncio.Lock()\nasync def process():\n    async with lock:\n        pass`;
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "SCALE-001", title: "Local process lock won't work at scale", lineNumbers: [2] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(filtered.length, 1, "SCALE finding should be kept without distributed lock");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  describe("Retry/fallback suppresses resilience findings", () => {
+    it("should remove SOV-001 when retry with backoff is present", () => {
+      const code = [
+        `import tenacity`,
+        `from tenacity import retry, wait_exponential`,
+        `@retry(wait=wait_exponential(multiplier=1, max=10))`,
+        `async def fetch_data():`,
+        `    response = await client.get(url)`,
+        `    return response.json()`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "SOV-001",
+          title: "External API without circuit breaker resilience",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "SOV-001 should be removed when retry/backoff exists");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should remove SOV-001 when fallback chain is present", () => {
+      const code = [
+        `async def load():`,
+        `    try:`,
+        `        return await fetch_online()`,
+        `    except Exception:`,
+        `        return fallback_to_cache()`,
+        `        # fallback default bundled data`,
+      ].join("\n");
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "SOV-001", title: "Without retry or fallback resilience pattern", lineNumbers: [1] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "SOV-001 should be removed when fallback chain exists");
+      assert.strictEqual(filtered.length, 0);
+    });
+  });
+
+  describe("Constant definitions suppress I18N hardcoded-string findings", () => {
+    it("should remove I18N finding on ALL_CAPS constant definitions", () => {
+      const code = `_F_TITLE = 'title'\n_F_BODY = 'body'\n_F_CHAPTER = 'chapter'\nclass Loader:\n    pass`;
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "I18N-001", title: "Hardcoded string literals detected", lineNumbers: [1, 2, 3] },
+      ];
+      // Note: this code has web-like patterns absent, so it would also be caught by web-only gating.
+      // Test with a file that has some web patterns to isolate the constant heuristic.
+      const webCode = `<div className="app">\n` + code;
+      const webFindings: Finding[] = [
+        { ...baseFinding, ruleId: "I18N-001", title: "Hardcoded string literals detected", lineNumbers: [2, 3, 4] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(webFindings, webCode, "python");
+      assert.strictEqual(removed.length, 1, "I18N finding on constant definitions should be removed");
+      assert.strictEqual(filtered.length, 0);
+    });
+  });
+
+  describe("Bounded dataset tree traversal suppresses O(n²) findings", () => {
+    it("should remove PERF finding when tree traversal patterns are present", () => {
+      const code = [
+        `def build_index(chapters):`,
+        `    for chapter in chapters:`,
+        `        for section in chapter.children:`,
+        `            for article in section.articles:`,
+        `                index[article.id] = article`,
+      ].join("\n");
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "PERF-002", title: "Nested loop creates O(n²) complexity", lineNumbers: [2, 3] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "PERF finding should be removed for tree traversal");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should remove COST finding when bounded dataset documentation is present", () => {
+      const code = [
+        `# This operates on a bounded dataset of fixed-size regulation text`,
+        `# Total items < 500, so nested iteration is O(n) over the tree`,
+        `for item in data:`,
+        `    for child in item.parts:`,
+        `        process(child)`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "COST-001",
+          title: "Nested loop with quadratic time complexity",
+          lineNumbers: [3, 4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "COST finding should be removed for bounded dataset");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep PERF finding when no tree/bounded patterns", () => {
+      const code = `users = get_users()\nfor u in users:\n    for o in orders:\n        if u.id == o.user_id:\n            process(u, o)`;
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "PERF-002", title: "Nested loop creates O(n²) complexity", lineNumbers: [2, 3] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(filtered.length, 1, "PERF finding should be kept for cross-join");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  describe("Read-only content fetch suppresses SOV-002 cross-border findings", () => {
+    it("should remove SOV-002 when fetching public regulation content", () => {
+      const code = [
+        `async def fetch_gdpr_text():`,
+        `    """Fetch GDPR regulation content from EUR-Lex."""`,
+        `    response = await client.get(GDPR_URL)`,
+        `    return parse_regulation(response.text)`,
+      ].join("\n");
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "SOV-002", title: "Cross-border data egress detected", lineNumbers: [3] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "SOV-002 should be removed for read-only regulation fetch");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep SOV-002 when personal data is present", () => {
+      const code = [
+        `async def export_user_data():`,
+        `    personal_data = get_user_profile()`,
+        `    await send_to_external_api(personal_data)`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "SOV-002",
+          title: "Cross-border data egress in jurisdiction transfer",
+          lineNumbers: [3],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(filtered.length, 1, "SOV-002 should be kept when personal data is present");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  describe("Cache-age TTL context suppresses COMP age-verification findings", () => {
+    it("should remove COMP finding when age refers to cache TTL", () => {
+      const code = [
+        `def check_freshness(cache_age: int, max_age: int):`,
+        `    """Check if cached data is still fresh."""`,
+        `    if cache_age > max_age:`,
+        `        return False`,
+        `    return True`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "COMP-001",
+          title: "Age-related data without verification mechanism",
+          lineNumbers: [1],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "COMP finding should be removed for cache-age context");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep COMP finding when age refers to user age", () => {
+      const code = [
+        `def register_user(name, age, date_of_birth):`,
+        `    if age < 13:`,
+        `        raise ValueError("Must verify parental consent")`,
+        `    create_account(name, age, date_of_birth)`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "COMP-001",
+          title: "Age-related data without verification mechanism",
+          lineNumbers: [2],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(filtered.length, 1, "COMP finding should be kept for actual age verification");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  describe("Safe idiom: env var fallback for connection strings", () => {
+    it("should remove DB-001 when connection string is env var fallback", () => {
+      const code = `import os\ndb_url = os.environ.get("DATABASE_URL", "sqlite:///local.db")`;
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "DB-001", title: "Hardcoded database connection string", lineNumbers: [2] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "DB-001 on env var fallback should be removed");
+      assert.strictEqual(filtered.length, 0);
+    });
+  });
+
+  describe("Safe idiom: justified suppression comments", () => {
+    it("should remove SWDEV finding for type:ignore with rationale", () => {
+      const code = `data = json.loads(response.text)  # type: ignore[no-any-return] -- JSON deserialization boundary`;
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "SWDEV-001", title: "Type-checker suppression comments", lineNumbers: [1] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "SWDEV finding on justified type:ignore should be removed");
+      assert.strictEqual(filtered.length, 0);
+    });
+  });
+
+  describe("Safe idiom: json.dumps as internal serialization", () => {
+    it("should remove SOV-003 when json.dumps is used for search indexing", () => {
+      const code = `import json\nchunks = [json.dumps(doc) for doc in documents]  # internal search index`;
+      const findings: Finding[] = [
+        { ...baseFinding, ruleId: "SOV-003", title: "Data export path without sovereignty controls", lineNumbers: [2] },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "SOV-003 on json.dumps for internal use should be removed");
+      assert.strictEqual(filtered.length, 0);
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

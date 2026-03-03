@@ -28,6 +28,11 @@ RULES FOR YOUR EVALUATION:
 - Consider the impact on languages with different scripts (CJK, Arabic, Thai, Devanagari).
 - Score from 0-100 where 100 means fully internationalization-ready.
 
+FALSE POSITIVE AVOIDANCE:
+- **Internal constant definitions**: Constants like _F_TITLE = 'title' or FIELD_NAME = 'name' are JSON/API field-name keys for internal data processing, NOT user-facing strings. Only flag I18N-001 when strings are rendered to end-user UIs (HTML, templates, CLI output messages), not when they are dictionary lookup keys or schema field names.
+- **Developer tools / MCP servers / CLI tools**: Projects that output to developer consoles, AI agents, or machine-readable formats (Markdown, JSON, SARIF) do not require i18n. Only flag I18N when the project has a user-facing UI requiring translation.
+- **Sourced regulatory/legal text**: Content loaded from regulatory sources (laws, standards) in its original language does not require translation.
+
 ADVERSARIAL MANDATE:
 - Your role is adversarial: assume the code will break in non-English locales and actively hunt for i18n defects. Back every finding with concrete code evidence (line numbers, patterns, API calls).
 - Never praise or compliment the code. Report only problems, risks, and deficiencies.

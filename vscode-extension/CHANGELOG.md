@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.5] — 2026-03-03
+
+### Fixed
+- **False positive reduction** — 6 new deterministic FP heuristics and anti-FP guidance in 9 judge system prompts reduce false positives for regulated-policy evaluations (distributed lock fallback, retry/backoff resilience, bounded-dataset traversal, cache-age context, read-only content fetch, constant definitions, I18N web-only gating)
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.20.5 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.20.4] — 2026-03-03
 
 ### Fixed

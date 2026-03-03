@@ -118,9 +118,10 @@ const KEYWORD_IDENTIFIER_PATTERNS: Array<{
   identifierContext: RegExp;
 }> = [
   {
-    // "age" in cacheAge, maxAge, ttlAge, etc.
+    // "age" in cacheAge, maxAge, ttlAge, cache-age log, etc.
     trigger: /\bage\b/i,
-    identifierContext: /(?:cache|max|ttl|min|avg|token|cookie|session|expir)\s*age|age\s*(?:out|limit|check)/i,
+    identifierContext:
+      /(?:cache|max|ttl|min|avg|token|cookie|session|expir|stale|fresh)\s*[-_]?\s*age|age\s*[-_]?\s*(?:out|limit|check|seconds|minutes|hours|days|ms|header)|\bcache[_-]age\b|\bmax[_-]age\b/i,
   },
   {
     // "delete" in deleteButton, onDelete, handleDelete, isDeleted
@@ -183,6 +184,23 @@ const SAFE_IDIOM_PATTERNS: Array<{
     // os.path.join / path.join flagged as path traversal when inputs are literals
     findingPattern: /path\s*travers/i,
     safeContext: /(?:os\.path\.join|path\.join|Path\.Combine)\s*\(\s*["'`]/,
+  },
+  {
+    // json.dumps / JSON.stringify flagged as data export/transfer by SOV judges
+    findingPattern: /data\s*(?:export|transfer|egress)|export\s*path|SOV-003/i,
+    safeContext: /json\.dumps\s*\(|JSON\.stringify\s*\(|json\.dump\s*\(/i,
+  },
+  {
+    // Connection string in env var fallback (os.environ.get / process.env)
+    findingPattern: /hardcoded.*(?:connection|database|db|redis|mongo|postgres|mysql)|connection.*string.*code|DB-001/i,
+    safeContext:
+      /os\.environ\.get\s*\(|os\.getenv\s*\(|process\.env\.|System\.getenv\s*\(|Environment\.GetEnvironmentVariable\s*\(/i,
+  },
+  {
+    // Justified type: ignore / noqa suppression comments — not reckless suppression
+    findingPattern: /suppress|type.*ignore|noqa|lint.*disabl|SWDEV-001|CICD-003/i,
+    safeContext:
+      /(?:#\s*type:\s*ignore|#\s*noqa|(?:\/\/|#)\s*eslint-disable).*(?:--|—|because|reason|\bfor\b|\bdue\b|\bruntyped\b|\bstubs\b|\bno\s+stubs)/i,
   },
 ];
 
@@ -344,7 +362,7 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
   // ── 9. Web-only rules on non-web code ──
   // Accessibility, UX, and i18n rendering rules are only meaningful on files
   // that contain web-facing patterns (HTML, JSX, routes, templates, CSS).
-  const WEB_ONLY_PREFIXES = ["A11Y-", "UX-"];
+  const WEB_ONLY_PREFIXES = ["A11Y-", "UX-", "I18N-"];
   const isWebOnly = WEB_ONLY_PREFIXES.some((p) => finding.ruleId.startsWith(p));
   if (isWebOnly) {
     const hasWebPatterns =
@@ -380,10 +398,113 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     }
   }
 
-  // ── 12. (reserved — absence gating moved upstream to evaluateWithJudge) ──
-  // Absence-based rules are gated by projectMode in evaluateWithJudge():
-  // suppressed in single-file mode, allowed in project mode. No need for
-  // a file-level heuristic here.
+  // ── 12. Distributed lock presence suppresses local-lock scaling findings ──
+  // SCALE-001 flags local file/process locks, but if the same file implements
+  // distributed locking (Redlock, Redis lock, etcd, Consul, ZooKeeper), the
+  // local lock is a documented single-instance fallback, not a scaling issue.
+  if (
+    /^SCALE-/.test(finding.ruleId) &&
+    /local.*lock|process.*lock|file.*lock|asyncio\.Lock|threading\.Lock/i.test(finding.title)
+  ) {
+    const fullCode = lines.join("\n");
+    const hasDistributedLock =
+      /\bredlock\b|\bredis.*lock\b|\bdistributed.*lock\b|\betcd\b.*lock|\bconsul\b.*lock|\bzookeeper\b.*lock|\bLock\s*\(.*redis/i.test(
+        fullCode,
+      );
+    if (hasDistributedLock) {
+      return "Local lock is a fallback — distributed locking (Redlock/Redis) is implemented in the same module.";
+    }
+  }
+
+  // ── 13. Retry/backoff/fallback suppresses resilience-pattern-absence findings ──
+  // SOV-001 and REL- rules flag missing circuit breakers, but if the code
+  // implements retry with backoff and/or a multi-tier fallback chain, it has
+  // equivalent or better resilience than a simple circuit breaker.
+  if (
+    /^(?:SOV-001|REL-)/.test(finding.ruleId) &&
+    /circuit.?breaker|resilience|without.*(?:retry|fallback)/i.test(finding.title)
+  ) {
+    const fullCode = lines.join("\n");
+    const hasRetryPattern =
+      /\bretry\b.*\b(?:backoff|exponential|delay)\b|\bbackoff\b.*\bretry\b|\btenacity\b|\bretrying\b|@retry\b|with_retry\b|fetch.*retry|retry.*fetch/i.test(
+        fullCode,
+      );
+    const hasFallbackChain =
+      /\bfallback\b.*\b(?:cache|bundled|default|local|offline)\b|(?:cache|bundled|default|local|offline)\b.*\bfallback\b/i.test(
+        fullCode,
+      );
+    if (hasRetryPattern || hasFallbackChain) {
+      return "Retry/backoff and/or fallback chain detected — equivalent resilience pattern is implemented.";
+    }
+  }
+
+  // ── 14. Constant definitions suppress I18N hardcoded-string findings ──
+  // I18N-001 flags hardcoded strings, but constant definitions like
+  // _F_TITLE = 'title' are JSON field-name keys, not user-facing text.
+  if (/^I18N-/.test(finding.ruleId) && /hardcoded.*string/i.test(finding.title)) {
+    if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+      const allConstants = finding.lineNumbers.every((ln) => {
+        const line = lines[ln - 1];
+        if (!line) return false;
+        const trimmed = line.trim();
+        // Python/JS/TS constant definitions: ALL_CAPS_NAME = "value" or const NAME = "value"
+        return (
+          /^[A-Z_][A-Z_0-9]*\s*=\s*["']/.test(trimmed) ||
+          /^(?:const|final|static\s+final)\s+\w+\s*=\s*["']/.test(trimmed) ||
+          /^_[A-Z_][A-Z_0-9]*\s*=\s*["']/.test(trimmed)
+        );
+      });
+      if (allConstants) {
+        return "Flagged strings are constant definitions (field-name keys), not user-facing text.";
+      }
+    }
+  }
+
+  // ── 15. Bounded-dataset tree traversal suppresses O(n²) nested-loop findings ──
+  // PERF-002/COST-001 flag nested loops as O(n²), but tree traversals
+  // (chapters → sections → articles) iterate each item once — O(n total).
+  if (/^(?:PERF|COST)-/.test(finding.ruleId) && /nested.*loop|O\(n[²2]\)|quadratic/i.test(finding.title)) {
+    const fullCode = lines.join("\n");
+    // Detect documented bounded datasets or tree-traversal patterns
+    const hasBoundedDatasetDoc =
+      /\bbounded\b.*\b(?:dataset|corpus|data|size)\b|\bfixed[- ]size\b|\bO\(n\)\b|\bO\(total_/i.test(fullCode);
+    const hasTreeTraversal = /\bchapter|\bsection|\barticle|\bnode|\bchild(?:ren)?|\btree|\btravers/i.test(fullCode);
+    if (hasBoundedDatasetDoc || hasTreeTraversal) {
+      return "Nested iteration is a tree traversal over a bounded dataset — total work is O(n), not O(n²).";
+    }
+  }
+
+  // ── 16. Read-only content fetch suppresses cross-border data egress findings ──
+  // SOV-002 flags external API calls as cross-border data egress, but read-only
+  // fetches of public regulatory/reference content are not personal data transfers.
+  if (/^SOV-002/.test(finding.ruleId) && /cross.?border|data.*egress|jurisdiction/i.test(finding.title)) {
+    const fullCode = lines.join("\n");
+    const isReadOnlyFetch =
+      /\bfetch\b.*\b(?:regulation|reference|content|static|public|gdpr|law)\b|\breadonly\b|\bread[_-]only\b/i.test(
+        fullCode,
+      );
+    const noPersonalData = !/\buser[_-]?data\b|\bpersonal[_-]?data\b|\bpii\b|\bprofile\b.*\bdata\b/i.test(fullCode);
+    if (isReadOnlyFetch && noPersonalData) {
+      return "Read-only fetch of public/regulatory content — no personal data egress detected.";
+    }
+  }
+
+  // ── 17. Cache-age / TTL context suppresses compliance age-verification findings ──
+  // COMP-001 flags "age" as age-verification concern, but in cache/TTL contexts
+  // (cache_age, max_age, stale), "age" refers to data freshness, not user age.
+  if (/^COMP-/.test(finding.ruleId) && /\bage\b/i.test(finding.title)) {
+    const fullCode = lines.join("\n");
+    const isCacheAgeContext =
+      /\bcache[_-]?age\b|\bmax[_-]?age\b|\bttl\b.*\bage\b|\bstale\b.*\bage\b|\bage\b.*\bseconds\b|\bage\b.*\bexpir/i.test(
+        fullCode,
+      );
+    const noUserAgeContext = !/\bdate[_-]?of[_-]?birth\b|\bdob\b|\bminor\b|\bparental\b|\bage[_-]?verif/i.test(
+      fullCode,
+    );
+    if (isCacheAgeContext && noUserAgeContext) {
+      return "Term 'age' appears in cache/TTL context (data freshness), not user age verification.";
+    }
+  }
 
   return null;
 }

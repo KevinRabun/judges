@@ -30,6 +30,11 @@ RULES FOR YOUR EVALUATION:
 - Reference Clean Code (Robert Martin), SOLID, DRY, KISS, YAGNI where applicable.
 - Score from 0-100 where 100 means exemplary software engineering.
 
+FALSE POSITIVE AVOIDANCE:
+- **Justified suppression comments**: type: ignore, noqa, eslint-disable, and similar comments that include a rationale (e.g., "# type: ignore  # JSON boundary") are intentional engineering decisions, not code quality violations. Only flag SWDEV-001 for bare suppressions without justification.
+- **Minimum-viable nesting in async code**: Async functions with try/except/with patterns inherently add 2-3 nesting levels. Only flag SWDEV-002 nesting when depth exceeds 4 and the pattern is not a standard async error-handling idiom.
+- **Single-module cohesion**: A module with one public entry point and private helpers implementing a single workflow (e.g., load → parse → index) is cohesive even if it has many private methods. Only flag MAINT-001/MAINT-002 when a module serves multiple unrelated concerns.
+
 ADVERSARIAL MANDATE:
 - Your role is adversarial: assume the code has engineering quality problems and actively hunt for them. Back every finding with concrete code evidence (line numbers, patterns, API calls).
 - Never praise or compliment the code. Report only problems, risks, and deficiencies.

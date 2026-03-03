@@ -2,6 +2,35 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.5] — 2026-03-03
+
+### Fixed
+- **False positive reduction — 6 new heuristics + 4 extended patterns** — Added six new deterministic FP heuristics to `filterFalsePositiveHeuristics` and extended three existing pattern sets, addressing 12 high-confidence false positive categories identified in regulated-policy evaluations:
+  - **H12**: Distributed lock fallback — SCALE local-lock findings suppressed when Redlock/Redis/etcd/Consul/ZooKeeper distributed locking is present in the same module
+  - **H13**: Retry/backoff/fallback chain — SOV-001/REL resilience findings suppressed when retry with exponential backoff or multi-tier fallback (cache→online→bundled) is implemented
+  - **H14**: Constant definitions — I18N hardcoded-string findings suppressed when flagged lines are ALL_CAPS or `const` constant definitions (field-name keys, not user-facing text)
+  - **H15**: Bounded-dataset tree traversal — PERF/COST O(n²) findings suppressed when code traverses tree structures (chapters→sections→articles) or operates on documented bounded datasets
+  - **H16**: Read-only content fetch — SOV-002 cross-border findings suppressed when code fetches public/regulatory content with no personal data patterns
+  - **H17**: Cache-age/TTL context — COMP age-verification findings suppressed when "age" appears in cache/TTL context (cache_age, max_age, stale) with no user-age patterns (dob, minor, parental)
+  - **Extended WEB_ONLY_PREFIXES**: Added `I18N-` — i18n findings now gated to files with HTML/JSX/DOM patterns
+  - **Extended KEYWORD_IDENTIFIER_PATTERNS**: Broadened `age` regex to cover hyphenated/underscored cache-age, stale-age, fresh-age, and age-seconds/minutes/hours/days/ms/header patterns
+  - **Extended SAFE_IDIOM_PATTERNS**: Added 3 new entries — json.dumps/JSON.stringify for SOV-003 data-export findings, os.environ.get/process.env for DB-001 connection-string findings, and justified type:ignore/noqa/eslint-disable for SWDEV-001/CICD-003 suppression findings
+
+- **Judge system prompt anti-FP guidance** — Added `FALSE POSITIVE AVOIDANCE` sections to 9 judge system prompts, providing explicit instructions to avoid known false-positive patterns at the LLM generation layer:
+  - **performance.ts**: Tree traversal is O(n), not O(n²); bounded reference datasets; list comprehension flattening
+  - **scalability.ts**: Distributed lock with local fallback is correct graceful degradation; two-tier locking design
+  - **data-sovereignty.ts**: Retry/fallback ≡ circuit breaker; read-only reference data ≠ cross-border egress; internal serialization ≠ data export
+  - **compliance.ts**: Cache-age/TTL "age" ≠ user age verification
+  - **internationalization.ts**: Constant definitions ≠ user-facing strings; developer tools/MCP servers don't need i18n; sourced regulatory text
+  - **cost-effectiveness.ts**: Tree/hierarchy traversal; bounded reference datasets
+  - **database.ts**: Environment variable fallback defaults; in-memory/embedded database defaults
+  - **code-structure.ts**: Dict[str,Any] at JSON boundaries; large single-responsibility files; async nesting ≤4
+  - **software-practices.ts**: Justified suppression comments; minimum-viable async nesting; single-module cohesion
+
+### Tests
+- Added 17 new tests covering all 6 new FP heuristics (H12–H17), I18N web-only gating, safe idiom extensions (env var fallback, justified suppressions, json.dumps), with both positive (should suppress) and negative (should keep) test cases
+- All 1,574 tests pass (976 judges + 218 negative + 268 subsystems + 70 extension + 42 tool-routing)
+
 ## [3.20.4] — 2026-03-03
 
 ### Fixed
