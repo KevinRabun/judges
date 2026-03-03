@@ -275,7 +275,7 @@ export function applyFrameworkAwareness(findings: Finding[], code: string): Find
  * Used by getLineNumbers / getLangLineNumbers to auto-skip comments and by
  * evaluators that iterate lines manually via forEach / for-loops.
  */
-const COMMENT_LINE_RE = /^\s*(?:\/\/|\/\*|\*[\s/]|\*$|#(?![!\[])|"""|'''|<!--)/;
+const COMMENT_LINE_RE = /^\s*(?:\/\/|\/\*|\*[\s/]|\*$|#(?![![])|"""|'''|<!--)/;
 
 /**
  * Returns true when `line` is a comment (or JSDoc / docstring delimiter).

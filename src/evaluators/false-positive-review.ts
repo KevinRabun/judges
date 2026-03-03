@@ -396,7 +396,7 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
   if (finding.isAbsenceBased && finding.ruleId.startsWith("SOV-")) {
     const codeStr = lines.join("\n");
     const hasDataOps =
-      /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE\s+TABLE)\b|\.(?:query|execute|find|findOne|findMany|save|create|update|delete|remove|aggregate)\s*\(|(?:fetch|axios|got|request|http|https)\s*[\.(]|(?:db|database|store|storage|repository|collection|model|prisma|knex|sequelize|typeorm|mongoose|redis|cache)\s*\./i.test(
+      /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE\s+TABLE)\b|\.(?:query|execute|find|findOne|findMany|save|create|update|delete|remove|aggregate)\s*\(|(?:fetch|axios|got|request|http|https)\s*[.(]|(?:db|database|store|storage|repository|collection|model|prisma|knex|sequelize|typeorm|mongoose|redis|cache)\s*\./i.test(
         codeStr,
       );
     if (!hasDataOps) {

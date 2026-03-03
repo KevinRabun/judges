@@ -1691,7 +1691,7 @@ describe("False-Positive Heuristic Filter", () => {
     it("should remove findings where all target lines are comments", () => {
       const code = `const x = 1;\n// SELECT * FROM users WHERE id = $input\nconst y = 2;`;
       const findings: Finding[] = [{ ...baseFinding, ruleId: "CYBER-010", lineNumbers: [2] }];
-      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      const { filtered: _filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
       assert.strictEqual(removed.length, 1, "Finding on comment line should be removed");
       assert.ok(removed[0].description.includes("FP Heuristic"), "Should annotate with FP reason");
     });
@@ -1709,7 +1709,7 @@ describe("False-Positive Heuristic Filter", () => {
     it("should remove findings where all target lines are string literals", () => {
       const code = `const messages = [\n  "DROP TABLE users;",\n  "SELECT * FROM passwords",\n];`;
       const findings: Finding[] = [{ ...baseFinding, ruleId: "CYBER-010", lineNumbers: [2, 3] }];
-      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      const { filtered: _filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
       assert.strictEqual(removed.length, 1, "Finding on string literal lines should be removed");
     });
   });
@@ -1718,14 +1718,14 @@ describe("False-Positive Heuristic Filter", () => {
     it("should remove findings on import statements", () => {
       const code = `import crypto from "crypto";\nimport { exec } from "child_process";\nconst x = 1;`;
       const findings: Finding[] = [{ ...baseFinding, ruleId: "CYBER-020", lineNumbers: [1, 2] }];
-      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      const { filtered: _filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
       assert.strictEqual(removed.length, 1, "Finding on import lines should be removed");
     });
 
     it("should remove findings on type declarations", () => {
       const code = `type Password = string;\ninterface SecretStore {\n  get(key: string): string;\n}`;
       const findings: Finding[] = [{ ...baseFinding, ruleId: "DSEC-001", lineNumbers: [1] }];
-      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      const { filtered: _filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
       assert.strictEqual(removed.length, 1, "Finding on type declaration should be removed");
     });
   });
@@ -1742,7 +1742,7 @@ describe("False-Positive Heuristic Filter", () => {
           lineNumbers: [2],
         },
       ];
-      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      const { filtered: _filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
       assert.strictEqual(removed.length, 1, "Keyword 'age' in 'maxAge' identifier should be FP");
     });
   });
@@ -1759,7 +1759,7 @@ describe("False-Positive Heuristic Filter", () => {
           lineNumbers: [],
         },
       ];
-      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      const { filtered: _filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
       assert.strictEqual(removed.length, 1, "Very low confidence absence-based finding should be removed");
     });
 
@@ -1787,16 +1787,16 @@ describe("False-Positive Heuristic Filter", () => {
           lineNumbers: [],
         },
       ];
-      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      const { filtered, removed: _removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
       assert.strictEqual(filtered.length, 1, "Moderate confidence absence-based finding should be kept");
     });
   });
 
   describe("Empty findings", () => {
     it("should return empty arrays for empty input", () => {
-      const { filtered, removed } = filterFalsePositiveHeuristics([], "const x = 1;", "javascript");
+      const { filtered, removed: _removed } = filterFalsePositiveHeuristics([], "const x = 1;", "javascript");
       assert.strictEqual(filtered.length, 0);
-      assert.strictEqual(removed.length, 0);
+      assert.strictEqual(_removed.length, 0);
     });
   });
 

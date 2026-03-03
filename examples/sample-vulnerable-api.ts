@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import express from "express";
+import moment from "moment"; // eslint-disable-line @typescript-eslint/no-unused-vars -- intentional: triggers DEPS evaluator risky-package detection
 import fs from "fs";
 
 // ── DATA-SECURITY: Hardcoded secrets ─────────────────────────────────────────

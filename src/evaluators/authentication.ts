@@ -118,14 +118,14 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
     );
   // Suppress when endpoints are explicitly marked as public/anonymous or are standard health-check routes
   const hasPublicEndpointMarker =
-    /(?:public|noAuth|anonymous|unauthenticated|AllowAnonymous|\@PermitAll|permitAll|open.?api|isPublic|skipAuth|no.?auth.?required)/i.test(
+    /(?:public|noAuth|anonymous|unauthenticated|AllowAnonymous|@PermitAll|permitAll|open.?api|isPublic|skipAuth|no.?auth.?required)/i.test(
       code,
     );
   const isHealthCheckOnly =
     actualRouteLines.length > 0 &&
     actualRouteLines.every((ln) => {
       const line = lines[ln - 1] || "";
-      return /['"\/](?:health|status|metrics|ready|live|liveness|readiness|ping|version|favicon|\.well-known)/i.test(
+      return /['"/](?:health|status|metrics|ready|live|liveness|readiness|ping|version|favicon|\.well-known)/i.test(
         line,
       );
     });

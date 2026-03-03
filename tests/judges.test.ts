@@ -63,7 +63,7 @@ import { analyzeDocumentation } from "../src/evaluators/documentation.js";
 import { analyzeEthicsBias } from "../src/evaluators/ethics-bias.js";
 import { analyzeDataSovereignty } from "../src/evaluators/data-sovereignty.js";
 import { buildSingleJudgeDeepReviewSection, buildTribunalDeepReviewSection } from "../src/tools/deep-review.js";
-import { isStringLiteralLine, isCommentLine, getLineNumbers, getLangLineNumbers } from "../src/evaluators/shared.js";
+import { isStringLiteralLine, getLineNumbers, getLangLineNumbers } from "../src/evaluators/shared.js";
 
 // ─── Tree-sitter warm-up ────────────────────────────────────────────────────
 // Must happen BEFORE any describe/it blocks so that tree-sitter grammars are
