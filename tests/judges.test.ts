@@ -5605,8 +5605,12 @@ describe("Config Integration — evaluateWithTribunal", () => {
   });
 
   it("should disable judges via config", () => {
-    const full = evaluateWithTribunal(sampleCode, "typescript");
+    // Disable per-file cap so we compare raw judge output
+    const full = evaluateWithTribunal(sampleCode, "typescript", undefined, {
+      maxFindingsPerFile: 0,
+    });
     const withDisabled = evaluateWithTribunal(sampleCode, "typescript", undefined, {
+      maxFindingsPerFile: 0,
       config: { disabledJudges: ["data-security", "cybersecurity"] },
     });
     assert.ok(withDisabled.findings.length < full.findings.length, "Disabling judges should reduce findings");

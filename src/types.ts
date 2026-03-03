@@ -48,6 +48,13 @@ export interface Finding {
    * change automatically without human interpretation of `suggestedFix`.
    */
   patch?: Patch;
+  /**
+   * Confidence-based disclosure tier, set by the tribunal pipeline:
+   * - "essential"     — confidence ≥ 0.8: always shown
+   * - "important"     — confidence ≥ 0.6: shown by default
+   * - "supplementary" — confidence < 0.6: shown on demand
+   */
+  confidenceTier?: "essential" | "important" | "supplementary";
 }
 
 /**

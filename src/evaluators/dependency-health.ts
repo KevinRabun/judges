@@ -178,6 +178,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
         reference: "package.json engines field",
         suggestedFix: 'Add `"engines": { "node": ">=18.0.0" }` to the top level of `package.json`.',
         confidence: 0.7,
+        isAbsenceBased: true,
       });
     }
   }

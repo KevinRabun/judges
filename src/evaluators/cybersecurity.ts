@@ -354,6 +354,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       suggestedFix:
         "Add helmet middleware: import helmet from 'helmet'; app.use(helmet()); — sets CSP, HSTS, X-Frame-Options, and other security headers automatically.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

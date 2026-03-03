@@ -55,6 +55,16 @@ const DEDUP_TOPIC_PATTERNS: Array<[RegExp, string]> = [
   [/open\s*redirect/i, "open-redirect"],
   [/csrf|cross.?site\s*request\s*forg/i, "csrf"],
   [/(?:eval|dynamic\s*code\s*exec)/i, "code-injection"],
+
+  // ── Cross-judge overlap patterns (v3.18.0) ────────────────────────────────
+  [/deeply?\s*nest|nesting.*(?:level|depth|complex)|callback.*(?:hell|pyramid)/i, "deep-nesting"],
+  [/no\s*test|test.*(?:not|without|missing)|test\s*infra/i, "missing-tests"],
+  [/weak.*type|dynamic.*type|type.*(?:safe|usage)|any\s*type|untyped/i, "type-safety"],
+  [/no\s*health|health\s*check|healthcheck/i, "missing-healthcheck"],
+  [/no\s*lint|linting.*config|formatting.*config|eslint|prettier/i, "missing-linting"],
+  [/no\s*build|build\s*script|missing.*build/i, "missing-build-script"],
+  [/(?:doc|documentation).*(?:missing|without|absent|lack)/i, "missing-documentation"],
+  [/error.*(?:log|report|track|monitor).*(?:missing|without|absent)/i, "missing-error-tracking"],
 ];
 
 const TOPIC_STOP_WORDS = new Set([

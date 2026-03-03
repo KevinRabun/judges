@@ -38,7 +38,7 @@ import {
 // ─── Extracted Modules ───────────────────────────────────────────────────────
 import { evaluateMustFixGate, clampConfidence, applyConfidenceThreshold, isAbsenceBasedFinding } from "../scoring.js";
 import { enrichWithPatches } from "../patches/index.js";
-import { crossEvaluatorDedup } from "../dedup.js";
+import { crossEvaluatorDedup, severityRank } from "../dedup.js";
 import { filterFalsePositiveHeuristics } from "./false-positive-review.js";
 
 // ─── Individual Analyzers ────────────────────────────────────────────────────
@@ -57,6 +57,12 @@ export interface EvaluationOptions {
   filePath?: string;
   /** Optional config for rule/judge/severity filtering (.judgesrc) */
   config?: JudgesConfig;
+  /**
+   * Maximum number of findings to keep per file. When exceeded, findings are
+   * priority-sorted (severity → confidence → suggestedFix) and the lowest-
+   * priority items are dropped. Defaults to 20. Set to 0 to disable.
+   */
+  maxFindingsPerFile?: number;
   /** @internal — pre-computed AST structure for the file (set by evaluateWithTribunal) */
   _astCache?: CodeStructure;
   /** @internal — pre-computed taint flows for the file (set by evaluateWithTribunal) */
@@ -430,6 +436,35 @@ export function evaluateWithJudge(
   };
 }
 
+// ─── Per-File Finding Cap ────────────────────────────────────────────────────
+
+/** Default maximum findings per file — keeps output actionable. */
+const DEFAULT_MAX_FINDINGS_PER_FILE = 20;
+
+/**
+ * Cap the number of findings by priority-sorting and keeping only
+ * the top N.  Ensures high-severity / high-confidence findings always survive.
+ *
+ * In the current single-file `evaluateWithTribunal` pipeline all findings
+ * belong to one file, so a flat cap suffices.  When multi-file evaluation
+ * is added, this function should group findings by file path first.
+ */
+function applyPerFileFindingCap(findings: Finding[], maxFindings: number): Finding[] {
+  if (maxFindings <= 0 || findings.length <= maxFindings) return findings;
+
+  // Sort by: severity desc → confidence desc → has suggestedFix → description length
+  const sorted = [...findings].sort((a, b) => {
+    const sevDiff = severityRank(b.severity) - severityRank(a.severity);
+    if (sevDiff !== 0) return sevDiff;
+    const confDiff = (b.confidence ?? 0) - (a.confidence ?? 0);
+    if (confDiff !== 0) return confDiff;
+    const fixDiff = (b.suggestedFix ? 1 : 0) - (a.suggestedFix ? 1 : 0);
+    if (fixDiff !== 0) return fixDiff;
+    return b.description.length - a.description.length;
+  });
+  return sorted.slice(0, maxFindings);
+}
+
 /**
  * Run the full tribunal — all judges evaluate the code.
  */
@@ -487,7 +522,20 @@ export function evaluateWithTribunal(
     language,
     enrichedOptions?.filePath,
   );
-  const allFindings = applyConfig(fpFiltered, options?.config);
+  const configFiltered = applyConfig(fpFiltered, options?.config);
+  const maxFindings = options?.maxFindingsPerFile ?? DEFAULT_MAX_FINDINGS_PER_FILE;
+  const cappedFindings = applyPerFileFindingCap(configFiltered, maxFindings);
+
+  // ── Confidence-based tiering for progressive disclosure ──
+  // Tag each finding with a disclosure tier so downstream consumers (CLI,
+  // formatters, VS Code extension) can show only high-confidence findings
+  // by default and reveal lower tiers on demand.
+  const allFindings = cappedFindings.map((f) => {
+    const conf = f.confidence ?? 0.5;
+    const tier: Finding["confidenceTier"] = conf >= 0.8 ? "essential" : conf >= 0.6 ? "important" : "supplementary";
+    return { ...f, confidenceTier: tier };
+  });
+
   const mustFixGate = evaluateMustFixGate(allFindings, options?.mustFixGate);
   const criticalCount = allFindings.filter((f) => f.severity === "critical").length;
   const highCount = allFindings.filter((f) => f.severity === "high").length;

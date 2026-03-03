@@ -639,11 +639,32 @@ export function processItem(item: Item): Result {
   });
 
   describe("Absence-based findings should be tagged appropriately", () => {
+    // Server has >10 substantive lines so it avoids the trivially-small-file
+    // heuristic, but still lacks security features → absence findings fire.
+    // Note: avoids "/health" path to prevent health-check utility classification.
     const serverCode = `
 import express from "express";
+
 const app = express();
-app.get("/api/data", (req, res) => { res.json({ ok: true }); });
-app.listen(3000);
+
+app.get("/api/data", (req, res) => {
+  const payload = { ok: true, timestamp: Date.now() };
+  res.json(payload);
+});
+
+app.post("/api/submit", (req, res) => {
+  const body = req.body;
+  console.log("Received:", body);
+  res.status(201).json({ created: true });
+});
+
+app.get("/api/info", (req, res) => {
+  res.json({ version: "1.0", uptime: process.uptime() });
+});
+
+app.listen(3000, () => {
+  console.log("Server running on port 3000");
+});
 `;
 
     it("absence-based findings should have isAbsenceBased=true", () => {

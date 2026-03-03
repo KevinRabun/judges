@@ -192,6 +192,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       suggestedFix:
         "Return 429 responses: if (isRateLimited) { res.status(429).set('Retry-After', '60').json({ error: 'Too many requests', retryAfter: 60 }); }",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

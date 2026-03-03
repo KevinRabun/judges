@@ -56,6 +56,7 @@ export function analyzeAgentInstructions(code: string, language: string): Findin
       suggestedFix:
         "Add a '## Precedence' section listing rule layers in descending priority (system > developer > user > project) with a conflict-resolution policy.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 

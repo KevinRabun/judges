@@ -2,6 +2,20 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.18.0] — 2025-07-09
+
+### Improved
+- **Third round false positive reduction** — Cross-project findings 11,011 → 7,898 (−28.3%, −3,113 findings) across 30 projects / 1,149 files through 7 complementary strategies:
+  - **Cross-judge semantic dedup** — 8 new topic patterns in `crossEvaluatorDedup()`: `deep-nesting`, `missing-tests`, `type-safety`, `missing-healthcheck`, `missing-linting`, `missing-build-script`, `missing-documentation`, `missing-error-tracking`. Eliminates duplicate findings from different judges flagging the same conceptual issue.
+  - **5 new `isAbsenceBased` flags** — Added explicit absence markers to internationalization (encoding detection), agent-instructions (AGENT-001), dependency-health (DEPS-001), cybersecurity (security headers), and rate-limiting (no 429 handling). Triggers severity cap to medium + confidence cap to 0.6.
+  - **Per-file finding cap** — New `applyPerFileFindingCap()` function with default limit of 20 findings per evaluation. Prioritizes by severity → confidence → actionability (suggestedFix presence) → description length. Configurable via `maxFindingsPerFile` option (0 to disable).
+  - **CI/CD project-level gating** (FP rule #12) — Suppresses all absence-based `CICD-*` findings, which are inherently project-level concerns that cannot be meaningfully assessed from individual file analysis.
+  - **SOV relevance gating** (FP rule #13) — Suppresses absence-based `SOV-*` findings on files that contain no data operation patterns (SQL, fetch, axios, database access, ORM methods, store operations).
+  - **DOC-001 severity adjustment** — Documentation findings handled by existing absence pipeline for appropriate severity/confidence calibration.
+  - **Confidence-based progressive disclosure** — New `confidenceTier` field on `Finding` type: `"essential"` (≥0.8), `"important"` (≥0.6), `"supplementary"` (<0.6). Enables UI consumers to implement progressive disclosure of findings by confidence level.
+- **Cross-project breakdown**: { essential: 3,677, important: 4,010, supplementary: 211 } | { critical: 222, high: 1,342, medium: 4,195, low: 1,865, info: 274 } | absence-based: 1,722
+- All 1,358 tests pass (960 judges + 134 negative + 194 subsystems + 70 extension-logic)
+
 ## [3.17.0] — 2025-07-08
 
 ### Improved

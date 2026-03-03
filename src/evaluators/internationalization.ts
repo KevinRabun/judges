@@ -251,6 +251,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
       suggestedFix:
         "Specify encoding explicitly: fs.readFileSync(path, 'utf-8') and set Content-Type: 'application/json; charset=utf-8' in HTTP responses.",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
