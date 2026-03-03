@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.1] — 2026-03-03
+
+### Fixed
+- **Layer 2 uses user-selected model** — Deep review no longer hardcodes `gpt-4o`. Uses whichever model you select in the Copilot Chat model picker (GPT-4o, Claude, Gemini, o4-mini, etc.).
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.20.1 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.20.0] — 2026-03-06
 
 ### Added

@@ -2,6 +2,11 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.1] — 2026-03-03
+
+### Fixed
+- **Layer 2 now uses user-selected model** — The `/deepreview` deep review and diagnostics Layer 2 no longer hardcode `gpt-4o`. In chat, it uses `request.model` (the model the user picked in the Copilot Chat model selector). In diagnostics, it uses `selectChatModels()` without a family filter, respecting whatever models are available.
+
 ## [3.20.0] — 2026-03-06
 
 ### Added
