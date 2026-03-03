@@ -406,6 +406,29 @@ function detectDeadCode(lines: string[], language: string): number[] {
 
     // Check if this line is a terminal statement
     if (terminalPatterns.test(trimmed)) {
+      // Skip when the terminal also opens a new scope on the same line
+      // (e.g., `return func(...) {` in Go, `return std::all_of(..., [](char c) {` in C++).
+      // The `return` is returning a closure/lambda, not terminating the scope.
+      if (!isPython && line.includes("{") && !line.trimEnd().endsWith(";")) {
+        continue;
+      }
+
+      // Skip terminals inside braceless control structures (C#: `if (...)\n    return ...;`)
+      // The next statement after the braceless block IS reachable.
+      if (!isPython) {
+        let prevNonBlank = "";
+        for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
+          const pt = lines[j].trim();
+          if (pt.length > 0 && !pt.startsWith("//") && !pt.startsWith("*") && !pt.startsWith("#")) {
+            prevNonBlank = pt;
+            break;
+          }
+        }
+        if (/^\s*(?:if|else\s+if|for|while)\s*\(/.test(prevNonBlank) && !prevNonBlank.endsWith("{")) {
+          continue;
+        }
+      }
+
       if (isPython) {
         const indent = line.search(/\S/);
         unreachableAtDepth = Math.floor(indent / 4) + 1;

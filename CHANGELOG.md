@@ -2,6 +2,34 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.19.5] — 2026-03-05
+
+### Fixed
+- **Cross-judge dedup: same-topic bridging** — Findings from different evaluators about the same known topic (e.g., API versioning, deep nesting, abrupt termination) are now deduped even when they reference different line numbers. Previously, two evaluators flagging "API endpoints without versioning" on different lines escaped dedup because the union-find only clustered same-line findings. Added known-topic bridging logic and 3 new topic patterns (`api-versioning`, `pagination`, `abrupt-termination`).
+- **DOC-001: Python validators no longer flagged as undocumented** — Pydantic `@validator`, `@field_validator`, `@root_validator`, and `@property`-decorated methods are now recognized as framework internals and skipped from the exported-function-without-docs check.
+- **DOC-001: Java getters/setters no longer flagged** — Trivial one-line getters/setters (`getName()`, `setName()`) are skipped from the exported-function documentation check.
+- **DOC-001: Route wiring lines no longer flagged** — Method-chained route registrations (`.route(`, `.get(`, `.HandleFunc(`) are no longer flagged as API endpoints missing documentation. Only handler definitions need docs.
+- **DOC-001: `main()` no longer flagged as long function** — Application entry-point `main()` functions are excluded from the long-function-with-insufficient-comments check.
+- **STRUCT-005: Closures and lambdas no longer cause dead code FPs** — Go `return func(...) {` closures and C++ `return std::all_of(..., [](char c) {` lambdas are no longer treated as terminal statements that make subsequent code unreachable.
+- **STRUCT-005: Braceless `if` statements no longer cause dead code FPs** — C# single-line `if (cond) return;` without braces no longer marks the next line as dead code.
+- **UX-001: Server-side error responses no longer flagged as "generic error messages"** — JSON error keys (`"error"`), structured logging calls (`.Error()`, `logger.Error()`), and HTTP response builders (`HttpResponse::`, `http.Error()`) are filtered from the generic-error-message check.
+- **I18N-001: Framework metadata no longer flagged as hardcoded strings** — FastAPI/Flask/OpenAPI initialization lines (`FastAPI(title="...")`) are excluded from the hardcoded-user-facing-string check.
+- **MAINT: C/C++ type declarations now skip magic number check** — `int port = 8080` and similar C/C++ typed variable declarations are recognized as named assignments, not magic numbers.
+- **MAINT: Unused imports no longer cross-line match** — The ES module import regex no longer accidentally matches Python's `from X import Y` syntax across line boundaries.
+- **Compliance: Tighter regulated-operation detection** — Removed `sign` (matches `signIn`, `signal`) and `authorize` (matches `[Authorize]` attribute) from the regulated-operations regex. Attribute/annotation lines are now skipped.
+
+### Changed
+- **Absence promotion** — `TEST-001` ("No tests detected"), `COMP-001` ("Data model lacks classification markers"), and `REL-001` ("No retry logic") are now marked `isAbsenceBased: true` and suppressed in single-file mode alongside other absence findings.
+
+### Tests
+- 1 new dedup test (same-known-topic bridging), 1 updated test (topic bridging replaces separate-lines-no-dedup)
+- All 1,460 tests pass (964 judges + 217 negative + 209 subsystems + 70 extension)
+
+### Metrics
+- Cross-language FP sweep: 134 → 122 evaluator-level findings (−12, −9.0%)
+- Pipeline-level (after dedup + absence filtering): 56 → 24 findings (−32, −57.1%)
+- Cumulative since v3.18.3: 170 → 122 evaluator-level (−48, −28.2%)
+
 ## [3.19.4] — 2026-03-04
 
 ### Changed

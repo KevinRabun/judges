@@ -303,6 +303,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         suggestedFix:
           "Create a co-located test file (e.g., `<filename>.test.ts`) with at least one test per exported function covering a happy path, an edge case, and an error path.",
         confidence: 0.7,
+        isAbsenceBased: true,
       });
     }
   }

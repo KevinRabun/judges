@@ -39,9 +39,9 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       // Skip numbers inside string literals (e.g., ":8080", "localhost:3000")
       if (/["'`][^"'`]*\b(?:86400|3600|1000|5000|8080|3000|4200|8000|1024|2048|4096)\b[^"'`]*["'`]/.test(line))
         continue;
-      // Skip named constant declarations (e.g., const TIMEOUT_MS = 3600)
+      // Skip named constant declarations (e.g., const TIMEOUT_MS = 3600, int port = 8080)
       if (
-        /(?:const|let|var|val|final|static|#define|pub\s+(?:const|static))\s+\w{2,}\s*[:=].*\b(?:86400|3600|1000|5000|8080|3000|4200|8000|1024|2048|4096)\b/.test(
+        /(?:const|let|var|val|final|static|#define|pub\s+(?:const|static)|int|long|unsigned|double|float|auto|size_t|[su]?int\d+_t)\s+\w{2,}\s*[:=].*\b(?:86400|3600|1000|5000|8080|3000|4200|8000|1024|2048|4096)\b/.test(
           line,
         )
       )
@@ -260,11 +260,13 @@ export function analyzeMaintainability(code: string, language: string): Finding[
     });
   }
 
-  // Unused imports heuristic
-  const importPattern = /import\s+(?:\{([^}]+)\}|(\w+))\s+from/g;
-  let importMatch;
+  // Unused imports heuristic (ES/TS module syntax: import { x } from "...")
+  // Use per-line matching to avoid cross-line false positives with Python's `from X import Y`
   const unusedImportLines: number[] = [];
-  while ((importMatch = importPattern.exec(code)) !== null) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const importMatch = /import\s+(?:\{([^}]+)\}|(\w+))\s+from/.exec(line);
+    if (!importMatch) continue;
     const importedNames = (importMatch[1] || importMatch[2] || "")
       .split(",")
       .map((s) =>
@@ -281,8 +283,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const usageCount = (code.match(new RegExp(`\\b${escapedName}\\b`, "g")) || []).length;
       if (usageCount <= 1) {
-        const importLine = code.substring(0, importMatch.index).split("\n").length;
-        unusedImportLines.push(importLine);
+        unusedImportLines.push(i + 1);
         break; // one finding per import line is enough
       }
     }

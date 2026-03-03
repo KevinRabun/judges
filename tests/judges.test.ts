@@ -5616,10 +5616,22 @@ describe("crossEvaluatorDedup", () => {
     assert.strictEqual(result.length, 2);
   });
 
-  it("should NOT dedup findings with same topic on different lines", () => {
+  it("should dedup findings with same known topic on different lines (topic bridging)", () => {
+    // Same topic (sql-injection matched by DEDUP_TOPIC_PATTERNS) on different lines
+    // should be deduped — cross-evaluator findings about the same vulnerability
+    // often land on different lines because each evaluator picks its own line.
     const findings = [
       makeFinding("SEC-001", "high", [10], "SQL injection vulnerability"),
       makeFinding("CYBER-001", "high", [20], "SQL injection detected"),
+    ];
+    const result = crossEvaluatorDedup(findings);
+    assert.strictEqual(result.length, 1);
+  });
+
+  it("should NOT dedup findings with different topics on different lines", () => {
+    const findings = [
+      makeFinding("SEC-001", "high", [10], "SQL injection vulnerability"),
+      makeFinding("PERF-001", "medium", [20], "Missing database index"),
     ];
     const result = crossEvaluatorDedup(findings);
     assert.strictEqual(result.length, 2);

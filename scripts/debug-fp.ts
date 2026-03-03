@@ -42,6 +42,7 @@ import { analyzeDependencyHealth } from "../src/evaluators/dependency-health.js"
 import { analyzeFrameworkSafety } from "../src/evaluators/framework-safety.js";
 import { analyzeIacSecurity } from "../src/evaluators/iac-security.js";
 import type { Finding } from "../src/types.js";
+import { crossEvaluatorDedup } from "../src/dedup.js";
 
 // ─── All evaluators ──────────────────────────────────────────────────────────
 const EVALUATORS: Array<{ name: string; fn: (code: string, lang: string) => Finding[] }> = [
@@ -1401,4 +1402,37 @@ const sorted = [...byRule.entries()].sort((a, b) => b[1].count - a[1].count);
 for (const [ruleId, info] of sorted) {
   console.log(`  ${ruleId} × ${info.count} — ${info.title} — langs: ${[...info.languages].join(", ")}`);
 }
+
+// ─── Pipeline-level simulation (dedup + absence gating) ─────────────────────
+console.log(`\n${"═".repeat(80)}`);
+console.log("PIPELINE-LEVEL SIMULATION (after dedup + absence filtering):");
+console.log(`${"═".repeat(80)}\n`);
+
+let pipelineTotal = 0;
+for (const sample of SAMPLES) {
+  // Collect all findings for this sample
+  const sampleFindings: Finding[] = [];
+  for (const evaluator of EVALUATORS) {
+    try {
+      const findings = evaluator.fn(sample.code, sample.language);
+      sampleFindings.push(...findings);
+    } catch {
+      // skip
+    }
+  }
+  // Apply dedup
+  const deduped = crossEvaluatorDedup(sampleFindings);
+  // Filter absence-based
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nonAbsence = deduped.filter((f) => !(f as any).isAbsenceBased);
+
+  console.log(
+    `  ${sample.name} (${sample.language}): ${sampleFindings.length} raw → ${deduped.length} deduped → ${nonAbsence.length} non-absence`,
+  );
+  pipelineTotal += nonAbsence.length;
+  for (const f of nonAbsence) {
+    console.log(`    ${f.ruleId} — ${f.title} [conf=${f.confidence}]`);
+  }
+}
+console.log(`\n  PIPELINE TOTAL: ${pipelineTotal} findings`);
 console.log();

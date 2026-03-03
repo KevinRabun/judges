@@ -176,6 +176,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       suggestedFix:
         "Add classification markers: interface User { /** @classification PII */ email: string; /** @classification Public */ displayName: string; }",
       confidence: 0.75,
+      isAbsenceBased: true,
     });
   }
 
@@ -370,7 +371,9 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   const regulatedOpLines: number[] = [];
   lines.forEach((line, i) => {
     if (isCommentLine(line)) return;
-    if (/(?:transfer|payment|withdrawal|approve|sign|certify|authorize|attest)\s*[=(]/i.test(line)) {
+    // Skip attribute/annotation lines (e.g., [Authorize], @Authorize) — these are access control, not operations
+    if (/^\s*[\[@]/.test(line)) return;
+    if (/(?:transfer|payment|withdrawal|approve|certify|attest)\s*[=(]/i.test(line)) {
       regulatedOpLines.push(i + 1);
     }
   });

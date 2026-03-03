@@ -19,7 +19,9 @@ export function analyzeInternationalization(code: string, language: string): Fin
     // Look for label/title/placeholder with hardcoded strings
     if (
       /(?:label|title|placeholder|aria-label)\s*[=:]\s*["'`][A-Z]/i.test(line) &&
-      !/translate|t\(|i18n|intl|formatMessage/i.test(line)
+      !/translate|t\(|i18n|intl|formatMessage/i.test(line) &&
+      // Skip framework/API metadata (e.g., FastAPI title=, OpenAPI description=)
+      !/(?:FastAPI|Flask|App|Blueprint|Swagger|OpenAPI|APIRouter)\s*\(/i.test(line)
     ) {
       hardcodedStringLines.push(i + 1);
     }

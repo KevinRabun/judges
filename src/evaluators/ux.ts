@@ -60,7 +60,17 @@ export function analyzeUx(code: string, language: string): Finding[] {
 
   // Generic error messages in UI
   const genericUiErrorPattern = /["'`](?:Error|Something went wrong|An error occurred|Oops|Server error)["'`]/gi;
-  const genericUiErrorLines = getLineNumbers(code, genericUiErrorPattern);
+  const codeLines = code.split("\n");
+  const genericUiErrorLines = getLineNumbers(code, genericUiErrorPattern).filter((ln) => {
+    const line = codeLines[ln - 1] ?? "";
+    // Skip JSON keys like {"error": msg} — the word "error" as a key is not a user message
+    if (/["'`]error["'`]\s*[:,]/i.test(line)) return false;
+    // Skip structured logging calls: logger.Error("...", "error", err)
+    if (/\.\s*(?:Error|Warn|Info|Debug|Fatal|Log)\s*\(/i.test(line)) return false;
+    // Skip server-side HTTP error responses (Rust HttpResponse, Go http.Error, etc.)
+    if (/HttpResponse::|http\.Error\s*\(|\.status\s*\(\s*[45]\d\d\s*\)/i.test(line)) return false;
+    return true;
+  });
   if (genericUiErrorLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

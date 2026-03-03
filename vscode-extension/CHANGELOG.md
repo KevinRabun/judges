@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.19.5] — 2026-03-05
+
+### Fixed
+- **Major FP reduction** — Cross-judge dedup bridging, DOC-001 fixes (Python validators, Java getters, route wiring, main()), STRUCT-005 fixes (closures, braceless if), UX-001 server-side error filtering, I18N-001 framework metadata exclusion, MAINT magic number and import fixes, and compliance pattern tightening. Pipeline-level findings reduced from 56 → 24 (−57%).
+
+### Changed
+- **Additional absence gating** — TEST-001, COMP-001, and REL-001 now suppressed in single-file mode alongside other absence findings.
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.19.5 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.19.4] — 2026-03-04
 
 ### Changed

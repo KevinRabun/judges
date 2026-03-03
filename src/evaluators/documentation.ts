@@ -23,7 +23,14 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
         return /\bexport\b/.test(fnLine) || (idx > 0 && /^\s*export\b/.test(lines[idx - 1]));
       }
       if (lang === "rust") return /\bpub\b/.test(fnLine);
-      if (lang === "java" || lang === "csharp") return /\bpublic\b/.test(fnLine);
+      if (lang === "java" || lang === "csharp") {
+        if (!/\bpublic\b/.test(fnLine)) return false;
+        // Skip trivial Java getter/setter one-liners (getName, setName, isActive, etc.)
+        if (lang === "java" && /public\s+\w+\s+(?:get|set|is)[A-Z]\w*\s*\(/.test(fnLine) && /\{.*\}/.test(fnLine)) {
+          return false;
+        }
+        return true;
+      }
       if (lang === "go") {
         // Go: exported functions start with uppercase
         const m = fnLine.match(/func\s+(?:\(\w+\s+\*?\w+\)\s+)?([A-Z]\w*)\s*\(/);
@@ -31,7 +38,16 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       }
       if (lang === "python") {
         // Python: skip private/protected (underscore-prefixed) functions
-        return !/def\s+_/.test(fnLine);
+        if (/def\s+_/.test(fnLine)) return false;
+        // Skip Pydantic / framework validator methods — internal plumbing, not public API
+        for (let k = idx - 1; k >= Math.max(0, idx - 5); k--) {
+          const t = lines[k].trim();
+          if (t.length === 0) continue;
+          if (/^@(?:validator|field_validator|root_validator|property)\b/.test(t)) return false;
+          if (/^@/.test(t)) continue; // other decorator — keep walking
+          break;
+        }
+        return true;
       }
       return true; // unknown language — flag all
     })();
@@ -149,6 +165,11 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   const allFnLines = getLangLineNumbers(code, language, LP.FUNCTION_DEF);
   allFnLines.forEach((ln) => {
     const idx = ln - 1;
+
+    // Skip main() / entry-point functions — app setup code is inherently self-documenting
+    const fnNameMatch = lines[idx].match(/(?:func|fn|function|def|void|int|async)\s+(\w+)\s*\(/);
+    if (fnNameMatch && fnNameMatch[1] === "main") return;
+
     if (LP.isJsTs(lang) || lang === "rust" || lang === "csharp" || lang === "java" || lang === "go") {
       let braceCount = 0;
       let fnLength = 0;
@@ -224,6 +245,14 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   const httpRouteLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
   httpRouteLines.forEach((ln) => {
     const idx = ln - 1;
+    const routeLine = lines[idx].trim();
+
+    // Skip route *wiring* lines — documentation belongs on handler definitions, not registrations.
+    // Actix-web: .route("/path", web::get().to(handler))
+    // Go: mux.HandleFunc("METHOD /path", handler)
+    if (/^\.\s*(?:route|get|post|put|delete|patch|use)\s*\(/i.test(routeLine)) return;
+    if (/\.(?:HandleFunc|Handle)\s*\(/i.test(routeLine)) return;
+
     // Look back up to 15 lines to cover large JSDoc / docstring blocks
     const prevLines = lines.slice(Math.max(0, idx - 15), idx).join("\n");
     if (

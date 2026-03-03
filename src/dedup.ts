@@ -65,6 +65,14 @@ const DEDUP_TOPIC_PATTERNS: Array<[RegExp, string]> = [
   [/no\s*build|build\s*script|missing.*build/i, "missing-build-script"],
   [/(?:doc|documentation).*(?:missing|without|absent|lack)/i, "missing-documentation"],
   [/error.*(?:log|report|track|monitor).*(?:missing|without|absent)/i, "missing-error-tracking"],
+
+  // ── Additional cross-judge overlap patterns (v3.19.5) ─────────────────────
+  [/api.*version|version.*api|endpoint.*version/i, "api-versioning"],
+  [/pagination|paginate|without.*paginat|unbounded.*(?:data|fetch|query|result)/i, "pagination"],
+  [
+    /abrupt.*(?:termination|exit|shutdown)|(?:process|hard).*(?:termination|exit)|panic.*exit|process\.exit|graceful.*(?:shutdown|lifecycle)/i,
+    "abrupt-termination",
+  ],
 ];
 
 const TOPIC_STOP_WORDS = new Set([
@@ -188,6 +196,26 @@ export function crossEvaluatorDedup(findings: Finding[]): Finding[] {
   }
 
   for (const indices of groups.values()) {
+    for (let j = 1; j < indices.length; j++) {
+      union(indices[0], indices[j]);
+    }
+  }
+
+  // Bridge same-known-topic findings regardless of line numbers.
+  // When different evaluators flag the same conceptual issue (e.g., "rate-limiting")
+  // but detect different lines (AST vs regex, or one is noLine), union them
+  // so only the best finding per root cause survives.
+  const knownTopics = new Set(DEDUP_TOPIC_PATTERNS.map(([, t]) => t));
+  const topicBridgeGroups = new Map<string, number[]>();
+  for (let i = 0; i < findings.length; i++) {
+    const topic = extractFindingTopic(findings[i]);
+    if (knownTopics.has(topic)) {
+      const group = topicBridgeGroups.get(topic) ?? [];
+      group.push(i);
+      topicBridgeGroups.set(topic, group);
+    }
+  }
+  for (const indices of topicBridgeGroups.values()) {
     for (let j = 1; j < indices.length; j++) {
       union(indices[0], indices[j]);
     }

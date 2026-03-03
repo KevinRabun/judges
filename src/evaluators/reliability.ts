@@ -92,6 +92,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       suggestedFix:
         "Add retry: import pRetry from 'p-retry'; const result = await pRetry(() => fetchData(), { retries: 3, minTimeout: 1000 });",
       confidence: 0.7,
+      isAbsenceBased: true,
     });
   }
 
