@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.19.2] — 2026-03-03
+
+### Fixed
+- **IaC security FP — resource-name parameters no longer flagged for `@secure()`** — Bicep parameters like `param keyVaultName string` were incorrectly flagged because the regex matched "key" inside compound names. Added post-match exclusion: if the parameter name ends with a resource-identifier suffix (`Name`, `Uri`, `Url`, `Endpoint`, `Id`, `ResourceGroup`, `Location`, `Sku`, `Region`, `Type`), it is recognized as a resource reference rather than a secret and skipped.
+- **MCP server version now dynamically read from `package.json`** — The `McpServer` constructor was hardcoded to version `3.6.0` since initial creation. MCP clients may cache tool definitions keyed by server version; a stale version prevents clients from refreshing their cached tool lists. Now reads version from `package.json` at startup.
+
+### CI
+- **npm propagation wait in publish workflow** — Added a polling step (up to 10 × 15s = 150s) that verifies the npm package is visible before proceeding to MCP Registry publish, preventing the race condition that caused the v3.19.1 publish to fail on first attempt.
+
+### Tests
+- 3 new negative tests for IaC security resource-name exclusion
+- All 1,379 tests pass (963 judges + 207 negative + 209 subsystems)
+
 ## [3.19.1] — 2026-03-03
 
 ### Fixed

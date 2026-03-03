@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.19.2] — 2026-03-03
+
+### Fixed
+- **IaC security FP fix** — Bicep resource-name parameters (`keyVaultName`, `secretName`, etc.) no longer incorrectly flagged for missing `@secure()` decorator
+- **MCP server version fix** — Server now advertises correct version to clients, preventing stale tool cache issues
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.19.2 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.19.1] — 2026-03-03
 
 ### Fixed
