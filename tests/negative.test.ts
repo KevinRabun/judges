@@ -41,6 +41,7 @@ import { analyzeConcurrency } from "../src/evaluators/concurrency.js";
 import { analyzeRateLimiting } from "../src/evaluators/rate-limiting.js";
 import { analyzeFrameworkSafety } from "../src/evaluators/framework-safety.js";
 import { analyzeErrorHandling } from "../src/evaluators/error-handling.js";
+import { analyzeMaintainability } from "../src/evaluators/maintainability.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 
@@ -4670,5 +4671,329 @@ describe("FP Strategy 2 — Context window: JWT decode with algorithms on next l
     const findings = analyzeDataSecurity(code, "python");
     const jwtFindings = findings.filter((f) => /jwt/i.test(f.title) && /algorithm/i.test(f.description ?? ""));
     assert.strictEqual(jwtFindings.length, 0, "jwt.decode with algorithms= on adjacent line should not be flagged");
+  });
+});
+
+// ─── v3.20.0 — CI/CD absence gating on application source files ─────────────
+
+describe("CI/CD absence gating — Python server file", () => {
+  it("should NOT flag missing tests/lint/build on a Python API file", () => {
+    const code = [
+      "from fastapi import FastAPI, Depends, HTTPException",
+      "from pydantic import BaseModel",
+      "import bcrypt",
+      "",
+      "app = FastAPI()",
+      "",
+      "class UserCreate(BaseModel):",
+      "    email: str",
+      "    password: str",
+      "",
+      '@app.post("/api/users")',
+      "def create_user(data: UserCreate):",
+      "    hashed = bcrypt.hashpw(data.password.encode(), bcrypt.gensalt())",
+      '    return {"email": data.email}',
+      "",
+      '@app.get("/api/users/{user_id}")',
+      "def get_user(user_id: int):",
+      '    return {"id": user_id}',
+      "",
+      '@app.get("/health")',
+      "def health():",
+      '    return {"status": "ok"}',
+      ...Array.from({ length: 30 }, (_, i) => `# line ${i}`),
+    ].join("\n");
+    const findings = analyzeCiCd(code, "python");
+    const absenceFindings = findings.filter((f) => f.isAbsenceBased && /test|lint|build/i.test(f.title));
+    assert.strictEqual(absenceFindings.length, 0, "CI/CD absence rules should not fire on app source files");
+  });
+});
+
+describe("CI/CD absence gating — Go HTTP server", () => {
+  it("should NOT flag missing tests/lint/build on a Go server file", () => {
+    const code = [
+      "package main",
+      "",
+      "import (",
+      '    "net/http"',
+      '    "encoding/json"',
+      '    "log"',
+      ")",
+      "",
+      "type Server struct { db interface{} }",
+      "",
+      "func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {",
+      '    w.Header().Set("Content-Type", "application/json")',
+      '    json.NewEncoder(w).Encode(map[string]string{"status": "ok"})',
+      "}",
+      "",
+      "func main() {",
+      "    mux := http.NewServeMux()",
+      "    srv := &Server{}",
+      '    mux.HandleFunc("/api/items", srv.handleList)',
+      '    httpSrv := &http.Server{Addr: ":8080", Handler: mux}',
+      "    log.Fatal(httpSrv.ListenAndServe())",
+      "}",
+      ...Array.from({ length: 30 }, (_, i) => `// line ${i}`),
+    ].join("\n");
+    const findings = analyzeCiCd(code, "go");
+    const absenceFindings = findings.filter((f) => f.isAbsenceBased && /test|lint|build/i.test(f.title));
+    assert.strictEqual(absenceFindings.length, 0, "CI/CD absence rules should not fire on Go server files");
+  });
+});
+
+describe("CI/CD absence gating — Rust Actix-web server", () => {
+  it("should NOT flag missing tests/lint/build on a Rust server file", () => {
+    const code = [
+      "use actix_web::{web, App, HttpServer, HttpResponse};",
+      "use serde::Serialize;",
+      "",
+      "#[derive(Serialize)]",
+      "struct Item { id: i32, name: String }",
+      "",
+      "async fn list_items() -> HttpResponse {",
+      '    HttpResponse::Ok().json(vec![Item { id: 1, name: "Widget".into() }])',
+      "}",
+      "",
+      "async fn health() -> HttpResponse {",
+      '    HttpResponse::Ok().json(serde_json::json!({"status": "healthy"}))',
+      "}",
+      "",
+      "#[actix_web::main]",
+      "async fn main() -> std::io::Result<()> {",
+      "    HttpServer::new(|| {",
+      "        App::new()",
+      '            .route("/api/items", web::get().to(list_items))',
+      '            .route("/health", web::get().to(health))',
+      "    })",
+      '    .bind("0.0.0.0:8080")?',
+      "    .run()",
+      "    .await",
+      "}",
+      ...Array.from({ length: 30 }, (_, i) => `// line ${i}`),
+    ].join("\n");
+    const findings = analyzeCiCd(code, "rust");
+    const absenceFindings = findings.filter((f) => f.isAbsenceBased && /test|lint|build/i.test(f.title));
+    assert.strictEqual(absenceFindings.length, 0, "CI/CD absence rules should not fire on Rust server files");
+  });
+});
+
+// ─── v3.20.0 — Framework-aware auth pattern detection ────────────────────────
+
+describe("Auth — Python FastAPI with OAuth2PasswordBearer", () => {
+  it("should NOT flag missing auth middleware when OAuth2PasswordBearer is used", () => {
+    const code = [
+      "from fastapi import FastAPI, Depends",
+      "from fastapi.security import OAuth2PasswordBearer",
+      "",
+      "app = FastAPI()",
+      'oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")',
+      "",
+      "def get_current_user(token: str = Depends(oauth2_scheme)):",
+      '    return {"user": "test"}',
+      "",
+      '@app.get("/api/users")',
+      "def list_users(user = Depends(get_current_user)):",
+      '    return [{"id": 1}]',
+      "",
+      '@app.post("/api/users")',
+      "def create_user(user = Depends(get_current_user)):",
+      '    return {"created": True}',
+      ...Array.from({ length: 10 }, (_, i) => `# padding ${i}`),
+    ].join("\n");
+    const findings = analyzeAuthentication(code, "python");
+    const noAuthFindings = findings.filter((f) => /without.*auth/i.test(f.title));
+    assert.strictEqual(noAuthFindings.length, 0, "OAuth2PasswordBearer should be recognized as auth middleware");
+  });
+});
+
+describe("Auth — Go with jwt.Parse middleware", () => {
+  it("should NOT flag missing auth middleware when jwt.Parse is used", () => {
+    const code = [
+      "package main",
+      "",
+      "import (",
+      '    "net/http"',
+      '    "github.com/golang-jwt/jwt/v5"',
+      ")",
+      "",
+      "func authMiddleware(next http.HandlerFunc) http.HandlerFunc {",
+      "    return func(w http.ResponseWriter, r *http.Request) {",
+      '        tokenStr := r.Header.Get("Authorization")',
+      "        token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {",
+      '            return []byte("secret"), nil',
+      "        })",
+      "        if err != nil || !token.Valid {",
+      '            http.Error(w, "unauthorized", http.StatusUnauthorized)',
+      "            return",
+      "        }",
+      "        next.ServeHTTP(w, r)",
+      "    }",
+      "}",
+      "",
+      "func handleItems(w http.ResponseWriter, r *http.Request) {",
+      '    w.Write([]byte("items"))',
+      "}",
+      "",
+      "func main() {",
+      "    mux := http.NewServeMux()",
+      '    mux.HandleFunc("/api/items", authMiddleware(handleItems))',
+      "}",
+    ].join("\n");
+    const findings = analyzeAuthentication(code, "go");
+    const noAuthFindings = findings.filter((f) => /without.*auth/i.test(f.title));
+    assert.strictEqual(
+      noAuthFindings.length,
+      0,
+      "jwt.Parse and authMiddleware should be recognized as auth middleware",
+    );
+  });
+});
+
+describe("Auth — Rust with jsonwebtoken DecodingKey", () => {
+  it("should NOT flag missing auth middleware when DecodingKey/authenticate is used", () => {
+    const code = [
+      "use actix_web::{web, HttpResponse, HttpRequest};",
+      "use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};",
+      "",
+      "fn authenticate(req: &HttpRequest, secret: &str) -> Result<Claims, ApiError> {",
+      '    let header = req.headers().get("Authorization")',
+      '        .ok_or(ApiError::Unauthorized("Missing header".into()))?;',
+      "    let token = header.to_str().ok()?;",
+      "    let key = DecodingKey::from_secret(secret.as_bytes());",
+      "    let data = decode::<Claims>(token, &key, &Validation::new(Algorithm::HS256))",
+      "        .map_err(|e| ApiError::Unauthorized(e.to_string()))?;",
+      "    Ok(data.claims)",
+      "}",
+      "",
+      "async fn list_items(req: HttpRequest) -> HttpResponse {",
+      '    HttpResponse::Ok().json(vec!["item1"])',
+      "}",
+      "",
+      "async fn create_item(req: HttpRequest) -> HttpResponse {",
+      '    HttpResponse::Created().json("created")',
+      "}",
+      ...Array.from({ length: 10 }, (_, i) => `// padding ${i}`),
+    ].join("\n");
+    const findings = analyzeAuthentication(code, "rust");
+    const noAuthFindings = findings.filter((f) => /without.*auth/i.test(f.title));
+    assert.strictEqual(
+      noAuthFindings.length,
+      0,
+      "Rust authenticate fn with DecodingKey should be recognized as auth middleware",
+    );
+  });
+});
+
+describe("Auth — C# with [Authorize] attribute", () => {
+  it("should NOT flag missing auth middleware when [Authorize] is used", () => {
+    const code = [
+      "using Microsoft.AspNetCore.Authorization;",
+      "using Microsoft.AspNetCore.Mvc;",
+      "",
+      "[ApiController]",
+      '[Route("api/[controller]")]',
+      "[Authorize]",
+      "public class OrdersController : ControllerBase",
+      "{",
+      "    [HttpGet]",
+      '    public IActionResult GetOrders() => Ok(new[] { "order1" });',
+      "",
+      "    [HttpPost]",
+      '    public IActionResult CreateOrder() => Created("", "created");',
+      "",
+      '    [HttpGet("admin")]',
+      '    [Authorize(Roles = "Admin")]',
+      '    public IActionResult GetAll() => Ok(new[] { "all" });',
+      "}",
+      ...Array.from({ length: 10 }, (_, i) => `// padding ${i}`),
+    ].join("\n");
+    const findings = analyzeAuthentication(code, "csharp");
+    const noAuthFindings = findings.filter((f) => /without.*auth/i.test(f.title));
+    assert.strictEqual(noAuthFindings.length, 0, "C# [Authorize] attribute should be recognized as auth middleware");
+  });
+});
+
+// ─── v3.20.0 — Magic number tuning ──────────────────────────────────────────
+
+describe("Magic numbers — numbers inside string literals", () => {
+  it("should NOT flag port numbers inside string literals", () => {
+    const code = [
+      "package main",
+      "",
+      'import "net/http"',
+      "",
+      "func main() {",
+      '    addr := ":8080"',
+      "    srv := &http.Server{Addr: addr}",
+      "    srv.ListenAndServe()",
+      ...Array.from({ length: 45 }, (_, i) => `    // line ${i}`),
+      "}",
+    ].join("\n");
+    const findings = analyzeMaintainability(code, "go");
+    const magicFindings = findings.filter((f) => /magic/i.test(f.title));
+    assert.strictEqual(magicFindings.length, 0, "Port number in string literal should not be flagged");
+  });
+});
+
+describe("Magic numbers — named constant declarations", () => {
+  it("should NOT flag well-named const declarations", () => {
+    const code = [
+      "const POOL_RECYCLE_SECONDS = 3600;",
+      "const MAX_BUFFER_SIZE = 4096;",
+      "const DEFAULT_PORT = 8080;",
+      "const HEARTBEAT_MS = 5000;",
+      "",
+      "function createServer() {",
+      "    const server = { port: DEFAULT_PORT };",
+      "    return server;",
+      "}",
+      ...Array.from({ length: 45 }, (_, i) => `// line ${i}`),
+    ].join("\n");
+    const findings = analyzeMaintainability(code, "typescript");
+    const magicFindings = findings.filter((f) => /magic/i.test(f.title));
+    assert.strictEqual(magicFindings.length, 0, "Named constants should not be flagged as magic numbers");
+  });
+});
+
+describe("Magic numbers — keyword arguments (Python)", () => {
+  it("should NOT flag named keyword arguments", () => {
+    const code = [
+      "from sqlalchemy import create_engine",
+      "",
+      'DATABASE_URL = os.environ["DATABASE_URL"]',
+      "",
+      "engine = create_engine(",
+      "    DATABASE_URL,",
+      "    pool_size=10,",
+      "    max_overflow=20,",
+      "    pool_recycle=3600,",
+      ")",
+      "",
+      "def get_connection():",
+      "    return engine.connect()",
+      ...Array.from({ length: 45 }, (_, i) => `# line ${i}`),
+    ].join("\n");
+    const findings = analyzeMaintainability(code, "python");
+    const magicFindings = findings.filter((f) => /magic/i.test(f.title));
+    assert.strictEqual(magicFindings.length, 0, "Keyword arguments should not be flagged as magic numbers");
+  });
+});
+
+describe("Magic numbers — Rust string literal port", () => {
+  it("should NOT flag port in Rust string literal", () => {
+    const code = [
+      "use std::env;",
+      "",
+      "fn main() {",
+      '    let addr = env::var("LISTEN_ADDR")',
+      '        .unwrap_or_else(|_| "0.0.0.0:8080".to_string());',
+      '    println!("Listening on {}", addr);',
+      ...Array.from({ length: 48 }, (_, i) => `    // line ${i}`),
+      "}",
+    ].join("\n");
+    const findings = analyzeMaintainability(code, "rust");
+    const magicFindings = findings.filter((f) => /magic/i.test(f.title));
+    assert.strictEqual(magicFindings.length, 0, "Port in Rust string literal should not be flagged");
   });
 });

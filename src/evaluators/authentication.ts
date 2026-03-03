@@ -114,7 +114,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   });
   const hasRoutes = actualRouteLines.length > 0;
   const hasAuthMiddleware =
-    /(?:authenticate|authorize|requireAuth|ensureAuth|isAuthenticated|verifyToken|passport\.authenticate|jwt\.verify|auth\(\)|protect|guard|requireLogin|@login_required|@requires_auth|@Authorize|@PreAuthorize|@Secured)/gi.test(
+    /(?:authenticate|authorize|requireAuth|ensureAuth|isAuthenticated|verifyToken|passport\.authenticate|jwt\.verify|jwt\.decode|jwt\.Parse|jwt\.ParseWithClaims|OAuth2PasswordBearer|DecodingKey|\[Authorize|authMiddleware|auth_middleware|verify_token|check_auth|get_current_user|getCurrentUser|auth\(\)|protect|guard|requireLogin|@login_required|@requires_auth|@Authorize|@PreAuthorize|@Secured)/gi.test(
       code,
     );
   // Suppress when endpoints are explicitly marked as public/anonymous or are standard health-check routes

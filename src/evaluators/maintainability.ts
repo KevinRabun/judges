@@ -36,6 +36,18 @@ export function analyzeMaintainability(code: string, language: string): Finding[
     // Skip imports, comments, and obvious non-magic contexts
     if (/^\s*\/\/|^\s*\*|^\s*import|^\s*#|\.padStart|\.padEnd|\.slice|ruleNum|ruleId|String\(/.test(line)) continue;
     if (/(?<![.\w"'`])(?:86400|3600|1000|5000|8080|3000|4200|8000|1024|2048|4096)\b/.test(line)) {
+      // Skip numbers inside string literals (e.g., ":8080", "localhost:3000")
+      if (/["'`][^"'`]*\b(?:86400|3600|1000|5000|8080|3000|4200|8000|1024|2048|4096)\b[^"'`]*["'`]/.test(line))
+        continue;
+      // Skip named constant declarations (e.g., const TIMEOUT_MS = 3600)
+      if (
+        /(?:const|let|var|val|final|static|#define|pub\s+(?:const|static))\s+\w{2,}\s*[:=].*\b(?:86400|3600|1000|5000|8080|3000|4200|8000|1024|2048|4096)\b/.test(
+          line,
+        )
+      )
+        continue;
+      // Skip keyword arguments / named parameters (e.g., pool_recycle=3600, timeout=5000)
+      if (/[a-zA-Z_]\w{2,}\s*=\s*\b(?:86400|3600|1000|5000|8080|3000|4200|8000|1024|2048|4096)\b/.test(line)) continue;
       magicLines.push(i + 1);
     }
   }

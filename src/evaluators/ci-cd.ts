@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, testCode } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, testCode, classifyFile } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCiCd(code: string, language: string): Finding[] {
@@ -7,6 +7,12 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   let ruleNum = 1;
   const prefix = "CICD";
   const _lang = getLangFamily(language);
+
+  // CI/CD absence rules (no tests, no lint, no build script) are project-level
+  // concerns — they belong in config/manifest files (package.json, Cargo.toml),
+  // not in individual application source files. Skip them on server/utility code.
+  const fileCategory = classifyFile(code, language);
+  const isAppSourceFile = fileCategory === "server" || fileCategory === "utility";
 
   // No test script (multi-language test detection)
   const hasTestScript =
@@ -17,7 +23,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   // HTML/markup files are not application source code — skip CI/CD rules
   // that assume testable imperative logic.
   const isMarkupFile = /^\s*<(!DOCTYPE|html|head|body|meta|link)/im.test(code);
-  if (isSourceCode && !isMarkupFile && !hasTestScript && code.split("\n").length > 40) {
+  if (!isAppSourceFile && isSourceCode && !isMarkupFile && !hasTestScript && code.split("\n").length > 40) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -36,7 +42,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
 
   // No lint configuration
   const hasLint = testCode(code, /eslint|prettier|tslint|stylelint|rubocop|pylint|flake8|black|rustfmt|clippy|biome/gi);
-  if (isSourceCode && !hasLint && code.split("\n").length > 40) {
+  if (!isAppSourceFile && isSourceCode && !hasLint && code.split("\n").length > 40) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -93,7 +99,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   const hasBuildScript =
     testCode(code, /["']build["']\s*:\s*["']/gi) ||
     testCode(code, /tsc|webpack|vite|rollup|esbuild|babel|make\s+build|gradle\s+build|mvn\s+package/gi);
-  if (isSourceCode && !hasBuildScript && code.split("\n").length > 40) {
+  if (!isAppSourceFile && isSourceCode && !hasBuildScript && code.split("\n").length > 40) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "info",

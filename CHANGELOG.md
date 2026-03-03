@@ -2,6 +2,21 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.19.1] — 2026-03-03
+
+### Fixed
+- **CI/CD absence gating on application source files** — CI/CD absence rules (no test infrastructure, no linting, no build script) now skip files classified as server or utility code. These project-level concerns belong in config/manifest files, not individual application source files. Eliminates ~8 FPs across the 6-language sweep.
+- **Framework-aware auth pattern expansion** — `hasAuthMiddleware` regex expanded from 14 to 24 alternatives, adding language-specific patterns: Python (`jwt.decode`, `OAuth2PasswordBearer`, `get_current_user`), Go (`jwt.Parse`, `jwt.ParseWithClaims`), Rust (`DecodingKey`, `auth_middleware`), C# (`[Authorize]`), and generic (`verify_token`, `check_auth`, `getCurrentUser`).
+- **Magic number detection tuning** — Three new exclusions reduce false positives: (1) numbers inside string literals (e.g., `":8080"`), (2) named constant declarations (`const PORT = 8080`), (3) keyword arguments (`pool_recycle=3600`).
+
+### Tests
+- 11 new negative tests covering all three FP reduction changes
+- All 1,376 tests pass (963 judges + 204 negative + 209 subsystems)
+
+### Metrics
+- Cross-language FP sweep: 152 → 139 findings (−13, ~8.6% reduction)
+- Cumulative since v3.18.3: 170 → 139 findings (−31, ~18.2% reduction)
+
 ## [3.19.0] — 2026-03-04
 
 ### Added

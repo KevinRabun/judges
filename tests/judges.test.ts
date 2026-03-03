@@ -220,7 +220,7 @@ const JUDGE_EXPECTATIONS: Record<string, { prefix: string; minFindings: number; 
   ux: { prefix: "UX", minFindings: 2 },
   "logging-privacy": { prefix: "LOGPRIV", minFindings: 3, expectVerdict: "fail" },
   "rate-limiting": { prefix: "RATE", minFindings: 3, expectVerdict: "fail" },
-  "ci-cd": { prefix: "CICD", minFindings: 3 },
+  "ci-cd": { prefix: "CICD", minFindings: 2 },
   "code-structure": { prefix: "STRUCT", minFindings: 1 },
 };
 

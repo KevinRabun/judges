@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.19.1] — 2026-03-03
+
+### Fixed
+- **FP reduction round 6** — CI/CD absence gating on app source files, expanded auth pattern detection for 4 additional languages, and magic number exclusions for string literals, named constants, and keyword arguments. Cross-language findings reduced from 152 → 139 (−8.6%); see [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.19.0] — 2026-03-04
 
 ### Added
