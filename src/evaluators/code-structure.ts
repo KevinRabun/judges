@@ -129,7 +129,7 @@ export function analyzeCodeStructure(code: string, language: string): Finding[] 
       reference: "Code Quality — Dead Code Elimination",
       suggestedFix:
         "Delete the unreachable statements after return/throw/break/continue, or restructure control flow so the code is reachable.",
-      confidence: 0.85,
+      confidence: 0.7,
     });
   }
 

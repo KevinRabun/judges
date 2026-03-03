@@ -231,7 +231,7 @@ describe("Individual Judge Evaluations", () => {
       const expectations = JUDGE_EXPECTATIONS[judge.id];
 
       it("should evaluate without throwing", () => {
-        evaluation = evaluateWithJudge(judge, sampleCode, "typescript");
+        evaluation = evaluateWithJudge(judge, sampleCode, "typescript", undefined, { projectMode: true });
         assert.ok(evaluation);
       });
 
@@ -2211,7 +2211,7 @@ app.post("/login", async (req, res) => {
   }
 });
 `;
-    const evaluation = evaluateWithJudge(judge!, sessionFixCode, "typescript");
+    const evaluation = evaluateWithJudge(judge!, sessionFixCode, "typescript", undefined, { projectMode: true });
     const sessionFix = evaluation.findings.filter((f) => f.title.includes("session regeneration"));
     assert.ok(sessionFix.length > 0, "Expected session fixation finding for missing session.regenerate()");
   });
@@ -2258,7 +2258,7 @@ async function fetchWithRetry(url: string, maxRetries = 3) {
   throw new Error("Max retries exceeded");
 }
 `;
-    const evaluation = evaluateWithJudge(judge!, retryCode, "typescript");
+    const evaluation = evaluateWithJudge(judge!, retryCode, "typescript", undefined, { projectMode: true });
     const retryBackoff = evaluation.findings.filter((f) => f.title.includes("Retry") && f.title.includes("backoff"));
     assert.ok(retryBackoff.length > 0, "Expected retry-without-backoff finding");
   });
@@ -3004,7 +3004,7 @@ app.post("/api/login", async (req, res) => {
 });
 app.listen(3000);
 `;
-    const evaluation = evaluateWithJudge(judge!, serverCode, "typescript");
+    const evaluation = evaluateWithJudge(judge!, serverCode, "typescript", undefined, { projectMode: true });
     const rateFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("RATE-"));
     assert.ok(rateFindings.length > 0, "Expected RATE findings for unprotected server");
   });
@@ -3020,7 +3020,7 @@ app.post("/signin", signinHandler);
 app.post("/authenticate", authHandler);
 app.listen(3000);
 `;
-    const evaluation = evaluateWithJudge(judge!, authCode, "typescript");
+    const evaluation = evaluateWithJudge(judge!, authCode, "typescript", undefined, { projectMode: true });
     const authRateFindings = evaluation.findings.filter((f) => f.title.includes("auth") || f.title.includes("Auth"));
     assert.ok(authRateFindings.length > 0, "Expected auth rate limiting finding");
   });
@@ -3035,7 +3035,7 @@ app.use(express.json());
 app.post("/login", loginHandler);
 app.listen(3000);
 `;
-    const evaluation = evaluateWithJudge(judge!, serverCode, "typescript");
+    const evaluation = evaluateWithJudge(judge!, serverCode, "typescript", undefined, { projectMode: true });
     const fixFindings = evaluation.findings.filter((f) => f.ruleId.startsWith("RATE-") && f.suggestedFix);
     assert.ok(fixFindings.length > 0, "Expected at least one RATE finding with suggestedFix");
   });
@@ -3333,7 +3333,7 @@ app.get("/api/users", handler);
 app.post("/api/orders", handler);
 app.put("/api/products/:id", handler);
 `;
-    const evaluation = evaluateWithJudge(judge!, routeCode, "typescript");
+    const evaluation = evaluateWithJudge(judge!, routeCode, "typescript", undefined, { projectMode: true });
     const versionFindings = evaluation.findings.filter(
       (f) => f.ruleId.startsWith("COMPAT-") && (f.title.includes("version") || f.title.includes("Version")),
     );
@@ -3415,7 +3415,7 @@ app.get("/api/popular", async (req, res) => {
   res.json(popular);
 });
 `;
-    const evaluation = evaluateWithJudge(judge!, noCacheHeaderCode, "typescript");
+    const evaluation = evaluateWithJudge(judge!, noCacheHeaderCode, "typescript", undefined, { projectMode: true });
     const headerFindings = evaluation.findings.filter(
       (f) =>
         f.title.includes("caching header") || f.title.includes("Cache-Control") || f.title.includes("HTTP caching"),
@@ -3497,7 +3497,7 @@ class UserService {
   }
 }
 `;
-    const evaluation = evaluateWithJudge(judge!, noTestCode, "typescript");
+    const evaluation = evaluateWithJudge(judge!, noTestCode, "typescript", undefined, { projectMode: true });
     const testFindings = evaluation.findings.filter((f) => f.title.includes("test") || f.title.includes("Test"));
     assert.ok(testFindings.length > 0, "Expected no-test-infrastructure findings");
   });
@@ -3579,7 +3579,7 @@ app.get("/api/search", async (req, res) => {
 
 app.listen(3000);
 `;
-    const evaluation = evaluateWithJudge(judge!, noHealthCheckCode, "typescript");
+    const evaluation = evaluateWithJudge(judge!, noHealthCheckCode, "typescript", undefined, { projectMode: true });
     const healthFindings = evaluation.findings.filter((f) => f.title.includes("health") || f.title.includes("Health"));
     assert.ok(healthFindings.length > 0, "Expected missing health check findings");
   });
@@ -4232,7 +4232,7 @@ app.get("/api/orders", listOrders);
 app.post("/api/orders", createOrder);
 app.get("/api/items", listItems);
 `;
-    const evaluation = evaluateWithJudge(judge!, noHealthCode, "typescript");
+    const evaluation = evaluateWithJudge(judge!, noHealthCode, "typescript", undefined, { projectMode: true });
     const healthFindings = evaluation.findings.filter((f) => f.title.includes("health") || f.title.includes("Health"));
     assert.ok(healthFindings.length > 0, "Expected missing health check findings");
   });
@@ -9406,7 +9406,7 @@ class UserService {
   }
 }
 `;
-    const evaluation = evaluateWithJudge(judge!, noExportCode, "typescript");
+    const evaluation = evaluateWithJudge(judge!, noExportCode, "typescript", undefined, { projectMode: true });
     const exportFindings = evaluation.findings.filter(
       (f) => f.title.includes("portability") || f.title.includes("export"),
     );

@@ -380,29 +380,10 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     }
   }
 
-  // ── 12. CI/CD absence findings are project-level concerns ──
-  // CI/CD absence rules (no tests, no linting, no build script, etc.) check for
-  // project-level infrastructure. Firing on every source file is redundant —
-  // these should only surface once via project-level analysis. Suppress them on
-  // individual source files since the project evaluator aggregates them.
-  if (finding.isAbsenceBased && finding.ruleId.startsWith("CICD-")) {
-    return "CI/CD absence finding is a project-level concern — suppressed at file level to avoid per-file noise.";
-  }
-
-  // ── 13. SOV absence findings on files without data operations ──
-  // Data sovereignty rules are only meaningful on files that perform data
-  // storage, retrieval, or network transfer. Firing on utility functions,
-  // type definitions, or UI components is noise.
-  if (finding.isAbsenceBased && finding.ruleId.startsWith("SOV-")) {
-    const codeStr = lines.join("\n");
-    const hasDataOps =
-      /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE\s+TABLE)\b|\.(?:query|execute|find|findOne|findMany|save|create|update|delete|remove|aggregate)\s*\(|(?:fetch|axios|got|request|http|https)\s*[.(]|(?:db|database|store|storage|repository|collection|model|prisma|knex|sequelize|typeorm|mongoose|redis|cache)\s*\./i.test(
-        codeStr,
-      );
-    if (!hasDataOps) {
-      return "SOV absence finding on file without data storage/transfer operations — not relevant.";
-    }
-  }
+  // ── 12. (reserved — absence gating moved upstream to evaluateWithJudge) ──
+  // Absence-based rules are gated by projectMode in evaluateWithJudge():
+  // suppressed in single-file mode, allowed in project mode. No need for
+  // a file-level heuristic here.
 
   return null;
 }

@@ -63,6 +63,14 @@ export interface EvaluationOptions {
    * priority items are dropped. Defaults to 20. Set to 0 to disable.
    */
   maxFindingsPerFile?: number;
+  /**
+   * When true, absence-based findings ("no rate limiting", "no monitoring",
+   * etc.) are kept for cross-file resolution in project-level analysis.
+   * When false (default), absence-based findings are suppressed because they
+   * are project-level concerns that cannot be accurately assessed from a
+   * single file — the missing capability may exist in another module.
+   */
+  projectMode?: boolean;
   /** @internal — pre-computed AST structure for the file (set by evaluateWithTribunal) */
   _astCache?: CodeStructure;
   /** @internal — pre-computed taint flows for the file (set by evaluateWithTribunal) */
@@ -379,16 +387,21 @@ export function evaluateWithJudge(
     findings.push(...judge.analyze(code, language));
   }
 
-  // ── File-type gating: suppress absence-based findings on non-server files ──
+  // ── Absence gating ──
+  // Absence-based findings ("no rate limiting", "no monitoring", etc.) are
+  // project-level concerns that cannot be accurately assessed from a single
+  // file — the missing capability may exist in another module, middleware,
+  // or infrastructure layer. Suppress them entirely in single-file mode.
+  // In project mode (evaluateProject), keep them for cross-file resolution.
   const fileCategory = classifyFile(code, language, options?.filePath);
-  const gatedFindings = shouldRunAbsenceRules(fileCategory)
-    ? findings
-    : findings.filter((f) => !isAbsenceBasedFinding(f));
+  const isProjectMode = options?.projectMode === true;
+  const allowAbsence = shouldRunAbsenceRules(fileCategory) && isProjectMode;
+  const gatedFindings = allowAbsence ? findings : findings.filter((f) => !isAbsenceBasedFinding(f));
 
   // ── Tag & demote remaining absence-based findings ──
-  // In single-file mode, absence-based findings are inherently lower confidence
-  // because the missing capability may exist in another file. Cap their severity
-  // at 'medium' and tag them for downstream consumers.
+  // In project mode, absence-based findings are kept but demoted: cap severity
+  // at 'medium' and confidence at 0.6 since the missing capability may still
+  // exist in another file not yet analyzed.
   const taggedFindings = gatedFindings.map((f) => {
     if (isAbsenceBasedFinding(f)) {
       const cappedSeverity: Record<string, string> = { critical: "medium", high: "medium" };
@@ -571,7 +584,8 @@ export function evaluateProject(
   options?: EvaluationOptions,
 ): ProjectVerdict {
   const runner: TribunalRunner = { evaluateWithTribunal };
-  return _evaluateProject(runner, files, context, options);
+  // Enable project mode so absence-based findings survive for cross-file resolution
+  return _evaluateProject(runner, files, context, { ...options, projectMode: true });
 }
 
 // ─── Diff-based Incremental Analysis ──────────────────────────────────────────

@@ -344,6 +344,12 @@ function detectDeadCode(lines: string[], language: string): number[] {
     ? /^\s*(return|raise|break|continue|sys\.exit|exit)\b/
     : /^\s*(return|throw|break|continue|panic!?|Environment\.Exit|System\.exit|os\.Exit)\s*[;(\s]/;
 
+  // Patterns that reset unreachable state — these introduce a new reachable
+  // branch at the same scope (e.g. else, case, catch, finally).
+  const scopeResetPatterns = isPython
+    ? /^\s*(else\s*:|elif\s|except\s|finally\s*:|case\s)/
+    : /^\s*(else\s*\{|else\s*$|else\s+if\s*\(|case\s|default\s*:|catch\s*[\s(]|finally\s*\{)/;
+
   // Brace-tracking for scoped dead code analysis
   let depth = 0;
   let unreachableAtDepth = -1;
@@ -373,6 +379,11 @@ function detectDeadCode(lines: string[], language: string): number[] {
           depth--;
         }
       }
+    }
+
+    // Scope-reset: else/case/catch/finally introduce a new reachable branch
+    if (unreachableAtDepth >= 0 && scopeResetPatterns.test(trimmed)) {
+      unreachableAtDepth = -1;
     }
 
     // If we're in unreachable territory at this scope
@@ -450,7 +461,8 @@ function detectWeakTypes(lines: string[], language: string): number[] {
   const patterns: Record<string, RegExp> = {
     python: /\bAny\b|\btyping\.Any\b|\bcast\s*\(/,
     rust: /\bunsafe\b|\bas\s+\*(?:const|mut)\b/,
-    go: /\binterface\s*\{\s*\}|\bany\b/,
+    // Go's interface{} and any are idiomatic — only flag unsafe.Pointer
+    go: /\bunsafe\.Pointer\b/,
     java: /\bObject\b(?!\s*\.class)|\bClass<\?>/,
     csharp: /\bdynamic\b|\bobject\b/,
   };

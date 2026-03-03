@@ -184,8 +184,10 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   }
 
   // Detect importing specific vs barrel imports (multi-language wildcard detection)
+  // Skip Java wildcard imports — tree-shaking is a JS/TS concept; Java wildcard
+  // imports don't affect binary size and are a style preference, not a defect.
   const barrelImportLines: number[] = [];
-  const wildcardImportLines = getLangLineNumbers(code, language, LP.WILDCARD_IMPORT);
+  const wildcardImportLines = language === "java" ? [] : getLangLineNumbers(code, language, LP.WILDCARD_IMPORT);
   lines.forEach((line, i) => {
     if (isCommentLine(line)) return;
     if (/import\s+\{[^}]{100,}\}\s+from/i.test(line)) {

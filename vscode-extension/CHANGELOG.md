@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.19.4] — 2026-03-04
+
+### Changed
+- **Absence gating** — Absence-based findings (missing rate limiting, health checks, etc.) now suppressed in single-file mode; only surface during project-level analysis. Eliminates ~78 per-file false positives.
+
+### Fixed
+- **Language-idiomatic FP fixes** — Go `interface{}`/`any` and `os.ReadFile`, Java wildcard imports, error message prose, C# middleware error handling, and dead code scope boundaries no longer produce false positives. Cross-language findings reduced from 139 → 134.
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.19.4 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.19.3] — 2026-03-03
 
 ### Fixed

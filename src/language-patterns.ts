@@ -212,7 +212,10 @@ export const WEAK_TYPE = {
   rust: String.raw`unsafe\s*\{|as\s+\*(?:const|mut)`,
   csharp: String.raw`:\s*dynamic\b|:\s*object\b|as\s+object\b`,
   java: String.raw`:\s*Object\b|<\s*\?\s*>|@SuppressWarnings\s*\(\s*["']unchecked["']\s*\)`,
-  go: String.raw`interface\s*\{\s*\}|any\b`,
+  // Go's interface{} and any are idiomatic — they are the standard way to
+  // accept arbitrary types (pre-1.18 and post-1.18 respectively). Only flag
+  // unsafe pointer casts which genuinely bypass the type system.
+  go: String.raw`unsafe\.Pointer`,
 };
 
 // ── Async / Concurrency ─────────────────────────────────────────────────────

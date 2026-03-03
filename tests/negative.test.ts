@@ -43,6 +43,8 @@ import { analyzeFrameworkSafety } from "../src/evaluators/framework-safety.js";
 import { analyzeErrorHandling } from "../src/evaluators/error-handling.js";
 import { analyzeMaintainability } from "../src/evaluators/maintainability.js";
 import { analyzeIacSecurity } from "../src/evaluators/iac-security.js";
+import { analyzeDependencyHealth } from "../src/evaluators/dependency-health.js";
+import { analyzeCodeStructure } from "../src/evaluators/code-structure.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 
@@ -676,7 +678,7 @@ app.listen(3000, () => {
 `;
 
     it("absence-based findings should have isAbsenceBased=true", () => {
-      const verdict = evaluateWithTribunal(serverCode, "typescript");
+      const verdict = evaluateWithTribunal(serverCode, "typescript", undefined, { projectMode: true });
       const absenceFindings = verdict.findings.filter((f) => f.isAbsenceBased);
       // A bare server should have some absence-based findings (no rate limit, no error handler, etc.)
       assert.ok(absenceFindings.length > 0, "Expected some absence-based findings on bare server");
@@ -5031,5 +5033,254 @@ describe("IaC Security — Bicep resource-name parameters", () => {
       secureFindings.length >= 2,
       `Expected >=2 secure findings for actual secrets, got ${secureFindings.length}`,
     );
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// v3.19.4 FP Regression — Language-Idiomatic Fixes
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("FP Regression — Go interface{}/any should NOT trigger weak type findings", () => {
+  it("should NOT flag Go interface{} as weak type", () => {
+    const code = `
+package main
+
+type Handler func(ctx context.Context, data interface{}) error
+
+func processEvent(handler Handler, payload interface{}) error {
+    return handler(context.Background(), payload)
+}
+`;
+    const findings = analyzeMaintainability(code, "go");
+    const weakTypeFindings = findings.filter(
+      (f) => f.title.includes("Weak") || f.title.includes("weak") || f.ruleId.includes("WEAK"),
+    );
+    assert.strictEqual(
+      weakTypeFindings.length,
+      0,
+      "Go interface{} is idiomatic and should not be flagged as weak type",
+    );
+  });
+
+  it("should NOT flag Go 'any' keyword as weak type", () => {
+    const code = `
+package main
+
+func marshal(v any) ([]byte, error) {
+    return json.Marshal(v)
+}
+
+func unmarshal(data []byte, v any) error {
+    return json.Unmarshal(data, v)
+}
+`;
+    const findings = analyzeMaintainability(code, "go");
+    const weakTypeFindings = findings.filter(
+      (f) => f.title.includes("Weak") || f.title.includes("weak") || f.ruleId.includes("WEAK"),
+    );
+    assert.strictEqual(
+      weakTypeFindings.length,
+      0,
+      "Go 'any' is idiomatic (alias for interface{}) and should not be flagged",
+    );
+  });
+
+  it("should still flag Go unsafe.Pointer as weak type", () => {
+    const code = `
+package main
+
+import "unsafe"
+
+func cast(p unsafe.Pointer) *int {
+    return (*int)(p)
+}
+`;
+    const findings = analyzeMaintainability(code, "go");
+    const weakTypeFindings = findings.filter(
+      (f) =>
+        f.title.includes("Weak") || f.title.includes("weak") || f.title.includes("unsafe") || f.ruleId.includes("WEAK"),
+    );
+    assert.ok(weakTypeFindings.length > 0, "Go unsafe.Pointer should still be flagged");
+  });
+});
+
+describe("FP Regression — Java wildcard imports should NOT trigger DEPS findings", () => {
+  it("should NOT flag Java wildcard imports as tree-shaking issue", () => {
+    const code = `
+import java.util.*;
+import java.io.*;
+import javax.servlet.http.*;
+
+public class UserController {
+    public void handleRequest(HttpServletRequest req, HttpServletResponse res) {
+        List<String> users = new ArrayList<>();
+        users.add(req.getParameter("name"));
+    }
+}
+`;
+    const findings = analyzeDependencyHealth(code, "java");
+    const wildcardFindings = findings.filter(
+      (f) => f.title.includes("wildcard") || f.title.includes("Wildcard") || f.title.includes("tree-shak"),
+    );
+    assert.strictEqual(
+      wildcardFindings.length,
+      0,
+      "Java wildcard imports should not be flagged — tree-shaking is a JS concept",
+    );
+  });
+});
+
+describe("FP Regression — Go os.ReadFile should NOT trigger portability findings", () => {
+  it("should NOT flag Go os.ReadFile as non-portable file I/O", () => {
+    const code = `
+package main
+
+import (
+    "fmt"
+    "os"
+)
+
+func loadConfig(path string) ([]byte, error) {
+    data, err := os.ReadFile(path)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read config: %w", err)
+    }
+    return data, nil
+}
+`;
+    const findings = analyzePortability(code, "go");
+    const fileIOFindings = findings.filter(
+      (f) => f.title.includes("file") || f.title.includes("File") || f.title.includes("I/O"),
+    );
+    assert.strictEqual(fileIOFindings.length, 0, "Go os.ReadFile is standard library — not a portability issue");
+  });
+});
+
+describe("FP Regression — Error message strings should NOT trigger DATA-001", () => {
+  it("should NOT flag prose error messages as hardcoded credentials", () => {
+    const code = `
+function validateToken(token: string): boolean {
+  if (!token) {
+    throw new Error("Invalid authentication token provided");
+  }
+  if (token.length < 32) {
+    throw new Error("Token must be at least 32 characters long");
+  }
+  return true;
+}
+
+const API_KEY_ERROR = "Missing or invalid API key in request headers";
+`;
+    const findings = analyzeDataSecurity(code, "typescript");
+    const credFindings = findings.filter(
+      (f) => f.ruleId === "DATA-001" && (f.title.includes("credential") || f.title.includes("Credential")),
+    );
+    assert.strictEqual(credFindings.length, 0, "Prose error messages should not be flagged as hardcoded credentials");
+  });
+});
+
+describe("FP Regression — C# async with middleware error handling should NOT trigger ERR", () => {
+  it("should NOT flag missing try-catch when UseExceptionHandler is present", () => {
+    const code = `
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+app.UseExceptionHandler("/error");
+
+app.MapGet("/api/data", async () => {
+    var data = await GetDataAsync();
+    return Results.Ok(data);
+});
+
+app.MapPost("/api/submit", async (SubmitRequest req) => {
+    await ProcessAsync(req);
+    return Results.Created();
+});
+
+app.Run();
+`;
+    const findings = analyzeErrorHandling(code, "csharp");
+    const asyncErrFindings = findings.filter(
+      (f) => f.title.includes("Async") && (f.title.includes("try-catch") || f.title.includes("error")),
+    );
+    assert.strictEqual(
+      asyncErrFindings.length,
+      0,
+      "UseExceptionHandler provides centralized error handling — no need for per-method try-catch",
+    );
+  });
+});
+
+describe("FP Regression — Dead code in switch/case branches should NOT trigger STRUCT-005", () => {
+  it("should NOT flag code after return in one case branch as dead code in next branch", () => {
+    const code = `
+function handleStatus(status: string): string {
+  switch (status) {
+    case "active":
+      return "User is active";
+    case "inactive":
+      return "User is inactive";
+    case "pending":
+      return "User is pending";
+    default:
+      return "Unknown status";
+  }
+}
+
+function processResult(result: Result): void {
+  if (result.error) {
+    console.error(result.error);
+    return;
+  } else {
+    console.log(result.data);
+  }
+  // This line is reachable from the else branch
+  saveResult(result);
+}
+`;
+    const findings = analyzeCodeStructure(code, "typescript");
+    const deadCodeFindings = findings.filter(
+      (f) => f.ruleId === "STRUCT-005" || f.title.includes("dead code") || f.title.includes("Dead code"),
+    );
+    assert.strictEqual(deadCodeFindings.length, 0, "Code in adjacent case/else branches should not be flagged as dead");
+  });
+});
+
+describe("FP Regression — Absence gating in single-file mode", () => {
+  it("should suppress absence-based findings in single-file mode (no projectMode)", () => {
+    const judge = getJudge("rate-limiting");
+    assert.ok(judge, "rate-limiting judge should exist");
+
+    const serverCode = `
+const app = express();
+app.post("/api/login", async (req, res) => {
+  const user = await authenticate(req.body);
+  res.json({ token: user.token });
+});
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, serverCode, "typescript");
+    const absenceFindings = evaluation.findings.filter((f) => f.isAbsenceBased);
+    assert.strictEqual(absenceFindings.length, 0, "Absence findings should be suppressed in single-file mode");
+  });
+
+  it("should allow absence-based findings in project mode", () => {
+    const judge = getJudge("rate-limiting");
+    assert.ok(judge, "rate-limiting judge should exist");
+
+    const serverCode = `
+const app = express();
+app.post("/api/login", async (req, res) => {
+  const user = await authenticate(req.body);
+  res.json({ token: user.token });
+});
+app.listen(3000);
+`;
+    const evaluation = evaluateWithJudge(judge!, serverCode, "typescript", undefined, { projectMode: true });
+    const absenceFindings = evaluation.findings.filter((f) => f.isAbsenceBased);
+    assert.ok(absenceFindings.length > 0, "Absence findings should be allowed in project mode");
   });
 });

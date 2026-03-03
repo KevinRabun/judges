@@ -143,9 +143,12 @@ export function analyzePortability(code: string, language: string): Finding[] {
   }
 
   // Platform-specific line-ending handling
+  // Skip Go — `os.ReadFile` is the standard stdlib function, not a portability
+  // concern. The readFile/writeFile pattern is JS/Node-centric.
   const lineEndingPattern = /\\r\\n|\\r|CRLF|LF|line.?ending/gi;
   const hasExplicitLineEnding = testCode(code, lineEndingPattern);
-  const hasFileOps = testCode(code, /readFile|writeFile|createReadStream|createWriteStream|open\s*\(/gi);
+  const hasFileOps =
+    language === "go" ? false : testCode(code, /readFile|writeFile|createReadStream|createWriteStream|open\s*\(/gi);
   // Only flag if doing file I/O without line ending awareness
   if (hasFileOps && !hasExplicitLineEnding && code.split("\n").length > 30) {
     findings.push({

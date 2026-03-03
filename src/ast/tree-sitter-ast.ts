@@ -742,12 +742,9 @@ const WEAK_TYPE_PATTERNS: Record<string, (node: SyntaxNode) => boolean> = {
     return false;
   },
   go: (node) => {
-    // interface{} or any keyword
-    if (node.type === "interface_type") {
-      // Empty interface
-      return node.namedChildren.length === 0;
-    }
-    if (node.type === "type_identifier" && node.text === "any") return true;
+    // Go's interface{} and `any` are idiomatic, not weak types.
+    // Only flag unsafe pointer operations which genuinely bypass the type system.
+    if (node.type === "call_expression" && node.text.includes("unsafe.Pointer")) return true;
     return false;
   },
   rust: (node) => {

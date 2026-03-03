@@ -97,7 +97,14 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   // Async function without try/catch or .catch (multi-language)
   const asyncFuncLines = getLangLineNumbers(code, language, LP.ASYNC_FUNCTION);
   const tryCatchLines = getLangLineNumbers(code, language, LP.TRY_CATCH);
-  if (asyncFuncLines.length > 0 && tryCatchLines.length === 0) {
+  // C# ASP.NET apps commonly use middleware-based error handling (UseExceptionHandler,
+  // ExceptionFilter, middleware pipeline) — visible try/catch is not required per file.
+  const hasCSharpMiddlewareErrorHandling =
+    language === "csharp" &&
+    /UseExceptionHandler|ExceptionFilter|IExceptionFilter|HandleErrorAttribute|app\.Use[A-Z]|ProblemDetails/i.test(
+      code,
+    );
+  if (asyncFuncLines.length > 0 && tryCatchLines.length === 0 && !hasCSharpMiddlewareErrorHandling) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

@@ -867,6 +867,11 @@ export function looksLikeRealCredentialValue(value: string): boolean {
   )
     return false;
 
+  // Natural language strings (error messages, descriptions, etc.) are not secrets.
+  // Heuristic: if it contains 3+ space-separated words, it's likely prose.
+  const wordCount = normalized.split(/\s+/).filter((w) => w.length > 1).length;
+  if (wordCount >= 3) return false;
+
   const hasLower = /[a-z]/.test(normalized);
   const hasUpper = /[A-Z]/.test(normalized);
   const hasDigit = /\d/.test(normalized);

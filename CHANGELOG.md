@@ -2,6 +2,29 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.19.4] — 2026-03-04
+
+### Changed
+- **Absence gating via `projectMode` flag** — Absence-based findings (e.g., "no rate limiting detected", "no health check endpoint") are now suppressed in single-file evaluation and only surface during project-level analysis (`evaluateProject`). This eliminates ~78 per-file false positives that belong at the project level, not on individual source files. The `EvaluationOptions` type gains an optional `projectMode?: boolean` field; `evaluateProject()` sets it automatically.
+- **Consolidated absence filtering** — Removed duplicate absence filters from `filterFalsePositiveHeuristics` (rules 12 and 13); absence gating is now handled in a single location upstream in `evaluateWithJudge`.
+
+### Fixed
+- **Go `interface{}`/`any` no longer flagged as weak type** — The WEAK_TYPE pattern for Go now only flags `unsafe.Pointer`, not idiomatic Go empty interfaces. Changed in `language-patterns.ts`, `tree-sitter-ast.ts`, and `structural-parser.ts`. Eliminates 4 FPs in the cross-language sweep.
+- **Java wildcard imports no longer flagged** — `dependency-health.ts` skips wildcard import detection for Java, where `import java.util.*` is idiomatic. Eliminates 1 FP.
+- **Go `os.ReadFile` no longer flagged as portability issue** — `portability.ts` skips file I/O detection for Go, where `os.ReadFile` is the standard stdlib API with no portability concern.
+- **Error message prose no longer triggers DATA-001** — `looksLikeRealCredentialValue()` in `shared.ts` now checks word count; strings with 3+ words are recognized as prose/error messages rather than credential values.
+- **C# async with middleware error handling no longer triggers ERR** — `error-handling.ts` detects `UseExceptionHandler`, `ExceptionFilter`, and similar ASP.NET middleware patterns and suppresses redundant async error-handling findings.
+- **STRUCT-005 dead code no longer false-fires across scope boundaries** — `detectDeadCode()` in `structural-parser.ts` resets unreachable tracking at `else`/`elif`/`case`/`default`/`catch`/`finally`/`except` boundaries. Confidence reduced from 0.85 to 0.7.
+
+### Tests
+- 10 new negative regression tests covering all FP fixes above
+- All 1,449 tests pass (963 judges + 217 negative + 209 subsystems + 70 extension)
+
+### Metrics
+- Cross-language FP sweep: 139 → 134 findings (−5, ~3.6% reduction at evaluator level)
+- ~78 additional absence-based findings suppressed at pipeline level in single-file mode
+- Cumulative since v3.18.3: 170 → 134 findings (−36, ~21.2% reduction)
+
 ## [3.19.3] — 2026-03-03
 
 ### Fixed
