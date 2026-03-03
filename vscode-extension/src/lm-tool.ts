@@ -14,6 +14,8 @@ const LANG_MAP: Record<string, string> = {
   java: "java",
   csharp: "csharp",
   cpp: "cpp",
+  terraform: "terraform",
+  bicep: "bicep",
   powershell: "powershell",
 };
 

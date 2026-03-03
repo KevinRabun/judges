@@ -1,5 +1,13 @@
 import * as vscode from "vscode";
-import { evaluateWithTribunal, JUDGES, buildTribunalDeepReviewSection } from "@kevinrabun/judges/api";
+import {
+  evaluateWithTribunal,
+  JUDGES,
+  buildTribunalDeepReviewSection,
+  buildSimplifiedDeepReviewSection,
+  isContentPolicyRefusal,
+  DEEP_REVIEW_PROMPT_INTRO,
+  DEEP_REVIEW_IDENTITY,
+} from "@kevinrabun/judges/api";
 import type { Finding } from "@kevinrabun/judges/api";
 import type { JudgesDiagnosticProvider } from "./diagnostics";
 
@@ -575,13 +583,13 @@ async function handleDeepReview(
   const context = request.prompt.trim() || undefined;
   const deepReviewSection = buildTribunalDeepReviewSection(JUDGES, language, context);
 
-  const prompt =
-    `Review the following source code for quality, security defenses, and best practices.\n\n` +
+  const codeAndFindings =
     `--- SOURCE CODE (${language}) ---\n${code}\n\n` +
     `--- LAYER 1 FINDINGS (${findings.length} pattern-based) ---\n` +
     (findings.length > 0 ? findingsSummary : "(No pattern-based findings)") +
-    `\n\n` +
-    deepReviewSection;
+    `\n\n`;
+
+  const prompt = DEEP_REVIEW_PROMPT_INTRO + codeAndFindings + deepReviewSection;
 
   try {
     const models = await vscode.lm.selectChatModels({ family: "gpt-4o" });
@@ -604,23 +612,54 @@ async function handleDeepReview(
 
     stream.markdown(`\n\n---\n\n### 🧠 Layer 2 — AI Deep Contextual Review\n\n`);
 
-    const messages = [
-      vscode.LanguageModelChatMessage.Assistant(
-        `I am the Judges Panel — a professional code quality review tool. ` +
-          `I provide constructive, evidence-based analysis to help developers improve ` +
-          `their code's quality, security posture, and adherence to best practices.`,
-      ),
-      vscode.LanguageModelChatMessage.User(prompt),
-    ];
+    const identityMsg = vscode.LanguageModelChatMessage.Assistant(DEEP_REVIEW_IDENTITY);
+    const messages = [identityMsg, vscode.LanguageModelChatMessage.User(prompt)];
+
+    // ── First attempt ──
     const response = await model.sendRequest(messages, {}, token);
 
-    // Stream the LLM response directly to chat
+    // Buffer complete response to detect content-policy refusal
+    let responseText = "";
     for await (const chunk of response.text) {
       if (token.isCancellationRequested) return;
-      stream.markdown(chunk);
+      responseText += chunk;
     }
 
-    stream.markdown("\n");
+    if (!isContentPolicyRefusal(responseText)) {
+      // Normal response — stream to user
+      stream.markdown(responseText);
+      stream.markdown("\n");
+    } else {
+      // ── Content-policy refusal detected — retry with simplified prompt ──
+      stream.progress("Retrying with simplified review prompt…");
+
+      const simplifiedSection = buildSimplifiedDeepReviewSection(language, context);
+      const retryPrompt = DEEP_REVIEW_PROMPT_INTRO + codeAndFindings + simplifiedSection;
+
+      // Try a different model family if available, otherwise retry with same model
+      const altModels = await vscode.lm.selectChatModels();
+      const altModel = altModels.find((m) => m.id !== model!.id) ?? model;
+
+      const retryMessages = [identityMsg, vscode.LanguageModelChatMessage.User(retryPrompt)];
+      const retryResponse = await altModel.sendRequest(retryMessages, {}, token);
+
+      let retryText = "";
+      for await (const chunk of retryResponse.text) {
+        if (token.isCancellationRequested) return;
+        retryText += chunk;
+      }
+
+      if (!isContentPolicyRefusal(retryText)) {
+        stream.markdown(retryText);
+      } else {
+        stream.markdown(
+          `The AI model declined this review. This can happen with code that combines ` +
+            `privacy/security infrastructure (e.g., GDPR, PII handling) with security evaluation criteria. ` +
+            `Layer 1 findings above are still valid.\n`,
+        );
+      }
+      stream.markdown("\n");
+    }
   } catch (error) {
     if (error instanceof vscode.CancellationError) return;
     stream.markdown(

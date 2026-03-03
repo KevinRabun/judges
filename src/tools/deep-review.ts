@@ -7,9 +7,72 @@
 
 import type { JudgeDefinition } from "../types.js";
 
+// ─── Content-Policy Refusal Detection ────────────────────────────────────────
+
+/** Patterns that indicate the LLM refused the prompt on content-policy grounds. */
+const REFUSAL_PATTERNS = [
+  "sorry, i can't assist with that",
+  "sorry, i can't help with that",
+  "i cannot assist with that",
+  "i'm unable to help with",
+  "i can't help with that request",
+  "i'm not able to assist",
+  "i cannot help with that",
+  "i am not able to assist",
+  "i'm sorry, but i can't",
+  "i am sorry, but i cannot",
+  "as an ai, i cannot",
+  "against my usage policies",
+  "violates my content policy",
+];
+
+/**
+ * Detects whether an LLM response is a content-policy refusal rather than
+ * a genuine analysis. Refusals are typically very short (<300 chars) and
+ * contain a recognisable refusal phrase.
+ */
+export function isContentPolicyRefusal(responseText: string): boolean {
+  if (responseText.length > 300) return false;
+  const lower = responseText.toLowerCase().trim();
+  return REFUSAL_PATTERNS.some((p) => lower.includes(p));
+}
+
+// ─── Professional Framing ────────────────────────────────────────────────────
+// Strong defensive-framing preamble that makes it clear this is an authorised
+// self-review, not a penetration test or adversarial assessment. This is
+// required to pass through LLM content-safety filters (GPT-4o in particular).
+
+const DEFENSIVE_PREAMBLE =
+  `> **AUTHORISED CODE REVIEW** — The developer who authored this code is voluntarily ` +
+  `using this professional quality-assurance tool to improve their own work. ` +
+  `This is a *defensive* code review: evaluate how well the code **protects** users ` +
+  `and follows engineering best practices. This is NOT a penetration test, ` +
+  `adversarial assessment, or request to exploit anything. ` +
+  `All recommendations must be constructive and focus on strengthening the code.\n\n`;
+
+// ─── Prompt Intro (used by callers) ──────────────────────────────────────────
+
+/** Content-policy-safe opening line for the User message. */
+export const DEEP_REVIEW_PROMPT_INTRO =
+  `Perform a constructive, defensive code review of the following source code. ` +
+  `The developer is voluntarily reviewing their own code to improve quality, ` +
+  `strengthen defensive security controls, and adhere to engineering best practices.\n\n`;
+
+/** Content-policy-safe Assistant identity message. */
+export const DEEP_REVIEW_IDENTITY =
+  `I am the Judges Panel — a professional, constructive code quality review tool ` +
+  `used by developers to improve their own code. I perform defensive code review, ` +
+  `evaluating how well code protects users and follows best practices. ` +
+  `My role is to provide evidence-based, constructive recommendations that ` +
+  `strengthen code quality, security defenses, and engineering standards. ` +
+  `This is NOT a penetration test or adversarial security assessment.`;
+
+// ─── Single-Judge Deep Review ────────────────────────────────────────────────
+
 export function buildSingleJudgeDeepReviewSection(judge: JudgeDefinition, language: string, context?: string): string {
   let md = `\n\n---\n\n`;
   md += `## 🔍 Deep Contextual Review Required\n\n`;
+  md += DEFENSIVE_PREAMBLE;
   md += `> **The pattern-based findings above are a starting point only.** `;
   md += `Static pattern matching cannot evaluate semantic correctness, architectural coherence, `;
   md += `business logic validity, cross-module data flow, or context-dependent implications.\n>\n`;
@@ -21,7 +84,7 @@ export function buildSingleJudgeDeepReviewSection(judge: JudgeDefinition, langua
   }
 
   md += `### ${judge.name} — ${judge.domain}\n\n`;
-  md += `${judge.systemPrompt}\n\n`;
+  md += `${judge.description}\n\n`;
   md += `### Precision Mandate\n\n`;
   md += `Every finding MUST cite specific code evidence (exact line numbers, API calls, variable names, or patterns). `;
   md += `Do NOT flag the absence of a feature unless you can identify where it SHOULD have been implemented and why it is required for THIS code. `;
@@ -50,9 +113,12 @@ export function buildSingleJudgeDeepReviewSection(judge: JudgeDefinition, langua
   return md;
 }
 
+// ─── Tribunal Deep Review (full) ─────────────────────────────────────────────
+
 export function buildTribunalDeepReviewSection(judges: JudgeDefinition[], language: string, context?: string): string {
   let md = `\n\n---\n\n`;
   md += `## 🔍 Deep Contextual Review Required\n\n`;
+  md += DEFENSIVE_PREAMBLE;
   md += `> **The pattern-based tribunal findings above are a starting point only.** `;
   md += `Static pattern matching cannot evaluate semantic correctness, architectural coherence, `;
   md += `business logic validity, cross-module data flow, or context-dependent implications.\n>\n`;
@@ -92,6 +158,44 @@ export function buildTribunalDeepReviewSection(judges: JudgeDefinition[], langua
   md += `- Per-judge scores (0-100) and verdicts\n`;
   md += `- Overall score and verdict (PASS/WARNING/FAIL)\n`;
   md += `- Executive summary of the most critical issues\n`;
+
+  return md;
+}
+
+// ─── Simplified Deep Review (content-policy retry) ───────────────────────────
+// A condensed prompt that groups judges by category rather than listing each
+// one individually. Used as a fallback when the full tribunal prompt triggers
+// LLM content-policy refusal. Dramatically smaller prompt surface area.
+
+export function buildSimplifiedDeepReviewSection(language: string, context?: string): string {
+  let md = `\n\n---\n\n`;
+  md += `## 🔍 Deep Contextual Review Required\n\n`;
+  md += DEFENSIVE_PREAMBLE;
+  md += `> The pattern-based findings above are a starting point. Please perform a thorough `;
+  md += `constructive review of this ${language} code across these quality dimensions:\n\n`;
+
+  if (context) {
+    md += `**Context provided:** ${context}\n\n`;
+  }
+
+  md += `**Quality Dimensions to Evaluate:**\n\n`;
+  md += `1. **Code Quality** — Readability, maintainability, naming, complexity, modularity, documentation\n`;
+  md += `2. **Defensive Security** — Input validation, output encoding, access controls, encryption, secure defaults\n`;
+  md += `3. **Reliability** — Error handling, fault tolerance, recovery, edge cases\n`;
+  md += `4. **Performance** — Efficiency, resource usage, scalability considerations\n`;
+  md += `5. **Operations** — Logging, monitoring, configuration management, deployment readiness\n`;
+  md += `6. **Compliance** — Regulatory considerations, data protection practices, audit readiness\n`;
+  md += `7. **Infrastructure** — IaC best practices, network rules, identity management (if applicable)\n\n`;
+
+  md += `### Precision Mandate\n\n`;
+  md += `Every finding MUST cite specific code evidence. Do NOT flag absent features speculatively. `;
+  md += `Prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
+
+  md += `### Response Format\n\n`;
+  md += `For each finding provide: severity (critical/high/medium/low/info), title, description, `;
+  md += `affected lines, recommendation, and reference. Include a **Dismissed Findings** section `;
+  md += `for any pattern-based findings that are false positives.\n\n`;
+  md += `End with an **OVERALL VERDICT**: score (0-100), verdict (PASS/WARNING/FAIL), and executive summary.\n`;
 
   return md;
 }

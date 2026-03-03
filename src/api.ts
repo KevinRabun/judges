@@ -71,7 +71,14 @@ export { evaluateCodeV2, evaluateProjectV2, getSupportedPolicyProfiles } from ".
 export { analyzeCrossFileTaint } from "./ast/cross-file-taint.js";
 
 // ─── Deep Review Prompts ─────────────────────────────────────────────────────
-export { buildSingleJudgeDeepReviewSection, buildTribunalDeepReviewSection } from "./tools/deep-review.js";
+export {
+  buildSingleJudgeDeepReviewSection,
+  buildTribunalDeepReviewSection,
+  buildSimplifiedDeepReviewSection,
+  isContentPolicyRefusal,
+  DEEP_REVIEW_PROMPT_INTRO,
+  DEEP_REVIEW_IDENTITY,
+} from "./tools/deep-review.js";
 
 // ─── Cache Utilities ─────────────────────────────────────────────────────────
 export { LRUCache, contentHash } from "./cache.js";

@@ -1,5 +1,13 @@
 import * as vscode from "vscode";
-import { evaluateWithTribunal, JUDGES, buildTribunalDeepReviewSection } from "@kevinrabun/judges/api";
+import {
+  evaluateWithTribunal,
+  JUDGES,
+  buildTribunalDeepReviewSection,
+  buildSimplifiedDeepReviewSection,
+  isContentPolicyRefusal,
+  DEEP_REVIEW_PROMPT_INTRO,
+  DEEP_REVIEW_IDENTITY,
+} from "@kevinrabun/judges/api";
 import type { Finding, Patch } from "@kevinrabun/judges/api";
 
 const SEVERITY_MAP: Record<string, vscode.DiagnosticSeverity> = {
@@ -400,13 +408,13 @@ export class JudgesDiagnosticProvider {
 
     const deepReviewSection = buildTribunalDeepReviewSection(JUDGES, language);
 
-    const prompt =
-      `Review the following source code for quality, security defenses, and best practices.\n\n` +
+    const codeAndFindings =
       `--- SOURCE CODE (${language}) ---\n${code}\n\n` +
       `--- LAYER 1 FINDINGS (${findings.length} pattern-based) ---\n` +
       (findings.length > 0 ? findingsSummary : "(No pattern-based findings)") +
-      `\n\n` +
-      deepReviewSection;
+      `\n\n`;
+
+    const prompt = DEEP_REVIEW_PROMPT_INTRO + codeAndFindings + deepReviewSection;
 
     try {
       const models = await vscode.lm.selectChatModels({ family: "gpt-4o" });
@@ -427,19 +435,43 @@ export class JudgesDiagnosticProvider {
 
       md += `---\n\n## Layer 2 — AI Deep Contextual Review\n\n`;
 
-      const messages = [
-        vscode.LanguageModelChatMessage.Assistant(
-          `I am the Judges Panel — a professional code quality review tool. ` +
-            `I provide constructive, evidence-based analysis to help developers improve ` +
-            `their code's quality, security posture, and adherence to best practices.`,
-        ),
-        vscode.LanguageModelChatMessage.User(prompt),
-      ];
+      const identityMsg = vscode.LanguageModelChatMessage.Assistant(DEEP_REVIEW_IDENTITY);
+      const messages = [identityMsg, vscode.LanguageModelChatMessage.User(prompt)];
       const response = await model.sendRequest(messages, {}, token);
 
+      // Buffer response to detect content-policy refusal
+      let responseText = "";
       for await (const chunk of response.text) {
         if (token.isCancellationRequested) break;
-        md += chunk;
+        responseText += chunk;
+      }
+
+      if (!isContentPolicyRefusal(responseText)) {
+        md += responseText;
+      } else {
+        // Retry with simplified prompt
+        const simplifiedSection = buildSimplifiedDeepReviewSection(language);
+        const retryPrompt = DEEP_REVIEW_PROMPT_INTRO + codeAndFindings + simplifiedSection;
+
+        const altModels = await vscode.lm.selectChatModels();
+        const altModel = altModels.find((m) => m.id !== model!.id) ?? model;
+
+        const retryMessages = [identityMsg, vscode.LanguageModelChatMessage.User(retryPrompt)];
+        const retryResponse = await altModel.sendRequest(retryMessages, {}, token);
+
+        let retryText = "";
+        for await (const chunk of retryResponse.text) {
+          if (token.isCancellationRequested) break;
+          retryText += chunk;
+        }
+
+        if (!isContentPolicyRefusal(retryText)) {
+          md += retryText;
+        } else {
+          md += `The AI model declined this review. This can happen with code that combines `;
+          md += `privacy/security infrastructure with security evaluation criteria. `;
+          md += `Layer 1 findings above are still valid.\n`;
+        }
       }
 
       md += "\n";
