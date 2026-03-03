@@ -2,6 +2,11 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.2] — 2026-03-03
+
+### Fixed
+- **"Auto" model fallback** — When the Copilot Chat model selector is set to "auto", `request.model` returns a pseudo-model with no real endpoint. Layer 2 now catches the `sendRequest` failure and falls back to `selectChatModels()` to find a working model. Applied to both `chat-participant.ts` (deep review) and `diagnostics.ts` (deep review + refinement).
+
 ## [3.20.1] — 2026-03-03
 
 ### Fixed

@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.2] — 2026-03-03
+
+### Fixed
+- **"Auto" model fallback** — Layer 2 no longer fails with "Endpoint not found for model auto". When the model selector is set to auto, the extension now falls back to any available model.
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.20.2 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.20.1] — 2026-03-03
 
 ### Fixed
