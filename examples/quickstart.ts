@@ -26,7 +26,7 @@ const password = "admin123";  // hardcoded secret
 app.listen(3000);
 `;
 
-// ─── Full tribunal (all 35 judges) ──────────────────────────────────────────
+// ─── Full tribunal (all 37 judges) ──────────────────────────────────────────
 
 console.log("=== Full Tribunal ===\n");
 const verdict = evaluateCode(code, "typescript");

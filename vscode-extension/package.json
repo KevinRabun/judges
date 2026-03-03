@@ -1,8 +1,8 @@
 {
   "name": "judges-panel",
   "displayName": "Judges Panel",
-  "description": "35 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.20.3",
+  "description": "37 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
+  "version": "3.20.4",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -170,12 +170,12 @@
         "id": "judges-panel.judges",
         "name": "judges",
         "fullName": "Judges Panel",
-        "description": "Evaluate code for security, performance, reliability, and quality using 35 specialized judges",
+        "description": "Evaluate code for security, performance, reliability, and quality using 37 specialized judges",
         "isSticky": false,
         "commands": [
           {
             "name": "review",
-            "description": "Review the current file with all 35 judges"
+            "description": "Review the current file with all 37 judges"
           },
           {
             "name": "deepreview",
@@ -229,7 +229,7 @@
         "name": "judges_evaluate",
         "toolReferenceName": "judgesEvaluate",
         "displayName": "Judges: Evaluate Code",
-        "modelDescription": "Evaluate source code using 35 specialized judges covering security, performance, reliability, cost, compliance, observability, API design, and more. Use this tool when the user asks for a judges panel review, judges evaluation, code quality review, security review, or wants to check code against best practices. Returns findings with severity, description, and suggested fixes.",
+        "modelDescription": "Evaluate source code using 37 specialized judges covering security, performance, reliability, cost, compliance, observability, API design, and more. Use this tool when the user asks for a judges panel review, judges evaluation, code quality review, security review, or wants to check code against best practices. Returns findings with severity, description, and suggested fixes.",
         "canBeReferencedInPrompt": true,
         "icon": "$(shield)",
         "inputSchema": {

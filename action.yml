@@ -1,5 +1,5 @@
 name: "Judges Code Review"
-description: "Run 35 specialized judges against your code — security, cost, scalability, accessibility, compliance, and 30 more dimensions. Deterministic evaluators + expert-persona LLM prompts. Zero config, instant results."
+description: "Run 37 specialized judges against your code — security, cost, scalability, accessibility, compliance, and 32 more dimensions. Deterministic evaluators + expert-persona LLM prompts. Zero config, instant results."
 author: "kevinrabun"
 
 branding:

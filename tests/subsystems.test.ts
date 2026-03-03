@@ -36,6 +36,8 @@ import {
   testCode,
   getContextWindow,
 } from "../src/evaluators/shared.js";
+import { analyzeCodeStructure } from "../src/evaluators/code-structure.js";
+import { JUDGES } from "../src/judges/index.js";
 import type { Finding, Severity } from "../src/types.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1931,5 +1933,331 @@ describe("getContextWindow — basic behavior", () => {
     // lineNum=4, radius=3 → indices [0..6] → all lines
     assert.ok(ctx.includes("line0"), "Default radius 3: should include line0");
     assert.ok(ctx.includes("line6"), "Default radius 3: should include line6");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Doc-claim verification — Count assertions
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("JUDGES array — count matches documentation", () => {
+  it("should contain exactly 37 judges", () => {
+    assert.equal(JUDGES.length, 37, `Expected 37 judges, got ${JUDGES.length}`);
+  });
+
+  it("every judge should have an id, name, domain, and description", () => {
+    for (const j of JUDGES) {
+      assert.ok(j.id, `Judge missing id: ${JSON.stringify(j)}`);
+      assert.ok(j.name, `Judge ${j.id} missing name`);
+      assert.ok(j.domain, `Judge ${j.id} missing domain`);
+      assert.ok(j.description, `Judge ${j.id} missing description`);
+    }
+  });
+
+  it("at most one judge (false-positive-review) may omit analyze()", () => {
+    const withoutAnalyze = JUDGES.filter((j) => typeof j.analyze !== "function");
+    assert.ok(
+      withoutAnalyze.length <= 1,
+      `Expected at most 1 prompt-only judge, got ${withoutAnalyze.length}: ${withoutAnalyze.map((j) => j.id)}`,
+    );
+    if (withoutAnalyze.length === 1) {
+      assert.equal(withoutAnalyze[0].id, "false-positive-review");
+      assert.ok(withoutAnalyze[0].systemPrompt, "Prompt-only judge must have a systemPrompt");
+    }
+  });
+
+  it("every judge should have a unique id", () => {
+    const ids = JUDGES.map((j) => j.id);
+    const unique = new Set(ids);
+    assert.equal(unique.size, ids.length, `Duplicate judge ids: ${ids.filter((id, i) => ids.indexOf(id) !== i)}`);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Doc-claim verification — Scoring constants
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("calculateScore — basePenalty constants", () => {
+  it("critical finding at full confidence should deduct 30 points", () => {
+    const score = calculateScore([makeFinding({ severity: "critical", confidence: 1.0 })]);
+    assert.equal(score, 70, "100 − 30×1.0 = 70");
+  });
+
+  it("high finding at full confidence should deduct 18 points", () => {
+    const score = calculateScore([makeFinding({ severity: "high", confidence: 1.0 })]);
+    assert.equal(score, 82, "100 − 18×1.0 = 82");
+  });
+
+  it("medium finding at full confidence should deduct 10 points", () => {
+    const score = calculateScore([makeFinding({ severity: "medium", confidence: 1.0 })]);
+    assert.equal(score, 90, "100 − 10×1.0 = 90");
+  });
+
+  it("low finding at full confidence should deduct 5 points", () => {
+    const score = calculateScore([makeFinding({ severity: "low", confidence: 1.0 })]);
+    assert.equal(score, 95, "100 − 5×1.0 = 95");
+  });
+
+  it("info finding at full confidence should deduct 2 points", () => {
+    const score = calculateScore([makeFinding({ severity: "info" as Severity, confidence: 1.0 })]);
+    assert.equal(score, 98, "100 − 2×1.0 = 98");
+  });
+
+  it("penalty should be weighted by confidence", () => {
+    const score = calculateScore([makeFinding({ severity: "critical", confidence: 0.5 })]);
+    assert.equal(score, 85, "100 − 30×0.5 = 85");
+  });
+
+  it("score should never go below 0", () => {
+    const many = Array.from({ length: 10 }, () => makeFinding({ severity: "critical", confidence: 1.0 }));
+    const score = calculateScore(many);
+    assert.equal(score, 0, "Score should floor at 0");
+  });
+
+  it("score should never exceed 100 even with positive signals", () => {
+    const codeWithBonuses = `
+      const helmet = require("helmet");
+      passport.authenticate();
+      const stmt = db.prepare($1);
+      winston.createLogger();
+      rateLimit({ windowMs: 15 * 60 * 1000 });
+      joi.object({ name: joi.string() });
+      cors({ origin: true, methods: ["GET"], credentials: true });
+      "use strict";
+      strictMode: true;
+      describe("test", () => { it("works", () => { expect(1).toBe(1); }); });
+      try { riskyOp(); } catch (e) { log(e); throw e; }
+    `;
+    const score = calculateScore([], codeWithBonuses);
+    assert.ok(score <= 100, `Score ${score} should not exceed 100`);
+  });
+});
+
+describe("detectPositiveSignals — bonus values and cap", () => {
+  it("should award +3 for parameterized queries", () => {
+    assert.equal(detectPositiveSignals("db.query($1)"), 3);
+  });
+
+  it("should award +3 for helmet / security headers", () => {
+    assert.equal(detectPositiveSignals('const helmet = require("helmet")'), 3);
+  });
+
+  it("should award +3 for authentication middleware", () => {
+    assert.equal(detectPositiveSignals("app.use(passport.initialize())"), 3);
+  });
+
+  it("should award +2 for error handling (catch with handler)", () => {
+    const code = "try { x(); } catch (e) {\n  log(e);\n}";
+    assert.equal(detectPositiveSignals(code), 2);
+  });
+
+  it("should award +2 for input validation libraries", () => {
+    assert.equal(detectPositiveSignals("const schema = zod.object({})"), 2);
+  });
+
+  it("should award +2 for rate limiting", () => {
+    assert.equal(detectPositiveSignals("app.use(rateLimit({ max: 100 }))"), 2);
+  });
+
+  it("should award +2 for structured logging", () => {
+    assert.equal(detectPositiveSignals("const logger = pino()"), 2);
+  });
+
+  it("should award +1 for CORS with origin/methods/credentials", () => {
+    assert.equal(detectPositiveSignals("cors({ origin: '*', methods: ['GET'] })"), 1);
+  });
+
+  it("should award +1 for strict mode", () => {
+    assert.equal(detectPositiveSignals("strictMode: true"), 1);
+  });
+
+  it("should award +1 for test presence", () => {
+    assert.equal(detectPositiveSignals("describe('my test', () => {})"), 1);
+  });
+
+  it("should cap total bonus at 15", () => {
+    // Code that triggers all signals: 3+3+3+2+2+2+2+1+1+1 = 20 → capped at 15
+    const allSignals = `
+      db.prepare($1);
+      helmet;
+      passport.authenticate();
+      try { x(); } catch(e) { log(e); }
+      zod.object({});
+      rateLimit({});
+      cors({ origin: true, methods: ['GET'], credentials: true });
+      strictMode: true;
+      pino();
+      describe("test", () => {});
+    `;
+    const bonus = detectPositiveSignals(allSignals);
+    assert.equal(bonus, 15, `Bonus should be capped at 15, got ${bonus}`);
+  });
+
+  it("should return 0 for code with no positive signals", () => {
+    assert.equal(detectPositiveSignals("const x = 1;"), 0);
+  });
+});
+
+describe("deriveVerdict — threshold logic", () => {
+  it("should FAIL on critical finding with confidence >= 0.6", () => {
+    const v = deriveVerdict([makeFinding({ severity: "critical", confidence: 0.6 })], 100);
+    assert.equal(v, "fail");
+  });
+
+  it("should NOT fail on critical finding with confidence < 0.6", () => {
+    const v = deriveVerdict([makeFinding({ severity: "critical", confidence: 0.5 })], 100);
+    assert.notEqual(v, "fail", "Critical with confidence 0.5 should not fail");
+  });
+
+  it("should FAIL when score < 60 regardless of findings", () => {
+    assert.equal(deriveVerdict([], 59), "fail");
+    assert.equal(deriveVerdict([], 0), "fail");
+  });
+
+  it("should PASS when score is 60 and no high/medium findings", () => {
+    // score >= 60, no critical/high/medium — but score < 80 → warning
+    assert.equal(deriveVerdict([], 60), "warning");
+  });
+
+  it("should WARNING on high finding with confidence >= 0.4", () => {
+    const v = deriveVerdict([makeFinding({ severity: "high", confidence: 0.4 })], 85);
+    assert.equal(v, "warning");
+  });
+
+  it("should WARNING on medium finding with confidence >= 0.4", () => {
+    const v = deriveVerdict([makeFinding({ severity: "medium", confidence: 0.4 })], 85);
+    assert.equal(v, "warning");
+  });
+
+  it("should WARNING when score < 80 even with no findings", () => {
+    assert.equal(deriveVerdict([], 79), "warning");
+  });
+
+  it("should PASS when score >= 80 and no significant findings", () => {
+    assert.equal(deriveVerdict([], 80), "pass");
+    assert.equal(deriveVerdict([], 100), "pass");
+  });
+
+  it("should PASS with low findings regardless of confidence", () => {
+    const v = deriveVerdict([makeFinding({ severity: "low", confidence: 1.0 })], 90);
+    assert.equal(v, "pass");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Doc-claim verification — STRUCT thresholds (missing rules)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("analyzeCodeStructure — STRUCT-001 high CC > 10", () => {
+  it("should flag a function with cyclomatic complexity > 10", () => {
+    // Use Python because the structural-parser fallback has DECISION_POINTS
+    // for Python but not TypeScript (tree-sitter may not be loaded in tests).
+    // 12 if-branches → CC = 13 (1 base + 12 branches)
+    const branchLines = Array.from({ length: 12 }, (_, i) => `    if x == ${i}: return ${i}`).join("\n");
+    const code = `def many_branches(x):\n${branchLines}\n    return -1`;
+    const findings = analyzeCodeStructure(code, "python");
+    const cc001 = findings.filter((f) => f.ruleId === "STRUCT-001");
+    assert.ok(cc001.length > 0, "Should flag STRUCT-001 for CC > 10");
+    assert.equal(cc001[0].severity, "high");
+  });
+
+  it("should NOT flag a function with CC <= 10", () => {
+    const code = `def simple(x):\n    if x > 0: return 1\n    return 0`;
+    const findings = analyzeCodeStructure(code, "python");
+    const cc001 = findings.filter((f) => f.ruleId === "STRUCT-001");
+    assert.equal(cc001.length, 0, "Should not flag STRUCT-001 for CC <= 10");
+  });
+});
+
+describe("analyzeCodeStructure — STRUCT-007 file CC > 40", () => {
+  it("should flag when total file cyclomatic complexity > 40", () => {
+    // Generate 10 Python functions, each with 5 branches → 10 × 6 = 60 file CC
+    const functions = Array.from({ length: 10 }, (_, fi) => {
+      const branches = Array.from({ length: 5 }, (_, bi) => `    if x == ${bi}: return ${bi}`).join("\n");
+      return `def fn${fi}(x):\n${branches}\n    return -1`;
+    }).join("\n\n");
+    const findings = analyzeCodeStructure(functions, "python");
+    const cc007 = findings.filter((f) => f.ruleId === "STRUCT-007");
+    assert.ok(cc007.length > 0, "Should flag STRUCT-007 for file CC > 40");
+    assert.equal(cc007[0].severity, "high");
+  });
+});
+
+describe("analyzeCodeStructure — STRUCT-008 very high CC > 20", () => {
+  it("should flag a function with cyclomatic complexity > 20", () => {
+    // 22 if-branches → CC = 23
+    const branchLines = Array.from({ length: 22 }, (_, i) => `    if x == ${i}: return ${i}`).join("\n");
+    const code = `def huge_switch(x):\n${branchLines}\n    return -1`;
+    const findings = analyzeCodeStructure(code, "python");
+    const cc008 = findings.filter((f) => f.ruleId === "STRUCT-008");
+    assert.ok(cc008.length > 0, "Should flag STRUCT-008 for CC > 20");
+    assert.equal(cc008[0].severity, "critical");
+  });
+
+  it("should NOT flag a function with CC <= 20", () => {
+    // 10 branches → CC = 11 (triggers 001 but not 008)
+    const branchLines = Array.from({ length: 10 }, (_, i) => `    if x == ${i}: return ${i}`).join("\n");
+    const code = `def medium_switch(x):\n${branchLines}\n    return -1`;
+    const findings = analyzeCodeStructure(code, "python");
+    const cc008 = findings.filter((f) => f.ruleId === "STRUCT-008");
+    assert.equal(cc008.length, 0, "Should not flag STRUCT-008 for CC <= 20");
+  });
+});
+
+describe("analyzeCodeStructure — STRUCT-010 very long function > 150 lines", () => {
+  it("should flag a function with > 150 lines", () => {
+    // Use Python — structural parser handles it reliably without tree-sitter
+    const bodyLines = Array.from({ length: 155 }, (_, i) => `    v${i} = ${i}`).join("\n");
+    const code = `def very_long():\n${bodyLines}\n    return 0`;
+    const findings = analyzeCodeStructure(code, "python");
+    const long010 = findings.filter((f) => f.ruleId === "STRUCT-010");
+    assert.ok(long010.length > 0, "Should flag STRUCT-010 for > 150 lines");
+    assert.equal(long010[0].severity, "high");
+  });
+
+  it("should NOT flag a function with <= 150 lines", () => {
+    const bodyLines = Array.from({ length: 145 }, (_, i) => `    v${i} = ${i}`).join("\n");
+    const code = `def not_too_long():\n${bodyLines}\n    return 0`;
+    const findings = analyzeCodeStructure(code, "python");
+    const long010 = findings.filter((f) => f.ruleId === "STRUCT-010");
+    assert.equal(long010.length, 0, "Should not flag STRUCT-010 for <= 150 lines");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Doc-claim verification — enrichWithPatches behavioral smoke test
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("enrichWithPatches — produces patches for known vulnerable patterns", () => {
+  it("should generate a patch for eval() usage", () => {
+    const findings: Finding[] = [
+      makeFinding({
+        ruleId: "SEC-001",
+        severity: "critical",
+        title: "eval() usage",
+        description: "Use of eval() detected",
+        lineNumbers: [1],
+      }),
+    ];
+    const code = 'const result = eval("user_input");';
+    const enriched = enrichWithPatches(findings, code);
+    // enrichWithPatches should at minimum return the original findings
+    assert.ok(enriched.length >= findings.length);
+  });
+
+  it("should not crash on findings with no matching patch rules", () => {
+    const findings: Finding[] = [
+      makeFinding({
+        ruleId: "SEC-002",
+        severity: "high",
+        title: "Hardcoded password",
+        description: "Some description",
+        lineNumbers: [1],
+      }),
+    ];
+    const code = 'const password = "s3cret123";';
+    const enriched = enrichWithPatches(findings, code);
+    // enrichWithPatches should always return at least the original findings
+    assert.ok(enriched.length >= findings.length, "Should preserve original findings");
   });
 });

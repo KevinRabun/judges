@@ -2,17 +2,17 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.KevinRabun/judges",
   "title": "Judges Panel",
-  "description": "35 judges that evaluate AI-generated code for security, cost, and quality with built-in AST.",
+  "description": "37 judges that evaluate AI-generated code for security, cost, and quality with built-in AST.",
   "repository": {
     "url": "https://github.com/kevinrabun/judges",
     "source": "github"
   },
-  "version": "3.20.3",
+  "version": "3.20.4",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@kevinrabun/judges",
-      "version": "3.20.3",
+      "version": "3.20.4",
       "transport": {
         "type": "stdio"
       }
@@ -21,7 +21,7 @@
   "tools": [
     {
       "name": "evaluate_code",
-      "description": "Submit code to the full 35-judge tribunal for security, cost, and quality analysis. Handles all code types including application code, infrastructure-as-code (Bicep, Terraform, ARM), and configuration files."
+      "description": "Submit code to the full 37-judge tribunal for security, cost, and quality analysis. Handles all code types including application code, infrastructure-as-code (Bicep, Terraform, ARM), and configuration files."
     },
     {
       "name": "evaluate_code_single_judge",
@@ -59,7 +59,7 @@
   "prompts": [
     {
       "name": "full-tribunal",
-      "description": "Convene all 35 judges for a comprehensive LLM-powered deep review."
+      "description": "Convene all 37 judges for a comprehensive LLM-powered deep review."
     },
     {
       "name": "judge-{id}",

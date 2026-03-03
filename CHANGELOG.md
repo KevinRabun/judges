@@ -2,6 +2,15 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.4] — 2026-03-03
+
+### Fixed
+- **Stale documentation counts** — Updated all references across README, docs, server.json, action.yml, package.json, Dockerfile, extension metadata, examples, and scripts from "35 judges" → "37 judges", "47 patches" → "53 patches", and test badge "1515" → "1557". Historical changelog entries left unchanged.
+
+### Tests
+- **Doc-claim verification tests** — Added 42 new tests covering: JUDGES array count assertion (exactly 37), judge schema validation (id, name, domain, description), unique judge ID enforcement, scoring penalty constants (critical=30, high=18, medium=10, low=5, info=2), confidence-weighted deductions, score floor/ceiling, positive signal bonuses (+3/+3/+3/+2/+2/+2/+2/+1/+1/+1 with cap at 15), verdict threshold logic (fail/warning/pass boundaries), and STRUCT threshold rules not previously covered: STRUCT-001 (CC>10), STRUCT-007 (file CC>40), STRUCT-008 (CC>20), STRUCT-010 (>150 lines).
+- All 1,557 tests pass (976 judges + 218 negative + 251 subsystems + 70 extension + 42 tool-routing)
+
 ## [3.20.3] — 2026-03-03
 
 ### Fixed

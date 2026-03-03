@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.4] — 2026-03-03
+
+### Fixed
+- **Stale documentation counts** — All references to "35 judges" updated to "37 judges" across extension README, package.json, chat participant, and extension source.
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.20.4 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.20.3] — 2026-03-03
 
 ### Fixed

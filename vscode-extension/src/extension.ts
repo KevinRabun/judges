@@ -208,7 +208,7 @@ export function deactivate(): void {
 
 /**
  * Register the Judges MCP server via the VS Code MCP provider API.
- * This makes the 35 expert-persona prompts (Layer 2) automatically available
+ * This makes the 37 expert-persona prompts (Layer 2) automatically available
  * to Copilot and other LMs — zero manual configuration required.
  */
 function registerMcpServer(context: vscode.ExtensionContext): void {
