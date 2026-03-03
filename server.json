@@ -21,11 +21,11 @@
   "tools": [
     {
       "name": "evaluate_code",
-      "description": "Submit code to the full 35-judge tribunal for security, cost, and quality analysis with optional inline configuration."
+      "description": "Submit code to the full 35-judge tribunal for security, cost, and quality analysis. Handles all code types including application code, infrastructure-as-code (Bicep, Terraform, ARM), and configuration files."
     },
     {
       "name": "evaluate_code_single_judge",
-      "description": "Run a single judge against code for targeted domain analysis (e.g. cybersecurity, cost-effectiveness)."
+      "description": "Run a single judge against code for targeted domain analysis. Handles all code types including infrastructure-as-code (Bicep, Terraform, ARM). Key domains: cybersecurity, data-sovereignty, iac-security, compliance, cost-effectiveness, authentication, cloud-readiness."
     },
     {
       "name": "evaluate_project",
@@ -37,7 +37,7 @@
     },
     {
       "name": "analyze_dependencies",
-      "description": "Analyze dependency manifests (package.json, requirements.txt, Cargo.toml, etc.) for supply-chain risks and version pinning issues."
+      "description": "Analyze PACKAGE MANAGER manifests only (package.json, requirements.txt, Cargo.toml, go.mod, pom.xml, .csproj) for supply-chain risks and version pinning issues. NOT for Bicep, Terraform, or infrastructure config — use evaluate_code or evaluate_code_single_judge for those."
     },
     {
       "name": "get_judges",

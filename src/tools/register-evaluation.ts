@@ -57,7 +57,7 @@ function registerGetJudges(server: McpServer): void {
 function registerEvaluateCode(server: McpServer): void {
   server.tool(
     "evaluate_code",
-    `Submit code to the full Judges Panel for evaluation. All ${JUDGES.length} judges will independently review the code using both automated pattern detection and deep contextual analysis criteria. Returns a combined verdict with scores, findings, and expert review guidance for thorough evaluation.`,
+    `Submit code to the full Judges Panel for evaluation. Handles ALL code types including application code, infrastructure-as-code (Bicep, Terraform, ARM, CloudFormation), and configuration files. All ${JUDGES.length} judges will independently review the code using both automated pattern detection and deep contextual analysis criteria. Returns a combined verdict with scores, findings, and expert review guidance for thorough evaluation.`,
     {
       code: z.string().describe("The source code to evaluate. Include the full file content for best results."),
       language: z
@@ -121,7 +121,7 @@ function registerEvaluateSingleJudge(server: McpServer): void {
 
   server.tool(
     "evaluate_code_single_judge",
-    `Submit code to a specific judge on the Judges Panel. Use get_judges to see available judges. Available judge IDs: ${judgeIds.join(", ")}`,
+    `Submit code to a specific judge for targeted domain analysis. Handles ALL code types including application code, infrastructure-as-code (Bicep, Terraform, ARM, CloudFormation), and configuration files. Key domains: cybersecurity, data-sovereignty, iac-security, compliance, cost-effectiveness, authentication, cloud-readiness, and ${judgeIds.length - 7} more. Available judge IDs: ${judgeIds.join(", ")}`,
     {
       code: z.string().describe("The source code to evaluate. Include the full file content for best results."),
       language: z

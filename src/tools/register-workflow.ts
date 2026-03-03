@@ -418,7 +418,7 @@ function registerEvaluateDiff(server: McpServer): void {
 function registerAnalyzeDependencies(server: McpServer): void {
   server.tool(
     "analyze_dependencies",
-    "Analyze a dependency manifest file for supply-chain risks, version pinning issues, typosquatting indicators, and dependency hygiene. Supports package.json, requirements.txt, Cargo.toml, go.mod, pom.xml, and .csproj files.",
+    "Analyze a PACKAGE MANAGER manifest file (NOT infrastructure code) for supply-chain risks, version pinning issues, typosquatting indicators, and dependency hygiene. ONLY accepts: package.json, requirements.txt, Cargo.toml, go.mod, pom.xml, .csproj. Do NOT use this for Bicep, Terraform, ARM templates, CloudFormation, Dockerfiles, or any other infrastructure/deployment configuration — use evaluate_code or evaluate_code_single_judge for those.",
     {
       manifest: z.string().describe("The full content of the manifest file"),
       manifestType: z
