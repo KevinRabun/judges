@@ -89,6 +89,10 @@ export function buildSingleJudgeDeepReviewSection(judge: JudgeDefinition, langua
   md += `Every finding MUST cite specific code evidence (exact line numbers, API calls, variable names, or patterns). `;
   md += `Do NOT flag the absence of a feature unless you can identify where it SHOULD have been implemented and why it is required for THIS code. `;
   md += `Speculative findings erode developer trust — prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
+  md += `**IaC identifier handling:** Azure resource identifiers (policy definition IDs, role definition IDs, `;
+  md += `built-in policy assignments, subscription GUIDs, tenant IDs, etc.) are opaque platform identifiers `;
+  md += `provided by Microsoft. Do NOT validate them for strict UUID/GUID hex compliance or flag them as \"invalid\" — `;
+  md += `they may contain characters outside the hex range and are still correct. Treat all Azure resource IDs as verbatim constants.\n\n`;
 
   md += `### False Positive Review\n\n`;
   md += `Before adding new findings, **review each pattern-based finding above for false positives.** `;
@@ -133,7 +137,7 @@ export function buildTribunalDeepReviewSection(judges: JudgeDefinition[], langua
   for (const judge of judges) {
     md += `### ${judge.name} — ${judge.domain}\n\n`;
     md += `${judge.description}\n\n`;
-    md += `**Rule prefix:** \`${judge.rulePrefix}-\` · **Precision Mandate:** Every finding MUST cite specific code evidence. Do NOT flag absent features speculatively. Prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
+    md += `**Rule prefix:** \`${judge.rulePrefix}-\` · **Precision Mandate:** Every finding MUST cite specific code evidence. Do NOT flag absent features speculatively. Do NOT validate Azure resource identifiers for strict UUID/GUID hex compliance — they are opaque platform constants. Prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
     md += `---\n\n`;
   }
 
@@ -189,6 +193,8 @@ export function buildSimplifiedDeepReviewSection(language: string, context?: str
 
   md += `### Precision Mandate\n\n`;
   md += `Every finding MUST cite specific code evidence. Do NOT flag absent features speculatively. `;
+  md += `Do NOT validate Azure resource identifiers (policy IDs, role IDs, tenant IDs) for strict UUID/GUID hex compliance — `;
+  md += `they are opaque platform constants provided by Microsoft. `;
   md += `Prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
 
   md += `### Response Format\n\n`;
