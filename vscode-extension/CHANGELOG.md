@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.18.3] — 2026-03-03
+
+### Fixed
+- **FP reduction round 5** — Cross-language sweep across 6 languages eliminates 21 false positives in 10 evaluators (configurable defaults, Go idioms, Rust/C#/Java auth patterns, doc comment recognition)
+- **Bug fix** — Undefined `lines` variable in 4 evaluators caused post-filter logic to silently fail
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.18.3 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.18.2] — 2026-03-03
 
 ### Fixed

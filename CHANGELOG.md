@@ -2,6 +2,27 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.18.3] — 2026-03-03
+
+### Fixed
+- **FP reduction round 5 — cross-language sweep** — Ran all 36 evaluators against clean idiomatic code in 6 languages (Python/FastAPI, Rust/Actix-web, C#/ASP.NET Core, Java/Spring Boot, Go/stdlib, C++/REST), eliminating 21 false positives across 10 source files:
+  - **CLOUD-001 / PORTA-001** — Configurable defaults (`unwrap_or_else`, `os.Getenv`, `??`, `||`, `environ.get`) no longer flagged as hardcoded hosts
+  - **AICS-013** — Auth-check post-filter excludes `hasRole`, `@PreAuthorize`, `[Authorize]`, `claims.role`, CORS headers
+  - **AICS-016** — `ActionResult` (C#) no longer matched as unsafe action usage; requires explicit `_` or `.` separator
+  - **A11Y** — `spring` no longer matched inside words (e.g. `springframework`); form-error rule uses specific HTML element list instead of broad regex
+  - **DATA-001** — Python `jwt.decode` with `algorithms=` parameter (verified decode) no longer flagged
+  - **SWDEV-002** — Go `if err != nil` no longer flagged as bare exception catch
+  - **CONC-001** — Go graceful-shutdown goroutines (`signal.Notify`, `Shutdown`, `SIGTERM`) recognized as managed workers
+  - **CFG-001** — Go multi-line `os.Getenv` + `== ""` validation detection
+  - **DOC-001** — Backward-walk now recognizes Go `//` comments, Rust `///` with `#[attr]` traversal, C# `///` with `[Attr]` traversal, Python body docstrings
+
+### Bug Fixes
+- **Undefined `lines` variable in 4 evaluators** — `cloud-readiness.ts`, `portability.ts`, `ai-code-safety.ts`, and `data-security.ts` referenced `lines[ln - 1]` where `lines` was either undefined, scoped inside an if-block, or was a line-number array instead of text lines. Post-filter logic silently failed, producing incorrect results. Each file now defines a properly scoped `code.split("\n")` variable.
+
+### Tests
+- 30+ new negative FP regression tests with true-positive preservation checks
+- All 1,343 tests pass (963 judges + 186 negative + 194 subsystems)
+
 ## [3.18.2] — 2026-03-03
 
 ### Fixed
