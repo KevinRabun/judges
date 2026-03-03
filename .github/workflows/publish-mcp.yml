@@ -59,6 +59,20 @@ jobs:
 
       # ── Publish to MCP Registry ─────────────────────────────
 
+      - name: Wait for npm propagation
+        run: |
+          VERSION=$(node -p 'require("./package.json").version')
+          echo "Waiting for @kevinrabun/judges@${VERSION} to propagate on npm…"
+          for i in $(seq 1 10); do
+            if npm view "@kevinrabun/judges@${VERSION}" version > /dev/null 2>&1; then
+              echo "✓ Package visible on npm after ~$((i * 15))s"
+              exit 0
+            fi
+            echo "  Attempt $i/10 — not yet visible, sleeping 15s…"
+            sleep 15
+          done
+          echo "⚠ Package not visible after 150s — proceeding anyway"
+
       - name: Install mcp-publisher
         run: |
           curl -L \
