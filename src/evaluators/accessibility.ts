@@ -361,7 +361,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   const animationLines: number[] = [];
   lines.forEach((line, i) => {
     if (isCommentLine(line)) return;
-    if (/animation\s*:|transition\s*:|@keyframes|animate\s*\(|gsap|framer-motion|spring/i.test(line)) {
+    if (/animation\s*:|transition\s*:|@keyframes|animate\s*\(|gsap|framer-motion|\bspring\b/i.test(line)) {
       animationLines.push(i + 1);
     }
   });
@@ -414,7 +414,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   // Form error messages not associated with inputs
   // Only apply to files that contain HTML/JSX rendering patterns — skip backend-only code
   const hasRenderingPatterns =
-    /<[a-z]+[\s>]|jsx|tsx|render\s*\(|createElement|dangerouslySetInnerHTML|className\s*=|htmlFor|aria-|role\s*=|<input|<form|<select|<textarea|<button/i.test(
+    /jsx|tsx|render\s*\(|createElement|dangerouslySetInnerHTML|className\s*=|htmlFor|aria-|role\s*=|<input|<form|<select|<textarea|<button|<div[\s>]|<span[\s>]|<p[\s>]|<h[1-6][\s>]|<img[\s>]|<table[\s>]|<label[\s>]/i.test(
       code,
     );
   const errorMsgLines: number[] = [];

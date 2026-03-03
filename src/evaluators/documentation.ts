@@ -38,20 +38,38 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
 
     if (!isExported) return;
 
-    // Walk backwards through comment/blank/decorator lines to find doc comments
+    // Walk backwards through comment/blank/decorator/attribute lines to find doc comments
     // This handles arbitrarily long JSDoc blocks (e.g., large @returns types)
     let hasDoc = false;
     for (let j = idx - 1; j >= Math.max(0, idx - 60); j--) {
       const trimmed = lines[j].trim();
       if (trimmed.length === 0) continue; // blank line
-      if (/\/\*\*|\/\/\/|#\s+|"""|'''|:param|@param|@returns|@description|@doc\b|doc\s*=/i.test(trimmed)) {
+      if (
+        /\/\*\*|\/\/\/|#\s+|"""|'''|:param|@param|@returns|@description|@doc\b|doc\s*=/i.test(trimmed) ||
+        (lang === "go" && /^\/\/\s/.test(trimmed)) // Go doc comments use plain // comments
+      ) {
         hasDoc = true;
         break;
       }
       if (/^\*/.test(trimmed)) continue; // block comment body
-      if (/^@\w/.test(trimmed)) continue; // decorator / annotation
+      if (/^@\w/.test(trimmed)) continue; // decorator / annotation (Python, Java)
+      if (/^#\[/.test(trimmed)) continue; // Rust attribute (e.g., #[instrument])
+      if (/^\[[\w(]/.test(trimmed)) continue; // C# attribute (e.g., [HttpGet], [Authorize])
       break; // non-comment code — stop
     }
+
+    // Python: also check for docstrings inside the function body (first non-blank body line)
+    if (!hasDoc && lang === "python") {
+      for (let j = idx + 1; j < Math.min(lines.length, idx + 5); j++) {
+        const bodyLine = lines[j].trim();
+        if (bodyLine.length === 0) continue;
+        if (/^"""/.test(bodyLine) || /^'''/.test(bodyLine)) {
+          hasDoc = true;
+        }
+        break; // only check the first non-blank line inside the body
+      }
+    }
+
     if (!hasDoc) {
       undocFnLines.push(ln);
     }
@@ -209,7 +227,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
     // Look back up to 15 lines to cover large JSDoc / docstring blocks
     const prevLines = lines.slice(Math.max(0, idx - 15), idx).join("\n");
     if (
-      !/\/\*\*|\*\/|@swagger|@api|@route|@openapi|@summary|@description|""".*@|#\s+@|@ApiOperation|@Operation|godoc/i.test(
+      !/\/\*\*|\*\/|\/\/\/|"""|'''|@swagger|@api|@route|@openapi|@summary|@description|#\s+@|@ApiOperation|@Operation|godoc|\/\/\s+\w/i.test(
         prevLines,
       )
     ) {

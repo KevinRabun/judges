@@ -119,7 +119,13 @@ export function analyzePortability(code: string, language: string): Finding[] {
 
   // Hardcoded localhost / IP addresses
   const hardcodedHostPattern = /["'`](?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d+)?["'`]/gi;
-  const hostLines = getLineNumbers(code, hardcodedHostPattern);
+  // Post-filter: exclude configurable defaults / fallback values
+  const defaultCtxPattern = /unwrap_or|or_else|\|\||\?\?|environ\.get|getenv|os\.Getenv|default|fallback/i;
+  const portaCodeLines = code.split("\n");
+  const hostLines = getLineNumbers(code, hardcodedHostPattern).filter((ln) => {
+    const line = portaCodeLines[ln - 1] || "";
+    return !defaultCtxPattern.test(line);
+  });
   if (hostLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

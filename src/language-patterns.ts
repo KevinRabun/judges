@@ -192,7 +192,7 @@ export const GENERIC_CATCH = {
   python: String.raw`except\s*:(?!\s*\w)|except\s+Exception\s*:`,
   csharp: String.raw`catch\s*\(\s*Exception\s`,
   java: String.raw`catch\s*\(\s*(?:Exception|Throwable)\s`,
-  go: String.raw`if\s+err\s*!=\s*nil`,
+  // Go intentionally omitted: `if err != nil` is idiomatic, not a generic catch
 };
 
 export const PANIC_UNWRAP = {

@@ -154,8 +154,14 @@ export function analyzeConfigurationManagement(code: string, language: string): 
   const envWithDefaultPattern =
     /process\.env\.\w+\s*(?:\|\||\?\?)|os\.environ\.get\s*\([^)]+,|os\.Getenv\b[^;\n]*(?:\|\||==\s*"")|env::var\b[^;\n]*\.unwrap_or|GetEnvironmentVariable\b[^;\n]*\?\?|getenv\b[^;\n]*,\s*["'\d]/gi;
   const envWithDefaults = (code.match(envWithDefaultPattern) || []).length;
+  // Go-style multi-line validation: os.Getenv("X") on one line, if x == "" on the next.
+  // This explicit validation is an alternative to inline defaults.
+  const goValidationCount =
+    (code.match(/os\.Getenv\b/g) || []).length > 0 && (code.match(/==\s*""/g) || []).length > 0
+      ? Math.min((code.match(/os\.Getenv\b/g) || []).length, (code.match(/==\s*""/g) || []).length)
+      : 0;
   const envTotal = envAccessLines.length;
-  if (envTotal > 0 && envWithDefaults === 0) {
+  if (envTotal > 0 && envWithDefaults === 0 && goValidationCount === 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

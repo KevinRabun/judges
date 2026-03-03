@@ -375,7 +375,14 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
   // ── AICS-013  Excessive permissions or wildcard resource access ─────────────
   const wildcardPermPattern =
     /["'`]\*["'`]\s*(?:,|\]|\})|Action["']?\s*:\s*["'`]\*["'`]|Resource["']?\s*:\s*["'`]\*["'`]|grant\s+all|GRANT\s+ALL|role.*admin|ALL\s+PRIVILEGES|permissions?\s*[:=]\s*\[?\s*["'`]\*["'`]/gi;
-  const wildcardPermLines = getLineNumbers(code, wildcardPermPattern);
+  // Post-filter: exclude authorization CHECK lines — these verify roles, not grant them
+  const authCheckPattern =
+    /hasRole|isInRole|require_role|PreAuthorize|Authorize\s*\(|role\s*[!=]=|claims\.role|current_user\.role|allow_headers|allow_methods/i;
+  const aicsCodeLines = code.split("\n");
+  const wildcardPermLines = getLineNumbers(code, wildcardPermPattern).filter((ln) => {
+    const line = aicsCodeLines[ln - 1] || "";
+    return !authCheckPattern.test(line);
+  });
   if (wildcardPermLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -453,7 +460,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
 
   // ── AICS-016  Tool-call results used without validation ────────────────────
   const toolResultPattern =
-    /tool[_.]?(?:result|output|response|call)|function[_.]?(?:result|output|response|call)|action[_.]?result|tool_use|tool_calls/gi;
+    /tool[_.]?(?:result|output|response|call)|function[_.]?(?:result|output|response|call)|action[_.]result|tool_use|tool_calls/gi;
   const toolResultLines = getLineNumbers(code, toolResultPattern);
   const hasResultValidation =
     /(?:validate|sanitize|parse|check|verify|filter|schema|zod|joi|yup|JSON\.parse|try\s*\{[^}]*JSON)/gi.test(code);

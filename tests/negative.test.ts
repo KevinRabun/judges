@@ -36,6 +36,8 @@ import { analyzeAiCodeSafety } from "../src/evaluators/ai-code-safety.js";
 import { analyzeConfigurationManagement } from "../src/evaluators/configuration-management.js";
 import { analyzePerformance } from "../src/evaluators/performance.js";
 import { analyzeCaching } from "../src/evaluators/caching.js";
+import { analyzeDataSecurity } from "../src/evaluators/data-security.js";
+import { analyzeConcurrency } from "../src/evaluators/concurrency.js";
 
 // ─── Clean Code Samples ─────────────────────────────────────────────────────
 
@@ -3890,5 +3892,600 @@ describe("AICS-010 FP: Java Spring @Valid annotation is input validation", () =>
     const findings = analyzeAiCodeSafety(javaCode, "java");
     const valFindings = findings.filter((f) => f.title.toLowerCase().includes("input validation"));
     assert.ok(valFindings.length > 0, "Java handlers without @Valid or validation library should still be flagged");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// FP Regression — Cross-Language Sweep Round 5
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ─── AICS-013 FP: Authorization CHECK lines should not flag wildcard perms ──
+describe("FP Regression — AICS-013: Authorization checks are not wildcard grants", () => {
+  it("should NOT flag Python role CHECK with allow_headers=['*']", () => {
+    const code = `
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(CORSMiddleware, allow_headers=["*"], allow_methods=["*"])
+
+@app.get("/admin")
+async def admin_panel(user=Depends(get_current_user)):
+    if user.role != "admin":
+        raise HTTPException(403)
+    return {"data": "admin"}
+`;
+    const findings = analyzeAiCodeSafety(code, "python");
+    const wildcardFindings = findings.filter(
+      (f) => f.ruleId === "AICS-013" || f.title.toLowerCase().includes("wildcard"),
+    );
+    assert.strictEqual(
+      wildcardFindings.length,
+      0,
+      "allow_headers=['*'] and allow_methods=['*'] are CORS config, not permission grants",
+    );
+  });
+
+  it("should NOT flag Java @PreAuthorize role check", () => {
+    const code = `
+@RestController
+public class AdminController {
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/dashboard")
+    public ResponseEntity<Dashboard> getDashboard() {
+        return ResponseEntity.ok(service.getDashboard());
+    }
+}
+`;
+    const findings = analyzeAiCodeSafety(code, "java");
+    const wildcardFindings = findings.filter(
+      (f) => f.ruleId === "AICS-013" || f.title.toLowerCase().includes("wildcard"),
+    );
+    assert.strictEqual(
+      wildcardFindings.length,
+      0,
+      "Java @PreAuthorize role checks are authorization guards, not grants",
+    );
+  });
+
+  it("should NOT flag C# [Authorize(Roles='Admin')] attribute", () => {
+    const code = `
+[ApiController]
+[Route("api/admin")]
+public class AdminController : ControllerBase
+{
+    [Authorize(Roles = "Admin")]
+    [HttpGet("settings")]
+    public IActionResult GetSettings()
+    {
+        return Ok(settingsService.Get());
+    }
+
+    [HttpGet("profile")]
+    public IActionResult GetProfile()
+    {
+        if (!User.IsInRole("Admin")) return Forbid();
+        return Ok(profileService.Get());
+    }
+}
+`;
+    const findings = analyzeAiCodeSafety(code, "csharp");
+    const wildcardFindings = findings.filter(
+      (f) => f.ruleId === "AICS-013" || f.title.toLowerCase().includes("wildcard"),
+    );
+    assert.strictEqual(wildcardFindings.length, 0, "C# Authorize and IsInRole are authorization checks, not grants");
+  });
+
+  it("should NOT flag Rust claims.role != 'admin' check", () => {
+    const code = `
+fn authorize(claims: &Claims) -> Result<(), ApiError> {
+    if claims.role != "admin" {
+        return Err(ApiError::Forbidden("Admin role required".into()));
+    }
+    Ok(())
+}
+`;
+    const findings = analyzeAiCodeSafety(code, "rust");
+    const wildcardFindings = findings.filter(
+      (f) => f.ruleId === "AICS-013" || f.title.toLowerCase().includes("wildcard"),
+    );
+    assert.strictEqual(
+      wildcardFindings.length,
+      0,
+      "Rust claims.role comparison is an authorization check, not a grant",
+    );
+  });
+
+  it("SHOULD still flag actual wildcard IAM grants (TP)", () => {
+    const code = `
+const policy = {
+  Effect: "Allow",
+  Action: "*",
+  Resource: "*"
+};
+`;
+    const findings = analyzeAiCodeSafety(code, "javascript");
+    const wildcardFindings = findings.filter(
+      (f) => f.ruleId === "AICS-013" || f.title.toLowerCase().includes("wildcard"),
+    );
+    assert.ok(wildcardFindings.length > 0, "Actual IAM wildcard grants should still be flagged");
+  });
+});
+
+// ─── AICS-016 FP: C# ActionResult type should not flag tool-call results ────
+describe("FP Regression — AICS-016: C# ActionResult is a return type, not tool result", () => {
+  it("should NOT flag C# ActionResult return type", () => {
+    const code = `
+[ApiController]
+public class ItemsController : ControllerBase
+{
+    [HttpGet("{id}")]
+    public ActionResult<Item> GetItem(int id) {
+        var item = db.Items.Find(id);
+        if (item == null) return NotFound();
+        return Ok(item);
+    }
+
+    [HttpPost]
+    public ActionResult<Item> CreateItem(CreateItemRequest req) {
+        var item = new Item { Name = req.Name };
+        db.Items.Add(item);
+        db.SaveChanges();
+        return CreatedAtAction(nameof(GetItem), new { id = item.Id }, item);
+    }
+}
+`;
+    const findings = analyzeAiCodeSafety(code, "csharp");
+    const toolFindings = findings.filter((f) => f.ruleId === "AICS-016" || f.title.toLowerCase().includes("tool"));
+    assert.strictEqual(toolFindings.length, 0, "C# ActionResult is a standard return type, not a tool-call result");
+  });
+
+  it("SHOULD still flag actual tool_result usage without validation (TP)", () => {
+    const code = `
+const tool_result = await runTool(name, args);
+const output = tool_result.content;
+sendToUser(output);
+`;
+    const findings = analyzeAiCodeSafety(code, "javascript");
+    const toolFindings = findings.filter((f) => f.ruleId === "AICS-016" || f.title.toLowerCase().includes("tool"));
+    assert.ok(toolFindings.length > 0, "Actual tool_result usage without validation should still be flagged");
+  });
+});
+
+// ─── A11Y FP: Java Spring Framework should not match animation spring ───────
+describe("FP Regression — A11Y-001: 'springframework' should not match animation spring", () => {
+  it("should NOT flag Java Spring Framework imports as animation", () => {
+    const code = `
+import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+
+@RestController
+@RequestMapping("/api/v1/items")
+public class ItemController {
+    @GetMapping("/{id}")
+    public ResponseEntity<Item> getItem(@PathVariable Long id) {
+        return ResponseEntity.ok(service.findById(id));
+    }
+}
+`;
+    const findings = analyzeAccessibility(code, "java");
+    const animFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("animation") || f.title.toLowerCase().includes("motion"),
+    );
+    assert.strictEqual(animFindings.length, 0, "'springframework' should not trigger spring animation detection");
+  });
+});
+
+// ─── A11Y FP: Generics and XML doc tags should not match HTML rendering ─────
+describe("FP Regression — A11Y form error: Generics/XML tags are not HTML rendering", () => {
+  it("should NOT flag Rust code with generic type params as HTML rendering", () => {
+    const code = `
+use sqlx::PgPool;
+use actix_web::{web, HttpResponse};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct LoginForm {
+    username: String,
+    password: String,
+}
+
+async fn login(pool: web::Data<PgPool>, form: web::Form<LoginForm>) -> HttpResponse {
+    if form.username.is_empty() {
+        return HttpResponse::BadRequest().json(serde_json::json!({"error": "username required"}));
+    }
+    HttpResponse::Ok().json(serde_json::json!({"status": "ok"}))
+}
+`;
+    const findings = analyzeAccessibility(code, "rust");
+    const formFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("form") && f.title.toLowerCase().includes("error"),
+    );
+    assert.strictEqual(
+      formFindings.length,
+      0,
+      "Rust generics like <PgPool> should not trigger HTML form error detection",
+    );
+  });
+
+  it("should NOT flag C# code with XML doc comments as HTML rendering", () => {
+    const code = `
+/// <summary>
+/// User login endpoint with validation.
+/// </summary>
+[ApiController]
+public class AuthController : ControllerBase
+{
+    [HttpPost("login")]
+    public IActionResult Login([FromBody] LoginRequest req)
+    {
+        if (string.IsNullOrEmpty(req.Username))
+            return BadRequest(new { error = "username required" });
+        return Ok(new { token = "jwt" });
+    }
+}
+`;
+    const findings = analyzeAccessibility(code, "csharp");
+    const formFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("form") && f.title.toLowerCase().includes("error"),
+    );
+    assert.strictEqual(
+      formFindings.length,
+      0,
+      "C# XML doc tags like <summary> should not trigger HTML form error detection",
+    );
+  });
+});
+
+// ─── DATA-001 FP: Python jwt.decode with algorithms= is verified ────────────
+describe("FP Regression — DATA-001: Python jwt.decode with algorithms is verified", () => {
+  it("should NOT flag jwt.decode when algorithms= parameter is present", () => {
+    const code = `
+import jwt
+
+def verify_token(token: str, secret: str) -> dict:
+    """Verify and decode a JWT token."""
+    payload = jwt.decode(token, secret, algorithms=["HS256"])
+    return payload
+`;
+    const findings = analyzeDataSecurity(code, "python");
+    const jwtFindings = findings.filter(
+      (f) =>
+        f.ruleId === "DATA-001" ||
+        f.title.toLowerCase().includes("jwt") ||
+        f.title.toLowerCase().includes("token verification"),
+    );
+    assert.strictEqual(jwtFindings.length, 0, "jwt.decode with algorithms= parameter IS verified decoding");
+  });
+
+  it("SHOULD still flag jwt.decode without algorithms or verify (TP)", () => {
+    const code = `
+import jwt
+
+def read_token(token: str) -> dict:
+    return jwt.decode(token, options={"verify_signature": False})
+`;
+    const findings = analyzeDataSecurity(code, "python");
+    const jwtFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("jwt") || f.title.toLowerCase().includes("token verification"),
+    );
+    assert.ok(jwtFindings.length > 0, "jwt.decode without verification should still be flagged");
+  });
+});
+
+// ─── SWDEV-002 FP: Go if err != nil is idiomatic, not a bare catch ──────────
+describe("FP Regression — SWDEV-002: Go idiomatic error handling is not bare catch", () => {
+  it("should NOT flag Go if err != nil as bare except", () => {
+    const code = `
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+func readConfig(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config: %w", err)
+	}
+	return data, nil
+}
+
+func main() {
+	cfg, err := readConfig("config.json")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\\n", err)
+		os.Exit(1)
+	}
+	fmt.Println(string(cfg))
+}
+`;
+    const findings = analyzeSoftwarePractices(code, "go");
+    const catchFindings = findings.filter(
+      (f) =>
+        f.ruleId === "SWDEV-002" ||
+        f.title.toLowerCase().includes("bare except") ||
+        f.title.toLowerCase().includes("untyped catch"),
+    );
+    assert.strictEqual(catchFindings.length, 0, "Go 'if err != nil' is idiomatic error handling, not a bare catch");
+  });
+
+  it("SHOULD still flag C# catch(Exception) as bare catch (TP)", () => {
+    const code = `
+public class Service {
+    public void Process() {
+        try {
+            DoWork();
+        } catch (Exception e) {
+            Console.WriteLine(e);
+        }
+    }
+}
+`;
+    const findings = analyzeSoftwarePractices(code, "csharp");
+    const catchFindings = findings.filter(
+      (f) =>
+        f.ruleId === "SWDEV-002" ||
+        f.title.toLowerCase().includes("bare except") ||
+        f.title.toLowerCase().includes("untyped catch"),
+    );
+    assert.ok(catchFindings.length > 0, "C# catch(Exception) is a bare catch and should still be flagged");
+  });
+});
+
+// ─── CLOUD-001 / PORTA-001 FP: Configurable defaults are not hardcoded ──────
+describe("FP Regression — CLOUD-001/PORTA-001: Environment defaults are not hardcoded", () => {
+  it("should NOT flag Rust unwrap_or_else fallback as hardcoded host", () => {
+    const code = `
+use std::env;
+
+fn main() {
+    let addr = env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+    println!("Listening on {}", addr);
+}
+`;
+    const cloudFindings = analyzeCloudReadiness(code, "rust");
+    const hardcoded = cloudFindings.filter((f) => f.title.toLowerCase().includes("hardcoded"));
+    assert.strictEqual(hardcoded.length, 0, "Rust unwrap_or_else fallback is configurable, not hardcoded");
+
+    const portFindings = analyzePortability(code, "rust");
+    const portHardcoded = portFindings.filter((f) => f.title.toLowerCase().includes("hardcoded"));
+    assert.strictEqual(portHardcoded.length, 0, "Rust unwrap_or_else fallback is configurable, not hardcoded");
+  });
+
+  it("should NOT flag Go os.Getenv with || fallback as hardcoded", () => {
+    const code = `
+package main
+
+import "os"
+
+func main() {
+    port := os.Getenv("PORT")
+    if port == "" {
+        port = "8080"
+    }
+}
+`;
+    const findings = analyzeCloudReadiness(code, "go");
+    const hardcoded = findings.filter((f) => f.title.toLowerCase().includes("hardcoded"));
+    assert.strictEqual(hardcoded.length, 0, "Go os.Getenv with fallback is configurable, not hardcoded");
+  });
+
+  it("SHOULD still flag truly hardcoded hosts without env fallback (TP)", () => {
+    const code = `
+const API_URL = "http://localhost:3000/api";
+fetch(API_URL + "/users");
+`;
+    const findings = analyzeCloudReadiness(code, "javascript");
+    const hardcoded = findings.filter((f) => f.title.toLowerCase().includes("hardcoded"));
+    assert.ok(hardcoded.length > 0, "Truly hardcoded IPs without env fallback should still be flagged");
+  });
+});
+
+// ─── CONC-001 FP: Graceful shutdown goroutines are not unmanaged workers ────
+describe("FP Regression — CONC-001: Graceful shutdown goroutine is not unmanaged", () => {
+  it("should NOT flag Go graceful shutdown goroutine as worker without pooling", () => {
+    const code = `
+package main
+
+import (
+	"context"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+)
+
+func main() {
+	srv := &http.Server{Addr: ":8080"}
+
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		<-sigCh
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		srv.Shutdown(ctx)
+	}()
+
+	srv.ListenAndServe()
+}
+`;
+    const findings = analyzeConcurrency(code, "go");
+    const poolFindings = findings.filter(
+      (f) =>
+        f.ruleId === "CONC-001" || f.title.toLowerCase().includes("worker") || f.title.toLowerCase().includes("pool"),
+    );
+    assert.strictEqual(
+      poolFindings.length,
+      0,
+      "Graceful shutdown goroutine with signal.Notify is not an unmanaged worker",
+    );
+  });
+});
+
+// ─── CFG-001 FP: Go multi-line env validation is equivalent to defaults ─────
+describe("FP Regression — CFG-001: Go os.Getenv with validation is not missing defaults", () => {
+  it("should NOT flag Go env vars with empty-string checks as missing defaults", () => {
+    const code = `
+package main
+
+import (
+	"errors"
+	"os"
+)
+
+type Config struct {
+	DatabaseURL string
+	JWTSecret   string
+	Port        string
+}
+
+func LoadConfig() (*Config, error) {
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		return nil, errors.New("DATABASE_URL is required")
+	}
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return nil, errors.New("JWT_SECRET is required")
+	}
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	return &Config{DatabaseURL: dbURL, JWTSecret: secret, Port: port}, nil
+}
+`;
+    const findings = analyzeConfigurationManagement(code, "go");
+    const cfgFindings = findings.filter(
+      (f) =>
+        f.ruleId === "CFG-001" && (f.title.toLowerCase().includes("default") || f.title.toLowerCase().includes("env")),
+    );
+    assert.strictEqual(cfgFindings.length, 0, "Go os.Getenv with == '' validation is equivalent to providing defaults");
+  });
+});
+
+// ─── DOC-001 FP: Go // comments should count as function documentation ──────
+describe("FP Regression — DOC-001: Go // comments are doc comments", () => {
+  it("should NOT flag Go functions with // doc comments as undocumented", () => {
+    const code = [
+      "package main",
+      "",
+      "// LoadConfig reads configuration from environment variables.",
+      "func LoadConfig() (*Config, error) {",
+      "    return &Config{}, nil",
+      "}",
+      "",
+      "// handleListTasks returns all tasks for the authenticated user.",
+      "func handleListTasks(w http.ResponseWriter, r *http.Request) {",
+      '    w.Write([]byte("ok"))',
+      "}",
+      ...Array.from({ length: 85 }, (_, i) => `// padding line ${i}`),
+    ].join("\n");
+    const findings = analyzeDocumentation(code, "go");
+    const docFindings = findings.filter(
+      (f) => f.ruleId === "DOC-001" && f.title.toLowerCase().includes("exported function"),
+    );
+    assert.strictEqual(docFindings.length, 0, "Go // comments above functions should count as documentation");
+  });
+});
+
+// ─── DOC-001 FP: Rust /// doc comments with #[attr] should count ────────────
+describe("FP Regression — DOC-001: Rust /// with #[derive] should traverse attributes", () => {
+  it("should NOT flag Rust functions with /// above #[attributes] as undocumented", () => {
+    const code = [
+      "use serde::Deserialize;",
+      "",
+      "/// Request body for creating a product.",
+      "#[derive(Deserialize)]",
+      "pub struct CreateProductRequest {",
+      "    pub name: String,",
+      "    pub price: i64,",
+      "}",
+      "",
+      "/// List products with optional pagination.",
+      "#[instrument(skip(pool))]",
+      "pub async fn list_products(pool: Data<PgPool>) -> Result<Json<Vec<Product>>, ApiError> {",
+      "    Ok(Json(vec![]))",
+      "}",
+      ...Array.from({ length: 85 }, (_, i) => `// padding line ${i}`),
+    ].join("\n");
+    const findings = analyzeDocumentation(code, "rust");
+    const docFindings = findings.filter(
+      (f) => f.ruleId === "DOC-001" && f.title.toLowerCase().includes("exported function"),
+    );
+    assert.strictEqual(
+      docFindings.length,
+      0,
+      "Rust /// comments above #[attributes] should count via attribute traversal",
+    );
+  });
+});
+
+// ─── DOC-001 FP: C# /// with [Attributes] should traverse attributes ───────
+describe("FP Regression — DOC-001: C# /// with [Attr] should traverse attributes", () => {
+  it("should NOT flag C# methods with /// above [HttpGet] as undocumented", () => {
+    const code = [
+      "using Microsoft.AspNetCore.Mvc;",
+      "",
+      "/// <summary>",
+      "/// Gets an item by ID.",
+      "/// </summary>",
+      "[ApiController]",
+      '[Route("api/items")]',
+      "public class ItemsController : ControllerBase",
+      "{",
+      "    /// <summary>Fetch single item.</summary>",
+      '    [HttpGet("{id}")]',
+      "    public IActionResult GetItem(int id)",
+      "    {",
+      "        return Ok(new { id });",
+      "    }",
+      ...Array.from({ length: 85 }, (_, i) => `    // padding line ${i}`),
+      "}",
+    ].join("\n");
+    const findings = analyzeDocumentation(code, "csharp");
+    const docFindings = findings.filter(
+      (f) => f.ruleId === "DOC-001" && f.title.toLowerCase().includes("exported function"),
+    );
+    assert.strictEqual(
+      docFindings.length,
+      0,
+      "C# /// comments above [Attributes] should count via attribute traversal",
+    );
+  });
+});
+
+// ─── DOC-001 FP: Python body docstrings should count as documentation ───────
+describe("FP Regression — DOC-001: Python body docstrings are function docs", () => {
+  it("should NOT flag Python functions with body docstrings as undocumented", () => {
+    const code = [
+      '"""User management module."""',
+      "",
+      "from fastapi import APIRouter",
+      "",
+      "router = APIRouter()",
+      "",
+      "@router.get('/users')",
+      "async def list_users():",
+      '    """Return all active users."""',
+      "    return []",
+      "",
+      "@router.post('/users')",
+      "async def create_user(data: dict):",
+      '    """Create a new user account."""',
+      "    return data",
+      ...Array.from({ length: 85 }, (_, i) => `# padding line ${i}`),
+    ].join("\n");
+    const findings = analyzeDocumentation(code, "python");
+    const docFindings = findings.filter(
+      (f) => f.ruleId === "DOC-001" && f.title.toLowerCase().includes("exported function"),
+    );
+    assert.strictEqual(
+      docFindings.length,
+      0,
+      "Python body docstrings (first line after def) should count as documentation",
+    );
   });
 });

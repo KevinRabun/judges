@@ -225,7 +225,13 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
 
   // JWT without verification
   const jwtNoVerifyPatterns = /jwt\.decode\s*\(|jose\.decode\s*\(|JWT\.decode\s*\(/gi;
-  const jwtNoVerifyLines = getLineNumbers(code, jwtNoVerifyPatterns);
+  // Post-filter: Python's PyJWT uses jwt.decode(token, key, algorithms=[...]) for VERIFIED decode.
+  // Only jwt.decode() without algorithms= or with verify_signature=False is insecure.
+  const jwtCodeLines = code.split("\n");
+  const jwtNoVerifyLines = getLineNumbers(code, jwtNoVerifyPatterns).filter((ln) => {
+    const line = jwtCodeLines[ln - 1] || "";
+    return !(/algorithms\s*=/.test(line) || /,\s*\w+\s*,\s*algorithms/.test(line));
+  });
   if (jwtNoVerifyLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

@@ -197,7 +197,9 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
     }
   });
   const hasPool =
-    /pool|WorkerPool|ThreadPool|threadpool|ExecutorService|rayon|tokio::spawn|goroutine.*pool|semaphore/i.test(code);
+    /pool|WorkerPool|ThreadPool|threadpool|ExecutorService|rayon|tokio::spawn|goroutine.*pool|semaphore|signal\.Notify|Shutdown|SIGTERM|SIGINT|graceful/i.test(
+      code,
+    );
   if (workerLines.length > 0 && !hasPool) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

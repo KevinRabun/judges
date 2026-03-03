@@ -18,7 +18,13 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
 
   // Hardcoded hosts/ports
   const hardcodedHostPattern = /(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d{4,5}(?!.*(?:test|spec|mock|example))/gi;
-  const hardcodedLines = getLineNumbers(code, hardcodedHostPattern);
+  // Post-filter: exclude configurable defaults / fallback values
+  const defaultCtxPattern = /unwrap_or|or_else|\|\||\?\?|environ\.get|getenv|os\.Getenv|default|fallback/i;
+  const codeLines = code.split("\n");
+  const hardcodedLines = getLineNumbers(code, hardcodedHostPattern).filter((ln) => {
+    const line = codeLines[ln - 1] || "";
+    return !defaultCtxPattern.test(line);
+  });
   if (hardcodedLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
