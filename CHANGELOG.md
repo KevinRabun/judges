@@ -2,6 +2,24 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.18.2] — 2026-03-03
+
+### Fixed
+- **FP reduction round 4 — IaC gates + cross-language fixes** — 11 rules across 7 evaluators fixed to eliminate false positives on Infrastructure-as-Code files (Bicep, Terraform) and cross-language patterns:
+  - **SOV-001** catch-all and data-portability rules no longer fire on IaC templates
+  - **COST-001** caching and connection-pooling rules no longer fire on IaC templates
+  - **DOC-002** block-comment rule gated on IaC + expanded regex to recognize Bicep `@description`, `targetScope`, `metadata`, and non-JSDoc block comments
+  - **DOC-001** magic-numbers rule no longer flags Bicep numeric configuration values (SKU sizes, byte limits, retention days)
+  - **CACHE-002** no-cache-headers rule gated on IaC
+  - **SCALE-006** rate-limiting and **SCALE-010** circuit-breaker rules gated on IaC
+  - **CLOUD-001** resource-cleanup rule gated on IaC
+  - **AICS-010** input-validation rule now recognizes Java Bean Validation annotations (`@Valid`, `@NotNull`, `@NotBlank`, `@NotEmpty`, `javax.validation`, `jakarta.validation`)
+
+### Tests
+- 25 new negative tests with true-positive preservation checks covering all fixed rules
+- Comprehensive empirical sweep against Bicep, Terraform, Python, Rust, Java, and Go templates
+- All 1,320 tests pass (963 judges + 194 subsystems + 163 negative)
+
 ## [3.18.1] — 2026-03-03
 
 ### Fixed

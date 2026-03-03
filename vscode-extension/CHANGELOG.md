@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.18.2] — 2026-03-03
+
+### Fixed
+- **FP reduction round 4** — 11 rules across 7 evaluators fixed to eliminate false positives on IaC files (Bicep, Terraform) and improve cross-language accuracy (Java Bean Validation annotations now recognized)
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.18.2 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.18.1] — 2026-03-03
 
 ### Fixed
