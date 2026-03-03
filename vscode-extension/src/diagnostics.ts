@@ -430,7 +430,18 @@ export class JudgesDiagnosticProvider {
 
       const identityMsg = vscode.LanguageModelChatMessage.Assistant(DEEP_REVIEW_IDENTITY);
       const messages = [identityMsg, vscode.LanguageModelChatMessage.User(prompt)];
-      const response = await model.sendRequest(messages, {}, token);
+
+      // Try sending; if the first model fails, try an alternative
+      let response: vscode.LanguageModelChatResponse;
+      try {
+        response = await model.sendRequest(messages, {}, token);
+      } catch (sendError) {
+        const fallbackModels = await vscode.lm.selectChatModels();
+        const fallback = fallbackModels.find((m) => m.id !== model!.id) ?? fallbackModels[0];
+        if (!fallback) throw sendError;
+        model = fallback;
+        response = await model.sendRequest(messages, {}, token);
+      }
 
       // Buffer response to detect content-policy refusal
       let responseText = "";

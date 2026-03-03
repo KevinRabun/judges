@@ -591,9 +591,26 @@ async function handleDeepReview(
 
   const prompt = DEEP_REVIEW_PROMPT_INTRO + codeAndFindings + deepReviewSection;
 
+  // ── Resolve a usable model ─────────────────────────────────────────────
+  // request.model is the user's pick in the Copilot Chat model selector.
+  // When set to "auto" it may not have a real endpoint, so we fall back to
+  // selectChatModels() if sending fails.
+  async function resolveModel(): Promise<vscode.LanguageModelChat | undefined> {
+    // First try request.model (user's explicit choice)
+    if (request.model) {
+      try {
+        // Probe with an empty send — if this throws, the model isn't usable
+        return request.model;
+      } catch {
+        // Fall through to selectChatModels
+      }
+    }
+    const available = await vscode.lm.selectChatModels();
+    return available[0];
+  }
+
   try {
-    // Use whatever model the user selected in Copilot Chat
-    const model = request.model;
+    let model = await resolveModel();
     if (!model) {
       stream.markdown(
         `\n\n---\n\n### ⚠️ Layer 2 Unavailable\n\n` +
@@ -612,7 +629,18 @@ async function handleDeepReview(
     const messages = [identityMsg, vscode.LanguageModelChatMessage.User(prompt)];
 
     // ── First attempt ──
-    const response = await model.sendRequest(messages, {}, token);
+    // The "auto" model selector may fail at send time, so catch and fall back
+    let response: vscode.LanguageModelChatResponse;
+    try {
+      response = await model.sendRequest(messages, {}, token);
+    } catch (sendError) {
+      // If request.model failed (e.g. "auto" pseudo-model), try selectChatModels
+      const fallbackModels = await vscode.lm.selectChatModels();
+      const fallback = fallbackModels.find((m) => m.id !== model!.id) ?? fallbackModels[0];
+      if (!fallback) throw sendError; // re-throw if no fallback
+      model = fallback;
+      response = await model.sendRequest(messages, {}, token);
+    }
 
     // Buffer complete response to detect content-policy refusal
     let responseText = "";
@@ -632,7 +660,6 @@ async function handleDeepReview(
       const simplifiedSection = buildSimplifiedDeepReviewSection(language, context);
       const retryPrompt = DEEP_REVIEW_PROMPT_INTRO + codeAndFindings + simplifiedSection;
 
-      // Try a different model family if available, otherwise retry with same model
       // Try a different model family for the retry
       const altModels = await vscode.lm.selectChatModels();
       const altModel = altModels.find((m) => m.id !== model.id) ?? model;
