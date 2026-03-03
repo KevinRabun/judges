@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.0] — 2026-03-06
+
+### Added
+- **PowerShell language support** — Full PowerShell analysis across all 37 judges, including cmdlet conventions, credential handling, pipeline patterns, and AST structural parsing.
+
+### Fixed
+- **Deep review content-policy refusal (enhanced)** — Added defensive preamble framing, automatic refusal detection with simplified retry prompt, and alternative model fallback for Layer 2 deep review. Fixes persistent GPT-4o refusals on GDPR/IaC files.
+- **Bicep/Terraform in LM tool** — Added `bicep` and `terraform` to `lm-tool.ts` LANG_MAP for consistent language detection.
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.20.0 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.19.6] — 2026-03-03
 
 ### Fixed

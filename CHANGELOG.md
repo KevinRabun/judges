@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.0] — 2026-03-06
+
+### Added
+- **PowerShell language support** — Full PowerShell analysis across all 37 judges. Includes language patterns (cmdlet-verb conventions, `Invoke-Expression` detection, `$using:` scope, credential handling, `ConvertTo-SecureString`, pipeline best practices), AST structural parsing (function/class extraction, comment association, nesting depth, dead-code detection after `throw`/`return`), taint tracking, and cross-file taint analysis. PowerShell is now recognized in all LANG_MAP entries, the structural parser, the tree-sitter AST layer, and the VS Code extension tool routing.
+
+### Fixed
+- **Deep review content-policy refusal (enhanced)** — The v3.19.6 fix (switching from `systemPrompt` to `description`) was necessary but insufficient for GDPR/IaC files where the aggregate of 37 security-related judge descriptions still triggered GPT-4o content filters. Added a three-layer defence: (1) `DEFENSIVE_PREAMBLE` framing the request as an authorised voluntary code review, (2) `isContentPolicyRefusal()` detection with automatic retry using a simplified prompt that groups judges into 7 quality dimensions instead of listing all 37, (3) alternative model family fallback when the primary model refuses. Also fixed `buildSingleJudgeDeepReviewSection` which still used `judge.systemPrompt` instead of `judge.description`.
+- **Bicep/Terraform missing from LM tool LANG_MAP** — The VS Code extension's `lm-tool.ts` language map now includes `bicep` and `terraform` for parity with `chat-participant.ts` and `diagnostics.ts`.
+
+### Tests
+- All 1,472 tests pass (976 judges + 217 negative + 209 subsystems + 70 extension)
+
 ## [3.19.6] — 2026-03-03
 
 ### Fixed
