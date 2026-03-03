@@ -2,6 +2,22 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.18.1] — 2026-03-03
+
+### Fixed
+- **Python nested-loop false positives** — Generator expressions (`all(x for x in items)`), list comprehensions, and `x in string` substring checks were incorrectly flagged as nested O(n²) loops by both the cost-effectiveness and performance evaluators. Two root causes fixed:
+  - Loop regex matched `for` mid-line inside comprehensions/generators — now requires `for`/`while` at line start
+  - Loop depth tracked via `}` brace counting, which never decrements in Python — now uses indentation-stack scoping so sequential non-nested loops are correctly recognized as siblings
+- **CI lint warnings treated as errors** — Resolved 12 pre-existing ESLint warnings (`no-useless-escape`, `no-unused-vars`) across 5 files that caused CI to exit with code 1
+- **Restored intentional `moment` import** — `lint-staged` had silently removed the deliberately-vulnerable `import moment from "moment"` in `sample-vulnerable-api.ts`, breaking DEPS evaluator tests. Restored with `eslint-disable-line` guard
+
+### Removed
+- Internal dev-only scripts (`cross-project-analysis.ts`, `analyze-report-findings.ts`) — not needed for production releases
+
+### Tests
+- 3 new tests: Python nested loops (TP), generator expressions (FP prevention), sequential non-nested loops (FP prevention)
+- All 963 tests pass (960 judges + 3 new)
+
 ## [3.18.0] — 2025-07-09
 
 ### Improved

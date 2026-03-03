@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.18.1] — 2026-03-03
+
+### Fixed
+- **Python nested-loop false positives** — Generator expressions, list comprehensions, and `x in string` substring checks no longer incorrectly flagged as O(n²) nested loops
+- **CI stability** — Resolved ESLint warnings and restored intentional test fixture imports
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.18.1 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [0.4.0] — 2026-03-02
 
 ### Added
