@@ -35,6 +35,11 @@ const LANG_ALIAS_MAP: Record<string, LangFamily> = {
   c: "cpp",
   h: "cpp",
   hpp: "cpp",
+  powershell: "powershell",
+  ps1: "powershell",
+  psm1: "powershell",
+  psd1: "powershell",
+  pwsh: "powershell",
   terraform: "terraform",
   tf: "terraform",
   hcl: "terraform",
@@ -145,6 +150,7 @@ export const ENV_ACCESS = {
   csharp: String.raw`Environment\.GetEnvironmentVariable\s*\(`,
   java: String.raw`System\.getenv\s*\(`,
   go: String.raw`os\.(?:Getenv|LookupEnv)\s*\(`,
+  powershell: String.raw`\$env:\w+`,
 };
 
 export const HARDCODED_ENV = {
@@ -154,6 +160,7 @@ export const HARDCODED_ENV = {
   csharp: String.raw`GetEnvironmentVariable\s*\(.*\)\s*\?\?\s*["'][^"']+["']`,
   java: String.raw`getenv\s*\(.*\)\s*(?:!=\s*null\s*\?|==\s*null)`,
   go: String.raw`os\.Getenv\s*\(.*\)\s*==\s*["']`,
+  powershell: String.raw`\$env:\w+\s*=\s*["'][^"']+["']`,
 };
 
 // ── Function Definitions ─────────────────────────────────────────────────────
@@ -165,6 +172,7 @@ export const FUNCTION_DEF = {
   csharp: String.raw`(?:public|private|protected|internal|static|async|override|virtual)\s+[\w<>\[\]]+\s+\w+\s*\(`,
   java: String.raw`(?:public|private|protected|static|final|synchronized|abstract)\s+[\w<>\[\]]+\s+\w+\s*\(`,
   go: String.raw`func\s+(?:\(\w+\s+\*?\w+\)\s+)?\w+\s*\(`,
+  powershell: String.raw`function\s+[\w-]+\s*(?:\(|\{)`,
 };
 
 // ── Error Handling ───────────────────────────────────────────────────────────
@@ -176,6 +184,7 @@ export const TRY_CATCH = {
   csharp: String.raw`try\s*\{`,
   java: String.raw`try\s*\{`,
   go: String.raw`if\s+err\s*!=\s*nil`,
+  powershell: String.raw`try\s*\{`,
 };
 
 export const EMPTY_CATCH = {
@@ -185,6 +194,7 @@ export const EMPTY_CATCH = {
   csharp: String.raw`catch\s*(?:\([^)]*\))?\s*\{\s*\}`,
   java: String.raw`catch\s*\([^)]*\)\s*\{\s*\}`,
   go: String.raw`if\s+err\s*!=\s*nil\s*\{\s*\}|_\s*=\s*\w+\(`,
+  powershell: String.raw`catch\s*\{\s*\}`,
 };
 
 export const GENERIC_CATCH = {
@@ -193,6 +203,7 @@ export const GENERIC_CATCH = {
   csharp: String.raw`catch\s*\(\s*Exception\s`,
   java: String.raw`catch\s*\(\s*(?:Exception|Throwable)\s`,
   // Go intentionally omitted: `if err != nil` is idiomatic, not a generic catch
+  powershell: String.raw`catch\s*\{|catch\s*\[\s*System\.Exception\s*\]`,
 };
 
 export const PANIC_UNWRAP = {
@@ -202,6 +213,7 @@ export const PANIC_UNWRAP = {
   python: String.raw`sys\.exit\s*\(|os\._exit\s*\(`,
   csharp: String.raw`Environment\.Exit\s*\(|Environment\.FailFast\s*\(`,
   java: String.raw`System\.exit\s*\(|Runtime\.getRuntime\(\)\.halt\s*\(`,
+  powershell: String.raw`\[Environment\]::Exit\s*\(|exit\s+\d|throw\s`,
 };
 
 // ── Weak / Dynamic Types ────────────────────────────────────────────────────
@@ -216,6 +228,7 @@ export const WEAK_TYPE = {
   // accept arbitrary types (pre-1.18 and post-1.18 respectively). Only flag
   // unsafe pointer casts which genuinely bypass the type system.
   go: String.raw`unsafe\.Pointer`,
+  powershell: String.raw`\[object\]|\[psobject\]|\[System\.Object\]`,
 };
 
 // ── Async / Concurrency ─────────────────────────────────────────────────────
@@ -227,6 +240,7 @@ export const ASYNC_FUNCTION = {
   csharp: String.raw`async\s+Task|async\s+ValueTask`,
   java: String.raw`CompletableFuture|@Async|ExecutorService`,
   go: String.raw`go\s+\w+\s*\(|go\s+func\s*\(`,
+  powershell: String.raw`Start-Job|Start-ThreadJob|ForEach-Object\s+-Parallel`,
 };
 
 export const MISSING_AWAIT = {
@@ -270,6 +284,7 @@ export const SQL_INJECTION = {
   csharp: String.raw`(?:ExecuteNonQuery|ExecuteReader|ExecuteScalar|SqlCommand)\s*\(.*(?:\+\s*\w+|string\.Format|\$["'])`,
   java: String.raw`(?:executeQuery|executeUpdate|prepareStatement|createQuery)\s*\(\s*(?:["'].*\+\s*\w+|String\.format)`,
   go: String.raw`(?:db\.(?:Query|Exec|QueryRow)|\.Raw)\s*\(\s*(?:fmt\.Sprintf|["'].*\+\s*\w+)`,
+  powershell: String.raw`Invoke-Sqlcmd.*["'].*\$|Invoke-DbaQuery.*["'].*\$`,
 };
 
 // ── Security: Command Injection ──────────────────────────────────────────────
@@ -281,6 +296,7 @@ export const COMMAND_INJECTION = {
   csharp: String.raw`Process\.Start\s*\(.*(?:\+|\$["'])`,
   java: String.raw`Runtime\.getRuntime\(\)\.exec\s*\(.*\+|ProcessBuilder\s*\(.*\+`,
   go: String.raw`exec\.Command\s*\(.*(?:\+|fmt\.Sprintf)`,
+  powershell: String.raw`Invoke-Expression.*\$|Start-Process.*\$|&\s*\$\w+`,
 };
 
 // ── Security: Hardcoded Secrets ──────────────────────────────────────────────
@@ -306,6 +322,7 @@ export const WEAK_HASH = {
   csharp: String.raw`(?:MD5|SHA1)\.Create`,
   java: String.raw`MessageDigest\.getInstance\s*\(\s*["'](?:MD5|SHA-?1)["']\)`,
   go: String.raw`(?:md5|sha1)\.(?:New|Sum)\s*\(`,
+  powershell: String.raw`\[System\.Security\.Cryptography\.(?:MD5|SHA1)\]::Create`,
 };
 
 // ── Security: Eval / Dynamic Execution ───────────────────────────────────────
@@ -317,6 +334,7 @@ export const EVAL_USAGE = {
   csharp: String.raw`CSharpScript\.EvaluateAsync|Roslyn\.Scripting`,
   java: String.raw`ScriptEngine\.eval\s*\(|Nashorn|Groovy`,
   go: String.raw`(?!)`, // Go has no eval equivalent
+  powershell: String.raw`Invoke-Expression|iex\s`,
 };
 
 // ── Security: TLS / Certificate ──────────────────────────────────────────────
@@ -328,6 +346,7 @@ export const TLS_DISABLED = {
   csharp: String.raw`ServerCertificateValidationCallback\s*=.*true|ServicePointManager\.ServerCertificateValidationCallback`,
   java: String.raw`TrustAllCerts|X509TrustManager|trustAllCerts`,
   go: String.raw`InsecureSkipVerify\s*:\s*true`,
+  powershell: String.raw`\[System\.Net\.ServicePointManager\]::ServerCertificateValidationCallback|\-SkipCertificateCheck`,
 };
 
 // ── Security: CORS ───────────────────────────────────────────────────────────
@@ -360,6 +379,7 @@ export const CONSOLE_LOG = {
   csharp: String.raw`Console\.Write(?:Line)?\s*\(`,
   java: String.raw`System\.(?:out|err)\.print(?:ln)?\s*\(`,
   go: String.raw`fmt\.Print(?:ln|f)?\s*\(`,
+  powershell: String.raw`Write-(?:Host|Output|Warning|Error|Verbose|Debug)\s`,
 };
 
 export const STRUCTURED_LOG = {
@@ -380,6 +400,7 @@ export const TEST_FUNCTION = {
   csharp: String.raw`\[(?:Test|TestMethod|Fact|Theory)\]`,
   java: String.raw`@(?:Test|Before|After|BeforeEach)\b`,
   go: String.raw`func\s+Test\w+\s*\(\s*t\s+\*testing\.T`,
+  powershell: String.raw`Describe\s+["']|It\s+["']|Context\s+["']|BeforeAll\s*\{|BeforeEach\s*\{|AfterAll\s*\{|AfterEach\s*\{`,
 };
 
 export const ASSERTION = {
@@ -389,6 +410,7 @@ export const ASSERTION = {
   csharp: String.raw`Assert\.\w+\s*\(`,
   java: String.raw`assert(?:Equals|True|False|NotNull|Throws)\s*\(|assertThat\s*\(`,
   go: String.raw`(?:t\.(?:Error|Fatal|Log|Run)|assert\.\w+|require\.\w+)\s*\(`,
+  powershell: String.raw`Should\s+-`,
 };
 
 // ── Documentation ────────────────────────────────────────────────────────────
@@ -400,6 +422,7 @@ export const DOC_COMMENT = {
   csharp: String.raw`///\s*<summary>|///\s`,
   java: String.raw`/\*\*[\s\S]*?\*/`,
   go: String.raw`//\s+\w+\s`,
+  powershell: String.raw`<#[\s\S]*?#>|\.SYNOPSIS|\.DESCRIPTION|\.PARAMETER|\.EXAMPLE`,
 };
 
 // ── Loop Constructs ──────────────────────────────────────────────────────────
@@ -411,6 +434,7 @@ export const FOR_LOOP = {
   csharp: String.raw`for\s*\(|foreach\s*\(|\.ForEach\s*\(`,
   java: String.raw`for\s*\(|\.forEach\s*\(|\.stream\(\)`,
   go: String.raw`for\s+(?:\w+\s*:?=|range\s)`,
+  powershell: String.raw`foreach\s*\(|for\s*\(|ForEach-Object|%\s*\{|\|\s*ForEach\b`,
 };
 
 // ── Type / Class Definitions ─────────────────────────────────────────────────
@@ -422,6 +446,7 @@ export const CLASS_DEF = {
   csharp: String.raw`(?:public|internal|private|protected)\s+(?:class|struct|record|interface)\s+\w+`,
   java: String.raw`(?:public|private|protected)\s+(?:class|interface|enum|record)\s+\w+`,
   go: String.raw`type\s+\w+\s+struct`,
+  powershell: String.raw`class\s+\w+`,
 };
 
 // ── Package Manifests ────────────────────────────────────────────────────────
@@ -435,6 +460,7 @@ export const MANIFEST_FILES: Record<LangFamily, string[]> = {
   java: ["pom.xml", "build.gradle", "build.gradle.kts"],
   go: ["go.mod"],
   cpp: ["CMakeLists.txt", "Makefile", "conanfile.txt", "vcpkg.json"],
+  powershell: ["*.psd1", "*.psm1"],
   terraform: ["*.tf", "terraform.tfvars", ".terraform.lock.hcl"],
   bicep: ["*.bicep", "bicepconfig.json"],
   arm: ["*.json"],
@@ -450,6 +476,7 @@ export const INPUT_VALIDATION = {
   csharp: String.raw`\[FromBody\]|\[FromQuery\]|\[FromRoute\]|Request\.(?:Form|Query)`,
   java: String.raw`@RequestParam|@PathVariable|@RequestBody|request\.getParameter`,
   go: String.raw`r\.(?:URL\.Query|FormValue|PostFormValue)\(`,
+  powershell: String.raw`\[Parameter\s*\(Mandatory|\[ValidateNotNullOrEmpty\s*\(\)|\[ValidateSet\s*\(|\[ValidateRange\s*\(|\$PSBoundParameters`,
 };
 
 // ── Mutex / Lock ─────────────────────────────────────────────────────────────
@@ -472,6 +499,7 @@ export const DB_QUERY = {
   csharp: String.raw`\.(?:ExecuteNonQuery|ExecuteReader|ExecuteScalar|SaveChanges|ToList)\s*\(`,
   java: String.raw`\.(?:executeQuery|executeUpdate|createQuery|persist|merge|find)\s*\(`,
   go: String.raw`db\.(?:Query|QueryRow|Exec|QueryContext|ExecContext)\s*\(`,
+  powershell: String.raw`Invoke-Sqlcmd|Invoke-DbaQuery|\[System\.Data\.SqlClient`,
 };
 
 // ── HTTP Client ──────────────────────────────────────────────────────────────
@@ -483,6 +511,7 @@ export const HTTP_CLIENT = {
   csharp: String.raw`HttpClient\.\w+\s*\(|WebClient\.\w+\s*\(`,
   java: String.raw`HttpClient\.\w+\s*\(|OkHttpClient|RestTemplate\.\w+\s*\(|WebClient\.\w+\s*\(`,
   go: String.raw`http\.(?:Get|Post|NewRequest)\s*\(|http\.Client`,
+  powershell: String.raw`Invoke-(?:WebRequest|RestMethod)\s`,
 };
 
 // ── Config / Constants ───────────────────────────────────────────────────────
@@ -494,6 +523,7 @@ export const MAGIC_NUMBER = {
   csharp: String.raw`(?:==|!=|<=?|>=?|&&|\|\|)\s*\d{2,}|(?:Timeout|Delay|Limit|Max|Min|Size|Count|Port)\s*=\s*\d{3,}`,
   java: String.raw`(?:==|!=|<=?|>=?|&&|\|\|)\s*\d{2,}|(?:TIMEOUT|DELAY|LIMIT|MAX|MIN|SIZE|COUNT|PORT)\s*=\s*\d{3,}`,
   go: String.raw`(?:==|!=|<=?|>=?|&&|\|\|)\s*\d{2,}|(?:timeout|delay|limit|max|min|size|count|port)\s*[:=]\s*\d{3,}`,
+  powershell: String.raw`(?:-eq|-ne|-lt|-le|-gt|-ge)\s*\d{2,}|(?:Timeout|Delay|Limit|Max|Min|Size|Count|Port)\s*=\s*\d{3,}`,
 };
 
 // ── TODO / FIXME ─────────────────────────────────────────────────────────────
@@ -511,6 +541,7 @@ export const LINTER_DISABLE = {
   csharp: String.raw`#pragma\s+warning\s+disable|SuppressMessage`,
   java: String.raw`@SuppressWarnings|NOSONAR|noinspection`,
   go: String.raw`//nolint`,
+  powershell: String.raw`\[Diagnostics\.CodeAnalysis\.SuppressMessage|#\s*PSScriptAnalyzer`,
 };
 
 // ── Serialization ────────────────────────────────────────────────────────────
@@ -522,6 +553,7 @@ export const UNSAFE_DESERIALIZATION = {
   csharp: String.raw`BinaryFormatter\.Deserialize|JsonConvert\.DeserializeObject.*(?:TypeNameHandling|TypeNameAssemblyFormatHandling)`,
   java: String.raw`ObjectInputStream\.readObject|XMLDecoder\.readObject|readUnshared`,
   go: String.raw`encoding/gob|json\.Unmarshal\(.*(?:req\.|request\.)`,
+  powershell: String.raw`Import-Clixml|\[System\.Runtime\.Serialization.*Deserialize|ConvertFrom-Json.*\$`,
 };
 
 // ── Memory / Resource ────────────────────────────────────────────────────────
@@ -533,6 +565,7 @@ export const RESOURCE_LEAK = {
   csharp: String.raw`new\s+(?:FileStream|StreamReader|StreamWriter|SqlConnection|HttpClient)\s*\(`,
   java: String.raw`new\s+(?:FileInputStream|FileOutputStream|BufferedReader|Connection|Socket)\s*\(`,
   go: String.raw`os\.(?:Open|Create)\s*\(|net\.(?:Dial|Listen)\s*\(`,
+  powershell: String.raw`New-Object\s+System\.IO\.(?:StreamReader|StreamWriter|FileStream)|\[System\.IO\.File\]::Open`,
 };
 
 // ── Deprecated APIs ──────────────────────────────────────────────────────────

@@ -34,6 +34,8 @@ const WATCH_EXTENSIONS = new Set([
   ".cxx",
   ".h",
   ".hpp",
+  ".ps1",
+  ".psm1",
 ]);
 
 const EXT_TO_LANG: Record<string, string> = {
@@ -53,6 +55,8 @@ const EXT_TO_LANG: Record<string, string> = {
   ".cxx": "cpp",
   ".h": "c",
   ".hpp": "cpp",
+  ".ps1": "powershell",
+  ".psm1": "powershell",
 };
 
 function detectLanguage(filePath: string): string {

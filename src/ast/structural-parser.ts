@@ -50,6 +50,7 @@ const FUNC_PATTERNS: Record<string, RegExp> = {
   java: /^\s*(?:(?:public|private|protected|static|final|abstract|synchronized)\s+)*\w[\w<>,\s[\]]*\s+(\w+)\s*\(([^)]*)\)/,
   csharp:
     /^\s*(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|sealed)\s+)*\w[\w<>,\s[\]?]*\s+(\w+)\s*\(([^)]*)\)/,
+  powershell: /^\s*function\s+([\w-]+)\s*(?:\(([^)]*)\))?/,
 };
 
 function extractBraceFunctions(lines: string[], language: string): FunctionInfo[] {
@@ -63,8 +64,8 @@ function extractBraceFunctions(lines: string[], language: string): FunctionInfo[
     const match = lines[i].match(pattern);
     if (match) {
       const name = match[1];
-      const params = match[2].trim();
-      const paramCount = params.length === 0 ? 0 : params.split(",").length;
+      const params = (match[2] ?? "").trim();
+      let paramCount = params.length === 0 ? 0 : params.split(",").length;
       const startLine = i + 1;
 
       // Find the opening brace (may be on this line or next)
@@ -88,6 +89,33 @@ function extractBraceFunctions(lines: string[], language: string): FunctionInfo[
         if (depth <= 0) {
           endIdx = j;
           break;
+        }
+      }
+
+      // PowerShell: if no inline params, look for a param() block inside the body
+      if (language === "powershell" && paramCount === 0) {
+        const bodySlice = lines.slice(braceStart, endIdx + 1).join("\n");
+        const paramIdx = bodySlice.search(/\bparam\s*\(/i);
+        if (paramIdx >= 0) {
+          // Find matching closing paren using depth counting (handles nested parens from attributes)
+          const openIdx = bodySlice.indexOf("(", paramIdx);
+          if (openIdx >= 0) {
+            let pd = 0;
+            let closeIdx = -1;
+            for (let c = openIdx; c < bodySlice.length; c++) {
+              if (bodySlice[c] === "(") pd++;
+              if (bodySlice[c] === ")") pd--;
+              if (pd === 0) {
+                closeIdx = c;
+                break;
+              }
+            }
+            if (closeIdx > openIdx) {
+              const paramContent = bodySlice.slice(openIdx + 1, closeIdx);
+              const paramVars = paramContent.match(/\$(?!true\b|false\b|null\b)\w+/gi);
+              if (paramVars) paramCount = paramVars.length;
+            }
+          }
         }
       }
 
@@ -255,6 +283,7 @@ const CLASS_PATTERNS: Record<string, RegExp> = {
   csharp: /^\s*(?:(?:public|private|protected|internal|abstract|sealed|static|partial)\s+)*class\s+(\w+)/,
   rust: /^\s*(?:pub\s+)?struct\s+(\w+)/,
   go: /^\s*type\s+(\w+)\s+struct\b/,
+  powershell: /^\s*class\s+(\w+)/,
 };
 
 function extractBraceClassNames(lines: string[], language: string): string[] {
@@ -276,6 +305,7 @@ const DECISION_POINTS: Record<string, RegExp> = {
   go: /\b(if|else\s+if|for|switch|case|select|&&|\|\|)\b/g,
   java: /\b(if|else\s+if|for|while|do|case|catch|\?|&&|\|\|)\b/g,
   csharp: /\b(if|else\s+if|for|foreach|while|do|case|catch|\?|&&|\|\|)\b/g,
+  powershell: /\b(if|elseif|foreach|for|while|do|switch|catch|\-and|\-or)\b/g,
 };
 
 function computeComplexityFromLines(lines: string[], language: string): number {
@@ -488,6 +518,7 @@ function detectWeakTypes(lines: string[], language: string): number[] {
     go: /\bunsafe\.Pointer\b/,
     java: /\bObject\b(?!\s*\.class)|\bClass<\?>/,
     csharp: /\bdynamic\b|\bobject\b/,
+    powershell: /\[object\]|\[psobject\]|\[System\.Object\]/,
   };
 
   const pattern = patterns[language];
@@ -530,6 +561,10 @@ function extractImports(lines: string[], language: string): string[] {
     rust: [
       /^\s*use\s+([\w:]+)/, // use std::io
       /^\s*extern\s+crate\s+(\w+)/, // extern crate serde
+    ],
+    powershell: [
+      /^\s*(?:Import-Module|using\s+module)\s+([\w.\\/-]+)/, // Import-Module Az.Accounts
+      /^\s*#Requires\s+-Module\s+([\w.]+)/, // #Requires -Module PSScriptAnalyzer
     ],
   };
 

@@ -23,6 +23,7 @@ const LANG_MAP: Record<string, string> = {
   cpp: "cpp",
   terraform: "terraform",
   bicep: "bicep",
+  powershell: "powershell",
 };
 
 interface FindingWithPatch extends Finding {

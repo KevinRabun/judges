@@ -14,6 +14,7 @@ const LANG_MAP: Record<string, string> = {
   java: "java",
   csharp: "csharp",
   cpp: "cpp",
+  powershell: "powershell",
 };
 
 /** Input schema for the judges_evaluate tool. */

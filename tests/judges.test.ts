@@ -706,12 +706,28 @@ public class Handler {
 }
 `;
 
+  const powershellCode = `
+$password = "admin123"
+$env:SECRET_KEY = "hardcoded-secret"
+
+function Invoke-UnsafeQuery {
+    param([string]$UserInput)
+    Invoke-Expression $UserInput
+    Invoke-Sqlcmd -Query "SELECT * FROM users WHERE id = $UserInput"
+    $hash = [System.Security.Cryptography.MD5]::Create()
+    Start-Process $UserInput
+    Invoke-WebRequest -Uri "http://example.com/api?q=$UserInput" -SkipCertificateCheck
+    Write-Host "Processing: $UserInput"
+}
+`;
+
   const samples: Array<{ lang: string; code: string; label: string }> = [
     { lang: "python", code: pythonCode, label: "Python" },
     { lang: "rust", code: rustCode, label: "Rust" },
     { lang: "go", code: goCode, label: "Go" },
     { lang: "java", code: javaCode, label: "Java" },
     { lang: "csharp", code: csharpCode, label: "C#" },
+    { lang: "powershell", code: powershellCode, label: "PowerShell" },
   ];
 
   for (const { lang, code, label } of samples) {
@@ -1667,6 +1683,89 @@ public:
     const findings = analyzeCodeStructure(cppCode, "cpp");
     const params = findings.filter((f) => f.ruleId === "STRUCT-004" || f.ruleId === "STRUCT-009");
     assert.ok(params.length > 0, "Should flag excessive parameters");
+  });
+});
+
+describe("AST Analysis — PowerShell", () => {
+  const psCode = `
+function Get-UserData {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$UserId,
+        [string]$Name,
+        [int]$Age
+    )
+    if ($UserId) {
+        if ($Age -gt 0) {
+            if ($Age -gt 18) {
+                if ($Age -gt 65) {
+                    if ($Age -gt 100) {
+                        return "centenarian"
+                    }
+                    return "senior"
+                }
+                return "adult"
+            }
+            return "minor"
+        }
+        return "invalid"
+    }
+    return "unknown"
+}
+
+function Simple-Helper { return "ok" }
+
+class UserService {
+    [string]$Name
+    [void] Process() {
+        Write-Host "processing"
+    }
+}
+`;
+
+  it("should parse PowerShell code into a CodeStructure", () => {
+    const structure = analyzeStructure(psCode, "powershell");
+    assert.ok(structure);
+    assert.equal(structure.language, "powershell");
+    assert.ok(structure.functions.length >= 2, `Expected >=2 functions, got ${structure.functions.length}`);
+  });
+
+  it("should compute cyclomatic complexity for PowerShell", () => {
+    const structure = analyzeStructure(psCode, "powershell");
+    const complexFn = structure.functions.find((f) => f.name === "Get-UserData");
+    assert.ok(complexFn, "Should find the 'Get-UserData' function");
+    assert.ok(complexFn!.cyclomaticComplexity >= 5, `Expected CC >= 5, got ${complexFn!.cyclomaticComplexity}`);
+  });
+
+  it("should compute nesting depth for PowerShell", () => {
+    const structure = analyzeStructure(psCode, "powershell");
+    const complexFn = structure.functions.find((f) => f.name === "Get-UserData");
+    assert.ok(complexFn, "Should find the 'Get-UserData' function");
+    assert.ok(complexFn!.maxNestingDepth >= 4, `Expected nesting >= 4, got ${complexFn!.maxNestingDepth}`);
+  });
+
+  it("should count parameters for PowerShell", () => {
+    const structure = analyzeStructure(psCode, "powershell");
+    const fn = structure.functions.find((f) => f.name === "Get-UserData");
+    assert.ok(fn, "Should find the 'Get-UserData' function");
+    assert.ok(fn!.parameterCount >= 3, `Expected >=3 params, got ${fn!.parameterCount}`);
+  });
+
+  it("should detect weak type usage in PowerShell", () => {
+    const weakCode = `
+function Test-Weak {
+    param([object]$data, [psobject]$item)
+    return $data
+}
+`;
+    const structure = analyzeStructure(weakCode, "powershell");
+    assert.ok(structure.typeAnyLines.length > 0, "Should detect [object] / [psobject] as weak types");
+  });
+
+  it("should detect classes in PowerShell", () => {
+    const structure = analyzeStructure(psCode, "powershell");
+    assert.ok(structure.classes !== undefined);
+    assert.ok(structure.classes!.length >= 1, `Expected >=1 class, got ${structure.classes!.length}`);
   });
 });
 
@@ -4826,6 +4925,21 @@ import (
     const structure = analyzeStructure(goCode, "go");
     assert.ok(structure.imports.includes("fmt"), "Should extract 'fmt'");
     assert.ok(structure.imports.includes("net/http"), "Should extract 'net/http'");
+  });
+
+  it("should extract PowerShell imports", async () => {
+    const { analyzeStructure } = await import("../src/ast/index.js");
+    const psCode = `
+Import-Module ActiveDirectory
+Import-Module Az.Accounts
+using module PSReadLine
+#Requires -Module Pester
+`;
+    const structure = analyzeStructure(psCode, "powershell");
+    assert.ok(structure.imports.includes("ActiveDirectory"), "Should extract 'ActiveDirectory'");
+    assert.ok(structure.imports.includes("Az.Accounts"), "Should extract 'Az.Accounts'");
+    assert.ok(structure.imports.includes("PSReadLine"), "Should extract 'PSReadLine'");
+    assert.ok(structure.imports.includes("Pester"), "Should extract 'Pester'");
   });
 });
 

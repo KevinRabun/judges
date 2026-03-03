@@ -103,6 +103,8 @@ const INCLUDE_EXTENSIONS = new Set([
   ".hpp",
   ".hh",
   ".inl",
+  ".ps1",
+  ".psm1",
 ]);
 
 const EXCLUDED_DIRS = new Set([
@@ -155,6 +157,9 @@ function normalizeLanguageFromExtension(filePath: string): string {
     case ".hh":
     case ".inl":
       return "cpp";
+    case ".ps1":
+    case ".psm1":
+      return "powershell";
     default:
       return "unknown";
   }

@@ -126,6 +126,8 @@ const EXT_TO_LANG: Record<string, string> = {
   ".hcl": "terraform",
   ".sh": "bash",
   ".bash": "bash",
+  ".ps1": "powershell",
+  ".psm1": "powershell",
 };
 
 function detectLanguage(filePath: string): string | undefined {

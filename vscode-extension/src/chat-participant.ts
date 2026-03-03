@@ -18,6 +18,7 @@ const LANG_MAP: Record<string, string> = {
   cpp: "cpp",
   terraform: "terraform",
   bicep: "bicep",
+  powershell: "powershell",
 };
 
 // ─── Severity Icons ──────────────────────────────────────────────────────────
@@ -135,7 +136,7 @@ function inferCommand(prompt: string): string {
 // ─── Workspace Intent Detection ──────────────────────────────────────────────
 
 /** File extensions supported by judges, mapped to language names. */
-const SUPPORTED_GLOB = "**/*.{ts,tsx,js,jsx,py,go,rs,java,cs,cpp,tf,bicep}";
+const SUPPORTED_GLOB = "**/*.{ts,tsx,js,jsx,py,go,rs,java,cs,cpp,tf,bicep,ps1,psm1}";
 const EXT_TO_LANG: Record<string, string> = {
   ".ts": "typescript",
   ".tsx": "typescript",
@@ -149,6 +150,8 @@ const EXT_TO_LANG: Record<string, string> = {
   ".cpp": "cpp",
   ".tf": "terraform",
   ".bicep": "bicep",
+  ".ps1": "powershell",
+  ".psm1": "powershell",
 };
 
 /** Max files to evaluate in a single workspace review to avoid timeouts. */

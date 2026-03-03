@@ -45,6 +45,7 @@ const LANG_MAP: Record<string, string> = {
   java: "java",
   csharp: "csharp",
   cpp: "cpp",
+  powershell: "powershell",
 };
 
 function isWorkspaceIntent(prompt: string): boolean {
@@ -312,8 +313,8 @@ describe("Chat Participant — Language Map", () => {
     assert.equal(LANG_MAP["javascriptreact"], "javascript");
   });
 
-  it("should map all 8 supported languages", () => {
-    const supported = ["typescript", "javascript", "python", "go", "rust", "java", "csharp", "cpp"];
+  it("should map all 9 supported languages", () => {
+    const supported = ["typescript", "javascript", "python", "go", "rust", "java", "csharp", "cpp", "powershell"];
     for (const lang of supported) {
       assert.ok(LANG_MAP[lang], `${lang} should be in LANG_MAP`);
     }

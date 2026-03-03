@@ -86,6 +86,7 @@ export type LangFamily =
   | "java"
   | "go"
   | "cpp"
+  | "powershell"
   | "terraform"
   | "bicep"
   | "arm"

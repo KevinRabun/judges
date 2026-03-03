@@ -157,6 +157,7 @@ export function activate(context: vscode.ExtensionContext): void {
     "cpp",
     "terraform",
     "bicep",
+    "powershell",
   ];
 
   for (const lang of supportedLanguages) {

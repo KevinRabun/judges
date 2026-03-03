@@ -72,6 +72,10 @@ export function analyzeStructure(code: string, language: string): CodeStructure 
       }
       return analyzeStructurally(code, lang);
 
+    case "powershell":
+      // No tree-sitter grammar for PowerShell — use structural parser directly
+      return analyzeStructurally(code, lang);
+
     default:
       // Unknown language — return a minimal structure
       return {
@@ -119,6 +123,10 @@ export async function analyzeStructureAsync(code: string, language: string): Pro
       }
       return analyzeStructurally(code, lang);
     }
+
+    case "powershell":
+      // No tree-sitter grammar for PowerShell — use structural parser directly
+      return analyzeStructurally(code, lang);
 
     default:
       return {
