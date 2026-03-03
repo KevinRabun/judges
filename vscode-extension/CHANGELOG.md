@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.19.6] — 2026-03-03
+
+### Fixed
+- **Deep review no longer refused by LLM** — The `/deepreview` Layer 2 prompt triggered content-policy filters when all 37 judges' adversarial system prompts were concatenated. Tribunal mode now uses condensed judge descriptions and professional framing to avoid refusal.
+
+### Core Engine
+- See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.19.5] — 2026-03-05
 
 ### Fixed

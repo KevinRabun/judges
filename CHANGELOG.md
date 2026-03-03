@@ -2,6 +2,14 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.19.6] — 2026-03-03
+
+### Fixed
+- **Deep review content-policy refusal** — The `/deepreview` Layer 2 prompt concatenated all 37 judges' full `systemPrompt` text — including adversarial mandates like "hunt for exploits" and "think like an attacker" — into a single User message. LLM safety filters interpreted this as requesting help with security exploitation and refused with "Sorry, I can't assist with that." Fixed by using condensed `judge.description` (1-line summary) instead of full `systemPrompt` in tribunal mode, adding professional code-review framing, and prepending an Assistant context message to establish legitimate tool identity.
+
+### Tests
+- All 1,460 tests pass (964 judges + 217 negative + 209 subsystems + 70 extension)
+
 ## [3.19.5] — 2026-03-05
 
 ### Fixed
