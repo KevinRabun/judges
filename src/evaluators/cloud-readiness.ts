@@ -257,7 +257,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
     /\.close\s*\(|\.end\s*\(|\.destroy\s*\(|\.dispose\s*\(|finally\s*\{|using\s*\(|with\s+.*as\s|defer\s|Drop\s+for|IDisposable|AutoCloseable/gi.test(
       code,
     );
-  if (hasResources && !hasCleanup) {
+  if (hasResources && !hasCleanup && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

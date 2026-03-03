@@ -586,7 +586,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       code,
     );
 
-  if (hasDataStorage && !hasDataExport && !hasExportApi && code.split("\n").length > 30) {
+  if (hasDataStorage && !hasDataExport && !hasExportApi && !iacTemplate && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -607,7 +607,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   // CATCH-ALL: Sovereignty evidence not explicit
   // ═══════════════════════════════════════════════════════════════════════════
 
-  if (findings.length === 0 && code.length > 0) {
+  if (findings.length === 0 && code.length > 0 && !iacTemplate) {
     const hasDataHandling = /(user|customer|personal|profile|account|email|phone|pii|data)/i.test(code);
     if (hasDataHandling) {
       findings.push({

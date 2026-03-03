@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCaching(code: string, language: string): Finding[] {
@@ -34,7 +34,8 @@ export function analyzeCaching(code: string, language: string): Finding[] {
   const hasCaching = /cache|Cache|redis|memcache|lru|ttl|stale|expires|ETag|If-None-Match|If-Modified-Since/gi.test(
     code,
   );
-  if ((hasDbQueries || hasFetch) && !hasCaching && code.split("\n").length > 40) {
+  const iacTemplate = isIaCTemplate(code);
+  if ((hasDbQueries || hasFetch) && !hasCaching && !iacTemplate && code.split("\n").length > 40) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

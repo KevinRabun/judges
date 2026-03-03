@@ -177,7 +177,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
     /fetch\s*\(|axios\.|\.query\s*\(|\.findOne|\.findMany|\.aggregate|SELECT\s+.*FROM|INSERT\s+INTO|\.execute\s*\(|database|db\.|app\.(listen|use|get|post)\s*\(|createServer|express\(\)/i.test(
       code,
     );
-  if (!hasCaching && hasDataFetchOrServe && code.split("\n").length > 50) {
+  if (!hasCaching && hasDataFetchOrServe && !iacTemplate && code.split("\n").length > 50) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "info",
@@ -314,7 +314,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
       code,
     );
   const hasPooling = /Pool|pool|createPool|connection_pool|pooling|DataSource|HikariCP/gi.test(code);
-  if (hasDbConnection && !hasPooling) {
+  if (hasDbConnection && !hasPooling && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

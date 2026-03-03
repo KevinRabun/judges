@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, isIaCTemplate } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeDocumentation(code: string, language: string): Finding[] {
@@ -86,7 +86,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       magicNumberLines.push(i + 1);
     }
   });
-  if (magicNumberLines.length > 3) {
+  if (magicNumberLines.length > 3 && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -176,10 +176,11 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   }
 
   // Detect missing README or module-level documentation
-  if (lines.length > 100) {
+  // Skip IaC templates — they use decorators / metadata blocks as module-level docs.
+  if (lines.length > 100 && !isIaCTemplate(code)) {
     const firstLines = lines.slice(0, 10).join("\n");
     if (
-      !/\/\*\*|\/\/!|#!.*\n#|"""|'''|\bmodule|@module|@fileoverview|@file|^\/\/\/|^package\s|^\s*\/\/\s+Package/im.test(
+      !/\/\*\*|\/\*[^*]|\/\/!|#!.*\n#|"""|'''|\bmodule|@module|@fileoverview|@file|@description\s*\(|targetScope|metadata\s+|^\/\/\/|^package\s|^\s*\/\/\s+Package/im.test(
         firstLines,
       )
     ) {

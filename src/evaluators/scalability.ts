@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeScalability(code: string, language: string): Finding[] {
@@ -137,7 +137,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
 
   // No rate limiting detected
   const hasRateLimit = /rate.?limit|throttle|limiter|RateLimit/gi.test(code);
-  if (!hasRateLimit && fetchLines.length > 0) {
+  const iacTemplate = isIaCTemplate(code);
+  if (!hasRateLimit && fetchLines.length > 0 && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "info",
@@ -218,7 +219,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   // No circuit breaker pattern
   const hasCircuitBreaker = /circuit.?breaker|opossum|cockatiel|polly|resilience4j|hystrix|CircuitBreaker/gi.test(code);
   const hasMultipleExternalCalls = fetchLines.length > 2;
-  if (hasMultipleExternalCalls && !hasCircuitBreaker) {
+  if (hasMultipleExternalCalls && !hasCircuitBreaker && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

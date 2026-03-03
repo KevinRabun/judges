@@ -291,7 +291,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
   const requestHandlerPattern =
     /(?:app|router)\.\s*(?:get|post|put|patch|delete)\s*\(\s*["'`]|@(?:Get|Post|Put|Patch|Delete|RequestMapping|ApiOperation)|def\s+\w+\s*\(\s*(?:request|req)|func\s+\w+\s*\(\s*(?:w\s+http\.ResponseWriter|c\s+\*gin\.Context)/gi;
   const inputValidationPattern =
-    /(?:validate|sanitize|schema|zod|joi|yup|class-validator|express-validator|pydantic|wtforms|marshmallow|cerberus|jsonschema|ajv|superstruct|io-ts|typia)\b/gi;
+    /(?:validate|sanitize|schema|zod|joi|yup|class-validator|express-validator|pydantic|wtforms|marshmallow|cerberus|jsonschema|ajv|superstruct|io-ts|typia|@Valid|@NotNull|@NotBlank|@NotEmpty|javax\.validation|jakarta\.validation|hibernate[.-]validator|Bean\s*Validation)\b/gi;
 
   const handlerLines = getLineNumbers(code, requestHandlerPattern);
   const hasValidation = inputValidationPattern.test(code);
