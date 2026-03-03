@@ -14,20 +14,46 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
 
   // Nested loops (potential O(n²)) (multi-language)
   const lines = code.split("\n");
-  let loopDepth = 0;
   const nestedLoopLines: number[] = [];
-  const loopPattern = lang === "python" ? /\b(?:for|while)\s/ : /\b(?:for|while|loop)\s*[\s(]/;
-  for (let i = 0; i < lines.length; i++) {
-    const trimmedLoop = lines[i].trim();
-    if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmedLoop)) continue;
-    if (loopPattern.test(lines[i])) {
-      loopDepth++;
-      if (loopDepth >= 2) {
-        nestedLoopLines.push(i + 1);
+
+  if (lang === "python") {
+    // Python uses indentation for scoping — track nesting via indent level
+    // rather than braces. Also require `for`/`while` at the start of a line
+    // (after whitespace) so that generator expressions and list
+    // comprehensions (e.g. `all(x for x in items)`) are not counted as loops.
+    const pyLoopRe = /^\s*(?:for|while)\s/;
+    const indentStack: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (/^#|^"""|^'''/.test(trimmed) || trimmed === "") continue;
+      if (pyLoopRe.test(lines[i])) {
+        const indent = (lines[i].match(/^(\s*)/)?.[1] ?? "").length;
+        // Pop loops whose indentation is >= this one (sibling or ended scope)
+        while (indentStack.length > 0 && indentStack[indentStack.length - 1] >= indent) {
+          indentStack.pop();
+        }
+        indentStack.push(indent);
+        if (indentStack.length >= 2) {
+          nestedLoopLines.push(i + 1);
+        }
       }
     }
-    if (/\}/.test(lines[i]) && loopDepth > 0) {
-      loopDepth--;
+  } else {
+    // Brace-scoped languages (JS/TS, Java, C#, Go, Rust, …)
+    let loopDepth = 0;
+    const loopPattern = /\b(?:for|while|loop)\s*[\s(]/;
+    for (let i = 0; i < lines.length; i++) {
+      const trimmedLoop = lines[i].trim();
+      if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmedLoop)) continue;
+      if (loopPattern.test(lines[i])) {
+        loopDepth++;
+        if (loopDepth >= 2) {
+          nestedLoopLines.push(i + 1);
+        }
+      }
+      if (/\}/.test(lines[i]) && loopDepth > 0) {
+        loopDepth--;
+      }
     }
   }
   if (nestedLoopLines.length > 0 && !iacTemplate) {

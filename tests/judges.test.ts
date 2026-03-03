@@ -3712,6 +3712,72 @@ function findDuplicates(items) {
     assert.ok(loopFindings.length > 0, "Expected nested loop O(n²) findings");
   });
 
+  it("should detect nested loops in Python code", () => {
+    const judge = getJudge("cost-effectiveness");
+    assert.ok(judge, "cost-effectiveness judge should exist");
+
+    const pyNestedLoopCode = `
+def find_duplicates(items):
+    duplicates = []
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            if items[i] == items[j]:
+                duplicates.append(items[i])
+    return duplicates
+`;
+    const evaluation = evaluateWithJudge(judge!, pyNestedLoopCode, "python");
+    const loopFindings = evaluation.findings.filter(
+      (f) => f.ruleId.startsWith("COST-") && (f.title.includes("Nested") || f.title.includes("O(n")),
+    );
+    assert.ok(loopFindings.length > 0, "Expected nested loop O(n²) findings for Python");
+  });
+
+  it("should NOT flag Python generator expressions / comprehensions as nested loops", () => {
+    const judge = getJudge("cost-effectiveness");
+    assert.ok(judge, "cost-effectiveness judge should exist");
+
+    const pyGeneratorCode = `
+from typing import List
+
+def _contains_all_keywords(searchable_text: str, keyword_parts: List[str]) -> bool:
+    return all(keyword in searchable_text for keyword in keyword_parts)
+
+def get_unique_names(items):
+    return [item.name for item in items if item.active]
+
+def has_overlap(set_a, set_b):
+    return any(x in set_b for x in set_a)
+`;
+    const evaluation = evaluateWithJudge(judge!, pyGeneratorCode, "python");
+    const loopFindings = evaluation.findings.filter(
+      (f) => f.title.includes("Nested loops") || f.title.includes("O(n²)"),
+    );
+    assert.strictEqual(loopFindings.length, 0, "Should not flag generator expressions as nested loops");
+  });
+
+  it("should NOT flag sequential (non-nested) Python loops as nested", () => {
+    const judge = getJudge("cost-effectiveness");
+    assert.ok(judge, "cost-effectiveness judge should exist");
+
+    const pySequentialCode = `
+def process(items, users):
+    for item in items:
+        item.process()
+
+    for user in users:
+        user.notify()
+`;
+    const evaluation = evaluateWithJudge(judge!, pySequentialCode, "python");
+    const loopFindings = evaluation.findings.filter(
+      (f) => f.title.includes("Nested loops") || f.title.includes("O(n²)"),
+    );
+    assert.strictEqual(
+      loopFindings.length,
+      0,
+      "Sequential Python loops at the same indent should not be flagged as nested",
+    );
+  });
+
   it("should detect N+1 query patterns (await in loop)", () => {
     const judge = getJudge("cost-effectiveness");
     assert.ok(judge, "cost-effectiveness judge should exist");

@@ -455,20 +455,43 @@ export function analyzePerformance(code: string, language: string): Finding[] {
 
   // ── Nested Loop Complexity (O(n²) / O(n³)) ───────────────────────────────
   const nestedLoopLines: number[] = [];
-  let nestingDepth = 0;
-  const loopStartRe = /^\s*(?:for\s*\(|while\s*\(|do\s*\{|\.forEach\s*\(|\.map\s*\(|for\s+\w+\s+(?:in|of)\s)/;
-  for (let i = 0; i < lines.length; i++) {
-    if (loopStartRe.test(lines[i])) {
-      nestingDepth++;
-      if (nestingDepth >= 2) {
-        nestedLoopLines.push(i + 1);
+
+  if (lang === "python") {
+    // Python uses indentation for scoping — track nesting via indent level
+    // rather than braces. Require `for`/`while` at line start to exclude
+    // generator expressions / list comprehensions.
+    const pyLoopStartRe = /^\s*(?:for|while)\s/;
+    const indentStack: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (/^#|^"""|^'''/.test(trimmed) || trimmed === "") continue;
+      if (pyLoopStartRe.test(lines[i])) {
+        const indent = (lines[i].match(/^(\s*)/)?.[1] ?? "").length;
+        while (indentStack.length > 0 && indentStack[indentStack.length - 1] >= indent) {
+          indentStack.pop();
+        }
+        indentStack.push(indent);
+        if (indentStack.length >= 2) {
+          nestedLoopLines.push(i + 1);
+        }
       }
     }
-    // Track brace depth — simplified: each closing brace decreases depth if inside loop
-    const opens = (lines[i].match(/\{/g) || []).length;
-    const closes = (lines[i].match(/\}/g) || []).length;
-    if (closes > opens && nestingDepth > 0) {
-      nestingDepth = Math.max(0, nestingDepth - (closes - opens));
+  } else {
+    let nestingDepth = 0;
+    const loopStartRe = /^\s*(?:for\s*\(|while\s*\(|do\s*\{|\.forEach\s*\(|\.map\s*\(|for\s+\w+\s+(?:in|of)\s)/;
+    for (let i = 0; i < lines.length; i++) {
+      if (loopStartRe.test(lines[i])) {
+        nestingDepth++;
+        if (nestingDepth >= 2) {
+          nestedLoopLines.push(i + 1);
+        }
+      }
+      // Track brace depth — simplified: each closing brace decreases depth if inside loop
+      const opens = (lines[i].match(/\{/g) || []).length;
+      const closes = (lines[i].match(/\}/g) || []).length;
+      if (closes > opens && nestingDepth > 0) {
+        nestingDepth = Math.max(0, nestingDepth - (closes - opens));
+      }
     }
   }
   if (nestedLoopLines.length > 0) {
