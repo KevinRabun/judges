@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCybersecurity(code: string, language: string): Finding[] {
@@ -197,7 +197,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     /ldap\.search|ldap_search|DirectorySearcher|LdapTemplate|ldap\.bind|python-ldap|go-ldap|novell\.directory/gi;
   const ldapLines = getLineNumbers(code, ldapPatterns);
   if (ldapLines.length > 0) {
-    const hasLdapSanitation = /escape|sanitize|ldap_escape|filter_format/gi.test(code);
+    const hasLdapSanitation = testCode(code, /escape|sanitize|ldap_escape|filter_format/gi);
     if (!hasLdapSanitation) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -363,7 +363,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     /session\s*\(\s*\{|express-session|SessionMiddleware|session_config|SessionOptions|gorilla\/sessions|actix.session|HttpSession/gi;
   const sessionLines = getLineNumbers(code, sessionPatterns);
   if (sessionLines.length > 0) {
-    const hasSecureSession = /secure\s*:\s*true|HttpOnly|sameSite/gi.test(code);
+    const hasSecureSession = testCode(code, /secure\s*:\s*true|HttpOnly|sameSite/gi);
     if (!hasSecureSession) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -384,8 +384,8 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
 
   // Weak password requirements
   const passwordValidation = /password.*(?:length|min|max|regex|pattern|require)/gi;
-  const hasPasswordInput = /password|passwd|pwd/gi.test(code);
-  const hasAuthRoutes = /(?:register|signup|sign-up|createUser|changePassword|resetPassword)/gi.test(code);
+  const hasPasswordInput = testCode(code, /password|passwd|pwd/gi);
+  const hasAuthRoutes = testCode(code, /(?:register|signup|sign-up|createUser|changePassword|resetPassword)/gi);
   if (hasAuthRoutes && hasPasswordInput && !passwordValidation.test(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -425,7 +425,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
 
   // Missing rate limiting on auth endpoints
   const authEndpoints = getLineNumbers(code, /(?:login|signin|sign-in|authenticate|auth|password|token)\s*['",:]/gi);
-  const hasRateLimit = /rate.?limit|throttle|limiter|brute/gi.test(code);
+  const hasRateLimit = testCode(code, /rate.?limit|throttle|limiter|brute/gi);
   if (authEndpoints.length > 0 && !hasRateLimit && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -444,7 +444,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
   }
   // Weak Content-Security-Policy directives
   const cspValuePattern = /Content-Security-Policy|contentSecurityPolicy|csp\s*[:=]/gi;
-  const cspPresent = cspValuePattern.test(code);
+  const cspPresent = testCode(code, cspValuePattern);
   if (cspPresent) {
     const cspWeakDirectives = /unsafe-inline|unsafe-eval|script-src\s+['"]?\s*\*/gi;
     const cspWeakLines = getLineNumbers(code, cspWeakDirectives);
@@ -513,8 +513,10 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     /(?:\.create|\.update|\.findOneAndUpdate|\.findByIdAndUpdate|\.insertOne|Object\.assign)\s*\(\s*(?:[^,)]*,\s*)*(?:req\.body|request\.body|request\.data|request\.json)/gi;
   const massAssignLines = getLineNumbers(code, massAssignPattern);
   if (massAssignLines.length > 0) {
-    const hasFieldWhitelist =
-      /(?:pick|allowedFields|whitelist|permit|only|pluck|select)\s*\(|\{\s*\w+\s*:\s*req\.body\.\w+/gi.test(code);
+    const hasFieldWhitelist = testCode(
+      code,
+      /(?:pick|allowedFields|whitelist|permit|only|pluck|select)\s*\(|\{\s*\w+\s*:\s*req\.body\.\w+/gi,
+    );
     if (!hasFieldWhitelist) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeTesting(code: string, language: string): Finding[] {
@@ -17,7 +17,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
   ).length;
   const hasTestStructure =
     jsTestSignals >= 2 ||
-    /def\s+test_|@Test|#\[test\]|#\[cfg\(test\)\]|func\s+Test[A-Z]|\[Fact\]|\[Theory\]|@pytest/i.test(code);
+    testCode(code, /def\s+test_|@Test|#\[test\]|#\[cfg\(test\)\]|func\s+Test[A-Z]|\[Fact\]|\[Theory\]|@pytest/i);
   if (hasTestStructure) {
     // Check for assertions (multi-language)
     const assertionLines = getLangLineNumbers(code, language, LP.ASSERTION);
@@ -177,7 +177,8 @@ export function analyzeTesting(code: string, language: string): Finding[] {
 
     // Detect tests without error case coverage
     const happyPathOnly =
-      /test|it\b/i.test(code) && !/error|throw|reject|fail|invalid|unauthorized|not found|exception/i.test(code);
+      testCode(code, /test|it\b/i) &&
+      !testCode(code, /error|throw|reject|fail|invalid|unauthorized|not found|exception/i);
     if (happyPathOnly && testBlockLines.length > 0) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -276,8 +277,8 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         headerText,
       );
     const isTypeDefinitionFile =
-      /^(?:export\s+)?(?:type|interface|enum|declare)\s+/gim.test(code) &&
-      !/(function|class)\s+\w+.*\{[\s\S]{10,}\}/gi.test(code);
+      testCode(code, /^(?:export\s+)?(?:type|interface|enum|declare)\s+/gim) &&
+      !testCode(code, /(function|class)\s+\w+.*\{[\s\S]{10,}\}/gi);
     const hasMinimalLogic = (code.match(/(?:if|for|while|switch|match)\s*[\s(]/g) || []).length >= 3;
     // Suppress for code-analysis / evaluator modules (many regex .test() calls or regex literals)
     const regexTestCalls = (code.match(/\.test\s*\(/g) || []).length;

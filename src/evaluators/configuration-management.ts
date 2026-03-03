@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeConfigurationManagement(code: string, language: string): Finding[] {
@@ -90,7 +90,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
 
   // No environment variable usage (multi-language)
   const hasEnvVars = getLangLineNumbers(code, language, LP.ENV_ACCESS).length > 0;
-  const hasConfig = /(?:port|host|database|url|key|secret|token)\s*[:=]\s*["'`0-9]/gi.test(code);
+  const hasConfig = testCode(code, /(?:port|host|database|url|key|secret|token)\s*[:=]\s*["'`0-9]/gi);
   if (!hasEnvVars && hasConfig && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -109,8 +109,10 @@ export function analyzeConfigurationManagement(code: string, language: string): 
   }
 
   // Config validation at startup
-  const hasConfigValidation =
-    /(?:assert|require|throw|exit|fatal|Error)\s*.*(?:missing|required|not set|undefined|config)/gi.test(code);
+  const hasConfigValidation = testCode(
+    code,
+    /(?:assert|require|throw|exit|fatal|Error)\s*.*(?:missing|required|not set|undefined|config)/gi,
+  );
   if (hasConfig && !hasConfigValidation && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -130,8 +132,8 @@ export function analyzeConfigurationManagement(code: string, language: string): 
 
   // .env file committed (detected by its presence in code)
   const _dotenvCommitPattern = /\.env\b(?!\.example|\.sample|\.template|\.schema)/gi;
-  const _hasGitignore = /\.gitignore/gi.test(code);
-  const hasEnvFile = /dotenv|\.env\b/gi.test(code);
+  const _hasGitignore = testCode(code, /\.gitignore/gi);
+  const hasEnvFile = testCode(code, /dotenv|\.env\b/gi);
   // This is a heuristic — can't truly check .gitignore from code alone
   if (hasEnvFile && code.split("\n").length > 10) {
     findings.push({
@@ -198,8 +200,8 @@ export function analyzeConfigurationManagement(code: string, language: string): 
   }
 
   // No secret rotation mechanism
-  const hasSecrets = /(?:password|secret|api_?key|token|private_?key)\s*[:=]/gi.test(code);
-  const hasRotation = /rotate|rotation|expir|renew|refresh.*token|refresh.*secret/gi.test(code);
+  const hasSecrets = testCode(code, /(?:password|secret|api_?key|token|private_?key)\s*[:=]/gi);
+  const hasRotation = testCode(code, /rotate|rotation|expir|renew|refresh.*token|refresh.*secret/gi);
   if (hasSecrets && !hasRotation && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -218,7 +220,10 @@ export function analyzeConfigurationManagement(code: string, language: string): 
   }
 
   // Missing config schema / documentation
-  const hasConfigSchema = /schema|convict|joi\.object|zod\.object|yup\.object|ajv|configSchema|configSpec/gi.test(code);
+  const hasConfigSchema = testCode(
+    code,
+    /schema|convict|joi\.object|zod\.object|yup\.object|ajv|configSchema|configSpec/gi,
+  );
   if (hasEnvVars && !hasConfigSchema && code.split("\n").length > 40) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

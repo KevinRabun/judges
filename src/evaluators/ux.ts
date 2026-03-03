@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangFamily, testCode } from "./shared.js";
 
 export function analyzeUx(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
@@ -34,8 +34,14 @@ export function analyzeUx(code: string, language: string): Finding[] {
 
   // No loading/disabled state for forms
   // Require actual HTML form elements or submit handlers, not just keyword mentions
-  const hasForm = /<form\b|<button\b|onSubmit\s*=|handleSubmit|formik|useForm|<input[^>]*type=["']submit/gi.test(code);
-  const hasLoadingState = /loading|isLoading|submitting|isSubmitting|disabled|pending|spinner|skeleton/gi.test(code);
+  const hasForm = testCode(
+    code,
+    /<form\b|<button\b|onSubmit\s*=|handleSubmit|formik|useForm|<input[^>]*type=["']submit/gi,
+  );
+  const hasLoadingState = testCode(
+    code,
+    /loading|isLoading|submitting|isSubmitting|disabled|pending|spinner|skeleton/gi,
+  );
   if (hasForm && !hasLoadingState && code.split("\n").length > 15) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -94,7 +100,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
   // No placeholder/label on inputs
   const _inputNoLabelPattern = /<input[^>]*(?!.*(?:aria-label|placeholder|id=))[^>]*>/gi;
   const inputLines = getLineNumbers(code, /<input\b/gi);
-  const hasLabels = /<label|aria-label|placeholder/gi.test(code);
+  const hasLabels = testCode(code, /<label|aria-label|placeholder/gi);
   if (inputLines.length > 0 && !hasLabels) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -114,8 +120,8 @@ export function analyzeUx(code: string, language: string): Finding[] {
 
   // Confirmation for destructive actions
   const _destructivePattern = /delete|remove|destroy|drop|purge|erase/gi;
-  const hasConfirmation = /confirm|modal|dialog|are you sure|confirmation/gi.test(code);
-  const hasDestructiveEndpoint = /app\.(delete|post)\s*\([^)]*(?:delete|remove|destroy)/gi.test(code);
+  const hasConfirmation = testCode(code, /confirm|modal|dialog|are you sure|confirmation/gi);
+  const hasDestructiveEndpoint = testCode(code, /app\.(delete|post)\s*\([^)]*(?:delete|remove|destroy)/gi);
   if (hasDestructiveEndpoint && !hasConfirmation) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -133,9 +139,9 @@ export function analyzeUx(code: string, language: string): Finding[] {
   }
 
   // No pagination
-  const hasListEndpoint = /app\.get\s*\([^)]*(?:list|all|users|items|posts|products|orders)/gi.test(code);
-  const hasPagination = /page|limit|offset|cursor|skip|take|per_?page|pageSize/gi.test(code);
-  const hasDbFind = /db\.find\s*\(\s*(?:\{\s*\}|\))/gi.test(code);
+  const hasListEndpoint = testCode(code, /app\.get\s*\([^)]*(?:list|all|users|items|posts|products|orders)/gi);
+  const hasPagination = testCode(code, /page|limit|offset|cursor|skip|take|per_?page|pageSize/gi);
+  const hasDbFind = testCode(code, /db\.find\s*\(\s*(?:\{\s*\}|\))/gi);
   if ((hasListEndpoint || hasDbFind) && !hasPagination) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -153,16 +159,18 @@ export function analyzeUx(code: string, language: string): Finding[] {
   }
 
   // No empty state handling
-  const hasEmptyCheck =
-    /(?:\.length\s*===?\s*0|isEmpty|no\s*(?:results|data|items)|empty.?state|emptyState|NoData|NoResults)/gi.test(code);
-  const hasListRendering = /\.map\s*\(|\.forEach\s*\(|v-for|ngFor|\*ngFor|\.render\s*\(/gi.test(code);
+  const hasEmptyCheck = testCode(
+    code,
+    /(?:\.length\s*===?\s*0|isEmpty|no\s*(?:results|data|items)|empty.?state|emptyState|NoData|NoResults)/gi,
+  );
+  const hasListRendering = testCode(code, /\.map\s*\(|\.forEach\s*\(|v-for|ngFor|\*ngFor|\.render\s*\(/gi);
   // Only flag when the file has UI rendering context — pure backend modules
   // use .map()/.forEach() for data processing, not list rendering.
   const hasUIRenderingContext =
     isReactOrJsx ||
-    /<[a-z][a-z0-9]*[\s>]/i.test(code) || // HTML/JSX tags
-    /innerHTML|appendChild|createElement|document\.|window\.|\$\(|v-for|ngFor|template\s*:/i.test(code) ||
-    /from\s+['"](?:vue|@angular|svelte|lit|preact|solid)/i.test(code);
+    testCode(code, /<[a-z][a-z0-9]*[\s>]/i) || // HTML/JSX tags
+    testCode(code, /innerHTML|appendChild|createElement|document\.|window\.|\$\(|v-for|ngFor|template\s*:/i) ||
+    testCode(code, /from\s+['"](?:vue|@angular|svelte|lit|preact|solid)/i);
   if (hasListRendering && hasUIRenderingContext && !hasEmptyCheck && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -180,8 +188,10 @@ export function analyzeUx(code: string, language: string): Finding[] {
   }
 
   // Missing success feedback
-  const hasMutation =
-    /\.post\s*\(|\.put\s*\(|\.delete\s*\(|\.patch\s*\(|fetch\s*\([^)]*(?:POST|PUT|DELETE|PATCH)/gi.test(code);
+  const hasMutation = testCode(
+    code,
+    /\.post\s*\(|\.put\s*\(|\.delete\s*\(|\.patch\s*\(|fetch\s*\([^)]*(?:POST|PUT|DELETE|PATCH)/gi,
+  );
   const hasSuccessFeedback =
     /toast|snackbar|notification|alert\s*\(\s*['"].*(?:success|saved|created|updated|deleted)|showMessage|showSuccess|feedback/gi.test(
       code,
@@ -203,9 +213,9 @@ export function analyzeUx(code: string, language: string): Finding[] {
   }
 
   // No progress indicator for long operations
-  const hasAsyncOp = /async\s+function|await\s+fetch|\.then\s*\(|Promise\./gi.test(code);
-  const hasProgress = /progress|spinner|loading|isLoading|setLoading|skeleton|placeholder/gi.test(code);
-  const hasFileProcessing = /readFile|writeFile|stream|pipe\s*\(|transform/gi.test(code);
+  const hasAsyncOp = testCode(code, /async\s+function|await\s+fetch|\.then\s*\(|Promise\./gi);
+  const hasProgress = testCode(code, /progress|spinner|loading|isLoading|setLoading|skeleton|placeholder/gi);
+  const hasFileProcessing = testCode(code, /readFile|writeFile|stream|pipe\s*\(|transform/gi);
   if (hasFileProcessing && hasAsyncOp && !hasProgress) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -245,7 +255,10 @@ export function analyzeUx(code: string, language: string): Finding[] {
   // Form submission without validation
   const formPattern = /onSubmit|handleSubmit|form\.submit|\.submit\s*\(/gi;
   const formLines = getLineNumbers(code, formPattern);
-  const hasValidation = /validate|validator|yup|zod|joi|schema|required|minLength|maxLength|pattern\s*=/gi.test(code);
+  const hasValidation = testCode(
+    code,
+    /validate|validator|yup|zod|joi|schema|required|minLength|maxLength|pattern\s*=/gi,
+  );
   if (formLines.length > 0 && !hasValidation) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.19.0] — 2026-03-04
+
+### Added
+- **Three FP reduction strategies** — Comment stripping before pattern matching, multi-line context windows for post-filters, and project-wide absence resolution significantly reduce false positives across all evaluators
+
+### Core Engine
+- Bumped core `@kevinrabun/judges` to v3.19.0 — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.18.3] — 2026-03-03
 
 ### Fixed

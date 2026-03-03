@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeLoggingPrivacy(code: string, language: string): Finding[] {
@@ -127,7 +127,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
 
   // Console.log used instead of proper logger (multi-language detection)
   const consoleLogLines = getLangLineNumbers(code, language, LP.CONSOLE_LOG);
-  const hasProperLogger = /winston|pino|bunyan|log4j|serilog|NLog|structuredLog|logger\./gi.test(code);
+  const hasProperLogger = testCode(code, /winston|pino|bunyan|log4j|serilog|NLog|structuredLog|logger\./gi);
   const structuredLogLines = getLangLineNumbers(code, language, LP.STRUCTURED_LOG);
   if (consoleLogLines.length > 3 && !hasProperLogger && structuredLogLines.length === 0) {
     findings.push({

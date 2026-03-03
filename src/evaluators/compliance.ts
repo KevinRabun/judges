@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine, isIaCTemplate } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, isIaCTemplate, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCompliance(code: string, language: string): Finding[] {
@@ -69,7 +69,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       trackingLines.push(i + 1);
     }
   });
-  const hasConsent = /consent|opt.?in|cookie.?banner|gdpr|accept.*cookie/i.test(code);
+  const hasConsent = testCode(code, /consent|opt.?in|cookie.?banner|gdpr|accept.*cookie/i);
   if (trackingLines.length > 0 && !hasConsent && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -255,9 +255,11 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   }
 
   // Detect right-to-delete / data erasure gaps
-  const deleteEndpointExists =
-    /delete.*user|erase.*data|remove.*account|right.?to.?delete|gdpr.*delete|data.?erasure/i.test(code);
-  const storesUserData = /(?:save|create|insert)\s*\(.*(?:user|customer|profile|account)/i.test(code);
+  const deleteEndpointExists = testCode(
+    code,
+    /delete.*user|erase.*data|remove.*account|right.?to.?delete|gdpr.*delete|data.?erasure/i,
+  );
+  const storesUserData = testCode(code, /(?:save|create|insert)\s*\(.*(?:user|customer|profile|account)/i);
   if (storesUserData && !deleteEndpointExists) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -372,7 +374,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       regulatedOpLines.push(i + 1);
     }
   });
-  const hasAuditTrail = /audit|auditLog|audit_log|audit_trail|compliance_log/i.test(code);
+  const hasAuditTrail = testCode(code, /audit|auditLog|audit_log|audit_trail|compliance_log/i);
   if (regulatedOpLines.length > 0 && !hasAuditTrail) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

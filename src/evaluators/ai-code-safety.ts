@@ -1,5 +1,12 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  isIaCTemplate,
+  testCode,
+  getContextWindow,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 /**
@@ -24,7 +31,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
 
   const promptConcatLines = getLineNumbers(code, promptConcatPattern);
   const promptTemplateLines = getLineNumbers(code, promptTemplatePattern);
-  const hasLlmCall = llmCallPattern.test(code);
+  const hasLlmCall = testCode(code, llmCallPattern);
 
   const allPromptInjectionLines = [...new Set([...promptConcatLines, ...promptTemplateLines])].sort((a, b) => a - b);
 
@@ -294,7 +301,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
     /(?:validate|sanitize|schema|zod|joi|yup|class-validator|express-validator|pydantic|wtforms|marshmallow|cerberus|jsonschema|ajv|superstruct|io-ts|typia|@Valid|@NotNull|@NotBlank|@NotEmpty|javax\.validation|jakarta\.validation|hibernate[.-]validator|Bean\s*Validation)\b/gi;
 
   const handlerLines = getLineNumbers(code, requestHandlerPattern);
-  const hasValidation = inputValidationPattern.test(code);
+  const hasValidation = testCode(code, inputValidationPattern);
 
   if (handlerLines.length >= 2 && !hasValidation) {
     findings.push({
@@ -320,7 +327,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
     const hasTimeout = /timeout|signal|AbortController|asyncio\.wait_for|context\.WithTimeout|CancellationToken/gi.test(
       code,
     );
-    const hasRetry = /retry|retries|backoff|tenacity|polly|resilience|Circuit/gi.test(code);
+    const hasRetry = testCode(code, /retry|retries|backoff|tenacity|polly|resilience|Circuit/gi);
 
     if (!hasTimeout && !hasRetry && llmCallLines.length > 0) {
       findings.push({
@@ -348,7 +355,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
   if (hasLlmCall) {
     const outputGuardrailPattern =
       /(?:guardrail|content.?filter|moderation|safety|toxicity|output.?valid|response.?valid|schema.?valid|json.?parse|structured.?output|function.?call|tool.?use)/gi;
-    const hasOutputGuardrails = outputGuardrailPattern.test(code);
+    const hasOutputGuardrails = testCode(code, outputGuardrailPattern);
 
     if (!hasOutputGuardrails && llmResponseLines.length > 0) {
       findings.push({
@@ -380,8 +387,8 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
     /hasRole|isInRole|require_role|PreAuthorize|Authorize\s*\(|role\s*[!=]=|claims\.role|current_user\.role|allow_headers|allow_methods/i;
   const aicsCodeLines = code.split("\n");
   const wildcardPermLines = getLineNumbers(code, wildcardPermPattern).filter((ln) => {
-    const line = aicsCodeLines[ln - 1] || "";
-    return !authCheckPattern.test(line);
+    const ctx = getContextWindow(aicsCodeLines, ln, 2);
+    return !authCheckPattern.test(ctx);
   });
   if (wildcardPermLines.length > 0) {
     findings.push({
@@ -405,7 +412,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
   // ── AICS-014  Missing rate limiting on AI/LLM endpoints ────────────────────
   if (hasLlmCall) {
     const rateLimitPattern = /rate.?limit|throttle|limiter|token.?bucket|sliding.?window|rateLimit/gi;
-    const hasRateLimit = rateLimitPattern.test(code);
+    const hasRateLimit = testCode(code, rateLimitPattern);
     const handlerCount = getLineNumbers(code, requestHandlerPattern).length;
 
     if (!hasRateLimit && handlerCount > 0) {
@@ -462,8 +469,10 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
   const toolResultPattern =
     /tool[_.]?(?:result|output|response|call)|function[_.]?(?:result|output|response|call)|action[_.]result|tool_use|tool_calls/gi;
   const toolResultLines = getLineNumbers(code, toolResultPattern);
-  const hasResultValidation =
-    /(?:validate|sanitize|parse|check|verify|filter|schema|zod|joi|yup|JSON\.parse|try\s*\{[^}]*JSON)/gi.test(code);
+  const hasResultValidation = testCode(
+    code,
+    /(?:validate|sanitize|parse|check|verify|filter|schema|zod|joi|yup|JSON\.parse|try\s*\{[^}]*JSON)/gi,
+  );
 
   if (toolResultLines.length > 0 && !hasResultValidation) {
     findings.push({

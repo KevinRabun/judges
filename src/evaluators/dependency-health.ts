@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeDependencyHealth(code: string, language: string): Finding[] {
@@ -165,7 +165,7 @@ export function analyzeDependencyHealth(code: string, language: string): Finding
   // Detect missing lockfile indicators
   const isPackageJson = /["']name["']\s*:\s*["']|["']version["']\s*:\s*["']\d/i.test(code);
   if (isPackageJson) {
-    const hasEngines = /["']engines["']\s*:/i.test(code);
+    const hasEngines = testCode(code, /["']engines["']\s*:/i);
     if (!hasEngines) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

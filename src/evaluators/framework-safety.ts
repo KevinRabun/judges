@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
 
 /**
  * Framework-specific deep safety rules.
@@ -178,7 +178,10 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
 
   // Error-handling middleware position (Express error middleware must be last)
   const expressErrorMwLines: number[] = [];
-  const hasExpressApp = /\bexpress\s*\(\s*\)|require\s*\(\s*["']express["']\s*\)|from\s+["']express["']/i.test(code);
+  const hasExpressApp = testCode(
+    code,
+    /\bexpress\s*\(\s*\)|require\s*\(\s*["']express["']\s*\)|from\s+["']express["']/i,
+  );
   if (hasExpressApp) {
     let lastErrorMw = -1;
     let hasRouteAfterErrorMw = false;
@@ -270,8 +273,8 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
     }
 
     // Missing helmet() or security headers middleware
-    const hasHelmet = /helmet\s*\(|require\s*\(\s*["']helmet["']\)|from\s+["']helmet["']/i.test(code);
-    const hasRoutes = /app\.(?:get|post|put|patch|delete)\s*\(\s*["']/i.test(code);
+    const hasHelmet = testCode(code, /helmet\s*\(|require\s*\(\s*["']helmet["']\)|from\s+["']helmet["']/i);
+    const hasRoutes = testCode(code, /app\.(?:get|post|put|patch|delete)\s*\(\s*["']/i);
     if (!hasHelmet && hasRoutes) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -289,9 +292,9 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
     }
 
     // Trust proxy not set when behind reverse proxy
-    const hasTrustProxy = /app\.set\s*\(\s*["']trust proxy["']|trustProxy|trust_proxy/i.test(code);
-    const hasRateLimit = /rateLimit|rate-limit|express-rate-limit/i.test(code);
-    const hasProxy = /nginx|reverse.?proxy|load.?balanc|X-Forwarded/i.test(code);
+    const hasTrustProxy = testCode(code, /app\.set\s*\(\s*["']trust proxy["']|trustProxy|trust_proxy/i);
+    const hasRateLimit = testCode(code, /rateLimit|rate-limit|express-rate-limit/i);
+    const hasProxy = testCode(code, /nginx|reverse.?proxy|load.?balanc|X-Forwarded/i);
     if (!hasTrustProxy && (hasRateLimit || hasProxy)) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -350,7 +353,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
     /export\s+(?:default\s+)?(?:async\s+)?function\s+handler|export\s+(?:default\s+)?(?:async\s+)?\(\s*req\s*(?::\s*\w+)?\s*,\s*res\s*(?::\s*\w+)?\s*\)/;
   const isNextApiRoute =
     /pages\/api\/|app\/api\//i.test(language) ||
-    (nextApiRoutePattern.test(code) && /NextApiRequest|NextRequest/i.test(code));
+    (testCode(code, nextApiRoutePattern) && testCode(code, /NextApiRequest|NextRequest/i));
   if (isNextApiRoute) {
     const hasAuthCheck =
       /getSession|getServerSession|getToken|auth\(\)|withAuth|requireAuth|session\?\.user|req\.headers\.authorization|Bearer/i.test(
@@ -401,7 +404,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
   // v-html with dynamic data
   const vHtmlLines = getLineNumbers(code, /v-html\s*=\s*["'](?!\s*$)/gi);
   if (vHtmlLines.length > 0) {
-    const hasVueSanitize = /DOMPurify|sanitize|xss|purify/i.test(code);
+    const hasVueSanitize = testCode(code, /DOMPurify|sanitize|xss|purify/i);
     if (!hasVueSanitize) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -504,7 +507,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
   // dangerouslySetInnerHTML without sanitization
   const dangerousHtmlLines = getLineNumbers(code, /dangerouslySetInnerHTML\s*=\s*\{\s*\{\s*__html\s*:/gi);
   if (dangerousHtmlLines.length > 0) {
-    const hasSanitizer = /DOMPurify|sanitize|purify|xss|sanitizeHtml/i.test(code);
+    const hasSanitizer = testCode(code, /DOMPurify|sanitize|purify|xss|sanitizeHtml/i);
     if (!hasSanitizer) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

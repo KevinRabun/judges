@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeReliability(code: string, language: string): Finding[] {
@@ -77,7 +77,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
   const externalCallLines = getLangLineNumbers(code, language, LP.HTTP_CLIENT).concat(
     getLangLineNumbers(code, language, LP.DB_QUERY),
   );
-  const hasRetry = /retry|retries|backoff|exponential|tenacity|Polly|resilience4j|backoff::/i.test(code);
+  const hasRetry = testCode(code, /retry|retries|backoff|exponential|tenacity|Polly|resilience4j|backoff::/i);
   if (externalCallLines.length > 2 && !hasRetry) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -164,7 +164,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
 
   // Circuit breaker pattern missing
   const hasMultipleExternalCalls = externalCallLines.length > 3;
-  const hasCircuitBreaker = /circuit.?breaker|CircuitBreaker|opossum|cockatiel|polly/i.test(code);
+  const hasCircuitBreaker = testCode(code, /circuit.?breaker|CircuitBreaker|opossum|cockatiel|polly/i);
   if (hasMultipleExternalCalls && !hasCircuitBreaker) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -217,7 +217,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       writeEndpointLines.push(i + 1);
     }
   });
-  const hasIdempotency = /idempoten|idempotency.?key|x-idempotency/i.test(code);
+  const hasIdempotency = testCode(code, /idempoten|idempotency.?key|x-idempotency/i);
   if (writeEndpointLines.length > 2 && !hasIdempotency) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

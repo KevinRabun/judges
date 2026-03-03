@@ -306,6 +306,213 @@ const STRING_LITERAL_LINE_RE = /^\s*["'`].*["'`][,;]?\s*$/;
 export function isStringLiteralLine(line: string): boolean {
   return STRING_LITERAL_LINE_RE.test(line);
 }
+
+// ─── Comment & String Stripping ──────────────────────────────────────────────
+// Provides `stripCommentsAndStrings()` which replaces all comments and string
+// literals with whitespace (preserving line structure) so that whole-file
+// boolean checks like `pattern.test(code)` don't match patterns that exist
+// only in comments, strings, or documentation.
+//
+// `testCode()` is a convenience wrapper: it lazily strips the code on first
+// call and caches the result for subsequent tests against the same source.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Strip all comments from source code, replacing their content with spaces.
+ * String literals are preserved so that import paths and require() arguments
+ * remain matchable. Line structure (newlines) is preserved so that line
+ * numbers remain stable.
+ *
+ * Handles:
+ * - Single-line comments: `//`, `#` (Python/Ruby/YAML)
+ * - Block comments: slash-star ... star-slash
+ * - Python docstrings: `"""..."""` / `'''...'''` (treated as comments)
+ *
+ * Strings (`"..."`, `'...'`, `` `...` ``) are skipped (preserved) to avoid
+ * breaking patterns that intentionally match import paths, require() calls,
+ * route strings, etc.
+ *
+ * This is intentionally a lightweight heuristic — the goal is to eliminate
+ * the most common FP source (patterns in comments) without the overhead of
+ * a full parser.
+ */
+export function stripCommentsAndStrings(code: string): string {
+  const len = code.length;
+  const result: string[] = new Array(len);
+  let i = 0;
+
+  while (i < len) {
+    const ch = code[i];
+    const next = i + 1 < len ? code[i + 1] : "";
+
+    // ── Single-line comment: // ──
+    if (ch === "/" && next === "/") {
+      while (i < len && code[i] !== "\n") {
+        result[i] = " ";
+        i++;
+      }
+      continue;
+    }
+
+    // ── Block comment: /* ... */ ──
+    if (ch === "/" && next === "*") {
+      result[i] = " ";
+      result[i + 1] = " ";
+      i += 2;
+      while (i < len) {
+        if (code[i] === "\n") {
+          result[i] = "\n";
+          i++;
+        } else if (code[i] === "*" && i + 1 < len && code[i + 1] === "/") {
+          result[i] = " ";
+          result[i + 1] = " ";
+          i += 2;
+          break;
+        } else {
+          result[i] = " ";
+          i++;
+        }
+      }
+      continue;
+    }
+
+    // ── Python-style `#` comment (but not `#!`, `#[` for Rust attributes) ──
+    if (ch === "#" && next !== "!" && next !== "[") {
+      while (i < len && code[i] !== "\n") {
+        result[i] = " ";
+        i++;
+      }
+      continue;
+    }
+
+    // ── Python triple-quoted strings / docstrings — treat as comments ──
+    if (
+      (ch === '"' && next === '"' && i + 2 < len && code[i + 2] === '"') ||
+      (ch === "'" && next === "'" && i + 2 < len && code[i + 2] === "'")
+    ) {
+      const quote3 = code.substring(i, i + 3);
+      result[i] = " ";
+      result[i + 1] = " ";
+      result[i + 2] = " ";
+      i += 3;
+      while (i < len) {
+        if (code[i] === "\n") {
+          result[i] = "\n";
+          i++;
+        } else if (code.substring(i, i + 3) === quote3) {
+          result[i] = " ";
+          result[i + 1] = " ";
+          result[i + 2] = " ";
+          i += 3;
+          break;
+        } else {
+          result[i] = " ";
+          i++;
+        }
+      }
+      continue;
+    }
+
+    // ── String literals: "...", '...', `...` — SKIP (preserve) ──
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const quote = ch;
+      result[i] = ch; // keep opening quote
+      i++;
+      while (i < len) {
+        if (code[i] === "\\") {
+          result[i] = code[i];
+          i++;
+          if (i < len) {
+            result[i] = code[i];
+            i++;
+          }
+        } else if (code[i] === "\n" && quote !== "`") {
+          break;
+        } else if (code[i] === quote) {
+          result[i] = ch; // keep closing quote
+          i++;
+          break;
+        } else {
+          result[i] = code[i]; // preserve string content
+          i++;
+        }
+      }
+      continue;
+    }
+
+    // ── Plain content — keep as-is ──
+    result[i] = ch;
+    i++;
+  }
+
+  return result.join("");
+}
+
+/**
+ * LRU-style cache for stripped code. Uses a WeakRef-based approach keyed
+ * by the code string itself (via a simple Map with bounded size).
+ */
+const strippedCodeCache = new Map<string, string>();
+const MAX_STRIPPED_CACHE = 64;
+
+/**
+ * Get or create a stripped version of the source code. Results are cached
+ * per unique `code` string so that multiple `testCode()` calls in the same
+ * evaluator invocation share one strip pass.
+ */
+function getStrippedCode(code: string): string {
+  let stripped = strippedCodeCache.get(code);
+  if (stripped !== undefined) return stripped;
+
+  stripped = stripCommentsAndStrings(code);
+
+  // Evict oldest entry if cache is full
+  if (strippedCodeCache.size >= MAX_STRIPPED_CACHE) {
+    const first = strippedCodeCache.keys().next().value;
+    if (first !== undefined) strippedCodeCache.delete(first);
+  }
+  strippedCodeCache.set(code, stripped);
+  return stripped;
+}
+
+/**
+ * Test whether a regex pattern matches in executable code (ignoring
+ * comments). String literals are preserved so that import paths, require()
+ * arguments, and route strings remain matchable. Drop-in replacement for
+ * `pattern.test(code)` that strips comments first.
+ *
+ * @example
+ * ```ts
+ * // Instead of:
+ * const hasRateLimit = /rateLimit/i.test(code);
+ * // Use:
+ * const hasRateLimit = testCode(code, /rateLimit/i);
+ * ```
+ */
+export function testCode(code: string, pattern: RegExp): boolean {
+  const stripped = getStrippedCode(code);
+  pattern.lastIndex = 0;
+  return pattern.test(stripped);
+}
+
+/**
+ * Get a multi-line context window around a specific line number.
+ * Returns the concatenated text of lines within ±radius of the target line.
+ * Useful for post-match filtering where the relevant pattern (e.g., a
+ * fallback operator `??`/`||`, an `await`, a config block brace) may appear
+ * on an adjacent line rather than the matched line itself.
+ *
+ * @param lines  Array of source code lines (0-indexed)
+ * @param lineNum  1-based line number (as returned by getLineNumbers)
+ * @param radius  Number of lines to include before and after (default 3)
+ * @returns  Concatenated text of lines in the window
+ */
+export function getContextWindow(lines: string[], lineNum: number, radius = 3): string {
+  const start = Math.max(0, lineNum - 1 - radius);
+  const end = Math.min(lines.length, lineNum + radius);
+  return lines.slice(start, end).join("\n");
+}
+
 /**
  * Find line numbers in source code that match a given regex pattern.
  * By default, comment lines and string-literal-only lines are skipped

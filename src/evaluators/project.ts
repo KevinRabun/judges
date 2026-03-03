@@ -82,6 +82,36 @@ const CROSS_FILE_SECURITY_CATEGORIES: Array<{
     findingPattern: /logging|audit.?trail|no.?log/i,
     confidenceReduction: -0.15,
   },
+  {
+    category: "health-check",
+    contentPattern: /(?:\/health|\/healthz|\/readyz|\/ready|\/live|\/liveness|healthCheck|readinessProbe)/i,
+    findingPattern: /health.?check|readiness|liveness|no.?health/i,
+    confidenceReduction: -0.2,
+  },
+  {
+    category: "graceful-shutdown",
+    contentPattern: /(?:SIGTERM|SIGINT|gracefulShutdown|server\.close|process\.on\s*\(\s*['"]SIG)/i,
+    findingPattern: /graceful.?shutdown|sigterm|signal.?handl/i,
+    confidenceReduction: -0.2,
+  },
+  {
+    category: "cors",
+    contentPattern: /(?:cors\s*\(|Access-Control-Allow|allowedOrigins|corsOptions)/i,
+    findingPattern: /cors|cross.?origin/i,
+    confidenceReduction: -0.15,
+  },
+  {
+    category: "secrets-management",
+    contentPattern: /(?:vault|keyVault|secretManager|ssm\.getParameter|getSecret|KMS|dotenv)/i,
+    findingPattern: /secret.?manage|hardcoded.?secret|credential.?stor/i,
+    confidenceReduction: -0.15,
+  },
+  {
+    category: "environment-config",
+    contentPattern: /(?:process\.env|os\.environ|os\.Getenv|System\.getenv|config\.|configuration\.)/i,
+    findingPattern: /hardcoded.?config|environment.?variable|config.?management/i,
+    confidenceReduction: -0.1,
+  },
 ];
 
 /**
@@ -201,6 +231,61 @@ function applyCrossFileAdjustments(findings: Finding[], mitigatedCategories: Set
   });
 }
 
+/**
+ * Scan ALL project files (regardless of import relationships) for security-
+ * relevant patterns. Returns the set of security categories found anywhere
+ * in the project. This enables project-wide absence resolution: if a security
+ * pattern (e.g., helmet middleware, rate limiting) exists in ANY file, absence-
+ * based findings about that category can have their confidence reduced.
+ */
+function scanProjectWideSecurityPatterns(
+  files: Array<{ path: string; content: string; language: string }>,
+): Set<string> {
+  const found = new Set<string>();
+  for (const f of files) {
+    for (const cat of CROSS_FILE_SECURITY_CATEGORIES) {
+      if (!found.has(cat.category) && cat.contentPattern.test(f.content)) {
+        found.add(cat.category);
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Apply project-wide security pattern resolution to absence-based findings.
+ * When a security category exists somewhere in the project (not necessarily
+ * in the same file or an imported file), absence-based findings matching
+ * that category get their confidence reduced. The reduction is smaller than
+ * the direct-import reduction (halved) to reflect the weaker evidence.
+ */
+function applyProjectWideAbsenceResolution(findings: Finding[], projectWideCategories: Set<string>): Finding[] {
+  return findings.map((f) => {
+    if (!isAbsenceBasedFinding(f)) return f;
+
+    const title = f.title + " " + (f.ruleId ?? "");
+    let adjustment = 0;
+
+    for (const cat of CROSS_FILE_SECURITY_CATEGORIES) {
+      if (projectWideCategories.has(cat.category) && cat.findingPattern.test(title)) {
+        // Halve the normal reduction — project-wide is weaker evidence than direct import
+        adjustment += cat.confidenceReduction * 0.5;
+        break;
+      }
+    }
+
+    if (adjustment !== 0) {
+      const currentConf = f.confidence ?? 0.5;
+      return {
+        ...f,
+        confidence: Math.max(0, Math.min(1, currentConf + adjustment)),
+        description: (f.description ?? "") + `\n\n_Note: Related security pattern found elsewhere in the project._`,
+      };
+    }
+    return f;
+  });
+}
+
 // ─── Project Evaluation ───────────────────────────────────────────────────────
 
 /**
@@ -216,6 +301,9 @@ export function evaluateProject(
   // Resolve cross-file imports to detect security mitigations from imported modules
   const crossFileMitigations = resolveProjectImports(files);
 
+  // Scan all project files for security patterns (regardless of import relationships)
+  const projectWideCategories = scanProjectWideSecurityPatterns(files);
+
   // Per-file evaluations (cached by content hash to skip unchanged files)
   const fileResults = files.map((f) => {
     const hash = contentHash(f.content, f.language);
@@ -226,8 +314,10 @@ export function evaluateProject(
     }
     // Apply cross-file adjustments if this file imports security modules
     const mitigated = crossFileMitigations.get(f.path);
-    const adjustedFindings =
+    let adjustedFindings =
       mitigated && mitigated.size > 0 ? applyCrossFileAdjustments(verdict.findings, mitigated) : verdict.findings;
+    // Apply project-wide absence resolution for categories found anywhere
+    adjustedFindings = applyProjectWideAbsenceResolution(adjustedFindings, projectWideCategories);
     return {
       path: f.path,
       language: f.language,

@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCostEffectiveness(code: string, language: string): Finding[] {
@@ -285,8 +285,10 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
   }
 
   // Uncompressed responses (multi-language)
-  const hasCompression =
-    /compression|gzip|deflate|brotli|Content-Encoding|Accept-Encoding|UseResponseCompression/gi.test(code);
+  const hasCompression = testCode(
+    code,
+    /compression|gzip|deflate|brotli|Content-Encoding|Accept-Encoding|UseResponseCompression/gi,
+  );
   const hasServer =
     /app\.(listen|use)|createServer|express\(\)|Flask|Django|WebApplication|actix_web|rocket::|gin\.|http\.ListenAndServe|SpringBoot/gi.test(
       code,
@@ -313,7 +315,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
     /createConnection|new\s+Client\s*\(|MongoClient|DriverManager\.getConnection|SqlConnection|psycopg2\.connect|mysql\.connector/gi.test(
       code,
     );
-  const hasPooling = /Pool|pool|createPool|connection_pool|pooling|DataSource|HikariCP/gi.test(code);
+  const hasPooling = testCode(code, /Pool|pool|createPool|connection_pool|pooling|DataSource|HikariCP/gi);
   if (hasDbConnection && !hasPooling && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

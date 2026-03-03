@@ -1,5 +1,12 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, looksLikeRealCredentialValue } from "./shared.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  looksLikeRealCredentialValue,
+  testCode,
+  getContextWindow,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 function lineContainsRealQuotedSecret(line: string, pattern: RegExp): boolean {
@@ -203,8 +210,8 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   // Cookie without security flags
   const cookieNoFlagLines = getLineNumbers(code, /(?:res\.cookie|setCookie|set_cookie|SetCookie)\s*\(/gi);
   if (cookieNoFlagLines.length > 0) {
-    const hasSecure = /secure\s*:\s*true|Secure/gi.test(code);
-    const hasHttpOnly = /httpOnly\s*:\s*true|HttpOnly/gi.test(code);
+    const hasSecure = testCode(code, /secure\s*:\s*true|Secure/gi);
+    const hasHttpOnly = testCode(code, /httpOnly\s*:\s*true|HttpOnly/gi);
     if (!hasSecure || !hasHttpOnly) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -229,8 +236,8 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   // Only jwt.decode() without algorithms= or with verify_signature=False is insecure.
   const jwtCodeLines = code.split("\n");
   const jwtNoVerifyLines = getLineNumbers(code, jwtNoVerifyPatterns).filter((ln) => {
-    const line = jwtCodeLines[ln - 1] || "";
-    return !(/algorithms\s*=/.test(line) || /,\s*\w+\s*,\s*algorithms/.test(line));
+    const ctx = getContextWindow(jwtCodeLines, ln, 2);
+    return !(/algorithms\s*=/.test(ctx) || /,\s*\w+\s*,\s*algorithms/.test(ctx));
   });
   if (jwtNoVerifyLines.length > 0) {
     findings.push({
@@ -253,8 +260,10 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   const fileUploadPatterns = /multer|upload|formidable|busboy|multipart|FileUpload|MultipartFile/gi;
   const fileUploadLines = getLineNumbers(code, fileUploadPatterns);
   if (fileUploadLines.length > 0) {
-    const hasValidation =
-      /mime|mimetype|content-type|extension|allowedTypes|fileFilter|accept|maxSize|fileSizeLimit/gi.test(code);
+    const hasValidation = testCode(
+      code,
+      /mime|mimetype|content-type|extension|allowedTypes|fileFilter|accept|maxSize|fileSizeLimit/gi,
+    );
     if (!hasValidation) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -278,7 +287,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
     /password\s*[:=]\s*(?:req\.|request\.|body\.|input\.|params\.).*(?:save|insert|create|update|store|set)/gi;
   const cleartextLines = getLineNumbers(code, cleartextPwPatterns);
   if (cleartextLines.length > 0) {
-    const hasHashing = /bcrypt|argon2|scrypt|pbkdf2|hashPassword|hash_password|PasswordHasher/gi.test(code);
+    const hasHashing = testCode(code, /bcrypt|argon2|scrypt|pbkdf2|hashPassword|hash_password|PasswordHasher/gi);
     if (!hasHashing) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -299,7 +308,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
 
   // CORS with credentials and wildcard
   const corsCredLines = getLineNumbers(code, /credentials\s*:\s*true|Access-Control-Allow-Credentials/gi);
-  const corsWildcard = /Access-Control-Allow-Origin.*\*|origin\s*:\s*['"]?\*/gi.test(code);
+  const corsWildcard = testCode(code, /Access-Control-Allow-Origin.*\*|origin\s*:\s*['"]?\*/gi);
   if (corsCredLines.length > 0 && corsWildcard) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -321,7 +330,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
     code,
     /app\.post\s*\(|router\.post\s*\(|@PostMapping|@RequestMapping.*POST|\.post\s*\(/gi,
   );
-  const hasCsrf = /csrf|xsrf|_token|csrfToken|antiforgery|AntiForgery|@csrf/gi.test(code);
+  const hasCsrf = testCode(code, /csrf|xsrf|_token|csrfToken|antiforgery|AntiForgery|@csrf/gi);
   if (formPostLines.length > 2 && !hasCsrf) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -437,9 +446,12 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   // Missing encryption at rest
   const dbWritePatterns = /\.(?:save|create|insert|insertMany|insertOne|put|store)\s*\(/gi;
   const dbWriteLines = getLineNumbers(code, dbWritePatterns);
-  const hasEncryption = /encrypt|cipher|aes|AES|crypto\.createCipher|DataProtect|ProtectedData/gi.test(code);
+  const hasEncryption = testCode(code, /encrypt|cipher|aes|AES|crypto\.createCipher|DataProtect|ProtectedData/gi);
   if (dbWriteLines.length > 3 && !hasEncryption) {
-    const hasSensitiveData = /(?:ssn|social_security|credit.?card|password|health|medical|financial|bank)/gi.test(code);
+    const hasSensitiveData = testCode(
+      code,
+      /(?:ssn|social_security|credit.?card|password|health|medical|financial|bank)/gi,
+    );
     if (hasSensitiveData) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

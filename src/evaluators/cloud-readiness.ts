@@ -1,5 +1,12 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  isIaCTemplate,
+  testCode,
+  getContextWindow,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCloudReadiness(code: string, language: string): Finding[] {
@@ -22,8 +29,8 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   const defaultCtxPattern = /unwrap_or|or_else|\|\||\?\?|environ\.get|getenv|os\.Getenv|default|fallback/i;
   const codeLines = code.split("\n");
   const hardcodedLines = getLineNumbers(code, hardcodedHostPattern).filter((ln) => {
-    const line = codeLines[ln - 1] || "";
-    return !defaultCtxPattern.test(line);
+    const ctx = getContextWindow(codeLines, ln, 2);
+    return !defaultCtxPattern.test(ctx);
   });
   if (hardcodedLines.length > 0) {
     findings.push({
@@ -63,7 +70,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   }
 
   // No health check endpoint
-  const hasHealthCheck = /health|healthz|readyz|readiness|liveness|\/ready|\/live|\/status/gi.test(code);
+  const hasHealthCheck = testCode(code, /health|healthz|readyz|readiness|liveness|\/ready|\/live|\/status/gi);
   if (!hasHealthCheck && hasServerCode && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -188,8 +195,10 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   }
 
   // Missing environment-based configuration
-  const hasEnvConfig =
-    /process\.env|os\.environ|os\.Getenv|Environment\.GetEnvironmentVariable|System\.getenv|ENV\[/gi.test(code);
+  const hasEnvConfig = testCode(
+    code,
+    /process\.env|os\.environ|os\.Getenv|Environment\.GetEnvironmentVariable|System\.getenv|ENV\[/gi,
+  );
   const hasHardcodedConfig = getLineNumbers(
     code,
     /(?:port|host|database|redis|mongo)\s*[:=]\s*["'`](?!process|os\.|ENV)/gi,
@@ -212,8 +221,10 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   }
 
   // No CI/CD pipeline indicators
-  const hasCICD =
-    /\.github\/workflows|\.gitlab-ci|Jenkinsfile|azure-pipelines|bitbucket-pipelines|circleci|\.travis/gi.test(code);
+  const hasCICD = testCode(
+    code,
+    /\.github\/workflows|\.gitlab-ci|Jenkinsfile|azure-pipelines|bitbucket-pipelines|circleci|\.travis/gi,
+  );
   // This check is informational and only applies to config/YAML files
   if (language === "yaml" && !hasCICD) {
     findings.push({

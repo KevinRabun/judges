@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeApiDesign(code: string, language: string): Finding[] {
@@ -119,7 +119,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
 
   // Detect missing API versioning (multi-language route detection)
   const routeRegLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
-  const hasVersioning = /\/v\d+\//i.test(code) || /api-version|x-api-version/i.test(code);
+  const hasVersioning = /\/v\d+\//i.test(code) || testCode(code, /api-version|x-api-version/i);
   if (routeRegLines.length > 2 && !hasVersioning) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -174,7 +174,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       bodyParsingLines.push(i + 1);
     }
   });
-  const hasContentTypeCheck = /content-type|content_type|contentType|express\.json|bodyParser/i.test(code);
+  const hasContentTypeCheck = testCode(code, /content-type|content_type|contentType|express\.json|bodyParser/i);
   if (bodyParsingLines.length > 0 && !hasContentTypeCheck) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -244,8 +244,8 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   }
 
   // GraphQL: no query depth/complexity limiting
-  const hasGraphQL = /graphql|typeDefs|resolvers|gql`/i.test(code);
-  const hasDepthLimit = /depthLimit|complexity|maxDepth|queryComplexity/i.test(code);
+  const hasGraphQL = testCode(code, /graphql|typeDefs|resolvers|gql`/i);
+  const hasDepthLimit = testCode(code, /depthLimit|complexity|maxDepth|queryComplexity/i);
   if (hasGraphQL && !hasDepthLimit) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -263,7 +263,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   }
 
   // Missing CORS configuration
-  const hasCors = /cors|Access-Control-Allow-Origin|allowedOrigins/i.test(code);
+  const hasCors = testCode(code, /cors|Access-Control-Allow-Origin|allowedOrigins/i);
   if (hasRoutes2 && !hasCors && routeRegLines.length > 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -282,7 +282,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   }
 
   // Missing request ID in responses
-  const hasRequestId = /x-request-id|requestId|correlationId|traceId/i.test(code);
+  const hasRequestId = testCode(code, /x-request-id|requestId|correlationId|traceId/i);
   if (hasRoutes2 && !hasRequestId && routeRegLines.length > 3) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

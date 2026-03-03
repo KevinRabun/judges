@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeSoftwarePractices(code: string, language: string): Finding[] {
@@ -403,8 +403,8 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   }
 
   // Retry logic without exponential backoff
-  const hasRetry = /retry|retries|maxRetries|retryCount|attempts|maxAttempts/gi.test(code);
-  const hasFixedDelay = /(?:setTimeout|sleep|delay|wait)\s*\(\s*(?:\w+,\s*)?\d{3,5}\s*\)/gi.test(code);
+  const hasRetry = testCode(code, /retry|retries|maxRetries|retryCount|attempts|maxAttempts/gi);
+  const hasFixedDelay = testCode(code, /(?:setTimeout|sleep|delay|wait)\s*\(\s*(?:\w+,\s*)?\d{3,5}\s*\)/gi);
   const hasBackoff =
     /(?:exponential|backoff|jitter|Math\.pow.*(?:retry|attempt)|Math\.random\s*\(\s*\).*delay|\*\s*2\s*\*|\*\*\s*(?:attempt|retry|count)|<<\s*\w*retry)/gi.test(
       code,

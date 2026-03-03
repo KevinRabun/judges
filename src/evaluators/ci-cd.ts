@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCiCd(code: string, language: string): Finding[] {
@@ -10,9 +10,9 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
 
   // No test script (multi-language test detection)
   const hasTestScript =
-    /["']test["']\s*:\s*["'][^"']+["']/gi.test(code) ||
+    testCode(code, /["']test["']\s*:\s*["'][^"']+["']/gi) ||
     getLangLineNumbers(code, language, LP.TEST_FUNCTION).length > 0 ||
-    /jest|mocha|vitest|unittest|pytest|xunit|nunit/gi.test(code);
+    testCode(code, /jest|mocha|vitest|unittest|pytest|xunit|nunit/gi);
   const isSourceCode = /(?:function|class|const|let|var|import|export|def |public\s+class)/gi.test(code);
   // HTML/markup files are not application source code — skip CI/CD rules
   // that assume testable imperative logic.
@@ -35,7 +35,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   }
 
   // No lint configuration
-  const hasLint = /eslint|prettier|tslint|stylelint|rubocop|pylint|flake8|black|rustfmt|clippy|biome/gi.test(code);
+  const hasLint = testCode(code, /eslint|prettier|tslint|stylelint|rubocop|pylint|flake8|black|rustfmt|clippy|biome/gi);
   if (isSourceCode && !hasLint && code.split("\n").length > 40) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -91,8 +91,8 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
 
   // No build script
   const hasBuildScript =
-    /["']build["']\s*:\s*["']/gi.test(code) ||
-    /tsc|webpack|vite|rollup|esbuild|babel|make\s+build|gradle\s+build|mvn\s+package/gi.test(code);
+    testCode(code, /["']build["']\s*:\s*["']/gi) ||
+    testCode(code, /tsc|webpack|vite|rollup|esbuild|babel|make\s+build|gradle\s+build|mvn\s+package/gi);
   if (isSourceCode && !hasBuildScript && code.split("\n").length > 40) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -132,8 +132,8 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
 
   // Dockerfile without .dockerignore
   const hasDockerfile = /^FROM\s+/gim.test(code);
-  const hasDockerignore = /\.dockerignore/gi.test(code);
-  const copiesEverything = /COPY\s+\.\s+\.|ADD\s+\.\s+\./gi.test(code);
+  const hasDockerignore = testCode(code, /\.dockerignore/gi);
+  const copiesEverything = testCode(code, /COPY\s+\.\s+\.|ADD\s+\.\s+\./gi);
   if (hasDockerfile && copiesEverything && !hasDockerignore) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -151,7 +151,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   }
 
   // Dockerfile without HEALTHCHECK
-  if (hasDockerfile && !/HEALTHCHECK/gi.test(code)) {
+  if (hasDockerfile && !testCode(code, /HEALTHCHECK/gi)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -169,8 +169,8 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   }
 
   // No test coverage configuration
-  const hasTests = /test|jest|mocha|vitest|ava|tape|jasmine|karma/gi.test(code);
-  const hasCoverage = /coverage|istanbul|nyc|c8|--coverage|coverageThreshold|coverageDirectory|lcov/gi.test(code);
+  const hasTests = testCode(code, /test|jest|mocha|vitest|ava|tape|jasmine|karma/gi);
+  const hasCoverage = testCode(code, /coverage|istanbul|nyc|c8|--coverage|coverageThreshold|coverageDirectory|lcov/gi);
   if (hasTests && !hasCoverage) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -191,7 +191,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   // npm install instead of npm ci in CI
   const npmInstallPattern = /npm\s+install(?!\s+--save|\s+-[gDEOS]|\s+\w)/gi;
   const npmInstallLines = getLineNumbers(code, npmInstallPattern);
-  const isCIConfig = /\.github\/workflows|\.gitlab-ci|jenkinsfile|\.circleci|pipeline|ci\s*:/gi.test(code);
+  const isCIConfig = testCode(code, /\.github\/workflows|\.gitlab-ci|jenkinsfile|\.circleci|pipeline|ci\s*:/gi);
   if (npmInstallLines.length > 0 && isCIConfig) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -210,8 +210,8 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   }
 
   // Running as root in Docker
-  const _hasRootUser = /^USER\s+root/gim.test(code);
-  const hasNonRootUser = /^USER\s+(?!root)\w+/gim.test(code);
+  const _hasRootUser = testCode(code, /^USER\s+root/gim);
+  const hasNonRootUser = testCode(code, /^USER\s+(?!root)\w+/gim);
   if (hasDockerfile && !hasNonRootUser) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

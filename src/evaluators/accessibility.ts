@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangFamily, isCommentLine } from "./shared.js";
+import { getLangFamily, isCommentLine, testCode } from "./shared.js";
 
 export function analyzeAccessibility(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
@@ -221,8 +221,8 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   }
 
   // Skip navigation link missing
-  const hasNav = /<nav\b|role\s*=\s*["']navigation/i.test(code);
-  const hasSkipLink = /skip.*nav|skip.*content|skipToContent|#main-content/i.test(code);
+  const hasNav = testCode(code, /<nav\b|role\s*=\s*["']navigation/i);
+  const hasSkipLink = testCode(code, /skip.*nav|skip.*content|skipToContent|#main-content/i);
   if (hasNav && !hasSkipLink) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -280,7 +280,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       dynamicUpdateLines.push(i + 1);
     }
   });
-  const hasAriaLive = /aria-live|role\s*=\s*["'](?:alert|status|log)/i.test(code);
+  const hasAriaLive = testCode(code, /aria-live|role\s*=\s*["'](?:alert|status|log)/i);
   if (dynamicUpdateLines.length > 0 && !hasAriaLive) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -365,7 +365,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
       animationLines.push(i + 1);
     }
   });
-  const hasReducedMotion = /prefers-reduced-motion|prefersReducedMotion|reducedMotion/i.test(code);
+  const hasReducedMotion = testCode(code, /prefers-reduced-motion|prefersReducedMotion|reducedMotion/i);
   if (animationLines.length > 0 && !hasReducedMotion) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

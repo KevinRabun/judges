@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangFamily, testCode, getContextWindow } from "./shared.js";
 
 export function analyzePortability(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
@@ -97,8 +97,8 @@ export function analyzePortability(code: string, language: string): Finding[] {
   const azureLines = getLineNumbers(code, azurePattern);
   const gcpLines = getLineNumbers(code, gcpPattern);
   const hasAbstraction =
-    /interface\s+\w*(?:Storage|Queue|Cache|Blob|Cloud)\w*/gi.test(code) ||
-    /(?:adapter|provider|strategy)Pattern/gi.test(code);
+    testCode(code, /interface\s+\w*(?:Storage|Queue|Cache|Blob|Cloud)\w*/gi) ||
+    testCode(code, /(?:adapter|provider|strategy)Pattern/gi);
   const vendorLines = [...new Set([...awsLines, ...azureLines, ...gcpLines])];
   if (vendorLines.length > 0 && !hasAbstraction) {
     findings.push({
@@ -123,8 +123,8 @@ export function analyzePortability(code: string, language: string): Finding[] {
   const defaultCtxPattern = /unwrap_or|or_else|\|\||\?\?|environ\.get|getenv|os\.Getenv|default|fallback/i;
   const portaCodeLines = code.split("\n");
   const hostLines = getLineNumbers(code, hardcodedHostPattern).filter((ln) => {
-    const line = portaCodeLines[ln - 1] || "";
-    return !defaultCtxPattern.test(line);
+    const ctx = getContextWindow(portaCodeLines, ln, 2);
+    return !defaultCtxPattern.test(ctx);
   });
   if (hostLines.length > 0) {
     findings.push({
@@ -144,8 +144,8 @@ export function analyzePortability(code: string, language: string): Finding[] {
 
   // Platform-specific line-ending handling
   const lineEndingPattern = /\\r\\n|\\r|CRLF|LF|line.?ending/gi;
-  const hasExplicitLineEnding = lineEndingPattern.test(code);
-  const hasFileOps = /readFile|writeFile|createReadStream|createWriteStream|open\s*\(/gi.test(code);
+  const hasExplicitLineEnding = testCode(code, lineEndingPattern);
+  const hasFileOps = testCode(code, /readFile|writeFile|createReadStream|createWriteStream|open\s*\(/gi);
   // Only flag if doing file I/O without line ending awareness
   if (hasFileOps && !hasExplicitLineEnding && code.split("\n").length > 30) {
     findings.push({
@@ -188,8 +188,8 @@ export function analyzePortability(code: string, language: string): Finding[] {
     /\b(?:document\.|window\.|navigator\.|localStorage\.|sessionStorage\.|alert\s*\(|confirm\s*\(|prompt\s*\()/g;
   const browserApiLines = getLineNumbers(code, browserApiPattern);
   const isLikelyServer =
-    /require\s*\(\s*['"](?:express|http|fs|net|child_process|cluster)/gi.test(code) ||
-    /import\s+.*from\s+['"](?:express|http|fs|net|child_process|cluster)/gi.test(code);
+    testCode(code, /require\s*\(\s*['"](?:express|http|fs|net|child_process|cluster)/gi) ||
+    testCode(code, /import\s+.*from\s+['"](?:express|http|fs|net|child_process|cluster)/gi);
   if (browserApiLines.length > 0 && isLikelyServer) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

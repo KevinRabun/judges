@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeConcurrency(code: string, language: string): Finding[] {
@@ -139,7 +139,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       setIntervalLines.push(i + 1);
     }
   });
-  const hasClearInterval = /clearInterval/i.test(code);
+  const hasClearInterval = testCode(code, /clearInterval/i);
   if (setIntervalLines.length > 0 && !hasClearInterval) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

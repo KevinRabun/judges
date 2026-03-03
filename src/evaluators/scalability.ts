@@ -1,5 +1,12 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  isIaCTemplate,
+  testCode,
+  getContextWindow,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeScalability(code: string, language: string): Finding[] {
@@ -71,8 +78,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   const rawBlockingLines = getLineNumbers(code, blockingPattern);
   // Exclude lines containing 'await' — those are async and non-blocking
   const blockingLines = rawBlockingLines.filter((ln) => {
-    const lineText = lines[ln - 1] || "";
-    return !/\bawait\b/i.test(lineText);
+    const ctx = getContextWindow(lines, ln, 1);
+    return !/\bawait\b/i.test(ctx);
   });
   if (blockingLines.length > 0) {
     findings.push({
@@ -93,7 +100,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
 
   // No timeout on external calls (multi-language)
   const fetchLines = getLangLineNumbers(code, language, LP.HTTP_CLIENT);
-  const hasTimeout = /timeout|Timeout|deadline|AbortController|Duration|TimeSpan|time\.After/gi.test(code);
+  const hasTimeout = testCode(code, /timeout|Timeout|deadline|AbortController|Duration|TimeSpan|time\.After/gi);
   if (fetchLines.length > 0 && !hasTimeout) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -117,7 +124,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   const heavyCompPattern = /(?:for|while)\s*\([^)]*(?:length|size|count)[^)]*\)[\s\S]{0,200}(?:for|while)\s*\(/gi;
   const cpuIntensiveOps =
     /crypto\.pbkdf2Sync|crypto\.scryptSync|bcrypt\.hashSync|JSON\.parse\s*\(\s*JSON\.stringify|structuredClone|zlib\.[^a-z]*Sync|(?:sort|reduce|map|filter)\s*\([^)]*(?:sort|reduce|map|filter)\s*\(/gi;
-  const hasNestedLoops = heavyCompPattern.test(code);
+  const hasNestedLoops = testCode(code, heavyCompPattern);
   const cpuOpsLines = getLineNumbers(code, cpuIntensiveOps);
   if (hasNestedLoops || cpuOpsLines.length > 0) {
     findings.push({
@@ -136,7 +143,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   }
 
   // No rate limiting detected
-  const hasRateLimit = /rate.?limit|throttle|limiter|RateLimit/gi.test(code);
+  const hasRateLimit = testCode(code, /rate.?limit|throttle|limiter|RateLimit/gi);
   const iacTemplate = isIaCTemplate(code);
   if (!hasRateLimit && fetchLines.length > 0 && !iacTemplate) {
     findings.push({
@@ -178,7 +185,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   // Sticky session / session affinity assumptions
   const stickySessionPattern = /session\s*\{|express-session|SessionMiddleware|sticky|affinity/gi;
   const stickySessionLines = getLineNumbers(code, stickySessionPattern);
-  const hasExternalSession = /redis|memcached|dynamodb|MongoStore|connect-redis|connect-mongo/gi.test(code);
+  const hasExternalSession = testCode(code, /redis|memcached|dynamodb|MongoStore|connect-redis|connect-mongo/gi);
   if (stickySessionLines.length > 0 && !hasExternalSession) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -217,7 +224,10 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   }
 
   // No circuit breaker pattern
-  const hasCircuitBreaker = /circuit.?breaker|opossum|cockatiel|polly|resilience4j|hystrix|CircuitBreaker/gi.test(code);
+  const hasCircuitBreaker = testCode(
+    code,
+    /circuit.?breaker|opossum|cockatiel|polly|resilience4j|hystrix|CircuitBreaker/gi,
+  );
   const hasMultipleExternalCalls = fetchLines.length > 2;
   if (hasMultipleExternalCalls && !hasCircuitBreaker && !iacTemplate) {
     findings.push({
@@ -239,7 +249,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   // Monolithic query / large payload assembly
   const largePayloadPattern =
     /JSON\.stringify\s*\(.*\bdata\b|res\.json\s*\(\s*\{[\s\S]{0,50}\.findAll|\.aggregate\s*\(\s*\[[\s\S]{200,}/gi;
-  if (largePayloadPattern.test(code)) {
+  if (testCode(code, largePayloadPattern)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -258,7 +268,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   // WebSocket without connection limits
   const wsPattern = /WebSocket|ws\s*\(|socket\.io|Socket\s*\(|socketserver/gi;
   const wsLines = getLineNumbers(code, wsPattern);
-  const hasWsLimit = /maxPayload|maxConnections|connectionLimit|max_connections/gi.test(code);
+  const hasWsLimit = testCode(code, /maxPayload|maxConnections|connectionLimit|max_connections/gi);
   if (wsLines.length > 0 && !hasWsLimit) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

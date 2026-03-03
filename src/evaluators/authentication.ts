@@ -5,6 +5,7 @@ import {
   getLangFamily,
   looksLikeRealCredentialValue,
   isCommentLine,
+  testCode,
 } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -197,8 +198,10 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   }
 
   // No RBAC / authorization checks
-  const hasRoleCheck =
-    /role|permission|isAdmin|isOwner|canAccess|authorize|requiredRole|hasPermission|checkPermission/gi.test(code);
+  const hasRoleCheck = testCode(
+    code,
+    /role|permission|isAdmin|isOwner|canAccess|authorize|requiredRole|hasPermission|checkPermission/gi,
+  );
   if (hasRoutes && !hasRoleCheck && code.split("\n").length > 40) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -219,9 +222,9 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   // JWT without verification
   // This is absence-based in single-file mode: verification middleware often
   // lives in a separate file from the login/sign endpoint.
-  const hasJwt = /jwt|jsonwebtoken|jose/gi.test(code);
-  const hasJwtVerify = /jwt\.verify|jwtVerify|verifyToken|jose\.jwtVerify/gi.test(code);
-  const hasJwtSign = /jwt\.sign|jwtSign|signToken/gi.test(code);
+  const hasJwt = testCode(code, /jwt|jsonwebtoken|jose/gi);
+  const hasJwtVerify = testCode(code, /jwt\.verify|jwtVerify|verifyToken|jose\.jwtVerify/gi);
+  const hasJwtSign = testCode(code, /jwt\.sign|jwtSign|signToken/gi);
   if (hasJwt && hasJwtSign && !hasJwtVerify) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -260,8 +263,8 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   }
 
   // No session expiration / no token expiry
-  const hasSession = /session|express-session|cookie-session|SessionMiddleware/gi.test(code);
-  const hasExpiry = /maxAge|expires|expiresIn|exp:|ttl|timeout.*session|cookie.*max/gi.test(code);
+  const hasSession = testCode(code, /session|express-session|cookie-session|SessionMiddleware/gi);
+  const hasExpiry = testCode(code, /maxAge|expires|expiresIn|exp:|ttl|timeout.*session|cookie.*max/gi);
   if (hasSession && !hasExpiry) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -280,7 +283,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   }
 
   // Weak password policy — no complexity enforcement
-  const hasUserRegistration = /register|signup|sign.?up|createUser|create.*user|new.*user/gi.test(code);
+  const hasUserRegistration = testCode(code, /register|signup|sign.?up|createUser|create.*user|new.*user/gi);
   const hasPasswordPolicy =
     /minLength|minimum.*length|password.*length|complexity|strongPassword|zxcvbn|password.*policy|password.*require/gi.test(
       code,
@@ -303,9 +306,11 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   }
 
   // No account lockout after failed attempts
-  const hasLogin = /login|signin|sign.?in|authenticate|verifyPassword|checkPassword/gi.test(code);
-  const hasLockout =
-    /lockout|lock.*out|attempt|maxAttempt|failedAttempt|rateLimitLogin|brute.?force|account.*lock/gi.test(code);
+  const hasLogin = testCode(code, /login|signin|sign.?in|authenticate|verifyPassword|checkPassword/gi);
+  const hasLockout = testCode(
+    code,
+    /lockout|lock.*out|attempt|maxAttempt|failedAttempt|rateLimitLogin|brute.?force|account.*lock/gi,
+  );
   if (hasLogin && !hasLockout) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -326,7 +331,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   // Cookie without Secure and HttpOnly flags
   const cookiePattern = /(?:cookie|Cookie|set-cookie|setCookie|res\.cookie)\s*\(/gi;
   const cookieLines = getLineNumbers(code, cookiePattern);
-  const hasSecureFlags = /secure\s*:\s*true|httpOnly\s*:\s*true|HttpOnly|Secure/g.test(code);
+  const hasSecureFlags = testCode(code, /secure\s*:\s*true|httpOnly\s*:\s*true|HttpOnly|Secure/g);
   if (cookieLines.length > 0 && !hasSecureFlags) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -345,8 +350,8 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   }
 
   // No CSRF protection
-  const hasFormPost = /app\.post\s*\(|method\s*=\s*["']POST/gi.test(code);
-  const hasCsrf = /csrf|csurf|xsrf|_token|csrfToken|antiForgery|X-CSRF|X-XSRF/gi.test(code);
+  const hasFormPost = testCode(code, /app\.post\s*\(|method\s*=\s*["']POST/gi);
+  const hasCsrf = testCode(code, /csrf|csurf|xsrf|_token|csrfToken|antiForgery|X-CSRF|X-XSRF/gi);
   if (hasFormPost && !hasCsrf && hasSession) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -369,9 +374,11 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
     /(?:login|signin|sign.?in|authenticate)\s*(?:=|=>|\(|async)|(?:\.post|\.get|\.put)\s*\(\s*["'][^"']*(?:login|signin|sign.?in|auth)["']/gi.test(
       code,
     );
-  const hasSessionUsage = /req\.session|session\[|session\./gi.test(code);
-  const hasSessionRegen =
-    /session\.regenerate|regenerateSession|session\.cycle|rotate.*session|new.*session|session\.create/gi.test(code);
+  const hasSessionUsage = testCode(code, /req\.session|session\[|session\./gi);
+  const hasSessionRegen = testCode(
+    code,
+    /session\.regenerate|regenerateSession|session\.cycle|rotate.*session|new.*session|session\.create/gi,
+  );
   if (hasLoginHandler && hasSessionUsage && !hasSessionRegen && code.split("\n").length > 10) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

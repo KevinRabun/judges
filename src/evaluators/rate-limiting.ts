@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeRateLimiting(code: string, language: string): Finding[] {
@@ -14,7 +14,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
       code,
     );
   const routeLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
-  const hasServerCode = routeLines.length > 0 || /createServer|express\(\)|new\s+Hono/gi.test(code);
+  const hasServerCode = routeLines.length > 0 || testCode(code, /createServer|express\(\)|new\s+Hono/gi);
   if (hasServerCode && !hasRateLimit && code.split("\n").length > 20) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -37,7 +37,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
   const hasBodyParser = /bodyParser|express\.json|express\.urlencoded|body-parser|app\.use\s*\(\s*express\.json/gi.test(
     code,
   );
-  const hasBodyLimit = /limit\s*:\s*["'`]\d|maxSize|maxBodySize|maxContentLength|payloadLimit/gi.test(code);
+  const hasBodyLimit = testCode(code, /limit\s*:\s*["'`]\d|maxSize|maxBodySize|maxContentLength|payloadLimit/gi);
   if (hasBodyParser && !hasBodyLimit) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -138,7 +138,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
   const authRoutePattern =
     /(?:post|put)\s*\(\s*['"]\/(?:auth|login|signin|register|signup|password|reset|forgot|token|oauth)/gi;
   const authRouteLines = getLineNumbers(code, authRoutePattern);
-  const hasRateLimiter = /rateLimit|rateLimiter|rate_limit|throttle/gi.test(code);
+  const hasRateLimiter = testCode(code, /rateLimit|rateLimiter|rate_limit|throttle/gi);
   if (authRouteLines.length > 0 && !hasRateLimiter) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -158,7 +158,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
   // File upload without size limit
   const uploadPattern = /multer\s*\(|upload\s*\.\s*(?:single|array|fields)|formidable|busboy|multipart/gi;
   const uploadLines = getLineNumbers(code, uploadPattern);
-  const hasUploadLimit = /limits\s*:\s*\{|maxFileSize|fileSizeLimit|maxFiles/gi.test(code);
+  const hasUploadLimit = testCode(code, /limits\s*:\s*\{|maxFileSize|fileSizeLimit|maxFiles/gi);
   if (uploadLines.length > 0 && !hasUploadLimit) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -176,9 +176,11 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
   }
 
   // Missing 429 status code responses
-  const has429 = /429|Too Many Requests|too_many_requests|RATE_LIMIT|rateLimited/gi.test(code);
-  const hasApiEndpoints =
-    /app\.\s*(?:get|post|put|delete|patch)\s*\(|router\.\s*(?:get|post|put|delete|patch)\s*\(/gi.test(code);
+  const has429 = testCode(code, /429|Too Many Requests|too_many_requests|RATE_LIMIT|rateLimited/gi);
+  const hasApiEndpoints = testCode(
+    code,
+    /app\.\s*(?:get|post|put|delete|patch)\s*\(|router\.\s*(?:get|post|put|delete|patch)\s*\(/gi,
+  );
   if (hasApiEndpoints && !has429 && !hasRateLimiter) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -199,7 +201,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
   // WebSocket connections without limits
   const wsPattern = /new\s+WebSocket(?:Server)?|wss?\.\s*on\s*\(\s*['"]connection/gi;
   const wsLines = getLineNumbers(code, wsPattern);
-  const hasWsLimit = /maxPayload|maxConnections|maxClientsCount|perMessageDeflate.*threshold/gi.test(code);
+  const hasWsLimit = testCode(code, /maxPayload|maxConnections|maxClientsCount|perMessageDeflate.*threshold/gi);
   if (wsLines.length > 0 && !hasWsLimit) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -219,8 +221,10 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
   // Recursive/infinite retry without backoff
   const retryPattern = /retry|retryCount|maxRetries|attempts?\s*[<>]/gi;
   const retryLines = getLineNumbers(code, retryPattern);
-  const hasBackoffStrategy =
-    /backoff|exponential|delay\s*\*|Math\.pow|jitter|p-retry|axios-retry|retry-axios|got\.retry|ky\.retry/gi.test(code);
+  const hasBackoffStrategy = testCode(
+    code,
+    /backoff|exponential|delay\s*\*|Math\.pow|jitter|p-retry|axios-retry|retry-axios|got\.retry|ky\.retry/gi,
+  );
   if (retryLines.length > 0 && !hasBackoffStrategy) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCaching(code: string, language: string): Finding[] {
@@ -53,9 +53,11 @@ export function analyzeCaching(code: string, language: string): Finding[] {
   }
 
   // No HTTP caching headers
-  const hasHttpResponse = /res\.(json|send|render|set|header)\s*\(/gi.test(code);
-  const hasCacheHeaders =
-    /Cache-Control|ETag|Last-Modified|Expires|max-age|s-maxage|must-revalidate|no-cache|no-store/gi.test(code);
+  const hasHttpResponse = testCode(code, /res\.(json|send|render|set|header)\s*\(/gi);
+  const hasCacheHeaders = testCode(
+    code,
+    /Cache-Control|ETag|Last-Modified|Expires|max-age|s-maxage|must-revalidate|no-cache|no-store/gi,
+  );
   if (hasHttpResponse && !hasCacheHeaders && code.split("\n").length > 20) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -138,7 +140,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
   // Thundering herd / cache stampede — multiple concurrent fetches on miss
   const cacheGetPattern = /cache\.get\s*\(/gi;
   const cacheGetLines = getLineNumbers(code, cacheGetPattern);
-  const hasStampedeProtection = /lock|mutex|singleflight|coalesce|dedupe|p-memoize/gi.test(code);
+  const hasStampedeProtection = testCode(code, /lock|mutex|singleflight|coalesce|dedupe|p-memoize/gi);
   if (cacheGetLines.length > 0 && !hasStampedeProtection) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -176,7 +178,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
   }
 
   // Stale data served without revalidation
-  const hasCacheRead = /cache\.get|cache\.fetch|getFromCache|getCached/gi.test(code);
+  const hasCacheRead = testCode(code, /cache\.get|cache\.fetch|getFromCache|getCached/gi);
   const hasRevalidation = /revalidate|stale-while-revalidate|refresh|ETag|If-None-Match|If-Modified-Since|304/gi.test(
     code,
   );
@@ -197,8 +199,8 @@ export function analyzeCaching(code: string, language: string): Finding[] {
   }
 
   // No cache warming strategy
-  const hasStartup = /listen\s*\(|bootstrap|main\s*\(|init\s*\(/gi.test(code);
-  const hasCacheWarm = /warm|preheat|preload|seed.*cache|cache.*seed|cache.*warm/gi.test(code);
+  const hasStartup = testCode(code, /listen\s*\(|bootstrap|main\s*\(|init\s*\(/gi);
+  const hasCacheWarm = testCode(code, /warm|preheat|preload|seed.*cache|cache.*seed|cache.*warm/gi);
   if (hasStartup && hasCacheRead && !hasCacheWarm && code.split("\n").length > 50) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

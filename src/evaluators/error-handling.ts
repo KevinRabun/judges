@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeErrorHandling(code: string, language: string): Finding[] {
@@ -47,11 +47,14 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
 
   // No global error handler / middleware
   const hasGlobalHandler =
-    /app\.use\s*\(\s*(?:function\s*)?\(\s*err/gi.test(code) ||
-    /process\.on\s*\(\s*['"](?:uncaughtException|unhandledRejection)['"]/gi.test(code) ||
-    /window\.onerror|window\.addEventListener\s*\(\s*['"]error['"]/gi.test(code) ||
-    /app\.use\s*\(\s*errorHandler\b/gi.test(code);
-  const hasServerCode = /app\.(listen|use|get|post|put|delete|patch)|createServer|express\(\)|new\s+Hono/gi.test(code);
+    testCode(code, /app\.use\s*\(\s*(?:function\s*)?\(\s*err/gi) ||
+    testCode(code, /process\.on\s*\(\s*['"](?:uncaughtException|unhandledRejection)['"]/gi) ||
+    testCode(code, /window\.onerror|window\.addEventListener\s*\(\s*['"]error['"]/gi) ||
+    testCode(code, /app\.use\s*\(\s*errorHandler\b/gi);
+  const hasServerCode = testCode(
+    code,
+    /app\.(listen|use|get|post|put|delete|patch)|createServer|express\(\)|new\s+Hono/gi,
+  );
   if (hasServerCode && !hasGlobalHandler && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -114,8 +117,8 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   // Callback without error check (Node.js pattern)
   const _callbackNoErrPattern = /(?:callback|cb|done|next)\s*\(\s*(?:null|undefined)\s*[,)]/gi;
   const callbackErrPattern = /(?:if\s*\(\s*err|if\s*\(\s*error)/gi;
-  const hasCallbacks = /function\s*\([^)]*(?:err|error|cb|callback|done)[^)]*\)/gi.test(code);
-  if (hasCallbacks && !callbackErrPattern.test(code) && code.split("\n").length > 20) {
+  const hasCallbacks = testCode(code, /function\s*\([^)]*(?:err|error|cb|callback|done)[^)]*\)/gi);
+  if (hasCallbacks && !testCode(code, callbackErrPattern) && code.split("\n").length > 20) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -208,7 +211,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   // Missing error codes in error responses
   const errorResponsePattern = /res\.status\s*\(\s*(?:4|5)\d{2}\s*\)\s*\.json\s*\(/g;
   const errorRespLines = getLineNumbers(code, errorResponsePattern);
-  const hasErrorCodes = /errorCode|error_code|code\s*:\s*["'`]ERR|code\s*:\s*["'`][A-Z_]+/gi.test(code);
+  const hasErrorCodes = testCode(code, /errorCode|error_code|code\s*:\s*["'`]ERR|code\s*:\s*["'`][A-Z_]+/gi);
   if (errorRespLines.length > 0 && !hasErrorCodes) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -229,8 +232,10 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   // console.error as sole error strategy
   const consoleErrorPattern = /console\.error\s*\(/g;
   const consoleErrorLines = getLineNumbers(code, consoleErrorPattern);
-  const hasErrorReporting =
-    /sentry|bugsnag|rollbar|newrelic|datadog|errorReporter|reportError|alerting|pagerduty/gi.test(code);
+  const hasErrorReporting = testCode(
+    code,
+    /sentry|bugsnag|rollbar|newrelic|datadog|errorReporter|reportError|alerting|pagerduty/gi,
+  );
   if (consoleErrorLines.length > 3 && !hasErrorReporting) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

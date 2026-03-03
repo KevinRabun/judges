@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeDatabase(code: string, language: string): Finding[] {
@@ -94,7 +94,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
     /(?:require|import).*(?:mysql|pg|postgres|mongodb|mongoose|prisma|knex|sequelize|typeorm|drizzle|redis|sqlite|better-sqlite|database)\b/i.test(
       code,
     ) ||
-    /\b(?:SELECT|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+TABLE)\b/i.test(code);
+    testCode(code, /\b(?:SELECT|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+TABLE)\b/i);
   if (n1Lines.length > 0 && hasDatabaseContext) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -116,7 +116,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
     /createConnection|new\s+Client|new\s+Pool|mongoose\.connect|createPool|DataSource|DriverManager|SqlConnection/gi.test(
       code,
     );
-  const hasPooling = /pool|Pool|connectionPool|poolSize|max_connections|maxPoolSize|connectionLimit/gi.test(code);
+  const hasPooling = testCode(code, /pool|Pool|connectionPool|poolSize|max_connections|maxPoolSize|connectionLimit/gi);
   if (hasDbConnection && !hasPooling) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -158,7 +158,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
     /(?:(?:query|execute|run|raw)\s*\(\s*["'`](?:INSERT|UPDATE|DELETE))|(?:\.(?:save|create|update|delete|remove|destroy|bulkCreate|insertMany|updateMany|deleteMany|insertOne|updateOne|deleteOne)\s*\()|(?:INSERT\s+INTO\b|UPDATE\s+\w+\s+SET\b|DELETE\s+FROM\b)|db\.(?:create|update|delete|save|remove)\s*\(/gi.test(
       code,
     );
-  const hasTransactions = /transaction|BEGIN|COMMIT|ROLLBACK|startTransaction|withTransaction/gi.test(code);
+  const hasTransactions = testCode(code, /transaction|BEGIN|COMMIT|ROLLBACK|startTransaction|withTransaction/gi);
   if (hasMutations && !hasTransactions && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -219,7 +219,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
     /migration|migrate|knex\.schema|Schema\.create|CreateTable|createTable|sequelize\.define|prisma\s+migrate|alembic|flyway|liquibase|db-migrate|umzug/gi.test(
       code,
     );
-  const hasSchemaChanges = /CREATE\s+TABLE|ALTER\s+TABLE|ADD\s+COLUMN|DROP\s+COLUMN/gi.test(code);
+  const hasSchemaChanges = testCode(code, /CREATE\s+TABLE|ALTER\s+TABLE|ADD\s+COLUMN|DROP\s+COLUMN/gi);
   if (hasSchemaChanges && !hasMigrations) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -237,8 +237,8 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   }
 
   // Missing database indexes heuristic
-  const hasWhereClause = /WHERE\s+\w+\s*(?:=|IN\s*\(|LIKE|>|<|BETWEEN)/gi.test(code);
-  const hasIndexHint = /CREATE\s+INDEX|ADD\s+INDEX|ensureIndex|createIndex|\.index\s*\(/gi.test(code);
+  const hasWhereClause = testCode(code, /WHERE\s+\w+\s*(?:=|IN\s*\(|LIKE|>|<|BETWEEN)/gi);
+  const hasIndexHint = testCode(code, /CREATE\s+INDEX|ADD\s+INDEX|ensureIndex|createIndex|\.index\s*\(/gi);
   if (hasWhereClause && !hasIndexHint && rawSqlLines.length > 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

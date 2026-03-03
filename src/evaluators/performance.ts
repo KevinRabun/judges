@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine, isStringLiteralLine } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, isStringLiteralLine, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzePerformance(code: string, language: string): Finding[] {
@@ -204,8 +204,10 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       addListenerLines.push(i + 1);
     }
   });
-  const hasRemoveListener =
-    /removeEventListener|\.off\s*\(|\.removeListener|\.removeAllListeners|AbortController|cleanup|dispose/i.test(code);
+  const hasRemoveListener = testCode(
+    code,
+    /removeEventListener|\.off\s*\(|\.removeListener|\.removeAllListeners|AbortController|cleanup|dispose/i,
+  );
   if (addListenerLines.length > 2 && !hasRemoveListener) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -264,7 +266,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       highFreqEventLines.push(i + 1);
     }
   });
-  const hasDebounce = /debounce|throttle|requestAnimationFrame|rAF/i.test(code);
+  const hasDebounce = testCode(code, /debounce|throttle|requestAnimationFrame|rAF/i);
   if (highFreqEventLines.length > 0 && !hasDebounce) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -569,7 +571,7 @@ export function analyzePerformance(code: string, language: string): Finding[] {
       setIntervalLines.push(i + 1);
     }
   });
-  const hasClearInterval = /clearInterval/i.test(code);
+  const hasClearInterval = testCode(code, /clearInterval/i);
   if (setIntervalLines.length > 0 && !hasClearInterval) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeBackwardsCompatibility(code: string, language: string): Finding[] {
@@ -11,7 +11,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
   // No API versioning (multi-language route detection)
   const routeLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
   const hasApiRoutes = routeLines.length > 0 && /\/api\//i.test(code);
-  const hasVersioning = /\/api\/v\d|\/v\d\/|api-version|x-api-version|accept-version/gi.test(code);
+  const hasVersioning = testCode(code, /\/api\/v\d|\/v\d\/|api-version|x-api-version|accept-version/gi);
   if (hasApiRoutes && !hasVersioning) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -29,8 +29,8 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
   }
 
   // Deprecated API indicators without deprecation headers
-  const hasDeprecated = /deprecated|@deprecated|obsolete|legacy/gi.test(code);
-  const hasDeprecationHeader = /Deprecation|Sunset|X-Deprecated/gi.test(code);
+  const hasDeprecated = testCode(code, /deprecated|@deprecated|obsolete|legacy/gi);
+  const hasDeprecationHeader = testCode(code, /Deprecation|Sunset|X-Deprecated/gi);
   if (hasDeprecated && !hasDeprecationHeader) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -148,7 +148,7 @@ export function analyzeBackwardsCompatibility(code: string, language: string): F
   // Enum/union type removals
   const enumPattern = /enum\s+\w+\s*\{[^}]*\}/g;
   const enumMatches = code.match(enumPattern) || [];
-  const hasDeprecatedEnumComment = /\/\/.*deprecated.*enum|\/\/.*removed.*value/gi.test(code);
+  const hasDeprecatedEnumComment = testCode(code, /\/\/.*deprecated.*enum|\/\*.*removed.*value/gi);
   if (enumMatches.length > 0 && hasDeprecatedEnumComment) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

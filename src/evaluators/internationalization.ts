@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangFamily, isCommentLine } from "./shared.js";
+import { getLangFamily, isCommentLine, testCode } from "./shared.js";
 
 export function analyzeInternationalization(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
@@ -230,8 +230,8 @@ export function analyzeInternationalization(code: string, language: string): Fin
   }
 
   // Detect missing text encoding considerations
-  const hasEncoding = /utf-8|utf8|encoding|charset/i.test(code);
-  const handlesText = /readFile|writeFile|fetch|response\.text|Buffer\.from/i.test(code);
+  const hasEncoding = testCode(code, /utf-8|utf8|encoding|charset/i);
+  const handlesText = testCode(code, /readFile|writeFile|fetch|response\.text|Buffer\.from/i);
   // Suppress for directory / module-loader files — readdir, dynamic imports,
   // and require() are filesystem navigation, not text-content I/O.
   const isDirOrModuleLoader =

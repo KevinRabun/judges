@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeObservability(code: string, language: string): Finding[] {
@@ -62,7 +62,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
     /app\.(get|post|use)|router\.(get|post)|@app\.route|@GetMapping|@PostMapping|http\.HandleFunc|actix_web|rocket::get/i.test(
       code,
     );
-  const hasHealthCheck = /health|readiness|liveness|\/ready|\/live|\/healthz/i.test(code);
+  const hasHealthCheck = testCode(code, /health|readiness|liveness|\/ready|\/live|\/healthz/i);
   if (hasRoutes && !hasHealthCheck) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -106,8 +106,8 @@ export function analyzeObservability(code: string, language: string): Finding[] 
   }
 
   // Detect missing request/correlation ID
-  const hasMiddleware = /app\.use|middleware/i.test(code);
-  const hasCorrelation = /correlation|requestId|request-id|x-request-id|trace-id|traceId/i.test(code);
+  const hasMiddleware = testCode(code, /app\.use|middleware/i);
+  const hasCorrelation = testCode(code, /correlation|requestId|request-id|x-request-id|trace-id|traceId/i);
   if (hasMiddleware && !hasCorrelation && hasRoutes) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -232,7 +232,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       securityOpLines.push(i + 1);
     }
   });
-  const hasAuditLog = /audit|auditLog|audit_log/i.test(code);
+  const hasAuditLog = testCode(code, /audit|auditLog|audit_log/i);
   if (securityOpLines.length > 0 && !hasAuditLog) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

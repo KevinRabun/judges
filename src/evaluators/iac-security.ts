@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 /**
@@ -252,7 +252,7 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
   if (resourceLines.length === 0 && code.split("\n").length > 5) {
     // Only flag on files that are long enough to plausibly be IaC but define no resources
     // (skip very short files like variable files, module references, etc.)
-    const hasModuleOrVariable = /(?:variable\s+"|module\s+"|param\s+|var\s+\w+\s*=|"parameters"\s*:)/i.test(code);
+    const hasModuleOrVariable = testCode(code, /(?:variable\s+"|module\s+"|param\s+|var\s+\w+\s*=|"parameters"\s*:)/i);
     if (!hasModuleOrVariable) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -270,8 +270,8 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
 
   // ── IAC-012: Terraform-specific: no required_providers ────────────────
   if (lang === "terraform") {
-    const hasRequiredProviders = /required_providers\s*\{/i.test(code);
-    const hasProvider = /provider\s+"[^"]+"\s*\{/i.test(code);
+    const hasRequiredProviders = testCode(code, /required_providers\s*\{/i);
+    const hasProvider = testCode(code, /provider\s+"[^"]+"\s*\{/i);
     if (hasProvider && !hasRequiredProviders) {
       const providerLines = getLineNumbers(code, /provider\s+"[^"]+"\s*\{/i);
       findings.push({
@@ -293,8 +293,8 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
 
   // ── IAC-013: Terraform-specific: no backend configuration ─────────────
   if (lang === "terraform") {
-    const hasBackend = /backend\s+"[^"]+"\s*\{/i.test(code);
-    const hasTerraformBlock = /terraform\s*\{/i.test(code);
+    const hasBackend = testCode(code, /backend\s+"[^"]+"\s*\{/i);
+    const hasTerraformBlock = testCode(code, /terraform\s*\{/i);
     if (hasTerraformBlock && !hasBackend) {
       const terraformLines = getLineNumbers(code, /terraform\s*\{/i);
       findings.push({

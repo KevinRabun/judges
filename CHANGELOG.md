@@ -2,6 +2,22 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.19.0] — 2026-03-04
+
+### Added
+- **Strategy 1 — Comment-stripping before pattern matching** — New `testCode(code, pattern)` utility replaces raw `pattern.test(code)` calls across 31 evaluators (184 conversions). Strips `//`, `/* */`, `#`, and Python `"""`/`'''` docstrings before testing, so patterns mentioned only in comments no longer trigger false positives. String literals are preserved so import paths, require() arguments, and route strings remain matchable.
+- **Strategy 2 — Multi-line context windows** — New `getContextWindow(lines, lineNum, radius)` utility enables post-match filters to check adjacent lines. Applied to 5 high-value evaluators:
+  - **cloud-readiness** — Hardcoded host/port fallback (`??`, `||`, `getenv`) detected across ±2 lines
+  - **portability** — Same fallback pattern for localhost/IP addresses
+  - **data-security** — JWT `algorithms=` parameter detected on adjacent lines in multi-line Python calls
+  - **scalability** — `await` on blocking calls detected ±1 line
+  - **ai-code-safety** — Auth-check patterns detected ±2 lines from wildcard permissions
+- **Strategy 3 — Project-mode absence resolution** — New `scanProjectWideSecurityPatterns()` scans all project files for security patterns regardless of import relationships. `applyProjectWideAbsenceResolution()` reduces confidence of absence-based findings when the security category exists anywhere in the project (halved reduction vs direct-import). 5 new security categories added: health-check, graceful-shutdown, CORS, secrets-management, environment-config (total: 12).
+
+### Tests
+- 22 new tests covering all three FP reduction strategies (15 subsystem unit tests + 7 negative integration tests)
+- All 1,365 tests pass (963 judges + 193 negative + 209 subsystems)
+
 ## [3.18.3] — 2026-03-03
 
 ### Fixed

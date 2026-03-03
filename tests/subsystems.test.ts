@@ -32,6 +32,9 @@ import {
   applyConfig,
   detectFrameworks,
   applyFrameworkAwareness,
+  stripCommentsAndStrings,
+  testCode,
+  getContextWindow,
 } from "../src/evaluators/shared.js";
 import type { Finding, Severity } from "../src/types.js";
 
@@ -1808,5 +1811,125 @@ describe("False-Positive Heuristic Filter", () => {
       assert.strictEqual(filtered.length, 1, "Finding without line numbers should be kept");
       assert.strictEqual(removed.length, 0);
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Strategy 1 — stripCommentsAndStrings / testCode
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("stripCommentsAndStrings — JS single-line comments", () => {
+  it("should strip // comments but preserve code", () => {
+    const code = "const x = 1; // rateLimit enabled here";
+    const stripped = stripCommentsAndStrings(code);
+    assert.ok(!stripped.includes("rateLimit"), "Comment text should be stripped");
+    assert.ok(stripped.includes("const x = 1;"), "Code should be preserved");
+  });
+});
+
+describe("stripCommentsAndStrings — JS block comments", () => {
+  it("should strip /* */ comments", () => {
+    const code = "const x = 1; /* helmet() applied globally */";
+    const stripped = stripCommentsAndStrings(code);
+    assert.ok(!stripped.includes("helmet"), "Block comment text should be stripped");
+    assert.ok(stripped.includes("const x = 1;"), "Code should be preserved");
+  });
+});
+
+describe("stripCommentsAndStrings — Python hash comments", () => {
+  it("should strip # comments", () => {
+    const code = "x = 1  # csrf_token validated";
+    const stripped = stripCommentsAndStrings(code);
+    assert.ok(!stripped.includes("csrf_token"), "Hash comment text should be stripped");
+    assert.ok(stripped.includes("x = 1"), "Code should be preserved");
+  });
+});
+
+describe("stripCommentsAndStrings — Python docstrings", () => {
+  it('should strip triple-quoted """docstrings"""', () => {
+    const code = '"""rateLimit middleware applied"""\nimport flask';
+    const stripped = stripCommentsAndStrings(code);
+    assert.ok(!stripped.includes("rateLimit"), "Docstring text should be stripped");
+    assert.ok(stripped.includes("import flask"), "Code should be preserved");
+  });
+});
+
+describe("stripCommentsAndStrings — preserves string literals", () => {
+  it("should NOT strip content inside single/double quoted strings", () => {
+    const code = `const pkg = require('express');\nconst route = "/api/data";`;
+    const stripped = stripCommentsAndStrings(code);
+    assert.ok(stripped.includes("express"), "Single-quoted string content should be preserved");
+    assert.ok(stripped.includes("/api/data"), "Double-quoted string content should be preserved");
+  });
+
+  it("should NOT strip content inside template literals", () => {
+    const code = "const url = `http://localhost:3000`;";
+    const stripped = stripCommentsAndStrings(code);
+    assert.ok(stripped.includes("localhost:3000"), "Template literal content should be preserved");
+  });
+});
+
+describe("stripCommentsAndStrings — preserves line structure", () => {
+  it("should maintain the same number of lines", () => {
+    const code = "line1\n// comment\nline3\n/* block */\nline5";
+    const stripped = stripCommentsAndStrings(code);
+    assert.strictEqual(stripped.split("\n").length, code.split("\n").length, "Line count should match");
+  });
+});
+
+describe("testCode — ignores comments", () => {
+  it("should NOT match pattern only in comments", () => {
+    const code = "// rateLimit is applied\nconst x = 1;";
+    assert.strictEqual(testCode(code, /rateLimit/i), false, "Pattern in comment should not match");
+  });
+
+  it("should match pattern in executable code", () => {
+    const code = "const rl = rateLimit({ max: 100 });";
+    assert.strictEqual(testCode(code, /rateLimit/i), true, "Pattern in code should match");
+  });
+
+  it("should match pattern inside string literals", () => {
+    const code = `const dep = require('helmet');`;
+    assert.strictEqual(testCode(code, /helmet/i), true, "Pattern in string literal should match");
+  });
+
+  it("should NOT match pattern only in a Python docstring", () => {
+    const code = '"""\nThis module uses helmet for security.\n"""\nimport os';
+    assert.strictEqual(testCode(code, /helmet/i), false, "Pattern in docstring should not match");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Strategy 2 — getContextWindow
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("getContextWindow — basic behavior", () => {
+  const lines = ["line0", "line1", "line2", "line3", "line4", "line5", "line6"];
+
+  it("should return lines within ±radius of target (1-based)", () => {
+    // lineNum=4 (1-based) → index 3 → range [1..6] with radius 2
+    const ctx = getContextWindow(lines, 4, 2);
+    assert.ok(ctx.includes("line1"), "Should include line at index 1");
+    assert.ok(ctx.includes("line5"), "Should include line at index 5");
+    assert.ok(!ctx.includes("line6"), "Should NOT include line at index 6");
+  });
+
+  it("should clamp to start of array", () => {
+    const ctx = getContextWindow(lines, 1, 3);
+    assert.ok(ctx.includes("line0"), "Should include first line");
+    assert.ok(ctx.includes("line3"), "Should include line at index 3");
+  });
+
+  it("should clamp to end of array", () => {
+    const ctx = getContextWindow(lines, 7, 3);
+    assert.ok(ctx.includes("line6"), "Should include last line");
+    assert.ok(ctx.includes("line3"), "Should include line at index 3");
+  });
+
+  it("should default to radius 3", () => {
+    const ctx = getContextWindow(lines, 4);
+    // lineNum=4, radius=3 → indices [0..6] → all lines
+    assert.ok(ctx.includes("line0"), "Default radius 3: should include line0");
+    assert.ok(ctx.includes("line6"), "Default radius 3: should include line6");
   });
 });

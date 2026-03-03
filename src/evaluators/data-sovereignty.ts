@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { isCommentLine, isIaCTemplate } from "./shared.js";
+import { isCommentLine, isIaCTemplate, testCode } from "./shared.js";
 
 export function analyzeDataSovereignty(code: string, _language: string): Finding[] {
   const findings: Finding[] = [];
@@ -198,8 +198,8 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     });
   }
 
-  const geoRoutingSignals = /(country|locale|region|jurisdiction|tenantRegion|dataBoundary)/i.test(code);
-  const hasPolicyEnforcement = /(deny|reject|throw|forbidden|policyViolation|residencyViolation)/i.test(code);
+  const geoRoutingSignals = testCode(code, /(country|locale|region|jurisdiction|tenantRegion|dataBoundary)/i);
+  const hasPolicyEnforcement = testCode(code, /(deny|reject|throw|forbidden|policyViolation|residencyViolation)/i);
 
   // Skip jurisdiction enforcement for HTML/markup files — mentions of
   // "jurisdiction" or "region" in privacy text are legal disclosures, not code
@@ -298,13 +298,15 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     /(?:email|phone|ssn|social.?security|date.?of.?birth|address|first.?name|last.?name|national.?id|passport|driver.?license)/i.test(
       code,
     );
-  const hasGeoPartitioning =
-    /(?:partition|shard|region.*key|tenant.*region|geo.*route|data.*boundary|residency.*tag|region.*id)/i.test(code);
+  const hasGeoPartitioning = testCode(
+    code,
+    /(?:partition|shard|region.*key|tenant.*region|geo.*route|data.*boundary|residency.*tag|region.*id)/i,
+  );
   // Require concrete DB mutation evidence: ORM method calls (.save(), .create(), etc.)
   // or SQL DML keywords (INSERT INTO, UPDATE...SET, DELETE FROM) — not just generic words
   const dbOpsPattern =
     /(?:\.(?:save|create|insertOne|insertMany|updateOne|updateMany|deleteOne|deleteMany|bulkWrite|persist|upsert)\s*\(|(?:INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b|cursor\.execute|\.execute\s*\(\s*["'`](?:INSERT|UPDATE|DELETE))/i;
-  const hasDbOps = dbOpsPattern.test(code);
+  const hasDbOps = testCode(code, dbOpsPattern);
 
   if (hasPiiFields && hasDbOps && !hasGeoPartitioning && code.split("\n").length > 20) {
     // Collect line numbers where DB operations with PII occur
@@ -332,7 +334,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   }
 
   // Region configuration without server-side enforcement
-  const hasClientRegionConfig = /(?:region|location|zone)\s*[:=]\s*["'`][^"'`]+["'`]/i.test(code);
+  const hasClientRegionConfig = testCode(code, /(?:region|location|zone)\s*[:=]\s*["'`][^"'`]+["'`]/i);
   const hasServerValidation =
     /(?:validateRegion|checkRegion|regionGuard|verifyJurisdiction|enforceResidency|assertRegion|regionPolicy)/i.test(
       code,
@@ -419,9 +421,9 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   });
 
   const hasAiAbstraction =
-    /interface\s+\w*(?:AI|Model|LLM|Inference|Predict|Embedding|Completion)\w*/i.test(code) ||
-    /(?:adapter|provider|strategy).*(?:AI|Model|LLM)/i.test(code) ||
-    /(?:openai|ollama|huggingface|transformers|vllm|litellm|langchain)/i.test(code);
+    testCode(code, /interface\s+\w*(?:AI|Model|LLM|Inference|Predict|Embedding|Completion)\w*/i) ||
+    testCode(code, /(?:adapter|provider|strategy).*(?:AI|Model|LLM)/i) ||
+    testCode(code, /(?:openai|ollama|huggingface|transformers|vllm|litellm|langchain)/i);
 
   if (aiVendorLines.length > 0 && !hasAiAbstraction) {
     findings.push({
@@ -608,7 +610,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   // ═══════════════════════════════════════════════════════════════════════════
 
   if (findings.length === 0 && code.length > 0 && !iacTemplate) {
-    const hasDataHandling = /(user|customer|personal|profile|account|email|phone|pii|data)/i.test(code);
+    const hasDataHandling = testCode(code, /(user|customer|personal|profile|account|email|phone|pii|data)/i);
     if (hasDataHandling) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
