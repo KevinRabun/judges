@@ -11,13 +11,13 @@ An MCP (Model Context Protocol) server that provides a panel of **37 specialized
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![npm downloads](https://img.shields.io/npm/dw/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-1557-brightgreen)](https://github.com/KevinRabun/judges/actions)
+[![Tests](https://img.shields.io/badge/tests-1666-brightgreen)](https://github.com/KevinRabun/judges/actions)
 
 ---
 
 ## Why Judges?
 
-AI code generators (Copilot, Cursor, Claude, ChatGPT, etc.) write code fast — but they routinely produce **insecure defaults, missing auth, hardcoded secrets, and poor error handling**. Human reviewers catch some of this, but nobody reviews 35 dimensions consistently.
+AI code generators (Copilot, Cursor, Claude, ChatGPT, etc.) write code fast — but they routinely produce **insecure defaults, missing auth, hardcoded secrets, and poor error handling**. Human reviewers catch some of this, but nobody reviews 37 dimensions consistently.
 
 | | ESLint / Biome | SonarQube | Semgrep / CodeQL | **Judges** |
 |---|---|---|---|---|
@@ -656,6 +656,8 @@ const svg2 = generateBadgeSvg(75, "quality"); // custom label
 | **Agent Instructions** | Agent Instruction Markdown Quality & Safety | `AGENT-` | Instruction hierarchy, conflict detection, unsafe overrides, scope, validation, policy guidance |
 | **AI Code Safety** | AI-Generated Code Safety | `AICS-` | Prompt injection, insecure LLM output handling, debug defaults, missing validation, unsafe deserialization of AI responses |
 | **Framework Safety** | Framework-Specific Safety | `FW-` | React hooks ordering, Express middleware chains, Next.js SSR/SSG pitfalls, Angular/Vue lifecycle patterns, framework-specific anti-patterns |
+| **IaC Security** | Infrastructure as Code | `IAC-` | Terraform, Bicep, ARM template misconfigurations, hardcoded secrets, missing encryption, overly permissive network/IAM rules |
+| **False-Positive Review** | False Positive Detection & Finding Accuracy | `FPR-` | Meta-judge reviewing pattern-based findings for false positives: string literal context, comment/docstring matches, test scaffolding, IaC template gating |
 
 ---
 
@@ -711,7 +713,7 @@ When your AI coding assistant connects to multiple MCP servers, each one contrib
   │   Judges     │  │  CVE / │  │ Linter │
   │   Panel      │  │  SBOM  │  │ Server │
   │ ─────────────│  └────────┘  └────────┘
-  │ 33 Heuristic │   Vuln DB     Style &
+  │ 36 Heuristic │   Vuln DB     Style &
   │   judges     │   scanning    correctness
   │ + AST judge  │
   └──────────────┘
@@ -934,7 +936,7 @@ Analyze a dependency manifest file for supply-chain risks, version pinning issue
 
 #### Judge IDs
 
-`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure` · `agent-instructions` · `ai-code-safety` · `framework-safety`
+`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure` · `agent-instructions` · `ai-code-safety` · `framework-safety` · `iac-security` · `false-positive-review`
 
 ---
 
@@ -979,6 +981,8 @@ Each judge has a corresponding prompt for LLM-powered deep analysis:
 | `judge-agent-instructions` | Deep review of agent instruction markdown quality and safety |
 | `judge-ai-code-safety` | Deep review of AI-generated code risks: prompt injection, insecure LLM output handling, debug defaults, missing validation |
 | `judge-framework-safety` | Deep review of framework-specific safety: React hooks, Express middleware, Next.js SSR/SSG, Angular/Vue patterns |
+| `judge-iac-security` | Deep review of infrastructure-as-code security: Terraform, Bicep, ARM template misconfigurations |
+| `judge-false-positive-review` | Meta-judge review of pattern-based findings for false positive detection and accuracy |
 | `full-tribunal` | All 37 judges in a single prompt |
 
 ---
@@ -1111,23 +1115,37 @@ The **overall tribunal score** is the average of all 37 judges. The overall verd
 judges/
 ├── src/
 │   ├── index.ts              # MCP server entry point — tools, prompts, transport
+│   ├── api.ts                # Programmatic API entry point
+│   ├── cli.ts                # CLI argument parser and command router
 │   ├── types.ts              # TypeScript interfaces (Finding, JudgeEvaluation, etc.)
 │   ├── config.ts             # .judgesrc configuration parser and validation
+│   ├── errors.ts             # Custom error types (ConfigError, EvaluationError, ParseError)
 │   ├── language-patterns.ts  # Multi-language regex pattern constants and helpers
+│   ├── plugins.ts            # Plugin system for custom rules
+│   ├── scoring.ts            # Confidence scoring and calibration
+│   ├── dedup.ts              # Finding deduplication engine
+│   ├── fingerprint.ts        # Finding fingerprint generation
+│   ├── comparison.ts         # Tool comparison benchmark data
+│   ├── cache.ts              # Evaluation result caching
+│   ├── calibration.ts        # Confidence calibration from feedback data
+│   ├── fix-history.ts        # Auto-fix application history tracking
 │   ├── ast/                  # AST analysis engine (built-in, no external deps)
 │   │   ├── index.ts          # analyzeStructure() — routes to correct parser
 │   │   ├── types.ts          # FunctionInfo, CodeStructure interfaces
 │   │   ├── tree-sitter-ast.ts    # Tree-sitter WASM parser (all 8 languages)
-│   │   └── structural-parser.ts  # Fallback scope-tracking parser
+│   │   ├── structural-parser.ts  # Fallback scope-tracking parser
+│   │   ├── cross-file-taint.ts   # Cross-file taint propagation analysis
+│   │   └── taint-tracker.ts      # Single-file taint flow tracking
 │   ├── evaluators/           # Analysis engine for each judge
 │   │   ├── index.ts          # evaluateWithJudge(), evaluateWithTribunal(), evaluateProject(), etc.
 │   │   ├── shared.ts         # Scoring, verdict logic, markdown formatters
-│   │   └── *.ts              # One analyzer per judge (35 files)
+│   │   └── *.ts              # One analyzer per judge (37 files)
 │   ├── formatters/           # Output formatters
 │   │   ├── sarif.ts              # SARIF 2.1.0 output
 │   │   ├── html.ts               # Self-contained HTML report (dark/light theme, filters)
 │   │   ├── junit.ts              # JUnit XML output (Jenkins, Azure DevOps, GitHub Actions)
 │   │   ├── codeclimate.ts        # CodeClimate/GitLab Code Quality JSON
+│   │   ├── diagnostics.ts        # Diagnostics formatter
 │   │   └── badge.ts              # SVG and text badge generator
 │   ├── commands/             # CLI subcommands
 │   │   ├── init.ts               # Interactive project setup wizard
@@ -1140,21 +1158,40 @@ judges/
 │   │   ├── deps.ts               # Dependency supply-chain analysis
 │   │   ├── baseline.ts           # Create baseline for finding suppression
 │   │   ├── completions.ts        # Shell completions (bash/zsh/fish/PowerShell)
-│   │   └── docs.ts               # Per-judge rule documentation generator
+│   │   ├── docs.ts               # Per-judge rule documentation generator
+│   │   ├── feedback.ts           # False-positive tracking & finding feedback
+│   │   ├── benchmark.ts          # Detection accuracy benchmark suite
+│   │   ├── rule.ts               # Custom rule authoring wizard
+│   │   ├── language-packs.ts     # Language-specific rule pack presets
+│   │   └── config-share.ts       # Shareable team/org configuration
 │   ├── presets.ts            # Named evaluation presets (strict, lenient, security-only, …)
+│   ├── patches/
+│   │   └── index.ts              # 53 deterministic auto-fix patch rules
+│   ├── tools/                # MCP tool registrations
+│   │   ├── register.ts           # Tool registration orchestrator
+│   │   ├── register-evaluation.ts    # Evaluation tools (evaluate_code, etc.)
+│   │   ├── register-workflow.ts      # Workflow tools (app builder, reports, etc.)
+│   │   ├── prompts.ts            # MCP prompt registrations (per-judge + full-tribunal)
+│   │   └── schemas.ts            # Zod schemas for tool parameters
 │   ├── reports/
 │   │   └── public-repo-report.ts   # Public repo clone + full tribunal report generation
 │   └── judges/               # Judge definitions (id, name, domain, system prompt)
 │       ├── index.ts          # JUDGES array, getJudge(), getJudgeSummaries()
-│       └── *.ts              # One definition per judge (35 files)
+│       └── *.ts              # One definition per judge (37 files)
 ├── scripts/
 │   ├── generate-public-repo-report.ts  # Run: npm run report:public-repo -- --repoUrl <url>
-│   └── daily-popular-repo-autofix.ts   # Run: npm run automation:daily-popular
+│   ├── daily-popular-repo-autofix.ts   # Run: npm run automation:daily-popular
+│   └── debug-fp.ts                     # Debug false-positive findings
 ├── examples/
 │   ├── sample-vulnerable-api.ts  # Intentionally flawed code (triggers all judges)
-│   └── demo.ts                   # Run: npm run demo
+│   ├── demo.ts                   # Run: npm run demo
+│   └── quickstart.ts             # Quick-start evaluation example
 ├── tests/
-│   └── judges.test.ts            # Run: npm test
+│   ├── judges.test.ts            # Core judge evaluation tests
+│   ├── negative.test.ts          # Negative / FP-avoidance tests
+│   ├── subsystems.test.ts        # Subsystem integration tests
+│   ├── extension-logic.test.ts   # VS Code extension logic tests
+│   └── tool-routing.test.ts      # MCP tool routing tests
 ├── grammars/                 # Tree-sitter WASM grammar files
 │   ├── tree-sitter-typescript.wasm
 │   ├── tree-sitter-cpp.wasm
@@ -1196,6 +1233,16 @@ judges/
 | `judges ci-templates` | Generate CI pipeline templates |
 | `judges docs` | Generate per-judge rule documentation |
 | `judges completions <shell>` | Shell completion scripts |
+| `judges feedback submit` | Mark findings as true positive, false positive, or won't fix |
+| `judges feedback stats` | Show false-positive rate statistics |
+| `judges benchmark run` | Run detection accuracy benchmark suite |
+| `judges rule create` | Interactive custom rule creation wizard |
+| `judges rule list` | List custom evaluation rules |
+| `judges pack list` | List available language packs |
+| `judges config export` | Export config as shareable package |
+| `judges config import <src>` | Import a shared configuration |
+| `judges compare` | Compare judges against other code review tools |
+| `judges list` | List all 37 judges with domains and descriptions |
 
 ---
 
@@ -1269,6 +1316,10 @@ const sarif = findingsToSarif(verdict.evaluations.flatMap(e => e.findings));
 | `@kevinrabun/judges/junit` | JUnit XML formatter |
 | `@kevinrabun/judges/codeclimate` | CodeClimate/GitLab Code Quality JSON |
 | `@kevinrabun/judges/badge` | SVG and text badge generator |
+| `@kevinrabun/judges/diagnostics` | Diagnostics formatter |
+| `@kevinrabun/judges/plugins` | Plugin system API |
+| `@kevinrabun/judges/fingerprint` | Finding fingerprint utilities |
+| `@kevinrabun/judges/comparison` | Tool comparison benchmarks |
 
 ### SARIF Output
 

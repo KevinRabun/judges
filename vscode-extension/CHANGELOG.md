@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.13] — 2026-03-04
+
+### Fixed
+- **Documentation accuracy** — Replaced 3 hardcoded GPT-4o model references with vendor-neutral phrasing, fixed "right-click a file" → "right-click in the editor", updated auto-fix patch count (47+ → 53); root README updated with correct judge counts, missing exports, expanded project structure; see [core CHANGELOG](../CHANGELOG.md) for full details
+
+### Tests
+- 1666 tests, 0 failures
+
 ## [3.20.12] — 2026-03-03
 
 ### Changed

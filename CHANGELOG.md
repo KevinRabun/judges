@@ -2,6 +2,23 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.13] — 2026-03-04
+
+### Fixed
+- **Documentation accuracy audit** — Comprehensive review and correction of all documentation claims against the actual codebase:
+  - Updated test badge count (1557 → 1666)
+  - Updated judge dimension counts throughout (35 → 37) and architecture diagram heuristic count (33 → 36)
+  - Added missing judges (`iac-security`, `false-positive-review`) to Judge IDs list, Judge Panel table, and MCP Prompts table
+  - Updated evaluator and judge file counts (35 → 37)
+  - Added 4 missing package exports to exports table (`./diagnostics`, `./plugins`, `./fingerprint`, `./comparison`)
+  - Added 10 missing CLI commands to Scripts table (`feedback`, `benchmark`, `rule`, `pack`, `config`, `compare`, `list`)
+  - Expanded project structure with ~20 missing files and directories (AST files, formatters, patches, tools, tests, scripts)
+  - Fixed incorrect script filename (`analyze-report-findings.ts` → `debug-fp.ts`)
+- **VS Code extension README** — Replaced 3 hardcoded GPT-4o model references with vendor-neutral phrasing ("available language model" / "AI contextual review"), fixed "right-click a file" → "right-click in the editor", updated auto-fix patch count (47+ → 53)
+
+### Tests
+- 1666 tests, 0 failures
+
 ## [3.20.12] — 2026-03-03
 
 ### Changed

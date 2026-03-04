@@ -14,7 +14,7 @@ Install one extension. Get **37 specialized judges** reviewing every file you sa
 - **Status bar** — one-click evaluation from the status bar shield icon
 - **Configurable** — choose presets, severity filters, and specific judges
 - **Combined deep review** — `/deepreview` runs Layer 1 (instant pattern analysis) and Layer 2 (LLM contextual review) in a single action, streaming results directly in chat or opening a markdown report
-- **AI-powered false-positive refinement** — right-click a file and select "Refine Findings with AI" to use GPT-4o to review pattern-matched findings and filter out false positives
+- **AI-powered false-positive refinement** — right-click in the editor and select "Refine Findings with AI" to use the available language model to review pattern-matched findings and filter out false positives
 
 ## Chat Participant — `@judges`
 
@@ -48,8 +48,8 @@ TypeScript, JavaScript, Python, Go, Rust, Java, C#, C++
 | `Judges: Evaluate Workspace` | Evaluate all supported files in the workspace |
 | `Judges: Clear Diagnostics` | Remove all Judges diagnostics |
 | `Judges: Show Results Panel` | Open the Judges results view |
-| `Judges: Refine Findings with AI` | Use GPT-4o to review findings and filter out false positives |
-| `Judges: Deep Review (Layer 1 + Layer 2)` | Run all 37 evaluators then GPT-4o contextual review — opens report as markdown tab |
+| `Judges: Refine Findings with AI` | Use the available language model to review findings and filter out false positives |
+| `Judges: Deep Review (Layer 1 + Layer 2)` | Run all 37 evaluators then AI contextual review — opens report as markdown tab |
 | `Judges: Configure MCP Server` | Write MCP server definition to `.vscode/mcp.json` (manual alternative to auto-config) |
 
 ## Configuration
@@ -101,7 +101,7 @@ Runs **locally in the extension host** — no network calls, no API keys, instan
 
 - **Pattern matching** against 400+ security, quality, and compliance rules
 - **AST analysis** via tree-sitter WASM for 8 languages
-- **Auto-fix patches** for 47+ common issues
+- **Auto-fix patches** for 53 common issues
 
 ### Layer 2 — LLM-Powered Deep Review (enabled automatically)
 
