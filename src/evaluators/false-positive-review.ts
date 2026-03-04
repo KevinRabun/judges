@@ -157,6 +157,20 @@ const KEYWORD_IDENTIFIER_PATTERNS: Array<{
     trigger: /\bglobal\b.*\bstate\b|\bstate\b.*\bglobal\b/i,
     identifierContext: /^\s*global\s+\w+/,
   },
+  {
+    // "key" in apiKeyHeader, primaryKey, foreignKey, keyName, keyPath, key_vault
+    // Note: api/encryption/signing/public/private prefixes require a suffix after "key"
+    // (e.g. apiKeyHeader ✓, apiKey ✗) because "apiKey" alone often holds an actual key value.
+    trigger: /\bkey\b/i,
+    identifierContext:
+      /(?:primary|foreign|partition|sort|composite|cache)\s*[-_]?\s*key|(?:api|encryption|signing|public|private)\s*[-_]?\s*key\w+|key\s*[-_]?\s*(?:name|path|id|vault|ring|store|pair|size|length|spec|ref|alias|header|prefix|column|field|index)|\bkey[_-]vault\b|\bKeyVault\b/i,
+  },
+  {
+    // "hash" in fileHash, contentHash, checksumHash, hashCode — non-crypto contexts
+    trigger: /\bhash\b/i,
+    identifierContext:
+      /(?:file|content|checksum|etag|commit|git|fingerprint|bucket|consistent)\s*[-_]?\s*hash|hash\s*[-_]?\s*(?:code|map|set|table|ring|key|value|function|sum|digest|string|name|id)|\bhashCode\b|\bhashMap\b|\bhashSet\b|\bgetHash\b|\bcomputeHash\b/i,
+  },
 ];
 
 /**
@@ -169,6 +183,8 @@ const SAFE_IDIOM_PATTERNS: Array<{
   findingPattern: RegExp;
   /** Regex matching the source line proving it's a safe idiom */
   safeContext: RegExp;
+  /** Optional: if this matches the finding title/ruleId, do NOT apply this safe idiom */
+  excludePattern?: RegExp;
 }> = [
   {
     // dict.get() flagged as HTTP fetch
@@ -201,6 +217,19 @@ const SAFE_IDIOM_PATTERNS: Array<{
     findingPattern: /suppress|type.*ignore|noqa|lint.*disabl|SWDEV-001|CICD-003/i,
     safeContext:
       /(?:#\s*type:\s*ignore|#\s*noqa|(?:\/\/|#)\s*eslint-disable).*(?:--|—|because|reason|\bfor\b|\bdue\b|\bruntyped\b|\bstubs\b|\bno\s+stubs)/i,
+  },
+  {
+    // logger.error / log.warn / console.error containing security keywords in the message string
+    // Exclude findings that are specifically ABOUT credential logging (LOGPRIV, LOG-*)
+    findingPattern: /password|secret|token|credential|hardcoded/i,
+    safeContext: /(?:logger|log|console|logging)\s*\.\s*(?:error|warn|warning|info|debug|critical|fatal)\s*\(/i,
+    excludePattern: /\blog(?:ged|ging|s|file)?\b|LOGPRIV|^LOG-/i,
+  },
+  {
+    // HTTP routing method app.delete() / router.delete() — "delete" is an HTTP verb, not data destruction
+    findingPattern: /\bdelete\b.*(?:data|destruct|unprotect|unauthori)|dangerous.*delete/i,
+    safeContext:
+      /(?:app|router|server|express|fastify|hapi|koa)\s*\.\s*delete\s*\(\s*["'`\/]|@(?:app|router)\s*\.\s*delete\s*\(/i,
   },
 ];
 
@@ -338,8 +367,12 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
 
   // ── 7. Safe standard-library idiom ──
   if (finding.lineNumbers && finding.lineNumbers.length > 0) {
-    for (const { findingPattern, safeContext } of SAFE_IDIOM_PATTERNS) {
+    for (const { findingPattern, safeContext, excludePattern } of SAFE_IDIOM_PATTERNS) {
       if (findingPattern.test(finding.title) || findingPattern.test(finding.ruleId)) {
+        // Skip safe-idiom suppression when the finding is about the very thing we'd suppress
+        if (excludePattern && (excludePattern.test(finding.title) || excludePattern.test(finding.ruleId))) {
+          continue;
+        }
         const hasSafeCtx = finding.lineNumbers.some((ln) => {
           const line = lines[ln - 1];
           return line !== undefined && safeContext.test(line);
@@ -503,6 +536,99 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     );
     if (isCacheAgeContext && noUserAgeContext) {
       return "Term 'age' appears in cache/TTL context (data freshness), not user age verification.";
+    }
+  }
+
+  // ── 18. Barrel / re-export files suppress absence-based findings ──
+  // Index files (index.ts, __init__.py, mod.rs) that primarily re-export
+  // other modules trigger absence-based findings like "missing error handling"
+  // or "missing validation" despite having no logic to validate.
+  if (finding.isAbsenceBased) {
+    const totalLines = lines.length;
+    const reExportLines = lines.filter((l) => {
+      const t = l.trim();
+      return (
+        /^export\s+\{/.test(t) ||
+        /^export\s+\*\s+from\s/.test(t) ||
+        /^export\s+(?:default\s+)?(?:type\s+)?\w+\s+from\s/.test(t) ||
+        /^from\s+\S+\s+import\s/.test(t) ||
+        /^import\s/.test(t) ||
+        /^__all__\s*=/.test(t) ||
+        /^pub\s+(?:mod|use)\s/.test(t) ||
+        t.length === 0 ||
+        /^\s*(?:\/\/|\/\*|\*|#|$)/.test(t)
+      );
+    }).length;
+    if (totalLines > 0 && reExportLines / totalLines >= 0.8) {
+      return "File is primarily re-exports/barrel — absence-based rules do not apply to aggregation modules.";
+    }
+  }
+
+  // ── 19. Decorator/annotation security presence suppresses AUTH absence findings ──
+  // If the file contains authentication/authorization decorators or annotations,
+  // absence-based AUTH- findings claiming "missing authentication" are FPs —
+  // the auth IS present via the decorator.
+  if (/^AUTH-/.test(finding.ruleId) && finding.isAbsenceBased) {
+    const fullCode = lines.join("\n");
+    const hasSecurityDecorator =
+      /@login_required|@requires_auth|@authenticated|@auth_required|@require_login|@jwt_required|\[Authorize\]|\[AllowAnonymous\]|@PreAuthorize|@Secured|@RolesAllowed|@PermitAll|@RequiresPermissions|@RequiresRoles|@Protected\b/i.test(
+        fullCode,
+      );
+    if (hasSecurityDecorator) {
+      return "Authentication decorator/annotation is present — auth is enforced via framework mechanism.";
+    }
+  }
+
+  // ── 20. Enum / union type definitions suppress keyword collision findings ──
+  // Enum values like `Action.DELETE`, `Method.POST`, or union types like
+  // `type Method = "GET" | "DELETE"` contain security keywords as inert values.
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const allEnumOrUnion = finding.lineNumbers.every((ln) => {
+      const line = lines[ln - 1];
+      if (!line) return false;
+      const trimmed = line.trim();
+      return (
+        /^\s*(?:export\s+)?enum\s+\w+/.test(trimmed) ||
+        /^\s*\w+\s*=\s*["']\w+["']\s*,?\s*(?:\/\/.*)?$/.test(trimmed) ||
+        /^\s*(?:export\s+)?type\s+\w+\s*=\s*(?:["'].*["']\s*\|?\s*)+/.test(trimmed) ||
+        /^\s*\|\s*["']/.test(trimmed)
+      );
+    });
+    if (allEnumOrUnion) {
+      const titleAndDesc = `${finding.title} ${finding.description}`;
+      const hasSecurityKeyword =
+        /\bdelete\b|\bexec\b|\bpassword\b|\bsecret\b|\btoken\b|\bdrop\b|\bkill\b|\broot\b|\badmin\b/i.test(
+          titleAndDesc,
+        );
+      if (hasSecurityKeyword) {
+        return "Security keyword appears in an enum/union type definition — inert value, not a dangerous operation.";
+      }
+    }
+  }
+
+  // ── 21. Log/error message strings with security keywords are informational ──
+  // Findings triggered by keywords like "password", "token", "secret" inside
+  // logging statements (logger.error("Failed to validate password")) are FPs —
+  // the log describes the operation, it doesn't leak the actual credential.
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const titleAndDesc = `${finding.title} ${finding.description}`;
+    const hasCredentialKeyword = /\bpassword\b|\bsecret\b|\btoken\b|\bcredential\b/i.test(titleAndDesc);
+    if (hasCredentialKeyword) {
+      // Don't suppress findings that are specifically ABOUT credential logging —
+      // those findings flag the log line itself as the problem (e.g. LOGPRIV-001).
+      const isAboutLogging = /\blog(?:ged|ging|s|file)?\b/i.test(titleAndDesc) || /^LOG|LOGPRIV/i.test(finding.ruleId);
+      if (!isAboutLogging) {
+        const allLogLines = finding.lineNumbers.every((ln) => {
+          const line = lines[ln - 1];
+          if (!line) return false;
+          return /(?:logger|log|console|logging)\s*\.\s*(?:error|warn|warning|info|debug|critical|fatal|log)\s*\(/i.test(
+            line,
+          );
+        });
+        if (allLogLines) {
+          return "Security keyword appears inside a logging statement — describes the operation, not a credential leak.";
+        }
+      }
     }
   }
 

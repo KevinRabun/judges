@@ -2,6 +2,21 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.6] — 2026-03-03
+
+### Fixed
+- **False positive reduction — 4 new heuristics (H18–H21) + 4 new pattern entries** — Proactive FP analysis adding heuristics and extending pattern arrays to reduce false positives across common code idioms:
+  - **H18**: Barrel/re-export file suppression — absence-based findings (ERR-001, OBS-001, etc.) suppressed on files where ≥80% of lines are re-exports, imports, comments, or blanks (index.ts, \_\_init\_\_.py, mod.rs barrel files)
+  - **H19**: Decorator/annotation security presence — AUTH absence findings suppressed when the file contains authentication decorators (`@login_required`, `[Authorize]`, `@PreAuthorize`, `@Secured`, `@RolesAllowed`, etc.)
+  - **H20**: Enum/union type definitions — keyword collision findings suppressed when all flagged lines are enum values or union type members containing security keywords as inert values (`Action.DELETE`, `type Method = "GET" | "DELETE"`)
+  - **H21**: Log/error message security keywords — findings triggered by `password`/`secret`/`token`/`credential` suppressed when all flagged lines are logging calls (`logger.error(...)`, `console.warn(...)`) describing the operation rather than leaking credentials; excludes LOGPRIV/LOG-* findings that flag the logging itself as the problem
+  - **Extended KEYWORD_IDENTIFIER_PATTERNS**: Added `key` pattern (matches `apiKeyHeader`, `primaryKey`, `foreignKey`, `keyVaultUrl` but NOT `apiKey` alone) and `hash` pattern (matches `contentHash`, `fileHash`, `checksumHash`, `hashCode`, `hashMap` — non-crypto contexts)
+  - **Extended SAFE_IDIOM_PATTERNS**: Added log/error message suppression for security keywords in logging calls (with LOGPRIV exclusion) and HTTP routing `app.delete()`/`router.delete()` suppression for data-deletion findings
+
+### Tests
+- 32 new tests covering all new heuristics and pattern entries: key/hash identifier collision (4), log/error message idiom (4), HTTP routing delete (3), barrel/re-export files (3), decorator security presence (4), enum/union type (4), log message keyword suppression (4), TP confidence edge cases (6)
+- 1606 tests, 0 failures
+
 ## [3.20.5] — 2026-03-03
 
 ### Fixed
