@@ -3743,6 +3743,239 @@ describe("False-Positive Heuristic Filter", () => {
     });
   });
 
+  // ── Bicep/IaC false-positive heuristics (H28–H32) ──
+  describe("IaC/Bicep-specific FP heuristics", () => {
+    const bicepCode = [
+      `@description('Virtual network for GDPR-compliant workloads')`,
+      `param location string`,
+      `param vnetName string`,
+      `param enableDdosProtection bool = false`,
+      `param logAnalyticsWorkspaceId string`,
+      ``,
+      `resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {`,
+      `  name: vnetName`,
+      `  location: location`,
+      `  properties: {`,
+      `    addressSpace: {`,
+      `      addressPrefixes: ['10.0.0.0/16']`,
+      `    }`,
+      `    subnets: [`,
+      `      {`,
+      `        name: 'app-subnet'`,
+      `        properties: {`,
+      `          addressPrefix: '10.0.1.0/24'`,
+      `        }`,
+      `      }`,
+      `      {`,
+      `        name: 'data-subnet'`,
+      `        properties: {`,
+      `          addressPrefix: '10.0.2.0/24'`,
+      `        }`,
+      `      }`,
+      `    ]`,
+      `  }`,
+      `}`,
+      ``,
+      `// Bastion NSG — requires HTTPS from Internet per Microsoft docs`,
+      `// Compensating control: AAD Conditional Access on Bastion sessions`,
+      `resource nsgBastion 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {`,
+      `  name: 'nsg-bastion'`,
+      `  location: location`,
+      `  properties: {`,
+      `    securityRules: [`,
+      `      {`,
+      `        name: 'AllowHttpsInbound'`,
+      `        properties: {`,
+      `          priority: 100`,
+      `          direction: 'Inbound'`,
+      `          access: 'Allow'`,
+      `          protocol: 'Tcp'`,
+      `          sourceAddressPrefix: 'Internet'`,
+      `          destinationPortRange: '443'`,
+      `        }`,
+      `      }`,
+      `      {`,
+      `        name: 'DenyAllOutbound'`,
+      `        properties: {`,
+      `          priority: 4096`,
+      `          direction: 'Outbound'`,
+      `          access: 'Deny'`,
+      `          protocol: '*'`,
+      `          sourceAddressPrefix: '*'`,
+      `          destinationPortRange: '*'`,
+      `        }`,
+      `      }`,
+      `    ]`,
+      `  }`,
+      `}`,
+      ``,
+      `output appSubnetId string = vnet.properties.subnets[0].id`,
+      `output dataSubnetId string = vnet.properties.subnets[1].id`,
+    ].join("\n");
+
+    // H28: REL null-check findings on IaC
+    it("should suppress REL-001 null-check finding on Bicep inline property access", () => {
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "REL-001",
+          title: "Deep property access without null checks (vnet.properties.subnets[n].id)",
+          description: "Property chain may be undefined at runtime",
+          lineNumbers: [64],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, bicepCode, "bicep");
+      assert.strictEqual(removed.length, 1, "REL-001 null-check on Bicep should be suppressed");
+      assert.ok(removed[0].description.includes("deploy time"), "Should mention deploy-time resolution");
+    });
+
+    it("should NOT suppress REL-001 on non-IaC code", () => {
+      const tsCode = `const x = obj.deeply.nested.prop;\nconsole.log(x);`;
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "REL-001",
+          title: "Deep property access without null checks",
+          description: "Property chain may be undefined",
+          lineNumbers: [1],
+        },
+      ];
+      const { filtered } = filterFalsePositiveHeuristics(findings, tsCode, "typescript");
+      assert.strictEqual(filtered.length, 1, "REL-001 on non-IaC should be kept");
+    });
+
+    // H29: MAINT magic-number findings on IaC
+    it("should suppress MAINT-001 magic-number finding on Bicep NSG priorities", () => {
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "MAINT-001",
+          title: "Magic numbers detected (NSG priorities 100, 110, 4096; retention 365)",
+          description: "Extract numeric literals to named constants",
+          lineNumbers: [43, 55],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, bicepCode, "bicep");
+      assert.strictEqual(removed.length, 1, "MAINT-001 magic numbers on IaC should be suppressed");
+      assert.ok(removed[0].description.includes("domain conventions"), "Should mention domain conventions");
+    });
+
+    // H30: MAINT deep-nesting findings on IaC
+    it("should suppress MAINT-002 deep-nesting finding on Bicep schema-mandated depth", () => {
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "MAINT-002",
+          title: "Deeply nested code detected (4+ levels)",
+          description: "Reduce nesting depth for readability",
+          lineNumbers: [18],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, bicepCode, "bicep");
+      assert.strictEqual(removed.length, 1, "MAINT-002 deep nesting on IaC should be suppressed");
+      assert.ok(removed[0].description.includes("resource schema"), "Should mention schema-mandated nesting");
+    });
+
+    // H31: MAINT duplicate-string findings on IaC
+    it("should suppress MAINT-003 duplicate-string finding on Bicep ARM enum values", () => {
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "MAINT-003",
+          title: "Duplicate string literals — extract to constants",
+          description: "Strings 'Tcp', 'Inbound', 'Allow' appear multiple times",
+          lineNumbers: [44, 46, 56],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, bicepCode, "bicep");
+      assert.strictEqual(removed.length, 1, "MAINT-003 duplicate strings on IaC should be suppressed");
+      assert.ok(removed[0].description.includes("schema-constrained"), "Should mention schema constraints");
+    });
+
+    // H32: IAC Bastion HTTPS from Internet with compensating controls
+    it("should suppress IAC-004 Bastion HTTPS finding when compensating controls documented", () => {
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "IAC-004",
+          title: "Bastion NSG allows HTTPS from entire Internet",
+          description: "Unrestricted inbound HTTPS access",
+          lineNumbers: [41],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, bicepCode, "bicep");
+      assert.strictEqual(removed.length, 1, "IAC-004 Bastion HTTPS with compensating controls should be suppressed");
+      assert.ok(removed[0].description.includes("Microsoft documentation"), "Should reference Microsoft docs");
+    });
+
+    it("should NOT suppress IAC-004 Bastion finding without compensating controls", () => {
+      // Strip the compensating control comment
+      const codeNoControls = bicepCode.replace(
+        "// Compensating control: AAD Conditional Access on Bastion sessions",
+        "// Standard bastion deployment",
+      );
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "IAC-004",
+          title: "Bastion NSG allows HTTPS from entire Internet",
+          description: "Unrestricted inbound HTTPS access",
+          lineNumbers: [41],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, codeNoControls, "bicep");
+      assert.strictEqual(filtered.length, 1, "IAC-004 without compensating controls should be kept");
+      assert.strictEqual(removed.length, 0);
+    });
+
+    it("should NOT suppress MAINT magic-number finding on non-IaC TypeScript", () => {
+      const tsCode = `const TIMEOUT = 100;\nconst RETRIES = 4096;\nexport { TIMEOUT, RETRIES };`;
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "MAINT-001",
+          title: "Magic numbers detected",
+          description: "Extract numeric literals to named constants",
+          lineNumbers: [1, 2],
+        },
+      ];
+      const { filtered } = filterFalsePositiveHeuristics(findings, tsCode, "typescript");
+      assert.strictEqual(filtered.length, 1, "MAINT-001 on non-IaC should be kept");
+    });
+
+    // Terraform IaC should also benefit from the same heuristics
+    it("should suppress MAINT-002 deep-nesting finding on Terraform", () => {
+      const tfCode = [
+        `resource "azurerm_network_security_group" "bastion" {`,
+        `  name                = "nsg-bastion"`,
+        `  location            = var.location`,
+        `  resource_group_name = var.resource_group_name`,
+        ``,
+        `  security_rule {`,
+        `    name                       = "AllowHttpsInbound"`,
+        `    priority                   = 100`,
+        `    direction                  = "Inbound"`,
+        `    access                     = "Allow"`,
+        `    protocol                   = "Tcp"`,
+        `    source_address_prefix      = "Internet"`,
+        `    destination_port_range     = "443"`,
+        `  }`,
+        `}`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "MAINT-002",
+          title: "Deeply nested code detected (3+ levels)",
+          description: "Reduce nesting for readability",
+          lineNumbers: [7],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, tfCode, "terraform");
+      assert.strictEqual(removed.length, 1, "MAINT-002 deep nesting on Terraform should be suppressed");
+    });
+  });
+
   // ── New: Additional edge-case negative tests for TP confidence ──
   describe("TP confidence — edge cases that should NOT be suppressed", () => {
     it("should keep CYBER finding even when code has imports (mixed lines)", () => {

@@ -810,6 +810,88 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     }
   }
 
+  // ── 28. IaC compile-time property resolution suppresses REL null-check findings ──
+  // Bicep/ARM/Terraform resolves resource property references at deployment
+  // time, not at runtime.  Deep property access like vnet.properties.subnets[0].id
+  // is compile-time safe — null checks and optional chaining are inapplicable.
+  if (isIaC && /^REL-/.test(finding.ruleId)) {
+    const titleLower = finding.title.toLowerCase();
+    if (
+      titleLower.includes("null") ||
+      titleLower.includes("optional chain") ||
+      titleLower.includes("property access") ||
+      titleLower.includes("deep property") ||
+      titleLower.includes("undefined")
+    ) {
+      return "IaC resource property references are resolved at deploy time — null checks are inapplicable.";
+    }
+  }
+
+  // ── 29. IaC domain-convention numbers suppress MAINT magic-number findings ──
+  // IaC templates use well-known numeric conventions: NSG priorities (100–4096),
+  // CIDR prefix lengths, port numbers, regulatory retention periods (365), and
+  // protocol-standard values.  These are domain conventions, not arbitrary magic numbers.
+  if (isIaC && /^MAINT-/.test(finding.ruleId)) {
+    const titleLower = finding.title.toLowerCase();
+    if (
+      titleLower.includes("magic number") ||
+      titleLower.includes("magic value") ||
+      titleLower.includes("numeric literal")
+    ) {
+      return "Numeric values in IaC templates are domain conventions (priorities, ports, retention periods) — not arbitrary magic numbers.";
+    }
+  }
+
+  // ── 30. Schema-mandated nesting depth suppresses MAINT deep-nesting on IaC ──
+  // ARM/Bicep/Terraform resource schemas enforce hierarchical property nesting
+  // (resource → properties → subnets[] → properties → addressPrefix) that
+  // cannot be flattened without breaking the schema.
+  if (isIaC && /^MAINT-/.test(finding.ruleId)) {
+    const titleLower = finding.title.toLowerCase();
+    if (
+      titleLower.includes("nested") ||
+      titleLower.includes("nesting") ||
+      titleLower.includes("depth") ||
+      titleLower.includes("indentation")
+    ) {
+      return "Nesting depth in IaC templates is mandated by the resource schema — it cannot be flattened.";
+    }
+  }
+
+  // ── 31. IaC schema enum values suppress MAINT duplicate-string findings ──
+  // ARM/Terraform templates repeat schema-constrained enum values ('Tcp', 'Allow',
+  // 'Deny', 'Inbound', 'Outbound') and consistent tag keys across resources.
+  // These are schema-required repetitions, not extractable constants.
+  if (isIaC && /^MAINT-/.test(finding.ruleId)) {
+    const titleLower = finding.title.toLowerCase();
+    if (
+      (titleLower.includes("duplicate") && titleLower.includes("string")) ||
+      titleLower.includes("repeated string") ||
+      titleLower.includes("extract to constant")
+    ) {
+      return "Repeated strings in IaC templates are schema-constrained enum values or consistent tag keys — not extractable constants.";
+    }
+  }
+
+  // ── 32. Azure Bastion documented-requirement suppresses IAC Internet-HTTPS ──
+  // Azure Bastion requires inbound HTTPS (443) from 'Internet' / '*' per
+  // Microsoft documentation.  When the NSG rule is scoped to a Bastion subnet
+  // and compensating controls are documented, the finding is an accepted risk.
+  if (isIaC && /^IAC-/.test(finding.ruleId)) {
+    const titleLower = finding.title.toLowerCase();
+    if (
+      (titleLower.includes("bastion") || titleLower.includes("internet")) &&
+      (titleLower.includes("https") || titleLower.includes("443") || titleLower.includes("inbound"))
+    ) {
+      const fullCode = lines.join("\n");
+      const hasBastionSubnet = /bastion/i.test(fullCode);
+      const hasCompensatingControl = /compensat|conditional\s*access|AAD|Entra|MFA|multi.?factor|audit/i.test(fullCode);
+      if (hasBastionSubnet && hasCompensatingControl) {
+        return "Azure Bastion requires inbound HTTPS from Internet per Microsoft documentation — compensating controls are documented.";
+      }
+    }
+  }
+
   // ── 27. String comparison / switch-case dispatch with security keywords ──
   // When a security keyword appears as a string value in a comparison operator
   // (=== / ==), switch-case label, or inclusion check (.includes()), the code

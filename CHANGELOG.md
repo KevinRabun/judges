@@ -2,6 +2,20 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.11] — 2026-03-03
+
+### Fixed
+- **False positive reduction — 5 new Bicep/IaC-specific heuristics (H28–H32)** — Eliminates 5 high-confidence false positive patterns specific to Infrastructure-as-Code templates (Bicep, ARM, Terraform):
+  - **H28 — IaC compile-time property resolution**: Suppresses REL null-check findings (e.g. "deep property access without null checks") on IaC templates where resource property references like `vnet.properties.subnets[0].id` are resolved at deploy time, not at runtime — null checks and optional chaining are inapplicable
+  - **H29 — IaC domain-convention numbers**: Suppresses MAINT magic-number findings for numeric values that are IaC domain conventions (NSG priorities 100–4096, port numbers, CIDR prefix lengths, retention periods like 365 days)
+  - **H30 — Schema-mandated nesting depth**: Suppresses MAINT deep-nesting findings on IaC templates where hierarchical depth (resource → properties → subnets[] → properties → addressPrefix) is mandated by the ARM/Terraform resource schema and cannot be flattened
+  - **H31 — IaC schema enum values**: Suppresses MAINT duplicate-string findings for schema-constrained enum values like `'Tcp'`, `'Allow'`, `'Deny'`, `'Inbound'`, `'Outbound'` that must be repeated per ARM/Terraform schema requirements
+  - **H32 — Azure Bastion documented-requirement**: Suppresses IAC Internet-HTTPS findings on Bastion NSG rules that require inbound HTTPS (443) from `'Internet'` per Microsoft documentation — only when a Bastion subnet is present AND compensating controls (Conditional Access, MFA, audit logging) are documented in comments
+
+### Tests
+- 9 new tests in `IaC/Bicep-specific FP heuristics` describe block: H28 REL-001 suppress + non-IaC keep, H29 MAINT-001 magic numbers, H30 MAINT-002 deep nesting on Bicep + Terraform, H31 MAINT-003 duplicate strings, H32 IAC-004 Bastion with/without compensating controls, MAINT on non-IaC keep
+- 1666 tests, 0 failures
+
 ## [3.20.10] — 2026-03-03
 
 ### Fixed

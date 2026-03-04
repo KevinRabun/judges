@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.11] — 2026-03-03
+
+### Fixed
+- **False positive reduction — 5 new Bicep/IaC-specific heuristics (H28–H32)** — Eliminates false positives for null-check, magic-number, deep-nesting, duplicate-string, and Bastion Internet-HTTPS findings on Infrastructure-as-Code templates; see [core CHANGELOG](../CHANGELOG.md) for full details
+
+### Tests
+- 1666 tests, 0 failures
+
 ## [3.20.10] — 2026-03-03
 
 ### Fixed
