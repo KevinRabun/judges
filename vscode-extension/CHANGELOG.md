@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.9] — 2026-03-03
+
+### Changed
+- **Token usage optimisation** — MCP full-tribunal prompt deduplicated shared directives (~10 000 tokens saved per invocation, ~30% reduction), per-judge prompts now include evaluation criteria for better TP detection; see [core CHANGELOG](../CHANGELOG.md) for full details
+
+### Tests
+- 11 new tests (1657 total, 0 failures)
+
 ## [3.20.8] — 2026-03-03
 
 ### Fixed

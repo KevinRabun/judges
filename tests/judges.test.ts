@@ -63,6 +63,7 @@ import { analyzeDocumentation } from "../src/evaluators/documentation.js";
 import { analyzeEthicsBias } from "../src/evaluators/ethics-bias.js";
 import { analyzeDataSovereignty } from "../src/evaluators/data-sovereignty.js";
 import { buildSingleJudgeDeepReviewSection, buildTribunalDeepReviewSection } from "../src/tools/deep-review.js";
+import { getCondensedCriteria } from "../src/tools/prompts.js";
 import { isStringLiteralLine, getLineNumbers, getLangLineNumbers } from "../src/evaluators/shared.js";
 
 // ─── Tree-sitter warm-up ────────────────────────────────────────────────────
@@ -9852,5 +9853,134 @@ function safeFunction(data: string): string {
       0,
       `Performance FP from strings: ${JSON.stringify(findings.map((f) => f.title))}`,
     );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Token Optimisation — getCondensedCriteria
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("getCondensedCriteria — Token Optimisation", () => {
+  it("should strip persona introduction line", () => {
+    const input = `You are Judge Test — an expert in testing.\n\nYOUR EVALUATION CRITERIA:\n1. **First**: detail\n2. **Second**: detail`;
+    const result = getCondensedCriteria(input);
+    assert.ok(!result.includes("You are Judge Test"), "Should strip persona intro");
+    assert.ok(result.includes("YOUR EVALUATION CRITERIA:"), "Should retain criteria heading");
+  });
+
+  it("should strip ADVERSARIAL MANDATE section", () => {
+    const input = `You are Judge Test — expert.\n\nYOUR EVALUATION CRITERIA:\n1. **A**: x\n\nADVERSARIAL MANDATE:\n- Your role is adversarial.\n- Never praise the code.`;
+    const result = getCondensedCriteria(input);
+    assert.ok(!result.includes("ADVERSARIAL MANDATE"), "Should strip adversarial mandate heading");
+    assert.ok(!result.includes("Your role is adversarial"), "Should strip adversarial mandate content");
+    assert.ok(result.includes("YOUR EVALUATION CRITERIA:"), "Should retain criteria");
+  });
+
+  it("should strip boilerplate rule-prefix and score lines", () => {
+    const input = `You are Expert.\n\nRULES FOR YOUR EVALUATION:\n- Assign rule IDs with prefix "TST-" (e.g. TST-001).\n- Domain specific rule.\n- Score from 0-100 where 100 means no issues found.`;
+    const result = getCondensedCriteria(input);
+    assert.ok(!result.includes("Assign rule IDs with prefix"), "Should strip rule prefix line");
+    assert.ok(!result.includes("Score from 0-100"), "Should strip score line");
+    assert.ok(result.includes("Domain specific rule"), "Should retain domain-specific rules");
+  });
+
+  it("should retain FALSE POSITIVE AVOIDANCE sections", () => {
+    const input = `You are Expert.\n\nYOUR EVALUATION CRITERIA:\n1. **X**: y\n\nFALSE POSITIVE AVOIDANCE:\n- Check for xyz.\n\nADVERSARIAL MANDATE:\n- adversarial.`;
+    const result = getCondensedCriteria(input);
+    assert.ok(result.includes("FALSE POSITIVE AVOIDANCE:"), "Should retain FP avoidance section");
+    assert.ok(result.includes("Check for xyz"), "Should retain FP avoidance content");
+  });
+
+  it("should retain all evaluation criteria from a real judge", () => {
+    const judge = JUDGES.find((j) => j.id === "cybersecurity")!;
+    const result = getCondensedCriteria(judge.systemPrompt);
+    // Cybersecurity has 9 evaluation criteria
+    assert.ok(result.includes("Injection Attacks"), "Should retain criterion 1");
+    assert.ok(result.includes("Cross-Site Scripting"), "Should retain criterion 2");
+    assert.ok(result.includes("Authentication"), "Should retain criterion 3");
+    assert.ok(result.includes("OWASP Top 10"), "Should retain criterion 9");
+    // Should NOT include persona or adversarial
+    assert.ok(!result.includes("You are Judge Cybersecurity"), "Should strip persona");
+    assert.ok(!result.includes("ADVERSARIAL MANDATE"), "Should strip adversarial mandate");
+  });
+
+  it("should retain all evaluation criteria from data-sovereignty judge", () => {
+    const judge = JUDGES.find((j) => j.id === "data-sovereignty")!;
+    const result = getCondensedCriteria(judge.systemPrompt);
+    // Uses pillar headers instead of "YOUR EVALUATION CRITERIA"
+    assert.ok(
+      result.includes("DATA SOVEREIGNTY") || result.includes("Sovereignty") || result.includes("sovereignty"),
+      "Should retain sovereignty criteria",
+    );
+    assert.ok(!result.includes("You are Judge Data Sovereignty"), "Should strip persona");
+  });
+
+  it("should produce measurably shorter text than full systemPrompt for all judges", () => {
+    let fullTotal = 0;
+    let condensedTotal = 0;
+    for (const judge of JUDGES) {
+      fullTotal += judge.systemPrompt.length;
+      condensedTotal += getCondensedCriteria(judge.systemPrompt).length;
+    }
+    const savings = fullTotal - condensedTotal;
+    // Should save at least 25% across all judges
+    assert.ok(
+      savings > fullTotal * 0.25,
+      `Expected >25% reduction, got ${Math.round((savings / fullTotal) * 100)}% (saved ${savings} chars)`,
+    );
+  });
+
+  it("should retain non-empty output for every judge", () => {
+    for (const judge of JUDGES) {
+      const result = getCondensedCriteria(judge.systemPrompt);
+      assert.ok(result.length > 100, `Judge ${judge.id} condensed criteria too short: ${result.length} chars`);
+    }
+  });
+
+  it("should strip persona intro from all judges that have one", () => {
+    for (const judge of JUDGES) {
+      const result = getCondensedCriteria(judge.systemPrompt);
+      assert.ok(
+        !result.includes(`You are ${judge.name}`),
+        `Judge ${judge.id} still has persona intro: "${result.substring(0, 80)}"`,
+      );
+    }
+  });
+
+  it("should strip ADVERSARIAL MANDATE from all judges that have one", () => {
+    for (const judge of JUDGES) {
+      const result = getCondensedCriteria(judge.systemPrompt);
+      assert.ok(!result.includes("ADVERSARIAL MANDATE:"), `Judge ${judge.id} still has adversarial mandate`);
+    }
+  });
+
+  it("should measure significant savings in a simulated tribunal prompt", () => {
+    // Original approach: full systemPrompt + PRECISION_MANDATE per judge
+    const precisionMandate =
+      "PRECISION MANDATE (overrides adversarial stance when in conflict):\n" +
+      "- Every finding MUST cite specific code evidence.\n" +
+      "- Do NOT flag absent features speculatively.\n" +
+      "- Prefer fewer, high-confidence findings.";
+
+    let originalSize = 0;
+    let optimisedSize = 0;
+
+    for (const j of JUDGES) {
+      // Original: full systemPrompt + precision mandate per judge
+      originalSize += `### ${j.name} — ${j.domain}\n${j.systemPrompt}\n\n${precisionMandate}`.length;
+      // Optimised: condensed criteria only (shared mandates stated once)
+      optimisedSize +=
+        `### ${j.name} — ${j.domain}\n**Rule prefix:** \`${j.rulePrefix}-\`\n\n${getCondensedCriteria(j.systemPrompt)}`
+          .length;
+    }
+
+    // Add shared mandates once for optimised
+    optimisedSize += 1000; // approximate shared preamble
+
+    const savings = originalSize - optimisedSize;
+    const pctSaved = Math.round((savings / originalSize) * 100);
+
+    // Should save at least 20% of tokens
+    assert.ok(pctSaved >= 20, `Expected ≥20% tribunal prompt savings, got ${pctSaved}% (${savings} chars saved)`);
   });
 });

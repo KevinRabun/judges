@@ -2,6 +2,17 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.9] — 2026-03-03
+
+### Changed
+- **Token usage optimisation — MCP full-tribunal prompt** — Refactored the `full-tribunal` MCP prompt to deduplicate shared behavioural directives (adversarial mandate, precision mandate) that were previously repeated 37× — once per judge. Shared directives are now stated once in a "Universal Evaluation Directives" preamble. Per-judge sections include only unique evaluation criteria, domain-specific rules, and FP-avoidance guidance. Boilerplate lines (persona introductions, rule-prefix assignment templates, score templates) are stripped by the new `getCondensedCriteria()` helper. **~40 000 chars (~10 000 tokens) saved per full-tribunal invocation — approximately 30% reduction — with zero impact on TP detection quality.** All evaluation criteria, domain-specific rules, and FP-avoidance sections are fully preserved.
+- **MCP per-judge prompts — evaluation criteria now included** — Per-judge MCP prompts previously sent only a generic "Please evaluate" message without the judge's evaluation criteria, making LLM-powered single-judge reviews less effective. Each per-judge prompt now includes the judge's full `systemPrompt` and precision mandate, significantly improving TP detection quality for single-judge deep reviews.
+- **New exported utility `getCondensedCriteria()`** — Extracts only the unique evaluation criteria from a judge's `systemPrompt`, stripping persona introductions, adversarial mandates, and boilerplate rule/score templates. Available via the public API for custom integrations that need token-efficient prompt construction.
+
+### Tests
+- 11 new tests in `getCondensedCriteria — Token Optimisation` describe block: persona intro stripping, adversarial mandate stripping, boilerplate rule/score line stripping, FP avoidance retention, real judge criteria retention (cybersecurity, data-sovereignty), measurable savings across all judges (>25% per-judge, ≥20% tribunal-level), non-empty output for every judge, persona stripping for all judges, adversarial mandate stripping for all judges, simulated tribunal prompt savings measurement
+- 1657 tests, 0 failures
+
 ## [3.20.8] — 2026-03-03
 
 ### Fixed

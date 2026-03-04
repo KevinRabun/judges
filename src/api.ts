@@ -80,6 +80,9 @@ export {
   DEEP_REVIEW_IDENTITY,
 } from "./tools/deep-review.js";
 
+// ─── Prompt Utilities ────────────────────────────────────────────────────────
+export { getCondensedCriteria } from "./tools/prompts.js";
+
 // ─── Cache Utilities ─────────────────────────────────────────────────────────
 export { LRUCache, contentHash } from "./cache.js";
 export { clearProjectCache } from "./evaluators/project.js";
