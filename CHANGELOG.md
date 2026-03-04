@@ -2,6 +2,21 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.2] — 2026-03-04
+
+### Fixed — False Positive Reductions (9 categories)
+- **COST-001 / PERF-001: Sequential Python loops no longer flagged as nested** — Fixed indent-stack algorithm to pop loop scopes on all code lines (not just loop lines), so that `try/except`, `if`, and `with` blocks correctly close preceding loop scopes. Sequential loops inside try/except blocks are no longer misidentified as O(n²).
+- **SWDEV-001-post / MAINT-001-post: Nesting depth threshold raised to 5+ levels** — Changed deep-nesting threshold from 16 spaces (4 levels) to 20 spaces (5 levels), matching `structural-parser.ts`. Python patterns like `async def → try/except → for → if` naturally need 4 levels and should not be flagged.
+- **SWDEV-002-post: `except Exception:` no longer flagged as bare except** — Removed `except Exception:` from `GENERIC_CATCH.python` pattern. `except Exception:` correctly excludes `BaseException` subclasses (KeyboardInterrupt, SystemExit) and is the recommended Python pattern for facade layers.
+- **SOV-001: Docstring body lines no longer trigger sovereignty findings** — Added multi-line Python string tracking (`"""`/`'''`) to the data-sovereignty export keyword scanner. Keywords like "export", "report", "analytics" inside module docstrings are no longer mistaken for real data export paths.
+- **DOC-001: Multi-line Python function signatures now detected** — Extended docstring lookahead to walk past multi-line function signatures (parameters spanning multiple lines) before searching for body docstrings. Previously, functions with signatures spanning 5+ lines would be falsely flagged as undocumented.
+- **MAINT-002-post: Format template strings excluded from duplicate detection** — Duplicate string detection now skips strings containing format placeholders (`{}`, `%s`, `${}`), and strings that are purely whitespace. Template strings repeated in different contexts are no longer flagged.
+- **STRUCT-006: `TYPE_CHECKING` imports excluded from weak type detection** — `detectWeakTypes()` now skips lines containing `TYPE_CHECKING` and all lines inside `if TYPE_CHECKING:` blocks in Python. Static-analysis-only imports are no longer flagged as weak/dynamic types.
+
+### Tests
+- 14 new tests covering all 9 FP categories (both positive and negative cases)
+- 1020 judges tests passing, 689 subsystems tests passing (1709 total)
+
 ## [3.23.1] — 2026-03-04
 
 ### Fixed

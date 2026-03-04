@@ -148,8 +148,23 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       code,
     );
   const exportLines: number[] = [];
+  let inMultiLineString = false;
   lines.forEach((line, index) => {
     const trimmed = line.trim();
+    // Track Python multi-line strings (""" / ''') so that docstring body
+    // lines mentioning "export", "report", etc. are not mistaken for real
+    // data-export code paths.
+    const tripleQuotes = (trimmed.match(/"""|'''/g) || []).length;
+    if (inMultiLineString) {
+      if (tripleQuotes % 2 === 1) inMultiLineString = false;
+      return; // skip lines inside multi-line strings
+    }
+    if (tripleQuotes === 1) {
+      inMultiLineString = true;
+      return;
+    }
+    if (tripleQuotes >= 2) return; // single-line docstring — skip entirely
+
     // Skip comment lines — doc blocks describing export policy are not real export paths
     if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
     // Skip JS/TS export keyword declarations (export const, export function, etc.)

@@ -76,7 +76,20 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
 
     // Python: also check for docstrings inside the function body (first non-blank body line)
     if (!hasDoc && lang === "python") {
-      for (let j = idx + 1; j < Math.min(lines.length, idx + 5); j++) {
+      // Walk past multi-line function signatures (parameters spanning
+      // several lines) before looking for the body docstring.
+      let bodyStart = idx + 1;
+      const defLine = lines[idx];
+      if (/\(/.test(defLine) && !/\)\s*(?:->.*)?:\s*$/.test(defLine)) {
+        // Signature continues on subsequent lines — find the closing `) ... :`
+        for (let j = idx + 1; j < Math.min(lines.length, idx + 30); j++) {
+          if (/\)\s*(?:->.*)?:\s*$/.test(lines[j])) {
+            bodyStart = j + 1;
+            break;
+          }
+        }
+      }
+      for (let j = bodyStart; j < Math.min(lines.length, bodyStart + 5); j++) {
         const bodyLine = lines[j].trim();
         if (bodyLine.length === 0) continue;
         if (/^"""/.test(bodyLine) || /^'''/.test(bodyLine)) {

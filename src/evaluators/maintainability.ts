@@ -129,14 +129,14 @@ export function analyzeMaintainability(code: string, language: string): Finding[
     });
   }
 
-  // Deep nesting (4+ levels of indentation)
+  // Deep nesting (5+ levels of indentation — 4 levels is the natural minimum for async/try/loop/condition)
   const deepNestLines: number[] = [];
   for (let i = 0; i < lines.length; i++) {
     const indentMatch = lines[i].match(/^(\s+)\S/);
     if (indentMatch) {
       const indent = indentMatch[1].replace(/\t/g, "    ").length;
-      if (indent >= 16) {
-        // 4+ levels at 4 spaces each
+      if (indent >= 20) {
+        // 5+ levels at 4 spaces each (4 levels is the natural minimum for async/try/loop/condition)
         deepNestLines.push(i + 1);
       }
     }
@@ -146,7 +146,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Deeply nested code detected",
-      description: `Found ${deepNestLines.length} line(s) with 4+ levels of nesting. Deep nesting increases cognitive complexity and makes code harder to follow.`,
+      description: `Found ${deepNestLines.length} line(s) with 5+ levels of nesting. Deep nesting increases cognitive complexity and makes code harder to follow.`,
       lineNumbers: deepNestLines.slice(0, 5),
       recommendation:
         "Use early returns (guard clauses), extract nested logic into helper functions, or use functional patterns (map, filter, reduce) to flatten nesting.",
@@ -310,6 +310,11 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   let strMatch;
   while ((strMatch = stringLiteralPattern.exec(code)) !== null) {
     const val = strMatch[1];
+    // Skip format-template strings containing placeholders — these are
+    // intentionally repeated in different contexts.
+    if (/\{[\w:,.]*\}|%[sdifFeEgGcrbox%]|\$\{/.test(val)) continue;
+    // Skip strings that are purely whitespace / paragraph spacing
+    if (/^\s+$/.test(val)) continue;
     stringLiterals[val] = (stringLiterals[val] || 0) + 1;
   }
   const duplicateStrings = Object.entries(stringLiterals).filter(([, count]) => count >= 3);

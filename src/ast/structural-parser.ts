@@ -524,9 +524,36 @@ function detectWeakTypes(lines: string[], language: string): number[] {
   const pattern = patterns[language];
   if (!pattern) return weakLines;
 
+  // Python: track `if TYPE_CHECKING:` blocks so that imports guarded by
+  // TYPE_CHECKING (used for static analysis only) are not flagged.
+  let inTypeCheckingBlock = false;
+  let typeCheckingIndent = -1;
+
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
     if (trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("/*")) continue;
+
+    if (language === "python") {
+      // Skip TYPE_CHECKING imports and lines referencing TYPE_CHECKING
+      if (/\bTYPE_CHECKING\b/.test(trimmed)) {
+        // Detect start of `if TYPE_CHECKING:` block
+        if (/^if\s+TYPE_CHECKING\s*:/.test(trimmed)) {
+          inTypeCheckingBlock = true;
+          typeCheckingIndent = (lines[i].match(/^(\s*)/)?.[1] ?? "").length;
+        }
+        continue;
+      }
+      // Skip lines inside an `if TYPE_CHECKING:` block
+      if (inTypeCheckingBlock) {
+        const currentIndent = (lines[i].match(/^(\s*)/)?.[1] ?? "").length;
+        if (trimmed.length > 0 && currentIndent <= typeCheckingIndent) {
+          inTypeCheckingBlock = false;
+        } else {
+          continue;
+        }
+      }
+    }
+
     if (pattern.test(lines[i])) {
       weakLines.push(i + 1);
     }

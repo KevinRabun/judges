@@ -210,12 +210,12 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
     });
   }
 
-  // Deep nesting (>4 levels)
+  // Deep nesting (>5 levels — 4 levels is the natural minimum for async/try/loop/condition)
   const deepNestLines: number[] = [];
   codeLines.forEach((line, i) => {
     if (isCommentLine(line)) return;
     const leadingSpaces = line.search(/\S/);
-    if (leadingSpaces >= 16 && !/^\s*[/*#]/.test(line) && !/^\s*$/.test(line)) {
+    if (leadingSpaces >= 20 && !/^\s*[/*#]/.test(line) && !/^\s*$/.test(line)) {
       deepNestLines.push(i + 1);
     }
   });
@@ -223,7 +223,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
-      title: "Deeply nested code (>4 levels)",
+      title: "Deeply nested code (>5 levels)",
       description:
         "Deeply nested code is hard to read, understand, and test. It often indicates complex conditional logic that could be simplified.",
       lineNumbers: deepNestLines.slice(0, 5),

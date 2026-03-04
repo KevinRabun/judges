@@ -231,7 +231,7 @@ export const EMPTY_CATCH = {
 
 export const GENERIC_CATCH = {
   jsts: String.raw`catch\s*\(\s*\w+\s*\)`,
-  python: String.raw`except\s*:(?!\s*\w)|except\s+Exception\s*:`,
+  python: String.raw`except\s*:(?!\s*\w)`,
   csharp: String.raw`catch\s*\(\s*Exception\s`,
   java: String.raw`catch\s*\(\s*(?:Exception|Throwable)\s`,
   // Go intentionally omitted: `if err != nil` is idiomatic, not a generic catch

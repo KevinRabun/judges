@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.2] — 2026-03-04
+
+### Fixed
+- **9 false-positive reductions** — Sequential Python loops in try/except, nesting depth threshold (4→5 levels), `except Exception:` no longer bare-except, docstring body sovereignty FP, multi-line signature documentation FP, format-template duplicate strings, and TYPE_CHECKING weak-type FP; see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.23.1] — 2026-03-04
 
 ### Fixed

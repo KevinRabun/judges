@@ -486,11 +486,15 @@ export function analyzePerformance(code: string, language: string, context?: Ana
     for (let i = 0; i < lines.length; i++) {
       const trimmed = lines[i].trim();
       if (/^#|^"""|^'''/.test(trimmed) || trimmed === "") continue;
+      const indent = (lines[i].match(/^(\s*)/)?.[1] ?? "").length;
+      // Pop loops whose scope has ended — any non-blank code at indent <= a
+      // tracked loop means that loop's body is finished (applies to ALL code
+      // lines, not just loop lines, so that try/if/with blocks correctly
+      // close preceding loop scopes).
+      while (indentStack.length > 0 && indentStack[indentStack.length - 1] >= indent) {
+        indentStack.pop();
+      }
       if (pyLoopStartRe.test(lines[i])) {
-        const indent = (lines[i].match(/^(\s*)/)?.[1] ?? "").length;
-        while (indentStack.length > 0 && indentStack[indentStack.length - 1] >= indent) {
-          indentStack.pop();
-        }
         indentStack.push(indent);
         if (indentStack.length >= 2) {
           nestedLoopLines.push(i + 1);

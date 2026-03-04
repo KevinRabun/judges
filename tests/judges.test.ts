@@ -62,6 +62,7 @@ import { analyzeInternationalization } from "../src/evaluators/internationalizat
 import { analyzeDocumentation } from "../src/evaluators/documentation.js";
 import { analyzeEthicsBias } from "../src/evaluators/ethics-bias.js";
 import { analyzeDataSovereignty } from "../src/evaluators/data-sovereignty.js";
+import { analyzeCostEffectiveness } from "../src/evaluators/cost-effectiveness.js";
 import { buildSingleJudgeDeepReviewSection, buildTribunalDeepReviewSection } from "../src/tools/deep-review.js";
 import { getCondensedCriteria } from "../src/tools/prompts.js";
 import { isStringLiteralLine, getLineNumbers, getLangLineNumbers } from "../src/evaluators/shared.js";
@@ -10222,5 +10223,254 @@ func loadData() {
     const dsEval = evaluateWithJudge(getJudge("data-security")!, swiftCode, "swift");
     const totalFindings = errEval.findings.length + dsEval.findings.length;
     assert.ok(totalFindings > 0, "Should detect force-try or secrets in Swift");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: v3.23.2 False-Positive Fixes
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("v3.23.2 FP Fixes — COST/PERF nested-loop sequential loops", () => {
+  it("should NOT flag sequential Python loops inside try/except as nested", () => {
+    const pyCode = `
+async def get_articles(db, query):
+    try:
+        articles = await db.fetch_articles(query)
+        for article in articles:
+            article.process()
+
+        references = await db.fetch_references(query)
+        for ref in references:
+            ref.validate()
+    except Exception as e:
+        logger.exception("Failed to fetch articles")
+`;
+    const costFindings = analyzeCostEffectiveness(pyCode, "python");
+    const nestedLoop = costFindings.filter((f) => f.title.includes("Nested loops") || f.title.includes("O(n²)"));
+    assert.strictEqual(nestedLoop.length, 0, "Sequential loops inside try should not be flagged as nested");
+
+    const perfFindings = analyzePerformance(pyCode, "python");
+    const nestedPerfLoop = perfFindings.filter((f) => f.title.includes("Nested loops") || f.title.includes("O(n²)"));
+    assert.strictEqual(nestedPerfLoop.length, 0, "Performance: sequential loops inside try should not be flagged");
+  });
+
+  it("should still flag truly nested Python loops", () => {
+    const pyCode = `
+def find_duplicates(items):
+    for item in items:
+        for other in items:
+            if item == other:
+                print("dup")
+`;
+    const findings = analyzeCostEffectiveness(pyCode, "python");
+    const nestedLoop = findings.filter((f) => f.title.includes("Nested loops") || f.title.includes("O(n²)"));
+    assert.ok(nestedLoop.length > 0, "Truly nested Python loops should still be flagged");
+  });
+
+  it("should NOT flag Python loops separated by if/with blocks as nested", () => {
+    const pyCode = `
+def process(data, config):
+    for item in data:
+        item.clean()
+
+    if config.validate:
+        for entry in config.entries:
+            entry.check()
+`;
+    const findings = analyzeCostEffectiveness(pyCode, "python");
+    const nestedLoop = findings.filter((f) => f.title.includes("Nested loops") || f.title.includes("O(n²)"));
+    assert.strictEqual(nestedLoop.length, 0, "Loops separated by if-blocks should not be flagged as nested");
+  });
+});
+
+describe("v3.23.2 FP Fixes — SWDEV/MAINT nesting depth threshold", () => {
+  it("should NOT flag 4-level nesting from async/try/for/if", () => {
+    const pyCode = `
+async def handler(request):
+    try:
+        items = await fetch_items()
+        for item in items:
+            if item.active:
+                await process(item)
+    except Exception as e:
+        logger.exception("handler failed")
+`;
+    const swFindings = analyzeSoftwarePractices(pyCode, "python");
+    const deepNest = swFindings.filter((f) => f.title.includes("Deeply nested"));
+    assert.strictEqual(deepNest.length, 0, "4-level nesting (async/try/for/if) should not be flagged");
+
+    const maintFindings = analyzeMaintainability(pyCode, "python");
+    const deepMaint = maintFindings.filter((f) => f.title.includes("Deeply nested"));
+    assert.strictEqual(deepMaint.length, 0, "Maintainability: 4-level nesting should not be flagged");
+  });
+
+  it("should flag 6-level deep nesting", () => {
+    const deepCode = `
+def handler():
+    if a:
+        if b:
+            if c:
+                for x in items:
+                    if d:
+                        do_something()
+                        do_more()
+                        do_extra()
+                        finish()
+`;
+    const findings = analyzeSoftwarePractices(deepCode, "python");
+    const deepNest = findings.filter((f) => f.title.includes("Deeply nested"));
+    assert.ok(deepNest.length > 0, "6+ level nesting should still be flagged");
+  });
+});
+
+describe("v3.23.2 FP Fixes — SWDEV-002 except Exception not bare", () => {
+  it("should NOT flag 'except Exception:' as bare except", () => {
+    const pyCode = `
+async def handler(request):
+    try:
+        result = await process(request)
+        return result
+    except Exception as e:
+        logger.exception("handler failed")
+        raise
+`;
+    const findings = analyzeSoftwarePractices(pyCode, "python");
+    const bareExcept = findings.filter((f) => f.title.includes("Bare except") || f.title.includes("untyped catch"));
+    assert.strictEqual(bareExcept.length, 0, "'except Exception:' should not be flagged as bare except");
+  });
+
+  it("should still flag truly bare 'except:' in Python", () => {
+    const pyCode = `
+def risky():
+    try:
+        do_thing()
+    except:
+        pass
+`;
+    const findings = analyzeSoftwarePractices(pyCode, "python");
+    const bareExcept = findings.filter((f) => f.title.includes("Bare except") || f.title.includes("untyped catch"));
+    assert.ok(bareExcept.length > 0, "Truly bare 'except:' should still be flagged");
+  });
+});
+
+describe("v3.23.2 FP Fixes — SOV-001 docstring body not flagged", () => {
+  it("should NOT flag export/report keywords inside Python docstrings", () => {
+    const pyCode = `
+"""
+Module for generating export reports and analytics dashboards.
+Supports data download and telemetry collection.
+"""
+
+import os
+
+def safe_function():
+    return 42
+`;
+    const findings = analyzeDataSovereignty(pyCode, "python");
+    const exportFindings = findings.filter((f) => f.title.includes("export path") || f.title.includes("sovereignty"));
+    assert.strictEqual(exportFindings.length, 0, "Keywords inside docstring body should not trigger SOV findings");
+  });
+
+  it("should still flag export keywords in actual code", () => {
+    const pyCode = `
+import os
+
+def export_data(data, path):
+    dump(data, path)
+    download(data)
+`;
+    const findings = analyzeDataSovereignty(pyCode, "python");
+    const exportFindings = findings.filter((f) => f.title.includes("export path") || f.title.includes("sovereignty"));
+    assert.ok(exportFindings.length > 0, "Export keywords in real code should still be flagged");
+  });
+});
+
+describe("v3.23.2 FP Fixes — DOC-001 multi-line Python signature", () => {
+  it("should detect docstrings after multi-line function signatures", () => {
+    const pyCode = `
+def get_articles(
+    db: Database,
+    query: str,
+    limit: int = 100,
+    offset: int = 0,
+) -> List[Article]:
+    """Fetch articles from the database.
+
+    Args:
+        db: Database connection
+        query: Search query string
+        limit: Maximum number of results
+        offset: Pagination offset
+
+    Returns:
+        List of matching Article objects.
+    """
+    return db.fetch(query, limit=limit, offset=offset)
+`;
+    const findings = analyzeDocumentation(pyCode, "python");
+    const undoc = findings.filter((f) => f.title.includes("without documentation"));
+    assert.strictEqual(undoc.length, 0, "Docstring after multi-line signature should be detected");
+  });
+
+  it("should still flag functions without any docstring", () => {
+    const pyCode = `
+def process_data(data):
+    for item in data:
+        item.clean()
+    return data
+`;
+    const findings = analyzeDocumentation(pyCode, "python");
+    const undoc = findings.filter((f) => f.title.includes("without documentation"));
+    assert.ok(undoc.length > 0, "Functions without any docstring should be flagged");
+  });
+});
+
+describe("v3.23.2 FP Fixes — MAINT-002 duplicate format strings", () => {
+  it("should NOT flag format template strings as duplicates", () => {
+    const pyCode = `
+def report(data):
+    for item in data:
+        print("Processing item: {}".format(item.name))
+        log("Processing item: {}".format(item.id))
+        debug("Processing item: {}".format(item.status))
+        trace("Processing item: {}".format(item.value))
+`;
+    const findings = analyzeMaintainability(pyCode, "python");
+    const dupStrings = findings.filter((f) => f.title.includes("Duplicate string"));
+    assert.strictEqual(dupStrings.length, 0, "Format template strings with {} should not be flagged as duplicates");
+  });
+});
+
+describe("v3.23.2 FP Fixes — STRUCT-006 TYPE_CHECKING not weak type", () => {
+  it("should NOT flag TYPE_CHECKING imports as weak/dynamic types", () => {
+    const pyCode = `
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mymod import MyClass
+    from typing import Any
+
+def process(data: str) -> str:
+    return data.strip()
+`;
+    const findings = analyzeCodeStructure(pyCode, "python");
+    const weakType = findings.filter(
+      (f) => f.title.includes("weak") || f.title.includes("dynamic") || f.ruleId === "STRUCT-006",
+    );
+    assert.strictEqual(weakType.length, 0, "TYPE_CHECKING imports should not trigger weak type detection");
+  });
+
+  it("should still flag direct Any usage outside TYPE_CHECKING", () => {
+    const pyCode = `
+from typing import Any
+
+def process(data: Any) -> Any:
+    return data
+`;
+    const findings = analyzeCodeStructure(pyCode, "python");
+    const weakType = findings.filter(
+      (f) => f.title.includes("weak") || f.title.includes("dynamic") || f.ruleId === "STRUCT-006",
+    );
+    assert.ok(weakType.length > 0, "Direct Any usage should still be flagged as weak type");
   });
 });
