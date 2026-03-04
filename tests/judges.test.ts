@@ -50,6 +50,7 @@ import { analyzePerformance } from "../src/evaluators/performance.js";
 import { analyzeAuthentication } from "../src/evaluators/authentication.js";
 import { analyzeApiDesign } from "../src/evaluators/api-design.js";
 import { analyzeConcurrency } from "../src/evaluators/concurrency.js";
+import { analyzeCybersecurity } from "../src/evaluators/cybersecurity.js";
 import { analyzeErrorHandling } from "../src/evaluators/error-handling.js";
 import { analyzeAccessibility } from "../src/evaluators/accessibility.js";
 import { analyzeFrameworkSafety } from "../src/evaluators/framework-safety.js";
@@ -10472,5 +10473,115 @@ def process(data: Any) -> Any:
       (f) => f.title.includes("weak") || f.title.includes("dynamic") || f.ruleId === "STRUCT-006",
     );
     assert.ok(weakType.length > 0, "Direct Any usage should still be flagged as weak type");
+  });
+});
+
+// ─── v3.23.3 Self-Review FP Fixes ──────────────────────────────────────────────
+
+describe("v3.23.3 FP Fix — CONC-001 skip local-scope let declarations", () => {
+  it("should NOT flag let inside a function body as shared mutable state", () => {
+    const code = `
+export function analyzeStuff(code: string): Finding[] {
+  let ruleNum = 1;
+  const lines = code.split("\\n");
+  lines.forEach((line) => {
+    if (/async\\s/.test(line)) {
+      ruleNum++;
+    }
+  });
+  return [];
+}
+`;
+    const findings = analyzeConcurrency(code, "typescript");
+    const conc001 = findings.filter((f) => f.title.includes("Shared mutable state"));
+    assert.strictEqual(conc001.length, 0, "Local let inside function body should not be flagged as shared mutable");
+  });
+
+  it("should still flag module-level let used in async context", () => {
+    const code = `
+let counter = 0;
+
+async function handleRequest() {
+  counter++;
+  await doWork();
+  return counter;
+}
+`;
+    const findings = analyzeConcurrency(code, "typescript");
+    const conc001 = findings.filter((f) => f.title.includes("Shared mutable state"));
+    assert.ok(conc001.length > 0, "Module-level let used in async context should still be flagged");
+  });
+});
+
+describe("v3.23.3 FP Fix — CYBER-001 skip analysis/evaluator code", () => {
+  it("should NOT flag auth keywords in evaluator/analysis code", () => {
+    const code = `
+import { testCode, getLineNumbers } from "./shared.js";
+
+export function analyzeAuth(code: string): Finding[] {
+  const hasLogin = /login|signin|authenticate/.test(code);
+  const hasPassword = /password|passwd/.test(code);
+  const hasToken = /token|jwt|bearer/.test(code);
+  const hasAuth = /auth|authorization/.test(code);
+  const hasSession = /session|cookie/.test(code);
+  const hasOAuth = /oauth|openid/.test(code);
+  const hasMFA = /mfa|two.?factor/.test(code);
+  const hasCrypto = /bcrypt|scrypt|argon/.test(code);
+  const hasRBAC = /role|permission|rbac/.test(code);
+  if (hasLogin && !hasPassword) {
+    return [{ title: "login without password check" }];
+  }
+  return [];
+}
+`;
+    const findings = analyzeCybersecurity(code, "typescript");
+    const cyber001 = findings.filter((f) => f.title.includes("Authentication endpoints without rate limiting"));
+    assert.strictEqual(cyber001.length, 0, "Auth keywords in analysis code should not trigger CYBER-001");
+  });
+});
+
+describe("v3.23.3 FP Fix — ERR-003 skip throw patterns in regex literals", () => {
+  it("should NOT flag throw pattern inside a regex literal as ERR-003", () => {
+    const code = `
+import { getLineNumbers } from "./shared.js";
+
+export function analyzeErrors(code: string): Finding[] {
+  const throwStringPattern = /throw\\s+["'\`]/g;
+  const throwStringLines = getLineNumbers(code, throwStringPattern);
+  if (throwStringLines.length > 0) {
+    return [{ title: "Throwing string literals instead of Error objects" }];
+  }
+  return [];
+}
+`;
+    const findings = analyzeErrorHandling(code, "typescript");
+    const err003 = findings.filter((f) => f.title.includes("Throwing string"));
+    assert.strictEqual(err003.length, 0, "throw pattern inside regex should not trigger ERR-003");
+  });
+
+  it("should NOT flag throw pattern inside string literal lines", () => {
+    const code = `
+export const rules = {
+  suggestedFix: "Replace throw 'message' with throw new Error('message').",
+  description: "Throwing strings loses the stack trace.",
+};
+`;
+    const findings = analyzeErrorHandling(code, "typescript");
+    const err003 = findings.filter((f) => f.title.includes("Throwing string"));
+    assert.strictEqual(err003.length, 0, "throw pattern inside string literal should not trigger ERR-003");
+  });
+
+  it("should still flag actual throw string literals", () => {
+    const code = `
+function handleError() {
+  throw "something went wrong";
+}
+function handleError2() {
+  throw 'bad input';
+}
+`;
+    const findings = analyzeErrorHandling(code, "typescript");
+    const err003 = findings.filter((f) => f.title.includes("Throwing string"));
+    assert.ok(err003.length > 0, "Actual throw string literals should still be flagged");
   });
 });

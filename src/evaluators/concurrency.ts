@@ -42,8 +42,12 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
   const sharedMutableLines = getLangLineNumbers(code, language, LP.SHARED_MUTABLE);
   sharedMutableLines.forEach((ln) => {
     const idx = ln - 1;
+    const declLine = lines[idx];
+    // Skip declarations inside function/method bodies (indented code is local, not shared)
+    const leadingSpaces = declLine.match(/^(\s*)/)?.[1]?.length ?? 0;
+    if (leadingSpaces > 0) return;
     const restOfFile = lines.slice(idx + 1).join("\n");
-    const varName = lines[idx].trim().match(/(?:let|var|static\s+mut|static\s+(?:Lazy|Once))\s+(\w+)/)?.[1];
+    const varName = declLine.trim().match(/(?:let|var|static\s+mut|static\s+(?:Lazy|Once))\s+(\w+)/)?.[1];
     if (
       varName &&
       /async\s|\.then\s*\(|await|tokio|Task\.|Thread|goroutine|go\s+func/i.test(restOfFile) &&

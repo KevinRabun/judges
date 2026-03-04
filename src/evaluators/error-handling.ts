@@ -1,5 +1,12 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  isCommentLine,
+  isStringLiteralLine,
+  testCode,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeErrorHandling(code: string, language: string): Finding[] {
@@ -142,7 +149,23 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
 
   // Throwing strings instead of Error objects
   const throwStringPattern = /throw\s+["'`]/g;
-  const throwStringLines = getLineNumbers(code, throwStringPattern);
+  const throwStringLinesRaw = getLineNumbers(code, throwStringPattern);
+  // Filter out matches inside regex literals or string-literal lines (detection patterns, not actual throws)
+  const codeLines = code.split("\n");
+  const throwStringLines = throwStringLinesRaw.filter((ln) => {
+    const line = codeLines[ln - 1] || "";
+    const trimmed = line.trim();
+    // Skip lines that are regex literals containing throw patterns (e.g. /throw\s+["'`]/g)
+    if (/^\/.*\/[gimsuy]*[;,]?$/.test(trimmed) || /(?:=|:)\s*\/.*throw.*\/[gimsuy]*/.test(trimmed)) return false;
+    // Skip lines that are primarily string literal values
+    if (isStringLiteralLine(line)) return false;
+    // Skip lines containing .test( or .match( or .exec( — they use regex patterns, not actual throws
+    if (/\.(?:test|match|exec|search|replace)\s*\(/.test(line) && /\/.*throw/.test(line)) return false;
+    // Skip lines where throw appears inside string content (e.g. key: "...throw 'msg'...")
+    const stripped = line.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g, '""');
+    if (!/throw\s+["'`]/.test(stripped)) return false;
+    return true;
+  });
   if (throwStringLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.3] — 2025-07-26
+
+### Fixed
+- **3 self-review false-positive reductions** — CONC-001 local let scope check, CYBER-001 analysis code guard, ERR-003 regex/string context filtering; see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.23.2] — 2026-03-04
 
 ### Fixed

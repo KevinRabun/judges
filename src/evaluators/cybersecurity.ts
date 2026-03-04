@@ -466,9 +466,12 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
   }
 
   // Missing rate limiting on auth endpoints
+  // Suppress when the file is primarily code-analysis / evaluator logic (many regex .test() calls)
+  const authAnalysisTestCount = (code.match(/\.test\s*\(/g) || []).length;
+  const isAuthAnalysisCode = authAnalysisTestCount >= 8;
   const authEndpoints = getLineNumbers(code, /(?:login|signin|sign-in|authenticate|auth|password|token)\s*['",:]/gi);
   const hasRateLimit = testCode(code, /rate.?limit|throttle|limiter|brute/gi);
-  if (authEndpoints.length > 0 && !hasRateLimit && !isIaCTemplate(code)) {
+  if (authEndpoints.length > 0 && !hasRateLimit && !isIaCTemplate(code) && !isAuthAnalysisCode) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

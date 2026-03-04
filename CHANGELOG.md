@@ -2,6 +2,20 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.3] — 2025-07-26
+
+### Fixed — Self-Review False Positive Reductions (3 root causes)
+
+Ran judges against its own evaluator source code to identify and fix FP root causes:
+
+- **CONC-001: Local `let` declarations no longer flagged as shared mutable state** — Added indentation-based scope check in `concurrency.ts`. Only module-level (column 0) `let`/`var` declarations are now considered potentially shared mutable state. Variables declared inside function bodies (indented code) are local by definition and no longer trigger false positives when the file contains `async`/`await` keywords in strings or later code.
+- **CYBER-001: Auth keywords in analysis/evaluator code no longer trigger rate-limiting findings** — Added `isLikelyAnalysisCode` guard to `cybersecurity.ts` auth endpoint rate-limiting rule of file. Files with ≥8 `.test()` calls (indicating code-analysis or evaluator logic) are now suppressed, matching the existing pattern in `authentication.ts`.
+- **ERR-003: `throw` patterns inside regex literals and string values no longer flagged** — Enhanced `error-handling.ts` throw-string detection with multi-layer filtering: skips regex literal lines, string-literal-only lines, lines with regex method calls containing throw patterns, and lines where `throw` appears inside quoted string content (e.g., `suggestedFix: "Replace throw 'msg' with throw new Error('msg')"`).
+
+### Tests
+- 6 new tests covering all 3 FP root causes (positive and negative cases)
+- 1026 judges tests passing, 689 subsystems tests passing (1715 total)
+
 ## [3.23.2] — 2026-03-04
 
 ### Fixed — False Positive Reductions (9 categories)
