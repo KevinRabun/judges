@@ -124,33 +124,33 @@ const KEYWORD_IDENTIFIER_PATTERNS: Array<{
       /(?:cache|max|ttl|min|avg|token|cookie|session|expir|stale|fresh)\s*[-_]?\s*age|age\s*[-_]?\s*(?:out|limit|check|seconds|minutes|hours|days|ms|header)|\bcache[_-]age\b|\bmax[_-]age\b/i,
   },
   {
-    // "delete" in deleteButton, onDelete, handleDelete, isDeleted
+    // "delete" in deleteButton, on_delete, handleDelete, isDeleted
     trigger: /\bdelete\b/i,
     identifierContext:
-      /(?:on|handle|is|can|should|will|did|set|get|btn|button|icon|modal|dialog|confirm)\s*delete|delete\s*(?:button|handler|modal|confirm|dialog|flag|status|action|event|click|icon)/i,
+      /(?:on|handle|is|can|should|will|did|set|get|btn|button|icon|modal|dialog|confirm)[-_]?delete|delete[-_]?(?:button|handler|modal|confirm|dialog|flag|status|action|event|click|icon|request|response|result)/i,
   },
   {
-    // "exec" in execMode, execPath, execOptions, childExec
+    // "exec" in execMode, exec_path, execOptions, child_exec
     trigger: /\bexec\b/i,
-    identifierContext: /exec\s*(?:mode|path|option|config|result|status|type|name|id)|(?:child|fork|spawn)\s*exec/i,
+    identifierContext: /exec[-_]?(?:mode|path|option|config|result|status|type|name|id)|(?:child|fork|spawn)[-_]?exec/i,
   },
   {
-    // "password" in passwordField, passwordInput, showPassword, passwordStrength
+    // "password" in passwordField, password_input, showPassword, confirm_password
     trigger: /\bpassword\b/i,
     identifierContext:
-      /password\s*(?:field|input|label|placeholder|strength|policy|rule|validator|visible|show|hide|toggle|confirm|match|min|max|length|reset|change|update|hash)/i,
+      /password[-_]?(?:field|input|label|placeholder|strength|policy|rule|validator|visible|show|hide|toggle|confirm|match|min|max|length|reset|change|update|hash|column|prop|param|check|verify|form|dialog|modal)|(?:confirm|verify|validate|check|reset|new|old|current|previous|hashed|encrypted)[-_]?password/i,
   },
   {
-    // "secret" in secretName, secretArn, secretRef, secretVersion
+    // "secret" in secretName, secret_arn, secretRef, client_secret
     trigger: /\bsecret\b/i,
     identifierContext:
-      /secret\s*(?:name|arn|ref|version|id|key|path|manager|store|engine|backend|rotation|value)|(?:aws|azure|gcp|vault|k8s|kube)\s*secret/i,
+      /secret[-_]?(?:name|arn|ref|version|id|key|path|manager|store|engine|backend|rotation|value)|(?:aws|azure|gcp|vault|k8s|kube|client|app)[-_]?secret/i,
   },
   {
-    // "token" in tokenExpiry, refreshToken, tokenType identifier contexts
+    // "token" in tokenExpiry, token_type, refreshToken, reset_token
     trigger: /\btoken\b/i,
     identifierContext:
-      /token\s*(?:type|name|expir|ttl|refresh|revoke|validate|verify|field|input|header|prefix|format|length)|(?:access|refresh|bearer|csrf|api|auth|jwt|session)\s*token/i,
+      /token[-_]?(?:type|name|expir|ttl|refresh|revoke|validate|verify|field|input|header|prefix|format|length|bucket|count|limit|usage)|(?:access|refresh|bearer|csrf|api|auth|jwt|session|reset|verification)[-_]?token/i,
   },
   {
     // "global" in Python's `global` keyword used for variable declarations
@@ -306,6 +306,14 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     if (isCodeOnly) {
       return `Code-quality rule ${finding.ruleId} does not apply to configuration/data files.`;
     }
+  }
+
+  // ── 2c. Type-definition file gating: absence rules on pure type files ──
+  // Pure type-definition files (interfaces, type aliases, enums) contain
+  // no runtime logic. Absence-based findings like "missing error handling"
+  // or "missing authentication" produce noise on these files.
+  if (finding.isAbsenceBased && fileCategory === "types") {
+    return "Absence-based rule does not apply to pure type-definition files — no runtime logic to evaluate.";
   }
 
   // ── 3. All target lines are comments ──
@@ -595,13 +603,24 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
       );
     });
     if (allEnumOrUnion) {
-      const titleAndDesc = `${finding.title} ${finding.description}`;
-      const hasSecurityKeyword =
-        /\bdelete\b|\bexec\b|\bpassword\b|\bsecret\b|\btoken\b|\bdrop\b|\bkill\b|\broot\b|\badmin\b/i.test(
-          titleAndDesc,
-        );
-      if (hasSecurityKeyword) {
-        return "Security keyword appears in an enum/union type definition — inert value, not a dangerous operation.";
+      // Require that the file actually contains an enum, type, or class declaration.
+      // Without this, bare variable assignments like `password = "admin123"`
+      // would incorrectly match the `WORD = "word"` enum-member pattern above.
+      const hasEnumTypeContext = lines.some(
+        (l) =>
+          /^\s*(?:export\s+)?enum\s+\w+/.test(l.trim()) ||
+          /^\s*(?:export\s+)?type\s+\w+\s*=/.test(l.trim()) ||
+          /^\s*class\s+\w+/.test(l.trim()),
+      );
+      if (hasEnumTypeContext) {
+        const titleAndDesc = `${finding.title} ${finding.description}`;
+        const hasSecurityKeyword =
+          /\bdelete\b|\bexec\b|\bpassword\b|\bsecret\b|\btoken\b|\bdrop\b|\bkill\b|\broot\b|\badmin\b/i.test(
+            titleAndDesc,
+          );
+        if (hasSecurityKeyword) {
+          return "Security keyword appears in an enum/union type definition — inert value, not a dangerous operation.";
+        }
       }
     }
   }
@@ -628,6 +647,92 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
         if (allLogLines) {
           return "Security keyword appears inside a logging statement — describes the operation, not a credential leak.";
         }
+      }
+    }
+  }
+
+  // ── 22. Typed parameter/property declarations with security keywords ──
+  // When a security keyword (password, token, secret, credential) appears as
+  // a typed parameter name (e.g. `password: string`, `String secret`), it's
+  // a declaration describing the input's purpose, not a hardcoded credential.
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const titleAndDesc22 = `${finding.title} ${finding.description}`;
+    const hasCredentialKw22 = /\bpassword\b|\bsecret\b|\btoken\b|\bcredential\b/i.test(titleAndDesc22);
+    if (hasCredentialKw22) {
+      // Don't suppress findings specifically about credential LEAKAGE or LOGGING
+      const isAboutExposure22 =
+        /\b(?:leak|expos|log(?:ged|ging)?|print|display|transmit|send)\b/i.test(titleAndDesc22) ||
+        /^LOG|LOGPRIV/i.test(finding.ruleId);
+      if (!isAboutExposure22) {
+        const allTypedDeclarations = finding.lineNumbers.every((ln) => {
+          const line = lines[ln - 1];
+          if (!line) return false;
+          // TS/Python/Rust typed parameter: `password: string`, `token?: str`
+          return (
+            /\b(?:password|secret|token|credential)\b\s*[?!]?\s*:\s*(?:str|string|String|number|int|Integer|boolean|bool|Boolean|any|object|Buffer|bytes|SecureString)\b/i.test(
+              line,
+            ) ||
+            // Java/C# style: `String password`, `SecureString credential`
+            /\b(?:String|int|Integer|boolean|char|SecureString|byte\[\])\s+(?:password|secret|token|credential)\b/i.test(
+              line,
+            )
+          );
+        });
+        if (allTypedDeclarations) {
+          return "Security keyword is a typed parameter/property name — declaration, not a hardcoded credential.";
+        }
+      }
+    }
+  }
+
+  // ── 23. Throw/raise error message strings with security keywords ──
+  // throw new Error("Invalid password format") or raise ValueError("Bad token")
+  // contain security keywords in a descriptive error message, not a credential
+  // leak. Only suppresses static string messages (no variable interpolation).
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const titleAndDesc23 = `${finding.title} ${finding.description}`;
+    const hasCredentialKw23 = /\bpassword\b|\bsecret\b|\btoken\b|\bcredential\b/i.test(titleAndDesc23);
+    if (hasCredentialKw23) {
+      const isAboutExposure23 =
+        /\blog(?:ged|ging|s)?\b|LOGPRIV|^LOG-|expos|leak/i.test(titleAndDesc23) || /^LOG|LOGPRIV/i.test(finding.ruleId);
+      if (!isAboutExposure23) {
+        const allThrowLines = finding.lineNumbers.every((ln) => {
+          const line = lines[ln - 1];
+          if (!line) return false;
+          // throw new Error("...") / raise ValueError("...") with static string arg
+          return /(?:throw\s+new\s+\w*(?:Error|Exception|Fault)|raise\s+\w*(?:Error|Exception|Warning))\s*\(\s*["'`]/i.test(
+            line,
+          );
+        });
+        if (allThrowLines) {
+          return "Security keyword appears in an error/exception message — describes the error, not a credential leak.";
+        }
+      }
+    }
+  }
+
+  // ── 24. Regex pattern literals containing security keywords ──
+  // Validation patterns like /password|secret|token/ or re.compile(r"password")
+  // contain security keywords as detection/matching targets, not credential values.
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const titleAndDesc24 = `${finding.title} ${finding.description}`;
+    const hasSecurityKw24 = /\bpassword\b|\bsecret\b|\btoken\b|\bcredential\b|\bexec\b|\bdelete\b/i.test(
+      titleAndDesc24,
+    );
+    if (hasSecurityKw24) {
+      const allRegexLines = finding.lineNumbers.every((ln) => {
+        const line = lines[ln - 1];
+        if (!line) return false;
+        // JS regex literal: /...keyword.../flags
+        const hasJsRegex = /\/[^/]*\b(?:password|secret|token|credential|exec|delete)\b[^/]*\/[gimsuy]*/.test(line);
+        // Python re.compile / re.search / re.match / re.findall
+        // Java Pattern.compile / new RegExp
+        const hasCompiledRegex =
+          /(?:re\.(?:compile|search|match|findall|sub)|Pattern\.compile|new\s+RegExp)\s*\(/i.test(line);
+        return hasJsRegex || hasCompiledRegex;
+      });
+      if (allRegexLines) {
+        return "Security keyword appears inside a regex pattern — used for matching/validation, not credential handling.";
       }
     }
   }

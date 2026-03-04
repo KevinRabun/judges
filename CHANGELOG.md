@@ -2,6 +2,21 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.7] — 2026-03-03
+
+### Fixed
+- **False positive reduction — 4 new heuristics (H2c, H22–H24) + extended identifier patterns + H20 bugfix** — Continued proactive FP analysis targeting typed declarations, error messages, regex patterns, and type-definition files:
+  - **H2c**: Type-definition file gating — absence-based findings suppressed on files classified as `"types"` by `classifyFile()` (`.d.ts` files, interface-only modules); type-definition files declaring shapes should not trigger missing-implementation findings
+  - **H22**: Typed parameter/property declarations — findings suppressed when security keywords (`password`, `secret`, `token`) appear as typed parameter names (`password: string`, `String secret`) rather than hardcoded credentials; excludes LOGPRIV findings that flag the parameter itself
+  - **H23**: Throw/raise error message strings — findings suppressed when keywords appear in static throw/raise error messages (`throw new Error("Invalid password")`, `raise ValueError("Bad token")`); extends H21 logging concept to error-throwing; excludes LOGPRIV/LOG-* findings
+  - **H24**: Regex pattern literal context — findings suppressed when keywords appear inside regex patterns (`/password|secret|token/`, `re.compile(r"...")`, `new RegExp(...)`, `Pattern.compile(...)`)
+  - **H20 bugfix**: Enum/union type definitions — fixed false match where bare assignments like `password = "admin123"` incorrectly matched the enum-member pattern; now requires `enum`, `type =`, or `class` declaration context in the file
+  - **Extended KEYWORD_IDENTIFIER_PATTERNS**: Changed separators from `\s*` to `[-_]?` across password, secret, token, delete, exec patterns to support snake_case/kebab-case identifiers while preventing space-separated English phrases from matching; added new suffixes (column, prop, param, check, verify, form, dialog, modal) and prefixes (confirm, verify, validate, check, reset, new, old, current, previous, hashed, encrypted) to password pattern; added client/app prefixes to secret; added verification/reset suffixes to token
+
+### Tests
+- 21 new tests across 5 describe blocks: keyword-in-identifier with underscore/hyphen separators (7), type-definition file gating (2), typed parameter/property declarations (4), throw/raise error messages (4), regex pattern literals (4)
+- 1627 tests, 0 failures
+
 ## [3.20.6] — 2026-03-03
 
 ### Fixed

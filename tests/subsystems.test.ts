@@ -2585,6 +2585,542 @@ describe("False-Positive Heuristic Filter", () => {
     });
   });
 
+  // ── New: Extended KEYWORD_IDENTIFIER_PATTERNS with snake_case/kebab-case separators ──
+  describe("Keyword-in-identifier with underscore/hyphen separators", () => {
+    it("should remove finding when 'password' is in snake_case identifier password_hash", () => {
+      const code = `password_hash = bcrypt.hashpw(raw, salt)`;
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Hardcoded password detected",
+          description: "Found password reference",
+          lineNumbers: [1],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "'password_hash' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should remove finding when 'password' has prefix confirm_password", () => {
+      const code = `const confirm_password = getInput("confirm");`;
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Hardcoded password detected",
+          description: "Password value found",
+          lineNumbers: [1],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "'confirm_password' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should remove finding when 'secret' is in client_secret identifier", () => {
+      const code = `const client_secret = process.env.CLIENT_SECRET;`;
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Secret handling detected",
+          description: "Found secret reference",
+          lineNumbers: [1],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "'client_secret' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should remove finding when 'token' is in reset_token identifier", () => {
+      const code = `const reset_token = generateToken();`;
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Token handling detected",
+          description: "Found token reference",
+          lineNumbers: [1],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "'reset_token' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should remove finding when 'delete' is in on_delete handler", () => {
+      const code = `const on_delete = (id: string) => removeItem(id);`;
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Unprotected delete operation",
+          description: "Found delete without authorization",
+          lineNumbers: [1],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "'on_delete' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should remove finding when 'exec' is in child_exec identifier", () => {
+      const code = `const child_exec = spawn("node", ["worker.js"]);`;
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "CYBER-010",
+          title: "Unsafe exec usage detected",
+          description: "Found exec reference",
+          lineNumbers: [1],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "'child_exec' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep finding when password is a bare assignment (not a compound identifier)", () => {
+      const code = `password = "admin123"`;
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Hardcoded password detected",
+          description: "Found password value in source",
+          lineNumbers: [1],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(filtered.length, 1, "Bare 'password = value' should be kept as TP");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  // ── New: Type-definition file gating (H2c) ──
+  describe("Type-definition file gating", () => {
+    it("should remove absence-based findings on pure type-definition files", () => {
+      const code = [
+        `export interface User {`,
+        `  id: string;`,
+        `  name: string;`,
+        `  email: string;`,
+        `}`,
+        ``,
+        `export interface AuthToken {`,
+        `  token: string;`,
+        `  expiresAt: Date;`,
+        `}`,
+        ``,
+        `export type Role = "admin" | "user" | "guest";`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "ERR-001",
+          title: "Missing error handling",
+          description: "No try/catch or error boundaries found",
+          isAbsenceBased: true,
+          lineNumbers: [],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript", "src/types.d.ts");
+      assert.strictEqual(removed.length, 1, "Absence rule on pure type-def file should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep presence-based findings on type-definition files", () => {
+      const code = [
+        `export interface Config {`,
+        `  password: "admin123";`,
+        `  secret: "hardcoded";`,
+        `}`,
+        ``,
+        `export type DatabaseUrl = string;`,
+        `export type ApiKey = string;`,
+        `export type SecretValue = string;`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Hardcoded credential in type definition",
+          description: "Found credential value in interface",
+          isAbsenceBased: false,
+          lineNumbers: [2],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript", "src/types.ts");
+      assert.strictEqual(filtered.length, 1, "Presence-based finding on type file should be kept");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  // ── New: Typed parameter/property declarations (H22) ──
+  describe("Typed parameter/property declarations suppress credential findings", () => {
+    it("should remove finding when 'password' is a typed function parameter in TS", () => {
+      const code = [
+        `import { hash } from "bcrypt";`,
+        `import { validateInput } from "./utils";`,
+        `function authenticate(email: string, password: string) {`,
+        `  const hashed = hash(password, 10);`,
+        `  return compareWithStored(email, hashed);`,
+        `}`,
+        `function logout(token: string) {`,
+        `  invalidateSession(token);`,
+        `}`,
+        `function register(name: string, email: string) {`,
+        `  return createUser({ name, email });`,
+        `}`,
+        `export { authenticate, logout, register };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Hardcoded password detected",
+          description: "Found password reference in source code",
+          lineNumbers: [3],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "Typed parameter 'password: string' should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should remove finding when 'secret' is a Java-style typed parameter", () => {
+      const code = [
+        `import javax.crypto.SecretKey;`,
+        `import javax.crypto.spec.SecretKeySpec;`,
+        `public boolean verifySecret(String secret) {`,
+        `    return secret != null && secret.length() > 0;`,
+        `}`,
+        `public boolean validateLength(String input) {`,
+        `    return input.length() >= 8;`,
+        `}`,
+        `public void processRequest(HttpRequest request) {`,
+        `    String body = request.getBody();`,
+        `    handlePayload(body);`,
+        `}`,
+        `// End of authentication utilities`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Secret handling without encryption",
+          description: "Found secret value in code",
+          lineNumbers: [3],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "java");
+      assert.strictEqual(removed.length, 1, "Java-style 'String secret' parameter should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep finding when password is assigned a hardcoded value (not typed param)", () => {
+      const code = [
+        `import { connect } from "database";`,
+        `const password = "admin123";`,
+        `const db = connect({ password });`,
+        `function query(sql: string) {`,
+        `    return db.execute(sql);`,
+        `}`,
+        `function disconnect() {`,
+        `    db.close();`,
+        `}`,
+        `export { query, disconnect };`,
+        `// Database utility module`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Hardcoded password detected",
+          description: "Found password value in source",
+          lineNumbers: [2],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(filtered.length, 1, "Hardcoded password value should be kept as TP");
+      assert.strictEqual(removed.length, 0);
+    });
+
+    it("should keep finding about credential leakage even on typed params", () => {
+      const code = [
+        `import { logger } from "./log";`,
+        `function processAuth(token: string) {`,
+        `    logger.info("Processing token: " + token);`,
+        `    return validateToken(token);`,
+        `}`,
+        `function validateToken(t: string) {`,
+        `    return t.startsWith("Bearer ");`,
+        `}`,
+        `function revokeToken(t: string) {`,
+        `    return deleteFromStore(t);`,
+        `}`,
+        `export { processAuth, validateToken };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "LOGPRIV-001",
+          title: "Token leaked in log output",
+          description: "Credential exposed via logging",
+          lineNumbers: [2],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(filtered.length, 1, "Credential leakage finding should be kept even on typed param");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  // ── New: Throw/raise error message strings (H23) ──
+  describe("Throw/raise error messages suppress credential keyword findings", () => {
+    it("should remove finding when 'password' appears in throw new Error()", () => {
+      const code = [
+        `import { validateInput } from "./validators";`,
+        `function checkPassword(input: string) {`,
+        `  if (input.length < 8) {`,
+        `    throw new Error("Invalid password format — must be at least 8 characters");`,
+        `  }`,
+        `  return true;`,
+        `}`,
+        `function checkEmail(input: string) {`,
+        `  if (!input.includes("@")) {`,
+        `    throw new Error("Invalid email format");`,
+        `  }`,
+        `  return true;`,
+        `}`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Hardcoded password detected",
+          description: "Found password reference in source code",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "'password' in throw Error message should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should remove finding when 'token' appears in Python raise ValueError()", () => {
+      const code = [
+        `from datetime import datetime`,
+        `def validate_token(token_str):`,
+        `    if not token_str:`,
+        `        raise ValueError("Token cannot be empty")`,
+        `    if is_expired(token_str):`,
+        `        raise ValueError("Token has expired")`,
+        `    return True`,
+        `def is_expired(t):`,
+        `    return False`,
+        `def refresh(t):`,
+        `    return generate_new()`,
+        `# Token validation utilities`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Token handling without encryption",
+          description: "Found token reference in code",
+          lineNumbers: [6],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "'token' in raise ValueError message should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep finding when throw line has variable interpolation (not static string)", () => {
+      const code = [
+        `import { getUser } from "./db";`,
+        `function checkAuth(userId: string) {`,
+        `  const user = getUser(userId);`,
+        `  if (!user) throw new Error(password);`,
+        `  return user;`,
+        `}`,
+        `function getUser(id: string) {`,
+        `  return db.find(id);`,
+        `}`,
+        `function deleteUser(id: string) {`,
+        `  return db.remove(id);`,
+        `}`,
+        `export { checkAuth };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Password exposed in error",
+          description: "Credential leaked in exception",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      // throw new Error(password) — no string literal, so H24 should NOT suppress
+      assert.strictEqual(filtered.length, 1, "Variable in throw should be kept as TP");
+      assert.strictEqual(removed.length, 0);
+    });
+
+    it("should keep LOGPRIV finding even on throw lines", () => {
+      const code = [
+        `function validate(input: string) {`,
+        `  throw new Error("Password check failed");`,
+        `  return false;`,
+        `}`,
+        `function process() { return true; }`,
+        `function cleanup() { return null; }`,
+        `function init() { return; }`,
+        `function start() { validate(""); }`,
+        `function stop() { cleanup(); }`,
+        `function restart() { stop(); start(); }`,
+        `export { validate, process };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "LOGPRIV-001",
+          title: "Password exposed in thrown error",
+          description: "Credential exposure via logging",
+          lineNumbers: [2],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(filtered.length, 1, "LOGPRIV finding should be kept even on throw line");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  // ── New: Regex pattern literal contexts (H24) ──
+  describe("Regex pattern literals suppress security keyword findings", () => {
+    it("should remove finding when 'password' appears in JS regex literal", () => {
+      const code = [
+        `import { sanitize } from "./utils";`,
+        `const fieldPattern = /password|email|username|phone/;`,
+        `function isSensitiveField(name: string) {`,
+        `  return fieldPattern.test(name);`,
+        `}`,
+        `function sanitizeField(name: string, value: string) {`,
+        `  if (isSensitiveField(name)) return "[REDACTED]";`,
+        `  return value;`,
+        `}`,
+        `function getFields() { return ["name", "email"]; }`,
+        `function formatField(n: string) { return n.trim(); }`,
+        `export { isSensitiveField, sanitizeField };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Hardcoded password detected",
+          description: "Found password reference in source code",
+          lineNumbers: [2],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "'password' in regex literal should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should remove finding when 'secret' appears in re.compile()", () => {
+      const code = [
+        `import re`,
+        `SENSITIVE_PATTERN = re.compile(r"(password|secret|token|api_key)")`,
+        `def mask_sensitive(text):`,
+        `    return SENSITIVE_PATTERN.sub("[REDACTED]", text)`,
+        `def clean_input(text):`,
+        `    return text.strip()`,
+        `def format_output(text):`,
+        `    return text.upper()`,
+        `def validate(text):`,
+        `    return len(text) > 0`,
+        `def process(text):`,
+        `    return mask_sensitive(clean_input(text))`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Secret pattern detected",
+          description: "Found secret handling in code",
+          lineNumbers: [2],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "'secret' in re.compile() should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should remove finding when 'token' appears in new RegExp()", () => {
+      const code = [
+        `const validators = {};`,
+        `const sensitiveFields = new RegExp("token|credential|secret", "i");`,
+        `function checkField(name) {`,
+        `  return sensitiveFields.test(name);`,
+        `}`,
+        `function isValid(value) {`,
+        `  return value !== null;`,
+        `}`,
+        `function normalize(value) {`,
+        `  return String(value).trim();`,
+        `}`,
+        `function parse(input) { return JSON.parse(input); }`,
+        `module.exports = { checkField };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Token handling without encryption",
+          description: "Found credential keyword",
+          lineNumbers: [2],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "'token' in new RegExp() should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep finding when password is assigned a value (not in regex)", () => {
+      const code = [
+        `const config = require("./config");`,
+        `const password = "super_secret_123";`,
+        `function connect() {`,
+        `  return db.connect({ password });`,
+        `}`,
+        `function disconnect() {`,
+        `  return db.close();`,
+        `}`,
+        `function query(sql) {`,
+        `  return db.execute(sql);`,
+        `}`,
+        `function ping() { return db.ping(); }`,
+        `module.exports = { connect };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Hardcoded password detected",
+          description: "Found password in source",
+          lineNumbers: [2],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(filtered.length, 1, "Actual hardcoded password should be kept as TP");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
   // ── New: Additional edge-case negative tests for TP confidence ──
   describe("TP confidence — edge cases that should NOT be suppressed", () => {
     it("should keep CYBER finding even when code has imports (mixed lines)", () => {
