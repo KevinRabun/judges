@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.1] — 2026-03-04
+
+### Fixed
+- **CI compilation fix** — Resolved 5 TypeScript type errors in new v3.23.0 modules (doctor, rule-metrics, snapshot, dedup) that caused CI failure; see [core CHANGELOG](../CHANGELOG.md) for details
+
 ## [3.23.0] — 2026-03-05
 
 ### Added

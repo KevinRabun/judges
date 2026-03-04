@@ -128,7 +128,7 @@ export function recordSnapshot(
   commit?: string,
   label?: string,
 ): FindingSnapshot {
-  const bySeverity: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
+  const bySeverity: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
   const ruleIdSet = new Set<string>();
 
   for (const f of findings) {

@@ -120,7 +120,7 @@ export function checkConfigFile(dir: string): DoctorCheck {
       name: "config-file",
       status: "pass",
       message: `Config file valid: ${found}`,
-      detail: `Judges: ${result.judges?.length ?? "default"}, Threshold: ${result.threshold ?? "default"}`,
+      detail: `Disabled judges: ${result.disabledJudges?.length ?? 0}, Min severity: ${result.minSeverity ?? "default"}`,
     };
   } catch (err) {
     return {

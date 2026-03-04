@@ -7,8 +7,7 @@
 //   console.log(formatRuleHitReport(metrics));
 // ──────────────────────────────────────────────────────────────────────────────
 
-import type { Finding } from "../types.js";
-import type { JudgeDefinition } from "../evaluators/index.js";
+import type { Finding, JudgeDefinition } from "../types.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

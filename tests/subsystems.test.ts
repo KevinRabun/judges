@@ -8526,13 +8526,16 @@ describe("27. Finding Diff Between Runs", () => {
     assert.equal(diff.stats.delta, 0);
   });
 
-  it("should use finding.filePath for key when no filePath param", () => {
-    const f1: Finding = { ...mkFinding("SEC-001", 10), filePath: "a.ts" };
-    const f2: Finding = { ...mkFinding("SEC-001", 10), filePath: "b.ts" };
-    const diff = diffFindings([f1], [f2]);
-    assert.equal(diff.newFindings.length, 1); // different file = new
-    assert.equal(diff.fixedFindings.length, 1);
-    assert.equal(diff.recurringFindings.length, 0);
+  it("should distinguish findings by filePath parameter", () => {
+    const f1 = mkFinding("SEC-001", 10);
+    const f2 = mkFinding("SEC-001", 10);
+    const diffSameFile = diffFindings([f1], [f2], "a.ts");
+    assert.equal(diffSameFile.recurringFindings.length, 1); // same file = recurring
+
+    const diffA = diffFindings([f1], [], "a.ts");
+    const diffB = diffFindings([], [f2], "b.ts");
+    assert.equal(diffA.fixedFindings.length, 1);
+    assert.equal(diffB.newFindings.length, 1);
   });
 
   it("should format diff with all sections", () => {

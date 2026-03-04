@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.1] — 2026-03-04
+
+### Fixed
+- **TypeScript type errors** — Fixed 5 compilation errors that caused CI failure on v3.23.0:
+  - `doctor.ts`: Referenced non-existent `judges` and `threshold` properties on `JudgesConfig`; now uses `disabledJudges` and `minSeverity`
+  - `rule-metrics.ts`: Imported `JudgeDefinition` from `evaluators/index.js` which didn't re-export it; now imports from `types.js`
+  - `snapshot.ts`: `Record<Severity, number>` missing `info` key; added `info: 0` initializer
+  - `dedup.ts`: Referenced non-existent `filePath` property on `Finding` type in `findingDiffKey()`
+- **Test fix** — Updated finding-diff test that relied on invalid `Finding.filePath` property to use the `diffFindings()` `filePath` parameter instead
+
+### Tests
+- 1006 judges tests passing, 689 subsystems tests passing (1695 total)
+
 ## [3.23.0] — 2026-03-05
 
 ### Added — P0: Trust & Accuracy Foundation

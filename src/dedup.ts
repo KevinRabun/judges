@@ -444,7 +444,7 @@ export interface FindingDiff {
  * Uses ruleId + file path + first line number for identity.
  */
 function findingDiffKey(f: Finding, filePath?: string): string {
-  const path = filePath || f.filePath || "";
+  const path = filePath || "";
   const line = f.lineNumbers?.[0] ?? 0;
   return `${f.ruleId}::${path}::${line}`;
 }
