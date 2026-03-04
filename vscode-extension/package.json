@@ -2,7 +2,7 @@
   "name": "judges-panel",
   "displayName": "Judges Panel",
   "description": "37 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.20.11",
+  "version": "3.20.12",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -242,7 +242,16 @@
             "language": {
               "type": "string",
               "description": "Programming language (typescript, javascript, python, go, rust, java, csharp, cpp). If omitted, auto-detected from the open file.",
-              "enum": ["typescript", "javascript", "python", "go", "rust", "java", "csharp", "cpp"]
+              "enum": [
+                "typescript",
+                "javascript",
+                "python",
+                "go",
+                "rust",
+                "java",
+                "csharp",
+                "cpp"
+              ]
             }
           }
         },

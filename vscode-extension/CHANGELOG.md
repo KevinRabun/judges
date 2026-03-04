@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.12] — 2026-03-03
+
+### Changed
+- **Layer 2 progress feedback** — Users now see real-time progress and streaming output during AI deep review instead of a blank screen for 30–60 seconds; chat participant streams LLM response incrementally after early content-policy check, command palette shows phase-specific progress notifications; see [core CHANGELOG](../CHANGELOG.md) for full details
+
+### Tests
+- 1666 tests, 0 failures
+
 ## [3.20.11] — 2026-03-03
 
 ### Fixed

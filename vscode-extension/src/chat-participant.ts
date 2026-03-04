@@ -569,7 +569,7 @@ async function handleDeepReview(
   if (token.isCancellationRequested) return;
 
   // ── Layer 2: LLM Deep Review ───────────────────────────────────────────
-  stream.progress("Layer 2 — Running AI deep review (contextual analysis)…");
+  stream.progress("Layer 2 — Preparing AI deep review prompt…");
 
   // Build the L1 findings summary for the prompt
   const findingsSummary = findings
@@ -610,6 +610,7 @@ async function handleDeepReview(
   }
 
   try {
+    stream.progress("Layer 2 — Selecting language model…");
     let model = await resolveModel();
     if (!model) {
       stream.markdown(
@@ -630,11 +631,13 @@ async function handleDeepReview(
 
     // ── First attempt ──
     // The "auto" model selector may fail at send time, so catch and fall back
+    stream.progress("Layer 2 — Sending request to AI model…");
     let response: vscode.LanguageModelChatResponse;
     try {
       response = await model.sendRequest(messages, {}, token);
     } catch (sendError) {
       // If request.model failed (e.g. "auto" pseudo-model), try selectChatModels
+      stream.progress("Layer 2 — Trying alternative model…");
       const fallbackModels = await vscode.lm.selectChatModels();
       const fallback = fallbackModels.find((m) => m.id !== model!.id) ?? fallbackModels[0];
       if (!fallback) throw sendError; // re-throw if no fallback
@@ -642,46 +645,95 @@ async function handleDeepReview(
       response = await model.sendRequest(messages, {}, token);
     }
 
-    // Buffer complete response to detect content-policy refusal
+    // ── Two-phase streaming with early refusal detection ──
+    // Content-policy refusals are always < 300 chars (isContentPolicyRefusal
+    // returns false for longer responses). Buffer the first 500 chars to
+    // detect refusals, then stream remaining chunks in real-time so the user
+    // sees progressive output instead of a blank screen for 30-60s.
+    const REFUSAL_BUFFER_LIMIT = 500;
     let responseText = "";
+    let bufferFlushed = false;
+    let chunkCount = 0;
+
+    stream.progress("Layer 2 — AI model is analyzing code…");
+
     for await (const chunk of response.text) {
       if (token.isCancellationRequested) return;
       responseText += chunk;
+      chunkCount++;
+
+      if (!bufferFlushed) {
+        // Still buffering for refusal detection
+        if (responseText.length >= REFUSAL_BUFFER_LIMIT) {
+          // Past refusal threshold — this is a real response, flush buffer
+          bufferFlushed = true;
+          stream.progress("Layer 2 — Streaming AI review results…");
+          stream.markdown(responseText);
+        } else if (chunkCount % 5 === 0) {
+          // Periodic progress during initial buffer phase
+          stream.progress("Layer 2 — AI model is reasoning…");
+        }
+      } else {
+        // Buffer flushed — stream in real-time
+        stream.markdown(chunk);
+      }
     }
 
-    if (!isContentPolicyRefusal(responseText)) {
-      // Normal response — stream to user
-      stream.markdown(responseText);
-      stream.markdown("\n");
-    } else {
-      // ── Content-policy refusal detected — retry with simplified prompt ──
-      stream.progress("Retrying with simplified review prompt…");
-
-      const simplifiedSection = buildSimplifiedDeepReviewSection(language, context);
-      const retryPrompt = DEEP_REVIEW_PROMPT_INTRO + codeAndFindings + simplifiedSection;
-
-      // Try a different model family for the retry
-      const altModels = await vscode.lm.selectChatModels();
-      const altModel = altModels.find((m) => m.id !== model.id) ?? model;
-
-      const retryMessages = [identityMsg, vscode.LanguageModelChatMessage.User(retryPrompt)];
-      const retryResponse = await altModel.sendRequest(retryMessages, {}, token);
-
-      let retryText = "";
-      for await (const chunk of retryResponse.text) {
-        if (token.isCancellationRequested) return;
-        retryText += chunk;
-      }
-
-      if (!isContentPolicyRefusal(retryText)) {
-        stream.markdown(retryText);
+    // Handle response based on refusal detection
+    if (!bufferFlushed) {
+      // Response was shorter than buffer limit — check for refusal
+      if (!isContentPolicyRefusal(responseText)) {
+        // Normal short response — stream it
+        stream.markdown(responseText);
+        stream.markdown("\n");
       } else {
-        stream.markdown(
-          `The AI model declined this review. This can happen with code that combines ` +
-            `privacy/security infrastructure (e.g., GDPR, PII handling) with security evaluation criteria. ` +
-            `Layer 1 findings above are still valid.\n`,
-        );
+        // ── Content-policy refusal detected — retry with simplified prompt ──
+        stream.progress("Layer 2 — Content policy triggered, retrying with simplified prompt…");
+
+        const simplifiedSection = buildSimplifiedDeepReviewSection(language, context);
+        const retryPrompt = DEEP_REVIEW_PROMPT_INTRO + codeAndFindings + simplifiedSection;
+
+        // Try a different model family for the retry
+        const altModels = await vscode.lm.selectChatModels();
+        const altModel = altModels.find((m) => m.id !== model.id) ?? model;
+
+        const retryMessages = [identityMsg, vscode.LanguageModelChatMessage.User(retryPrompt)];
+
+        stream.progress("Layer 2 — Sending simplified request…");
+        const retryResponse = await altModel.sendRequest(retryMessages, {}, token);
+
+        // Use same two-phase approach for retry
+        let retryText = "";
+        let retryFlushed = false;
+
+        stream.progress("Layer 2 — AI model is re-analyzing…");
+        for await (const chunk of retryResponse.text) {
+          if (token.isCancellationRequested) return;
+          retryText += chunk;
+
+          if (!retryFlushed && retryText.length >= REFUSAL_BUFFER_LIMIT) {
+            retryFlushed = true;
+            stream.progress("Layer 2 — Streaming retry results…");
+            stream.markdown(retryText);
+          } else if (retryFlushed) {
+            stream.markdown(chunk);
+          }
+        }
+
+        if (!retryFlushed) {
+          if (!isContentPolicyRefusal(retryText)) {
+            stream.markdown(retryText);
+          } else {
+            stream.markdown(
+              `The AI model declined this review. This can happen with code that combines ` +
+                `privacy/security infrastructure (e.g., GDPR, PII handling) with security evaluation criteria. ` +
+                `Layer 1 findings above are still valid.\n`,
+            );
+          }
+        }
+        stream.markdown("\n");
       }
+    } else {
       stream.markdown("\n");
     }
   } catch (error) {

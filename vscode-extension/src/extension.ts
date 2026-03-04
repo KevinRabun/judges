@@ -116,10 +116,12 @@ export function activate(context: vscode.ExtensionContext): void {
           title: "Judges: Running deep review (Layer 1 + Layer 2)…",
           cancellable: true,
         },
-        async (_progress, progressToken) => {
+        async (progress, progressToken) => {
           progressToken.onCancellationRequested(() => cts.cancel());
 
-          const result = await diagnosticProvider.deepReview(editor.document, cts.token);
+          const result = await diagnosticProvider.deepReview(editor.document, cts.token, (msg) =>
+            progress.report({ message: msg }),
+          );
 
           if (cts.token.isCancellationRequested) return;
 

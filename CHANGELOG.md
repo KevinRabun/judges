@@ -2,6 +2,17 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.12] — 2026-03-03
+
+### Changed
+- **VS Code extension — Layer 2 progress feedback** — Replaced silent full-response buffering with two-phase streaming and granular progress indicators so users see real-time status during the AI deep review instead of a blank screen for 30–60 seconds:
+  - **Chat participant (`/deepreview`)**: Added progress messages at each stage (preparing prompt, selecting model, sending request, AI analyzing, streaming results); LLM response now streams incrementally to the chat after the first 500 chars clear the content-policy refusal check — user sees text appearing in real-time instead of a single wall of text at the end
+  - **Command palette (`Judges: Deep Review`)**: `withProgress` notification now shows phase-specific messages via a new `onProgress` callback passed into `deepReview()` — Layer 1 analysis, model selection, request sending, AI analysis, retry status all reported in the notification area
+  - **Retry path**: Content-policy retry also uses two-phase streaming and granular progress instead of silent buffering
+
+### Tests
+- 1666 tests, 0 failures
+
 ## [3.20.11] — 2026-03-03
 
 ### Fixed

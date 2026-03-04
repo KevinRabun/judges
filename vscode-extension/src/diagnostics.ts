@@ -359,6 +359,7 @@ export class JudgesDiagnosticProvider {
   async deepReview(
     document: vscode.TextDocument,
     token: vscode.CancellationToken,
+    onProgress?: (message: string) => void,
   ): Promise<{ markdown: string; findingsCount: number }> {
     const language = LANG_MAP[document.languageId];
     if (!language) {
@@ -371,6 +372,7 @@ export class JudgesDiagnosticProvider {
     }
 
     // ── Layer 1: Deterministic Evaluation ──
+    onProgress?.("Layer 1 — Running deterministic analysis…");
     const verdict = evaluateWithTribunal(code, language);
     const findings = verdict.evaluations.flatMap((e) => e.findings);
     this.publishFindings(document, findings, code);
@@ -414,6 +416,7 @@ export class JudgesDiagnosticProvider {
 
     try {
       // Use any available model (no hardcoded preference)
+      onProgress?.("Layer 2 — Selecting language model…");
       const models = await vscode.lm.selectChatModels();
       let model = models[0];
       if (!model) {
@@ -432,10 +435,12 @@ export class JudgesDiagnosticProvider {
       const messages = [identityMsg, vscode.LanguageModelChatMessage.User(prompt)];
 
       // Try sending; if the first model fails, try an alternative
+      onProgress?.("Layer 2 — Sending request to AI model…");
       let response: vscode.LanguageModelChatResponse;
       try {
         response = await model.sendRequest(messages, {}, token);
       } catch (sendError) {
+        onProgress?.("Layer 2 — Trying alternative model…");
         const fallbackModels = await vscode.lm.selectChatModels();
         const fallback = fallbackModels.find((m) => m.id !== model!.id) ?? fallbackModels[0];
         if (!fallback) throw sendError;
@@ -443,17 +448,31 @@ export class JudgesDiagnosticProvider {
         response = await model.sendRequest(messages, {}, token);
       }
 
-      // Buffer response to detect content-policy refusal
+      // ── Two-phase streaming with early refusal detection ──
+      // Content-policy refusals are always < 300 chars (isContentPolicyRefusal
+      // returns false for longer responses). Buffer the first 500 chars to
+      // detect refusals, then accumulate remaining response.
+      const REFUSAL_BUFFER_LIMIT = 500;
       let responseText = "";
+      let refusalCleared = false;
+
+      onProgress?.("Layer 2 — AI model is analyzing code…");
+
       for await (const chunk of response.text) {
         if (token.isCancellationRequested) break;
         responseText += chunk;
+
+        if (!refusalCleared && responseText.length >= REFUSAL_BUFFER_LIMIT) {
+          refusalCleared = true;
+          onProgress?.("Layer 2 — Processing AI analysis…");
+        }
       }
 
       if (!isContentPolicyRefusal(responseText)) {
         md += responseText;
       } else {
         // Retry with simplified prompt
+        onProgress?.("Layer 2 — Content policy triggered, retrying…");
         const simplifiedSection = buildSimplifiedDeepReviewSection(language);
         const retryPrompt = DEEP_REVIEW_PROMPT_INTRO + codeAndFindings + simplifiedSection;
 
@@ -461,9 +480,11 @@ export class JudgesDiagnosticProvider {
         const altModel = altModels.find((m) => m.id !== model!.id) ?? model;
 
         const retryMessages = [identityMsg, vscode.LanguageModelChatMessage.User(retryPrompt)];
+        onProgress?.("Layer 2 — Sending simplified request…");
         const retryResponse = await altModel.sendRequest(retryMessages, {}, token);
 
         let retryText = "";
+        onProgress?.("Layer 2 — AI model is re-analyzing…");
         for await (const chunk of retryResponse.text) {
           if (token.isCancellationRequested) break;
           retryText += chunk;
