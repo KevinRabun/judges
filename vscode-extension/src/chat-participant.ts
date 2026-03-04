@@ -162,8 +162,30 @@ const EXT_TO_LANG: Record<string, string> = {
   ".psm1": "powershell",
 };
 
-/** Max files to evaluate in a single workspace review to avoid timeouts. */
-const MAX_WORKSPACE_FILES = 50;
+/** Default max files to evaluate in a single workspace review to avoid timeouts. */
+const DEFAULT_MAX_WORKSPACE_FILES = 50;
+
+/** Read the configured max-files cap (falls back to DEFAULT_MAX_WORKSPACE_FILES). */
+function getMaxWorkspaceFiles(): number {
+  return vscode.workspace.getConfiguration("judges").get<number>("maxFiles", DEFAULT_MAX_WORKSPACE_FILES);
+}
+
+/** Build a VS Code exclude glob from judges.exclude patterns. */
+function buildExcludeGlob(): string {
+  const cfg = vscode.workspace.getConfiguration("judges");
+  const excludes: string[] = cfg.get<string[]>("exclude", []);
+  const base = "**/node_modules/**";
+  if (excludes.length === 0) return base;
+  return `{${base},${excludes.join(",")}}`;
+}
+
+/** Return the minimum confidence threshold for the configured tier. */
+function getConfidenceThreshold(): number {
+  const tier = vscode.workspace.getConfiguration("judges").get<string>("confidenceTier", "important");
+  if (tier === "essential") return 0.8;
+  if (tier === "supplementary") return 0;
+  return 0.6; // important (default)
+}
 
 /**
  * Detect whether the user's prompt indicates a workspace-wide review
@@ -332,17 +354,33 @@ async function handleWorkspaceReview(
 
   stream.progress("Finding source files in workspace…");
 
-  const uris = await vscode.workspace.findFiles(SUPPORTED_GLOB, "**/node_modules/**", MAX_WORKSPACE_FILES + 1);
+  const maxFiles = getMaxWorkspaceFiles();
+  const excludeGlob = buildExcludeGlob();
+  const includes: string[] = vscode.workspace.getConfiguration("judges").get<string[]>("include", []);
+
+  const uris = await vscode.workspace.findFiles(SUPPORTED_GLOB, excludeGlob, maxFiles + 1);
 
   if (token.isCancellationRequested) return;
 
-  if (uris.length === 0) {
+  // Apply include-pattern filtering when configured
+  let filteredUris = uris;
+  if (includes.length > 0) {
+    const includeRegexes = includes.map(
+      (g) => new RegExp("^" + g.replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*").replace(/\?/g, ".") + "$"),
+    );
+    filteredUris = uris.filter((uri) => {
+      const rel = vscode.workspace.asRelativePath(uri).replace(/\\/g, "/");
+      return includeRegexes.some((rx) => rx.test(rel));
+    });
+  }
+
+  if (filteredUris.length === 0) {
     stream.markdown("No supported source files found in the workspace.");
     return;
   }
 
-  const capped = uris.length > MAX_WORKSPACE_FILES;
-  const filesToProcess = capped ? uris.slice(0, MAX_WORKSPACE_FILES) : uris;
+  const capped = filteredUris.length > maxFiles;
+  const filesToProcess = capped ? filteredUris.slice(0, maxFiles) : filteredUris;
 
   const promptLower = request.prompt.toLowerCase();
   const focusFilter = !preset ? detectFocusFilter(promptLower) : null;
@@ -377,6 +415,12 @@ async function handleWorkspaceReview(
         allFindings = allFindings.filter((f) => focusFilter.test(f.ruleId));
       }
 
+      // Apply confidence tier filtering
+      const minConfidence = getConfidenceThreshold();
+      if (minConfidence > 0) {
+        allFindings = allFindings.filter((f) => (f.confidence ?? 0.5) >= minConfidence);
+      }
+
       results.push({
         relativePath,
         score: verdict.overallScore,
@@ -406,7 +450,7 @@ async function handleWorkspaceReview(
   stream.markdown(
     `### 🔍 Judges Panel — Workspace Review\n\n` +
       `**Files evaluated:** ${results.length}` +
-      (capped ? ` (capped at ${MAX_WORKSPACE_FILES})` : "") +
+      (capped ? ` (capped at ${maxFiles})` : "") +
       `  |  **Avg score:** ${avgScore}/100  |  ` +
       `**Total findings:** ${totalFindings}  |  ` +
       `🔴 ${criticalCount} critical  🟠 ${highCount} high\n\n`,
@@ -825,7 +869,7 @@ function handleHelp(stream: vscode.ChatResponseStream): vscode.ChatResult | void
       `false positives, and architectural concerns that pattern matching cannot detect.\n\n` +
       `**Workspace review** triggers automatically when you mention ` +
       `*codebase*, *workspace*, *project*, *all files*, *repo*, or *folder* ` +
-      `in your prompt (up to ${MAX_WORKSPACE_FILES} files).\n\n` +
+      `in your prompt (up to ${getMaxWorkspaceFiles()} files).\n\n` +
       `You can also ask naturally:\n` +
       `- *"@judges review this file for performance issues"*\n` +
       `- *"@judges review the entire codebase"*\n` +

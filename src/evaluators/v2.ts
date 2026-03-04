@@ -80,6 +80,10 @@ function mapSpecialty(ruleId: string): string {
     ARCH: "Architecture",
     SUPPLY: "Dependency Supply Chain",
     AICS: "AI Code Safety",
+    RES: "Resilience",
+    SEC: "Framework Safety",
+    IAC: "IaC Security",
+    AIGEN: "AI Fingerprinting",
   };
 
   return map[prefix] ?? "General";
@@ -124,6 +128,10 @@ function mapJudgeIdFromRule(ruleId: string): string | undefined {
     ARCH: "software-practices",
     SUPPLY: "dependency-health",
     AICS: "ai-code-safety",
+    RES: "resilience",
+    SEC: "framework-safety",
+    IAC: "iac-security",
+    AIGEN: "ai-code-safety",
   };
 
   return map[prefix];

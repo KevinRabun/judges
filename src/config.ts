@@ -1,7 +1,10 @@
 // ─── Configuration Module ────────────────────────────────────────────────────
 // Loads and validates .judgesrc / .judgesrc.json project configuration.
+// Supports cascading config: child directories override parent settings.
 // ──────────────────────────────────────────────────────────────────────────────
 
+import { existsSync, readFileSync } from "fs";
+import { resolve, dirname, join } from "path";
 import type { JudgesConfig, Severity } from "./types.js";
 import { ConfigError } from "./errors.js";
 
@@ -91,4 +94,97 @@ export function parseConfig(jsonStr: string): JudgesConfig {
  */
 export function defaultConfig(): JudgesConfig {
   return {};
+}
+
+// ─── Cascading Config ───────────────────────────────────────────────────────
+
+/** Config file names to search for, in priority order. */
+const CONFIG_NAMES = [".judgesrc", ".judgesrc.json"];
+
+/**
+ * Discover .judgesrc files by walking up from `startDir` to `rootDir`.
+ * Returns configs from root → leaf order (leaf overrides root).
+ */
+export function discoverCascadingConfigs(startDir: string, rootDir?: string): JudgesConfig[] {
+  const configs: Array<{ dir: string; config: JudgesConfig }> = [];
+  let current = resolve(startDir);
+  const stop = rootDir ? resolve(rootDir) : undefined;
+
+  // Walk up the directory tree
+  const visited = new Set<string>();
+  while (current && !visited.has(current)) {
+    visited.add(current);
+
+    for (const name of CONFIG_NAMES) {
+      const p = join(current, name);
+      if (existsSync(p)) {
+        try {
+          const cfg = parseConfig(readFileSync(p, "utf-8"));
+          configs.push({ dir: current, config: cfg });
+        } catch {
+          // Skip invalid config files
+        }
+        break; // Only use the first matching file per directory
+      }
+    }
+
+    if (stop && current === stop) break;
+    const parent = dirname(current);
+    if (parent === current) break; // reached filesystem root
+    current = parent;
+  }
+
+  // Reverse so root comes first — leaf configs override root configs
+  configs.reverse();
+  return configs.map((c) => c.config);
+}
+
+/**
+ * Merge multiple configs (root → leaf order). Later entries override earlier.
+ * Arrays (disabledRules, disabledJudges, languages, exclude, include) are
+ * concatenated (union). Scalars (minSeverity, maxFiles) use the leaf value.
+ * ruleOverrides are deep-merged.
+ */
+export function mergeConfigs(...configs: JudgesConfig[]): JudgesConfig {
+  const merged: JudgesConfig = {};
+
+  for (const cfg of configs) {
+    // Concatenate arrays (deduplicated)
+    if (cfg.disabledRules) {
+      merged.disabledRules = [...new Set([...(merged.disabledRules ?? []), ...cfg.disabledRules])];
+    }
+    if (cfg.disabledJudges) {
+      merged.disabledJudges = [...new Set([...(merged.disabledJudges ?? []), ...cfg.disabledJudges])];
+    }
+    if (cfg.languages) {
+      merged.languages = [...new Set([...(merged.languages ?? []), ...cfg.languages])];
+    }
+    if (cfg.exclude) {
+      merged.exclude = [...new Set([...(merged.exclude ?? []), ...cfg.exclude])];
+    }
+    if (cfg.include) {
+      merged.include = [...new Set([...(merged.include ?? []), ...cfg.include])];
+    }
+
+    // Scalars: leaf wins
+    if (cfg.minSeverity !== undefined) merged.minSeverity = cfg.minSeverity;
+    if (cfg.maxFiles !== undefined) merged.maxFiles = cfg.maxFiles;
+
+    // Deep-merge ruleOverrides
+    if (cfg.ruleOverrides) {
+      merged.ruleOverrides = { ...(merged.ruleOverrides ?? {}), ...cfg.ruleOverrides };
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * Load a cascading config for a specific file path.
+ * Walks from the file's directory up to rootDir, merging all .judgesrc files.
+ */
+export function loadCascadingConfig(filePath: string, rootDir?: string): JudgesConfig {
+  const dir = dirname(resolve(filePath));
+  const configs = discoverCascadingConfigs(dir, rootDir);
+  return configs.length > 0 ? mergeConfigs(...configs) : {};
 }

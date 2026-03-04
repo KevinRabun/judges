@@ -2,6 +2,39 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.22.0] — 2026-03-04
+
+### Added — P0: Trust & Accuracy Foundation
+- **V2 prefix mapping completeness** — Added 4 missing rule prefix mappings (`RES`, `SEC`, `IAC`, `AIGEN`) to `mapSpecialty()` and `mapJudgeIdFromRule()` in v2.ts, ensuring all 37 judges route correctly in V2 policy profiles
+- **Cross-file deduplication** — New `crossFileDedup()` function in dedup.ts detects project-wide duplicate findings across files using topic patterns, severity matching, and configurable tightness; integrated into project.ts evaluation pipeline
+- **Benchmark expansion** — Expanded benchmark suite from 17 to ~47 test cases covering all major vulnerability categories with balanced true-positive / false-positive samples; version now auto-read from package.json
+- **Test coverage expansion** — 481 subsystem tests (up from ~400), covering scoring, dedup, config, CLI, presets, benchmark gate, cascading config, CSV formatter, and streaming API
+
+### Added — P1: Developer Experience & Adoption
+- **CLI `--exclude` / `--include` / `--maxFiles` flags** — File filtering via glob patterns and file-count limits; integrated into `action.yml` inputs and `.judgesrc` schema; `globToRegex()`, `matchesGlob()`, `collectFiles()` utilities
+- **Preset composability** — `composePresets()` merges multiple presets with intersection for disabledJudges, union for disabledRules, and most-permissive minSeverity; CLI accepts comma-separated `--preset security,quick`
+- **API reference & plugin guide** — New `docs/api-reference.md` (comprehensive API surface) and `docs/plugin-guide.md` (custom evaluator/formatter development guide)
+
+### Added — P2: Depth & Precision
+- **Confidence tuning** — Enhanced `estimateFindingConfidence` with provenance-based boosts (AST +0.15, taint-flow +0.18, regex +0.08), domain-severity alignment (+0.04 for security-critical), and 3-tier noise caps: Tier 1 subjective judges (COMP/ETHICS/SOV/COST/DOC → 0.82), Tier 2 context-dependent (API/CONC/DB/DEPS/LOGPRIV/OBS/PERF → 0.88), Tier 3 mechanical (CACHE/CFG/COMPAT/MAINT/SWDEV/TEST → 0.92)
+- **Dedup topic expansion** — Expanded `DEDUP_TOPIC_PATTERNS` from ~27 to ~52 patterns adding auth/session, concurrency, database, logging/privacy, config/infra, dependency, resource management, and error handling domains
+- **VS Code extension depth** — 4 new settings: `judges.exclude`, `judges.include`, `judges.maxFiles`, `judges.confidenceTier` (essential/important/supplementary); confidence tier filtering in diagnostics and workspace reviews; configurable workspace eval limits
+- **CI benchmark gate** — `--gate` CLI flag with `--min-f1`, `--min-precision`, `--min-recall`, `--min-detection-rate`, `--baseline` options; `benchmarkGate()` API function with regression detection (1% tolerance); `BenchmarkGateOptions` / `BenchmarkGateResult` types
+
+### Added — P3: Ecosystem & Integration
+- **Cascading config** — Directory-level `.judgesrc` override support: `discoverCascadingConfigs()` walks up from file to project root finding configs, `mergeConfigs()` unions arrays and deep-merges ruleOverrides, `loadCascadingConfig()` convenience wrapper; enables monorepo per-package configuration
+- **Streaming / async API** — `evaluateFilesStream()` async generator yields results per file for progress UIs; `evaluateFilesBatch()` with bounded concurrency (default 4 workers) and `onProgress` callback; new `FileInput` / `FileEvaluationResult` types
+- **MCP tool expansion** — 3 new MCP tools (13 → 16 total): `benchmark_gate` (run benchmark with quality thresholds), `compare_benchmarks` (diff two benchmark runs), `evaluate_batch` (evaluate multiple files in one call with per-file results table)
+- **CSV formatter** — New `src/formatters/csv.ts` with `verdictToCsvRows()`, `verdictsToCsv()`, `findingsToCsv()` for spreadsheet / data-pipeline ingestion; header: `file,ruleId,severity,confidence,title,lines,reference`
+
+### Changed
+- Benchmark report now reads version dynamically from package.json instead of hardcoded string
+- `evaluateWithTribunal` MCP tool handlers use correct call signature (`code, language, context?, options?`)
+
+### Tests
+- 481 subsystem tests passing (102 suites), covering all new features
+- 20 new tests for P3: cascading config merge (10), CSV formatter (5), streaming/batch API (5)
+
 ## [3.21.0] — 2026-03-05
 
 ### Added — P0: GitHub Action CI/CD

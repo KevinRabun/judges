@@ -11,8 +11,7 @@
     },
     "preset": {
       "type": "string",
-      "enum": ["strict", "lenient", "security-only", "startup", "compliance", "performance"],
-      "description": "Named preset to use as a base configuration. Individual settings override preset values."
+      "description": "Named preset or comma-separated composition (e.g. \"security-only\" or \"security-only,performance\"). Individual settings override preset values."
     },
     "disabledRules": {
       "type": "array",
@@ -68,6 +67,22 @@
       "enum": ["text", "json", "sarif", "markdown", "html", "junit", "codeclimate"],
       "description": "Default output format.",
       "default": "text"
+    },
+    "exclude": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Glob patterns to exclude files from analysis (e.g. [\"**/*.test.ts\", \"**/fixtures/**\"])."
+    },
+    "include": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Glob patterns to include only matching files (e.g. [\"**/*.py\", \"**/*.ts\"]). When specified, only matching files are analyzed."
+    },
+    "maxFiles": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum number of files to analyze when scanning a directory.",
+      "default": 300
     }
   },
   "additionalProperties": false

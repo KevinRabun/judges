@@ -9,6 +9,8 @@
 //   npx tsx --test tests/subsystems.test.ts
 // ─────────────────────────────────────────────────────────────────────────────
 
+/* eslint-disable @typescript-eslint/consistent-type-imports */
+
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
@@ -20,7 +22,7 @@ import {
   isAbsenceBasedFinding,
 } from "../src/scoring.js";
 import { crossEvaluatorDedup, severityRank } from "../src/dedup.js";
-import { parseConfig, defaultConfig } from "../src/config.js";
+import { parseConfig, defaultConfig, mergeConfigs } from "../src/config.js";
 import { enrichWithPatches } from "../src/patches/index.js";
 import { applyInlineSuppressions } from "../src/evaluators/index.js";
 import {
@@ -264,6 +266,80 @@ describe("Confidence — estimateFindingConfidence", () => {
     );
     assert.ok(absence < 0.5, `Absence finding should have low confidence: ${absence}`);
   });
+
+  it("should boost confidence for AST-confirmed provenance", () => {
+    const astConfirmed = estimateFindingConfidence(
+      makeFinding({ confidence: undefined, lineNumbers: [10], provenance: "ast-confirmed" }),
+    );
+    const noProvenance = estimateFindingConfidence(
+      makeFinding({ confidence: undefined, lineNumbers: [10], provenance: undefined }),
+    );
+    assert.ok(astConfirmed > noProvenance, `AST-confirmed (${astConfirmed}) should > no provenance (${noProvenance})`);
+  });
+
+  it("should boost confidence significantly for taint-flow provenance", () => {
+    const taintFlow = estimateFindingConfidence(
+      makeFinding({ confidence: undefined, lineNumbers: [5], provenance: "taint-flow" }),
+    );
+    const noProvenance = estimateFindingConfidence(
+      makeFinding({ confidence: undefined, lineNumbers: [5], provenance: undefined }),
+    );
+    assert.ok(taintFlow - noProvenance >= 0.15, `Taint-flow boost (${taintFlow - noProvenance}) should be >= 0.15`);
+  });
+
+  it("should apply domain-specific noise caps for advisory domains", () => {
+    const advisoryFinding = estimateFindingConfidence(
+      makeFinding({
+        confidence: undefined,
+        ruleId: "COMP-001",
+        lineNumbers: [10],
+        description: "Short compliance issue",
+      }),
+    );
+    assert.ok(advisoryFinding <= 0.82, `Advisory domain finding (${advisoryFinding}) should be capped at 0.82`);
+  });
+
+  it("should apply stricter noise caps for tier-1 vs tier-2 domains", () => {
+    const tier1 = estimateFindingConfidence(
+      makeFinding({
+        confidence: undefined,
+        ruleId: "ETHICS-001",
+        lineNumbers: [10],
+        description: "Short ethical issue",
+      }),
+    );
+    const tier2 = estimateFindingConfidence(
+      makeFinding({
+        confidence: undefined,
+        ruleId: "API-001",
+        lineNumbers: [10],
+        description: "Short API issue",
+      }),
+    );
+    assert.ok(tier1 <= tier2, `Tier-1 (${tier1}) should be <= tier-2 (${tier2})`);
+  });
+
+  it("should boost security-domain critical findings", () => {
+    const critical = estimateFindingConfidence(
+      makeFinding({
+        confidence: undefined,
+        ruleId: "CYBER-001",
+        severity: "critical",
+        lineNumbers: [10],
+        description: "SQL injection via eval() detected",
+      }),
+    );
+    const low = estimateFindingConfidence(
+      makeFinding({
+        confidence: undefined,
+        ruleId: "CYBER-002",
+        severity: "low",
+        lineNumbers: [10],
+        description: "Minor informational finding",
+      }),
+    );
+    assert.ok(critical > low, `Security critical (${critical}) should > security low (${low})`);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -464,6 +540,66 @@ describe("Deduplication — crossEvaluatorDedup", () => {
     const findings = [makeFinding()];
     const result = crossEvaluatorDedup(findings);
     assert.equal(result.length, 1);
+  });
+
+  it("should dedup new v3.22 topics: race-condition across judges", () => {
+    const findings = [
+      makeFinding({ ruleId: "CONC-001", title: "Race condition in shared state", description: "Data race detected" }),
+      makeFinding({
+        ruleId: "CYBER-005",
+        title: "TOCTOU race condition",
+        description: "Time of check race condition vulnerability",
+      }),
+    ];
+    const result = crossEvaluatorDedup(findings);
+    assert.equal(result.length, 1, "Race condition findings should dedup to 1");
+  });
+
+  it("should dedup new v3.22 topics: session-vulnerability across judges", () => {
+    const findings = [
+      makeFinding({
+        ruleId: "AUTH-003",
+        title: "Session fixation vulnerability",
+        description: "Insecure session management",
+      }),
+      makeFinding({ ruleId: "CYBER-010", title: "Session hijacking risk", description: "Session hijack possible" }),
+    ];
+    const result = crossEvaluatorDedup(findings);
+    assert.equal(result.length, 1, "Session vulnerability findings should dedup to 1");
+  });
+
+  it("should dedup new v3.22 topics: resource-leak across judges", () => {
+    const findings = [
+      makeFinding({
+        ruleId: "ERR-002",
+        title: "Unclosed file handle",
+        description: "Resource leak detected, file handle not closed",
+      }),
+      makeFinding({
+        ruleId: "PERF-008",
+        title: "Leaked connection resource",
+        description: "Leaked resource: connection handle",
+      }),
+    ];
+    const result = crossEvaluatorDedup(findings);
+    assert.equal(result.length, 1, "Resource leak findings should dedup to 1");
+  });
+
+  it("should dedup new v3.22 topics: cors-misconfiguration", () => {
+    const findings = [
+      makeFinding({
+        ruleId: "CYBER-011",
+        title: "Permissive CORS wildcard configuration",
+        description: "CORS allows all origins",
+      }),
+      makeFinding({
+        ruleId: "API-004",
+        title: "CORS wildcard origin detected",
+        description: "Cross-origin allow origin *",
+      }),
+    ];
+    const result = crossEvaluatorDedup(findings);
+    assert.equal(result.length, 1, "CORS findings should dedup to 1");
   });
 });
 
@@ -5481,5 +5617,1271 @@ describe("enrichWithPatches — produces patches for known vulnerable patterns",
     const enriched = enrichWithPatches(findings, code);
     // enrichWithPatches should always return at least the original findings
     assert.ok(enriched.length >= findings.length, "Should preserve original findings");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Cross-File Deduplication — crossFileDedup
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("crossFileDedup — basic behavior", () => {
+  let crossFileDedup: typeof import("../src/dedup.js").crossFileDedup;
+
+  it("should load crossFileDedup", async () => {
+    const mod = await import("../src/dedup.js");
+    crossFileDedup = mod.crossFileDedup;
+    assert.equal(typeof crossFileDedup, "function");
+  });
+
+  it("should return all findings unchanged for a single file", async () => {
+    const findings = [
+      makeFinding({ ruleId: "CYBER-001", title: "SQL Injection", description: "SQL injection detected" }),
+      makeFinding({ ruleId: "AUTH-001", title: "Hardcoded secret", description: "Token hardcoded" }),
+    ];
+    const result = crossFileDedup([{ path: "src/app.ts", findings }]);
+    assert.equal(result.length, 2);
+  });
+
+  it("should return empty array for empty input", async () => {
+    const result = crossFileDedup([]);
+    assert.equal(result.length, 0);
+  });
+
+  it("should consolidate identical topic+ruleId findings across files", async () => {
+    const result = crossFileDedup([
+      {
+        path: "src/a.ts",
+        findings: [
+          makeFinding({
+            ruleId: "CYBER-001",
+            title: "SQL Injection via concat",
+            description: "SQL query built with concatenation",
+            confidence: 0.8,
+            severity: "critical",
+            lineNumbers: [10],
+          }),
+        ],
+      },
+      {
+        path: "src/b.ts",
+        findings: [
+          makeFinding({
+            ruleId: "CYBER-001",
+            title: "SQL Injection via template literal",
+            description: "SQL query uses template string with user input",
+            confidence: 0.75,
+            severity: "critical",
+            lineNumbers: [25],
+          }),
+        ],
+      },
+      {
+        path: "src/c.ts",
+        findings: [
+          makeFinding({
+            ruleId: "CYBER-001",
+            title: "SQL Injection",
+            description: "SQL injection vulnerability via string interpolation",
+            confidence: 0.7,
+            severity: "critical",
+            lineNumbers: [5],
+          }),
+        ],
+      },
+    ]);
+
+    // Should consolidate the 3 identical-topic (sql-injection) + same ruleId into 1
+    const cyberFindings = result.filter((f) => f.ruleId === "CYBER-001");
+    assert.equal(cyberFindings.length, 1, "Should consolidate to single finding");
+    assert.ok(cyberFindings[0].description.includes("3 file(s)"), "Should annotate with file count");
+  });
+
+  it("should boost confidence for multi-file patterns", async () => {
+    const result = crossFileDedup([
+      {
+        path: "src/a.ts",
+        findings: [
+          makeFinding({
+            ruleId: "CYBER-001",
+            title: "SQL Injection",
+            description: "SQL injection via string concat",
+            confidence: 0.8,
+            severity: "critical",
+          }),
+        ],
+      },
+      {
+        path: "src/b.ts",
+        findings: [
+          makeFinding({
+            ruleId: "CYBER-001",
+            title: "SQL Injection",
+            description: "SQL injection via template literal",
+            confidence: 0.75,
+            severity: "critical",
+          }),
+        ],
+      },
+    ]);
+
+    const consolidated = result.find((f) => f.ruleId === "CYBER-001");
+    assert.ok(consolidated, "Should have consolidated finding");
+    // Confidence should be boosted: base 0.8 + 0.05 * min(1, 3) = 0.85
+    assert.ok(
+      (consolidated.confidence ?? 0) > 0.8,
+      `Confidence ${consolidated.confidence} should be boosted above 0.8`,
+    );
+  });
+
+  it("should NOT consolidate findings with different ruleIds even with same topic", async () => {
+    const result = crossFileDedup([
+      {
+        path: "src/a.ts",
+        findings: [
+          makeFinding({
+            ruleId: "CYBER-001",
+            title: "SQL Injection",
+            description: "SQL injection via string concat",
+          }),
+        ],
+      },
+      {
+        path: "src/b.ts",
+        findings: [
+          makeFinding({
+            ruleId: "CYBER-099",
+            title: "SQL Injection custom",
+            description: "SQL injection via custom ORM",
+          }),
+        ],
+      },
+    ]);
+
+    // Different ruleIds → should not consolidate even if same topic
+    assert.ok(result.length >= 2, "Should keep separate findings for different ruleIds");
+  });
+
+  it("should keep findings without known topics as ungrouped", async () => {
+    const result = crossFileDedup([
+      {
+        path: "src/a.ts",
+        findings: [
+          makeFinding({
+            ruleId: "CUSTOM-001",
+            title: "Some custom check",
+            description: "A novel issue that does not match any known pattern",
+          }),
+        ],
+      },
+      {
+        path: "src/b.ts",
+        findings: [
+          makeFinding({
+            ruleId: "CUSTOM-001",
+            title: "Same custom check",
+            description: "Another novel issue no known pattern",
+          }),
+        ],
+      },
+    ]);
+
+    // Without known topic pattern matches, these should remain ungrouped
+    assert.equal(result.length, 2, "Should keep ungrouped findings separate");
+  });
+
+  it("should preserve mixed grouped and ungrouped findings", async () => {
+    const result = crossFileDedup([
+      {
+        path: "src/a.ts",
+        findings: [
+          makeFinding({
+            ruleId: "CYBER-001",
+            title: "SQL Injection",
+            description: "SQL injection detected in query builder",
+          }),
+          makeFinding({
+            ruleId: "CUSTOM-001",
+            title: "Org-specific check",
+            description: "Internal lint rule violation xyz",
+          }),
+        ],
+      },
+      {
+        path: "src/b.ts",
+        findings: [
+          makeFinding({
+            ruleId: "CYBER-001",
+            title: "SQL Injection",
+            description: "SQL injection via raw query",
+          }),
+        ],
+      },
+    ]);
+
+    // SQL injection should consolidate (2 → 1), custom stays as-is (1)
+    const cyberCount = result.filter((f) => f.ruleId === "CYBER-001").length;
+    const customCount = result.filter((f) => f.ruleId === "CUSTOM-001").length;
+    assert.equal(cyberCount, 1, "SQL injection findings should consolidate");
+    assert.equal(customCount, 1, "Custom findings should remain");
+    assert.equal(result.length, 2, "Total findings should be 2");
+  });
+
+  it("should keep line numbers from all consolidated findings", async () => {
+    const result = crossFileDedup([
+      {
+        path: "src/a.ts",
+        findings: [
+          makeFinding({
+            ruleId: "AUTH-001",
+            title: "Hardcoded secret",
+            description: "Hardcoded secret or API key detected",
+            lineNumbers: [10, 20],
+          }),
+        ],
+      },
+      {
+        path: "src/b.ts",
+        findings: [
+          makeFinding({
+            ruleId: "AUTH-001",
+            title: "Hardcoded secret",
+            description: "Hardcoded secret found in source",
+            lineNumbers: [5, 15],
+          }),
+        ],
+      },
+    ]);
+
+    const consolidated = result.find((f) => f.ruleId === "AUTH-001");
+    assert.ok(consolidated, "Should have consolidated finding");
+    // All line numbers from both files should be present
+    const lines = consolidated.lineNumbers ?? [];
+    assert.ok(lines.length >= 3, `Should have merged line numbers, got ${lines.length}`);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V2 Evaluation — Prefix Mapping Coverage
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("V2 — mapSpecialty and mapJudgeIdFromRule prefix coverage", () => {
+  let evaluateCodeV2: typeof import("../src/evaluators/v2.js").evaluateCodeV2;
+  let getSupportedPolicyProfiles: typeof import("../src/evaluators/v2.js").getSupportedPolicyProfiles;
+
+  it("should load V2 module", async () => {
+    const mod = await import("../src/evaluators/v2.js");
+    evaluateCodeV2 = mod.evaluateCodeV2;
+    getSupportedPolicyProfiles = mod.getSupportedPolicyProfiles;
+    assert.equal(typeof evaluateCodeV2, "function");
+    assert.equal(typeof getSupportedPolicyProfiles, "function");
+  });
+
+  it("getSupportedPolicyProfiles should return all defined profiles", () => {
+    const profiles = getSupportedPolicyProfiles();
+    assert.ok(profiles.length >= 6, `Expected at least 6 profiles, got ${profiles.length}`);
+    assert.ok(profiles.includes("default"));
+    assert.ok(profiles.includes("regulated"));
+    assert.ok(profiles.includes("fintech"));
+    assert.ok(profiles.includes("healthcare"));
+    assert.ok(profiles.includes("startup"));
+    assert.ok(profiles.includes("public-sector"));
+  });
+
+  it("evaluateCodeV2 should produce V2 verdict with specialty grouping", () => {
+    const code = `
+const query = "SELECT * FROM users WHERE id = " + req.params.id;
+const password = "admin123";
+eval(userInput);
+    `;
+    const result = evaluateCodeV2({ code, language: "typescript" });
+    assert.ok(result, "Should return a V2 verdict");
+    assert.ok(typeof result.calibratedScore === "number");
+    assert.ok(typeof result.calibratedVerdict === "string");
+    assert.ok(result.findings !== undefined, "V2 verdict should include findings");
+    assert.ok(result.uncertainty !== undefined, "V2 verdict should include uncertaintyReport");
+    assert.ok(result.policyProfile === "default", "Should use default profile when none specified");
+  });
+
+  it("evaluateCodeV2 with regulated profile should escalate compliance findings", () => {
+    const code = `
+function processPayment(user: any) {
+  console.log("SSN:", user.ssn);
+  const card = user.creditCard;
+  db.query("INSERT INTO logs VALUES ('" + card + "')");
+}
+    `;
+    const result = evaluateCodeV2({ code, language: "typescript", policyProfile: "regulated" });
+    assert.ok(result, "Should return a V2 verdict");
+    assert.equal(result.policyProfile, "regulated");
+    assert.ok(result.calibratedScore <= 50, "Regulated profile with sensitive data violations should score low");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Fix History — Reverted + Acceptance Rate
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Fix History — recordFixReverted and getFixAcceptanceRate", () => {
+  let recordFixAccepted: typeof import("../src/fix-history.js").recordFixAccepted;
+  let recordFixRejected: typeof import("../src/fix-history.js").recordFixRejected;
+  let recordFixReverted: typeof import("../src/fix-history.js").recordFixReverted;
+  let computeFixStats: typeof import("../src/fix-history.js").computeFixStats;
+  let getFixAcceptanceRate: typeof import("../src/fix-history.js").getFixAcceptanceRate;
+  let loadFixHistory: typeof import("../src/fix-history.js").loadFixHistory;
+
+  let tmpDir: string;
+
+  it("should load fix-history module", async () => {
+    const mod = await import("../src/fix-history.js");
+    recordFixAccepted = mod.recordFixAccepted;
+    recordFixRejected = mod.recordFixRejected;
+    recordFixReverted = mod.recordFixReverted;
+    computeFixStats = mod.computeFixStats;
+    getFixAcceptanceRate = mod.getFixAcceptanceRate;
+    loadFixHistory = mod.loadFixHistory;
+    assert.equal(typeof recordFixReverted, "function");
+    assert.equal(typeof getFixAcceptanceRate, "function");
+  });
+
+  it("should handle reverted fixes in computeFixStats", async () => {
+    const { mkdtempSync, rmSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    tmpDir = mkdtempSync(join(tmpdir(), "judges-fix-"));
+
+    try {
+      // Record some outcomes
+      recordFixAccepted("CYBER-001", "src/a.ts", tmpDir);
+      recordFixAccepted("CYBER-001", "src/b.ts", tmpDir);
+      recordFixRejected("CYBER-002", "not useful", "src/c.ts", tmpDir);
+      recordFixReverted("CYBER-001", "src/a.ts", tmpDir);
+
+      const stats = computeFixStats(undefined, tmpDir);
+      assert.equal(stats.totalFixes, 4, "Should have 4 total outcomes");
+      // accepted = outcomes with accepted=true && !reverted = 2
+      // (recordFixReverted creates a separate entry with accepted=true, reverted=true)
+      assert.equal(stats.accepted, 2, "2 accepted (non-reverted)");
+      assert.equal(stats.rejected, 1);
+      assert.equal(stats.reverted, 1);
+      assert.ok(stats.acceptanceRate > 0 && stats.acceptanceRate < 1, "Rate should be between 0 and 1");
+
+      // Per-rule stats
+      assert.ok(stats.byRule["CYBER-001"], "Should have CYBER-001 stats");
+      assert.equal(stats.byRule["CYBER-001"].total, 3, "3 outcomes for CYBER-001");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("getFixAcceptanceRate should return rate for known rules", async () => {
+    const { mkdtempSync, rmSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    tmpDir = mkdtempSync(join(tmpdir(), "judges-fix-"));
+
+    try {
+      recordFixAccepted("AUTH-001", undefined, tmpDir);
+      recordFixAccepted("AUTH-001", undefined, tmpDir);
+      recordFixRejected("AUTH-001", undefined, undefined, tmpDir);
+
+      const rate = getFixAcceptanceRate("AUTH-001", tmpDir);
+      assert.ok(rate !== undefined);
+      assert.ok(rate > 0.5, `Expected rate > 0.5 for 2/3 accepts, got ${rate}`);
+
+      // Unknown rule should return undefined
+      const unknown = getFixAcceptanceRate("NONEXISTENT-999", tmpDir);
+      assert.equal(unknown, undefined);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("loadFixHistory should return empty history for non-existent dir", () => {
+    const history = loadFixHistory("/tmp/nonexistent-judges-dir-" + Date.now());
+    assert.equal(history.outcomes.length, 0);
+    assert.equal(history.version, "1.0.0");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Calibration — Edge Cases
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Calibration — buildCalibrationProfile and calibrateFindings", () => {
+  let buildCalibrationProfile: typeof import("../src/calibration.js").buildCalibrationProfile;
+  let calibrateFindings: typeof import("../src/calibration.js").calibrateFindings;
+
+  it("should load calibration module", async () => {
+    const mod = await import("../src/calibration.js");
+    buildCalibrationProfile = mod.buildCalibrationProfile;
+    calibrateFindings = mod.calibrateFindings;
+    assert.equal(typeof buildCalibrationProfile, "function");
+    assert.equal(typeof calibrateFindings, "function");
+  });
+
+  it("should build inactive profile from empty feedback store", () => {
+    const profile = buildCalibrationProfile({ version: "1.0.0", entries: [] });
+    assert.equal(profile.isActive, false);
+    assert.equal(profile.fpRateByRule.size, 0);
+    assert.equal(profile.feedbackCount, 0);
+  });
+
+  it("should build active profile from sufficient feedback data", () => {
+    const entries = [
+      {
+        ruleId: "CYBER-001",
+        verdict: "tp" as const,
+        timestamp: new Date().toISOString(),
+        filePath: "a.ts",
+        language: "typescript",
+      },
+      {
+        ruleId: "CYBER-001",
+        verdict: "tp" as const,
+        timestamp: new Date().toISOString(),
+        filePath: "b.ts",
+        language: "typescript",
+      },
+      {
+        ruleId: "CYBER-001",
+        verdict: "fp" as const,
+        timestamp: new Date().toISOString(),
+        filePath: "c.ts",
+        language: "typescript",
+      },
+      {
+        ruleId: "CYBER-001",
+        verdict: "fp" as const,
+        timestamp: new Date().toISOString(),
+        filePath: "d.ts",
+        language: "typescript",
+      },
+    ];
+    const profile = buildCalibrationProfile({ version: "1.0.0", entries });
+    assert.equal(profile.isActive, true);
+    assert.ok(profile.fpRateByRule.has("CYBER-001"));
+    assert.equal(profile.fpRateByRule.get("CYBER-001"), 0.5); // 2 FP / 4 total
+  });
+
+  it("should reduce confidence for high FP rate rules", () => {
+    const entries = Array.from({ length: 10 }, (_, i) => ({
+      ruleId: "FLAKY-001",
+      verdict: (i < 8 ? "fp" : "tp") as "fp" | "tp",
+      timestamp: new Date().toISOString(),
+      filePath: `file${i}.ts`,
+      language: "typescript" as const,
+    }));
+    const profile = buildCalibrationProfile({ version: "1.0.0", entries });
+    // FP rate = 8/10 = 0.8
+
+    const findings = [makeFinding({ ruleId: "FLAKY-001", confidence: 0.7 })];
+    const calibrated = calibrateFindings(findings, profile);
+    assert.ok((calibrated[0].confidence ?? 0) < 0.7, `Expected reduced confidence, got ${calibrated[0].confidence}`);
+  });
+
+  it("should boost confidence for low FP rate rules", () => {
+    const entries = Array.from({ length: 10 }, (_, i) => ({
+      ruleId: "SOLID-001",
+      verdict: (i < 1 ? "fp" : "tp") as "fp" | "tp",
+      timestamp: new Date().toISOString(),
+      filePath: `file${i}.ts`,
+      language: "typescript" as const,
+    }));
+    const profile = buildCalibrationProfile({ version: "1.0.0", entries });
+    // FP rate = 1/10 = 0.1
+
+    const findings = [makeFinding({ ruleId: "SOLID-001", confidence: 0.7 })];
+    const calibrated = calibrateFindings(findings, profile);
+    assert.ok((calibrated[0].confidence ?? 0) > 0.7, `Expected boosted confidence, got ${calibrated[0].confidence}`);
+  });
+
+  it("should not modify findings when profile is inactive", () => {
+    const profile = buildCalibrationProfile({ version: "1.0.0", entries: [] });
+    const findings = [makeFinding({ confidence: 0.6 })];
+    const calibrated = calibrateFindings(findings, profile);
+    assert.equal(calibrated[0].confidence, 0.6);
+  });
+
+  it("should fall back to prefix-level FP rate when rule-level unavailable", () => {
+    // Create enough data for prefix "CYBER" but not for specific "CYBER-999"
+    const entries = Array.from({ length: 5 }, (_, i) => ({
+      ruleId: `CYBER-00${i + 1}`,
+      verdict: (i < 4 ? "fp" : "tp") as "fp" | "tp",
+      timestamp: new Date().toISOString(),
+      filePath: `file${i}.ts`,
+      language: "typescript" as const,
+    }));
+    const profile = buildCalibrationProfile({ version: "1.0.0", entries });
+
+    // CYBER prefix should have FP rate (4/5 = 0.8), but CYBER-999 has no rule-level data
+    const findings = [makeFinding({ ruleId: "CYBER-999", confidence: 0.7 })];
+    const calibrated = calibrateFindings(findings, profile);
+    // Should use prefix-level rate, which is high FP, so confidence should decrease
+    assert.ok(
+      (calibrated[0].confidence ?? 0) < 0.7,
+      `Expected prefix-level calibration to reduce confidence, got ${calibrated[0].confidence}`,
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Plugins — getCustomRules, getPluginJudges, and edge cases
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Plugins — getCustomRules, getPluginJudges, hooks", () => {
+  let registerPlugin: typeof import("../src/plugins.js").registerPlugin;
+  let unregisterPlugin: typeof import("../src/plugins.js").unregisterPlugin;
+  let clearPlugins: typeof import("../src/plugins.js").clearPlugins;
+  let getCustomRules: typeof import("../src/plugins.js").getCustomRules;
+  let getPluginJudges: typeof import("../src/plugins.js").getPluginJudges;
+  let evaluateCustomRules: typeof import("../src/plugins.js").evaluateCustomRules;
+  let runBeforeHooks: typeof import("../src/plugins.js").runBeforeHooks;
+  let runAfterHooks: typeof import("../src/plugins.js").runAfterHooks;
+
+  it("should load plugins module", async () => {
+    const mod = await import("../src/plugins.js");
+    registerPlugin = mod.registerPlugin;
+    unregisterPlugin = mod.unregisterPlugin;
+    clearPlugins = mod.clearPlugins;
+    getCustomRules = mod.getCustomRules;
+    getPluginJudges = mod.getPluginJudges;
+    evaluateCustomRules = mod.evaluateCustomRules;
+    runBeforeHooks = mod.runBeforeHooks;
+    runAfterHooks = mod.runAfterHooks;
+    clearPlugins(); // Clean state
+  });
+
+  it("getCustomRules should return empty array with no plugins", () => {
+    clearPlugins();
+    assert.deepEqual(getCustomRules(), []);
+  });
+
+  it("getPluginJudges should return empty array with no plugins", () => {
+    clearPlugins();
+    assert.deepEqual(getPluginJudges(), []);
+  });
+
+  it("getCustomRules should return rules from registered plugins", () => {
+    clearPlugins();
+    registerPlugin({
+      name: "test-plugin",
+      version: "1.0.0",
+      rules: [
+        {
+          id: "TP-001",
+          title: "Test Rule",
+          severity: "medium" as Severity,
+          judgeId: "cybersecurity",
+          description: "A test rule",
+          pattern: /console\.log/g,
+        },
+        {
+          id: "TP-002",
+          title: "Test Rule 2",
+          severity: "low" as Severity,
+          judgeId: "cybersecurity",
+          description: "Another test rule",
+        },
+      ],
+    });
+
+    const rules = getCustomRules();
+    assert.equal(rules.length, 2);
+    assert.equal(rules[0].id, "TP-001");
+    assert.equal(rules[1].id, "TP-002");
+    clearPlugins();
+  });
+
+  it("getPluginJudges should return judges from registered plugins", () => {
+    clearPlugins();
+    const customJudge = {
+      id: "custom-judge",
+      name: "Custom Judge",
+      specialty: "Custom checks",
+      rulePrefix: "CJ",
+      evaluate: (_code: string, _lang: string) => [],
+    };
+    registerPlugin({
+      name: "judge-plugin",
+      version: "2.0.0",
+      judges: [customJudge as any],
+    });
+
+    const judges = getPluginJudges();
+    assert.equal(judges.length, 1);
+    assert.equal(judges[0].id, "custom-judge");
+    clearPlugins();
+  });
+
+  it("evaluateCustomRules should apply pattern-based rules", () => {
+    clearPlugins();
+    registerPlugin({
+      name: "pattern-plugin",
+      version: "1.0.0",
+      rules: [
+        {
+          id: "PP-001",
+          title: "Console.log detected",
+          severity: "low" as Severity,
+          judgeId: "software-practices",
+          description: "Console.log should not be in production",
+          pattern: /console\.log\(/g,
+        },
+      ],
+    });
+
+    const code = `console.log("debug 1");\nconst x = 1;\nconsole.log("debug 2");`;
+    const findings = evaluateCustomRules(code, "typescript");
+    assert.ok(findings.length >= 2, `Expected at least 2 findings, got ${findings.length}`);
+    assert.equal(findings[0].ruleId, "PP-001");
+    clearPlugins();
+  });
+
+  it("evaluateCustomRules should skip rules for non-matching languages", () => {
+    clearPlugins();
+    registerPlugin({
+      name: "lang-plugin",
+      version: "1.0.0",
+      rules: [
+        {
+          id: "LP-001",
+          title: "Python-only rule",
+          severity: "medium" as Severity,
+          judgeId: "cybersecurity",
+          description: "Only applies to Python",
+          languages: ["python"],
+          pattern: /eval\(/g,
+        },
+      ],
+    });
+
+    // Should not fire for TypeScript
+    const tsFindings = evaluateCustomRules("eval(x)", "typescript");
+    assert.equal(tsFindings.length, 0, "Should not apply Python rule to TypeScript");
+
+    // Should fire for Python
+    const pyFindings = evaluateCustomRules("eval(x)", "python");
+    assert.ok(pyFindings.length > 0, "Should apply Python rule to Python");
+    clearPlugins();
+  });
+
+  it("evaluateCustomRules should call custom analyze function", () => {
+    clearPlugins();
+    let analyzeCalled = false;
+    registerPlugin({
+      name: "analyze-plugin",
+      version: "1.0.0",
+      rules: [
+        {
+          id: "AP-001",
+          title: "Custom analyzer",
+          severity: "high" as Severity,
+          judgeId: "cybersecurity",
+          description: "Custom analyze function",
+          analyze: (code: string, _lang: string) => {
+            analyzeCalled = true;
+            if (code.includes("dangerous")) {
+              return [makeFinding({ ruleId: "AP-001", title: "Dangerous code" })];
+            }
+            return [];
+          },
+        },
+      ],
+    });
+
+    const findings = evaluateCustomRules("this is dangerous code", "typescript");
+    assert.ok(analyzeCalled, "Custom analyze should have been called");
+    assert.equal(findings.length, 1);
+    clearPlugins();
+  });
+
+  it("runAfterHooks should apply transformFindings hooks", () => {
+    clearPlugins();
+    registerPlugin({
+      name: "transform-plugin",
+      version: "1.0.0",
+      transformFindings: (findings) => findings.map((f) => ({ ...f, title: `[REVIEWED] ${f.title}` })),
+    });
+
+    const findings = [makeFinding({ title: "Original Title" })];
+    const transformed = runAfterHooks(findings);
+    assert.equal(transformed[0].title, "[REVIEWED] Original Title");
+    clearPlugins();
+  });
+
+  it("runBeforeHooks and runAfterHooks should not crash on throwing plugins", () => {
+    clearPlugins();
+    registerPlugin({
+      name: "crashing-plugin",
+      version: "1.0.0",
+      beforeEvaluate: () => {
+        throw new Error("before crash");
+      },
+      afterEvaluate: () => {
+        throw new Error("after crash");
+      },
+    });
+
+    // Should not throw
+    assert.doesNotThrow(() => runBeforeHooks("const x = 1;", "typescript"));
+    const findings = [makeFinding()];
+    const result = runAfterHooks(findings);
+    // Should still return the original findings
+    assert.equal(result.length, 1);
+    clearPlugins();
+  });
+
+  it("re-registering a plugin should replace the old one", () => {
+    clearPlugins();
+    registerPlugin({
+      name: "replace-me",
+      version: "1.0.0",
+      rules: [{ id: "R-001", title: "v1 rule", severity: "low" as Severity, judgeId: "test", description: "v1" }],
+    });
+    assert.equal(getCustomRules().length, 1);
+
+    registerPlugin({
+      name: "replace-me",
+      version: "2.0.0",
+      rules: [
+        { id: "R-002", title: "v2 rule", severity: "medium" as Severity, judgeId: "test", description: "v2" },
+        { id: "R-003", title: "v2 rule 2", severity: "high" as Severity, judgeId: "test", description: "v2b" },
+      ],
+    });
+
+    const rules = getCustomRules();
+    assert.equal(rules.length, 2, "Should have replaced old rules");
+    assert.equal(rules[0].id, "R-002");
+    clearPlugins();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Comparison — formatFullComparisonMatrix
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Comparison — formatComparisonReport and formatFullComparisonMatrix", () => {
+  let compareCapabilities: typeof import("../src/comparison.js").compareCapabilities;
+  let formatComparisonReport: typeof import("../src/comparison.js").formatComparisonReport;
+  let formatFullComparisonMatrix: typeof import("../src/comparison.js").formatFullComparisonMatrix;
+  let TOOL_PROFILES: typeof import("../src/comparison.js").TOOL_PROFILES;
+
+  it("should load comparison module", async () => {
+    const mod = await import("../src/comparison.js");
+    compareCapabilities = mod.compareCapabilities;
+    formatComparisonReport = mod.formatComparisonReport;
+    formatFullComparisonMatrix = mod.formatFullComparisonMatrix;
+    TOOL_PROFILES = mod.TOOL_PROFILES;
+    assert.equal(typeof formatFullComparisonMatrix, "function");
+  });
+
+  it("formatFullComparisonMatrix should return a non-empty comparison table", () => {
+    const matrix = formatFullComparisonMatrix();
+    assert.ok(matrix.length > 100, "Matrix should be substantial");
+    assert.ok(matrix.includes("Capability Matrix"), "Should include title");
+    assert.ok(matrix.includes("judges"), "Should mention judges");
+    assert.ok(matrix.includes("●") || matrix.includes("◐") || matrix.includes("○"), "Should contain coverage icons");
+  });
+
+  it("compareCapabilities should work for all tool profiles", () => {
+    assert.ok(TOOL_PROFILES.length >= 3, `Expected at least 3 tool profiles, got ${TOOL_PROFILES.length}`);
+    for (const profile of TOOL_PROFILES) {
+      const comparison = compareCapabilities(profile.name);
+      assert.ok(comparison, `Should return comparison for ${profile.name}`);
+      assert.ok(Array.isArray(comparison.judgesOnly));
+      assert.ok(Array.isArray(comparison.both));
+    }
+  });
+
+  it("formatComparisonReport should generate readable text report", () => {
+    const report = formatComparisonReport(TOOL_PROFILES[0].name);
+    assert.ok(report.length > 50, "Report should be substantial");
+    assert.ok(report.includes("judges vs"), "Should contain comparison header");
+  });
+});
+
+// ─── CLI — Glob Matching and File Collection ────────────────────────────────
+
+describe("CLI — globToRegex, matchesGlob, collectFiles", () => {
+  it("globToRegex should convert simple wildcard patterns", async () => {
+    const { globToRegex } = await import("../src/cli.js");
+    const re = globToRegex("*.ts");
+    assert.ok(re.test("app.ts"), "Should match app.ts");
+    assert.ok(!re.test("app.js"), "Should not match app.js");
+    assert.ok(!re.test("src/app.ts"), "Simple * should not cross path separators");
+  });
+
+  it("globToRegex should handle ** globstar patterns", async () => {
+    const { globToRegex } = await import("../src/cli.js");
+    const re = globToRegex("**/*.test.ts");
+    assert.ok(re.test("src/app.test.ts"), "Should match nested test files");
+    assert.ok(re.test("tests/unit/deep/file.test.ts"), "Should match deeply nested test files");
+    assert.ok(!re.test("src/app.ts"), "Should not match non-test files");
+  });
+
+  it("globToRegex should handle directory patterns", async () => {
+    const { globToRegex } = await import("../src/cli.js");
+    const re = globToRegex("**/fixtures/**");
+    assert.ok(re.test("tests/fixtures/data.json"), "Should match files inside fixtures");
+    assert.ok(re.test("src/fixtures/sample.ts"), "Should match fixtures at any depth");
+  });
+
+  it("matchesGlob should return false for empty patterns", async () => {
+    const { matchesGlob } = await import("../src/cli.js");
+    assert.strictEqual(matchesGlob("src/app.ts", []), false, "Empty patterns should never match");
+  });
+
+  it("matchesGlob should match against multiple patterns (OR logic)", async () => {
+    const { matchesGlob } = await import("../src/cli.js");
+    const patterns = ["**/*.test.ts", "**/*.spec.ts"];
+    assert.ok(matchesGlob("src/app.test.ts", patterns), "Should match .test.ts");
+    assert.ok(matchesGlob("src/app.spec.ts", patterns), "Should match .spec.ts");
+    assert.ok(!matchesGlob("src/app.ts", patterns), "Should not match regular .ts");
+  });
+
+  it("matchesGlob should handle Windows-style backslash paths", async () => {
+    const { matchesGlob } = await import("../src/cli.js");
+    assert.ok(matchesGlob("src\\utils\\helper.test.ts", ["**/*.test.ts"]), "Should normalize backslashes");
+  });
+
+  it("collectFiles should respect exclude patterns", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-test-"));
+    try {
+      // Create test structure
+      fs.writeFileSync(path.join(tmpDir, "app.ts"), "const x = 1;");
+      fs.writeFileSync(path.join(tmpDir, "app.test.ts"), "test('x', () => {});");
+      fs.mkdirSync(path.join(tmpDir, "src"));
+      fs.writeFileSync(path.join(tmpDir, "src", "util.ts"), "export const y = 2;");
+
+      const { collectFiles } = await import("../src/cli.js");
+      const allFiles = collectFiles(tmpDir);
+      assert.ok(allFiles.length === 3, `Expected 3 files, got ${allFiles.length}`);
+
+      const filtered = collectFiles(tmpDir, { exclude: ["*.test.ts"] });
+      assert.ok(filtered.length === 2, `Expected 2 files after exclude, got ${filtered.length}`);
+      assert.ok(!filtered.some((f) => f.includes(".test.ts")), "Should exclude .test.ts files");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("collectFiles should respect include patterns", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-test-"));
+    try {
+      fs.writeFileSync(path.join(tmpDir, "app.ts"), "const x = 1;");
+      fs.writeFileSync(path.join(tmpDir, "app.py"), "x = 1");
+      fs.writeFileSync(path.join(tmpDir, "note.md"), "# Notes");
+
+      const { collectFiles } = await import("../src/cli.js");
+      const pyOnly = collectFiles(tmpDir, { include: ["*.py"] });
+      assert.ok(pyOnly.length === 1, `Expected 1 .py file, got ${pyOnly.length}`);
+      assert.ok(pyOnly[0].endsWith(".py"), "Should only include .py files");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("collectFiles should respect maxFiles limit", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-test-"));
+    try {
+      for (let i = 0; i < 10; i++) {
+        fs.writeFileSync(path.join(tmpDir, `file${i}.ts`), `const x${i} = ${i};`);
+      }
+
+      const { collectFiles } = await import("../src/cli.js");
+      const limited = collectFiles(tmpDir, { maxFiles: 3 });
+      assert.ok(limited.length === 3, `Expected 3 files with maxFiles, got ${limited.length}`);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── Presets — Composition and Stacking ─────────────────────────────────────
+
+describe("Presets — composePresets", () => {
+  it("composePresets with a single preset should return it unchanged", async () => {
+    const { composePresets, getPreset } = await import("../src/presets.js");
+    const single = composePresets(["strict"]);
+    const original = getPreset("strict");
+    assert.ok(single, "Should return a preset");
+    assert.deepStrictEqual(single!.config.minSeverity, original!.config.minSeverity);
+  });
+
+  it("composePresets with empty array should return undefined", async () => {
+    const { composePresets } = await import("../src/presets.js");
+    const result = composePresets([]);
+    assert.strictEqual(result, undefined, "Empty names should return undefined");
+  });
+
+  it("composePresets with invalid names should return undefined", async () => {
+    const { composePresets } = await import("../src/presets.js");
+    const result = composePresets(["nonexistent-preset"]);
+    assert.strictEqual(result, undefined, "Invalid names should return undefined");
+  });
+
+  it("composing security-only + performance should intersect disabledJudges", async () => {
+    const { composePresets, getPreset } = await import("../src/presets.js");
+    const secOnly = getPreset("security-only");
+    const perfOnly = getPreset("performance");
+    const composed = composePresets(["security-only", "performance"]);
+
+    assert.ok(composed, "Should return a composed preset");
+    assert.ok(composed!.config.disabledJudges, "Should have disabledJudges");
+
+    // Intersection: only judges disabled in BOTH should remain disabled
+    const secDisabled = new Set(secOnly!.config.disabledJudges || []);
+    const perfDisabled = new Set(perfOnly!.config.disabledJudges || []);
+    const intersection = [...secDisabled].filter((j) => perfDisabled.has(j));
+    assert.deepStrictEqual(
+      composed!.config.disabledJudges!.sort(),
+      intersection.sort(),
+      "Should only disable judges disabled in BOTH presets",
+    );
+  });
+
+  it("composing presets should use most permissive minSeverity", async () => {
+    const { composePresets } = await import("../src/presets.js");
+    // strict has minSeverity: "info", lenient has "high"
+    const composed = composePresets(["lenient", "strict"]);
+    assert.ok(composed, "Should return a composed preset");
+    // "info" is more permissive than "high", so should keep "info"
+    assert.strictEqual(composed!.config.minSeverity, "info", "Should use most permissive severity");
+  });
+
+  it("composing strict + startup should intersect disabled judges (strict has none)", async () => {
+    const { composePresets } = await import("../src/presets.js");
+    const composed = composePresets(["strict", "startup"]);
+    assert.ok(composed, "Should return a composed preset");
+    // strict has no disabledJudges, so intersection should be empty
+    assert.deepStrictEqual(
+      composed!.config.disabledJudges,
+      [],
+      "Strict has no disabled judges, so intersection is empty",
+    );
+  });
+
+  it("composed preset should have a descriptive name", async () => {
+    const { composePresets } = await import("../src/presets.js");
+    const composed = composePresets(["security-only", "compliance"]);
+    assert.ok(composed, "Should return a composed preset");
+    assert.ok(composed!.name.includes("+"), "Name should indicate composition");
+    assert.ok(composed!.name.includes("Security"), "Name should include first preset");
+    assert.ok(composed!.name.includes("Compliance"), "Name should include second preset");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Benchmark Gate
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Benchmark Gate", () => {
+  it("benchmarkGate should pass with lenient thresholds", async () => {
+    const { benchmarkGate } = await import("../src/commands/benchmark.js");
+    const gate = benchmarkGate({ minF1: 0.1, minPrecision: 0.1, minRecall: 0.1, minDetectionRate: 0.1 });
+    assert.ok(gate.passed, `Gate should pass with lenient thresholds, failures: ${gate.failures.join("; ")}`);
+    assert.strictEqual(gate.failures.length, 0);
+    assert.ok(gate.result.totalCases > 0, "Should have run test cases");
+  });
+
+  it("benchmarkGate should fail with impossibly strict thresholds", async () => {
+    const { benchmarkGate } = await import("../src/commands/benchmark.js");
+    const gate = benchmarkGate({ minF1: 1.0, minPrecision: 1.0, minRecall: 1.0, minDetectionRate: 1.0 });
+    // At least one metric will be below 100%
+    assert.ok(!gate.passed || gate.result.f1Score === 1, "Gate should fail or have perfect scores");
+  });
+
+  it("benchmarkGate should detect regression from baseline", async () => {
+    const { benchmarkGate } = await import("../src/commands/benchmark.js");
+    // Create a fake baseline with impossibly high scores
+    const fakeBaseline = {
+      timestamp: new Date().toISOString(),
+      version: "0.0.0",
+      totalCases: 1,
+      detected: 1,
+      missed: 0,
+      totalExpected: 1,
+      truePositives: 1,
+      falseNegatives: 0,
+      falsePositives: 0,
+      precision: 1.0,
+      recall: 1.0,
+      f1Score: 1.0,
+      detectionRate: 1.0,
+      perCategory: {},
+      perJudge: {},
+      cases: [],
+    };
+    const gate = benchmarkGate({
+      minF1: 0.01,
+      minPrecision: 0.01,
+      minRecall: 0.01,
+      minDetectionRate: 0.01,
+      baseline: fakeBaseline as any,
+    });
+    // Unless current results are also perfect, regression should be detected
+    if (gate.result.f1Score < 0.99) {
+      assert.ok(!gate.passed, "Gate should fail due to regression from perfect baseline");
+      assert.ok(
+        gate.failures.some((f) => f.includes("regressed")),
+        "Should mention regression",
+      );
+    }
+  });
+
+  it("benchmarkGate result should contain valid metrics", async () => {
+    const { benchmarkGate } = await import("../src/commands/benchmark.js");
+    const gate = benchmarkGate({ minF1: 0 });
+    const r = gate.result;
+    assert.ok(r.f1Score >= 0 && r.f1Score <= 1, "F1 should be 0-1");
+    assert.ok(r.precision >= 0 && r.precision <= 1, "Precision should be 0-1");
+    assert.ok(r.recall >= 0 && r.recall <= 1, "Recall should be 0-1");
+    assert.ok(r.detectionRate >= 0 && r.detectionRate <= 1, "Detection rate should be 0-1");
+    assert.ok(r.totalCases > 40, `Should have 40+ test cases, got ${r.totalCases}`);
+    assert.ok(r.version !== "unknown", "Should resolve version from package.json");
+  });
+
+  it("runBenchmarkSuite should produce per-category breakdowns", async () => {
+    const { runBenchmarkSuite } = await import("../src/commands/benchmark.js");
+    const result = runBenchmarkSuite();
+    const categories = Object.keys(result.perCategory);
+    assert.ok(categories.length >= 5, `Should have 5+ categories, got ${categories.length}`);
+    for (const cat of Object.values(result.perCategory)) {
+      assert.ok(cat.total > 0, `Category ${cat.category} should have test cases`);
+      assert.ok(cat.precision >= 0 && cat.precision <= 1, `${cat.category} precision out of range`);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Cascading Config — mergeConfigs
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Cascading Config — mergeConfigs", () => {
+  it("should return empty config when merging zero configs", () => {
+    const result = mergeConfigs();
+    assert.deepStrictEqual(result, {});
+  });
+
+  it("should pass through a single config unchanged", () => {
+    const cfg = { disabledRules: ["RULE-A"], minSeverity: "high" as const };
+    const result = mergeConfigs(cfg);
+    assert.deepStrictEqual(result.disabledRules, ["RULE-A"]);
+    assert.equal(result.minSeverity, "high");
+  });
+
+  it("should union disabledRules from multiple configs", () => {
+    const root = { disabledRules: ["RULE-A", "RULE-B"] };
+    const leaf = { disabledRules: ["RULE-B", "RULE-C"] };
+    const result = mergeConfigs(root, leaf);
+    assert.ok(result.disabledRules);
+    assert.equal(result.disabledRules!.length, 3);
+    assert.ok(result.disabledRules!.includes("RULE-A"));
+    assert.ok(result.disabledRules!.includes("RULE-B"));
+    assert.ok(result.disabledRules!.includes("RULE-C"));
+  });
+
+  it("should union disabledJudges with deduplication", () => {
+    const root = { disabledJudges: ["judge-a"] };
+    const leaf = { disabledJudges: ["judge-a", "judge-b"] };
+    const result = mergeConfigs(root, leaf);
+    assert.ok(result.disabledJudges);
+    assert.equal(result.disabledJudges!.length, 2);
+  });
+
+  it("should use leaf value for scalar fields (minSeverity)", () => {
+    const root = { minSeverity: "low" as const };
+    const leaf = { minSeverity: "high" as const };
+    const result = mergeConfigs(root, leaf);
+    assert.equal(result.minSeverity, "high");
+  });
+
+  it("should use leaf value for maxFiles", () => {
+    const root = { maxFiles: 100 };
+    const leaf = { maxFiles: 25 };
+    const result = mergeConfigs(root, leaf);
+    assert.equal(result.maxFiles, 25);
+  });
+
+  it("should deep-merge ruleOverrides", () => {
+    const root = { ruleOverrides: { "CYBER-001": { severity: "high" as const } } };
+    const leaf = { ruleOverrides: { "CYBER-002": { disabled: true } } };
+    const result = mergeConfigs(root, leaf);
+    assert.ok(result.ruleOverrides);
+    assert.ok(result.ruleOverrides!["CYBER-001"]);
+    assert.ok(result.ruleOverrides!["CYBER-002"]);
+    assert.equal(result.ruleOverrides!["CYBER-001"].severity, "high");
+    assert.equal(result.ruleOverrides!["CYBER-002"].disabled, true);
+  });
+
+  it("should override ruleOverrides for same rule", () => {
+    const root = { ruleOverrides: { "CYBER-001": { severity: "high" as const, disabled: false } } };
+    const leaf = { ruleOverrides: { "CYBER-001": { severity: "low" as const } } };
+    const result = mergeConfigs(root, leaf);
+    // Leaf override replaces the entry for that key
+    assert.equal(result.ruleOverrides!["CYBER-001"].severity, "low");
+  });
+
+  it("should union exclude and include arrays", () => {
+    const root = { exclude: ["node_modules/**"], include: ["src/**"] };
+    const leaf = { exclude: ["dist/**", "node_modules/**"], include: ["lib/**"] };
+    const result = mergeConfigs(root, leaf);
+    assert.equal(result.exclude!.length, 2); // deduplicated
+    assert.equal(result.include!.length, 2);
+  });
+
+  it("should handle three-level cascading merge", () => {
+    const root = { disabledRules: ["A"], minSeverity: "info" as const };
+    const mid = { disabledRules: ["B"], minSeverity: "medium" as const };
+    const leaf = { disabledRules: ["C"], maxFiles: 10 };
+    const result = mergeConfigs(root, mid, leaf);
+    assert.equal(result.disabledRules!.length, 3);
+    assert.equal(result.minSeverity, "medium"); // mid is the last to set it
+    assert.equal(result.maxFiles, 10);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CSV Formatter
+// ═══════════════════════════════════════════════════════════════════════════
+
+import { verdictToCsvRows, verdictsToCsv, findingsToCsv } from "../src/formatters/csv.js";
+
+describe("CSV Formatter", () => {
+  it("should produce CSV rows for a verdict", () => {
+    const verdict = {
+      overallScore: 75,
+      verdict: "pass" as const,
+      findings: [
+        makeFinding({
+          ruleId: "CYBER-001",
+          severity: "high",
+          title: "SQL Injection",
+          confidence: 0.9,
+          lineNumbers: [10, 20],
+        }),
+      ],
+      judgeResults: [],
+    };
+    const rows = verdictToCsvRows(verdict, "app.ts");
+    assert.equal(rows.length, 1);
+    assert.ok(rows[0].includes("app.ts"));
+    assert.ok(rows[0].includes("CYBER-001"));
+    assert.ok(rows[0].includes("high"));
+    assert.ok(rows[0].includes("0.9"));
+    assert.ok(rows[0].includes("SQL Injection"));
+    assert.ok(rows[0].includes("10;20"));
+  });
+
+  it("should include CSV header in verdictsToCsv", () => {
+    const csv = verdictsToCsv([
+      {
+        filePath: "test.ts",
+        verdict: {
+          overallScore: 90,
+          verdict: "pass" as const,
+          findings: [makeFinding()],
+          judgeResults: [],
+        },
+      },
+    ]);
+    const lines = csv.trim().split("\n");
+    assert.equal(lines[0], "file,ruleId,severity,confidence,title,lines,reference");
+    assert.equal(lines.length, 2); // header + 1 finding
+  });
+
+  it("should escape CSV cells with commas and quotes", () => {
+    const csv = findingsToCsv([makeFinding({ title: 'Title with "quotes" and, commas', ruleId: "TEST-X" })], "file.ts");
+    assert.ok(csv.includes('"Title with ""quotes"" and, commas"'));
+  });
+
+  it("should handle empty findings list", () => {
+    const csv = findingsToCsv([], "empty.ts");
+    const lines = csv.trim().split("\n");
+    assert.equal(lines.length, 1); // header only
+  });
+
+  it("should handle findings without lineNumbers or reference", () => {
+    const csv = findingsToCsv([makeFinding({ lineNumbers: undefined, reference: undefined })]);
+    const lines = csv.trim().split("\n");
+    assert.equal(lines.length, 2);
+    // The line/reference cells should be empty, not "undefined"
+    assert.ok(!lines[1].includes("undefined"));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Streaming / Batch API
+// ═══════════════════════════════════════════════════════════════════════════
+
+import { evaluateFilesStream, evaluateFilesBatch } from "../src/api.js";
+import type { FileInput } from "../src/api.js";
+
+describe("Streaming / Batch API", () => {
+  const sampleFiles: FileInput[] = [
+    { path: "a.py", code: "import os\nos.system(input())", language: "python" },
+    { path: "b.js", code: "const x = 1;", language: "javascript" },
+  ];
+
+  it("evaluateFilesStream should yield results for each file", async () => {
+    const results: Array<{ path: string; index: number }> = [];
+    for await (const r of evaluateFilesStream(sampleFiles)) {
+      results.push({ path: r.path, index: r.index });
+      assert.ok(r.verdict, "Each result should have a verdict");
+      assert.ok(typeof r.verdict.overallScore === "number");
+    }
+    assert.equal(results.length, 2);
+    assert.equal(results[0].path, "a.py");
+    assert.equal(results[0].index, 0);
+    assert.equal(results[1].path, "b.js");
+    assert.equal(results[1].index, 1);
+  });
+
+  it("evaluateFilesStream should handle empty input", async () => {
+    const results = [];
+    for await (const r of evaluateFilesStream([])) {
+      results.push(r);
+    }
+    assert.equal(results.length, 0);
+  });
+
+  it("evaluateFilesBatch should evaluate all files", async () => {
+    const results = await evaluateFilesBatch(sampleFiles, 2);
+    assert.equal(results.length, 2);
+    assert.equal(results[0].path, "a.py");
+    assert.equal(results[1].path, "b.js");
+    for (const r of results) {
+      assert.ok(r.verdict);
+      assert.ok(typeof r.verdict.overallScore === "number");
+    }
+  });
+
+  it("evaluateFilesBatch should call onProgress callback", async () => {
+    let lastCompleted = 0;
+    let lastTotal = 0;
+    await evaluateFilesBatch(sampleFiles, 1, undefined, (completed, total) => {
+      lastCompleted = completed;
+      lastTotal = total;
+    });
+    assert.equal(lastCompleted, 2);
+    assert.equal(lastTotal, 2);
+  });
+
+  it("evaluateFilesBatch should handle concurrency > file count", async () => {
+    const results = await evaluateFilesBatch([sampleFiles[0]], 10);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].path, "a.py");
   });
 });

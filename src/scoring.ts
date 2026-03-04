@@ -132,7 +132,36 @@ export function estimateFindingConfidence(finding: Finding): number {
     score -= 0.1;
   }
 
-  // ── Noisy evaluator cap: prevent low-evidence findings from inflating ──
+  // ── Evidence tier 5: Provenance-based boost ─────────────────────────
+  // AST-confirmed and taint-flow findings have structural evidence beyond
+  // LLM pattern-matching, deserving significantly higher confidence.
+  const prov = (finding.provenance ?? "").toLowerCase();
+  const isAstConfirmed = prov.includes("ast-confirmed") || prov.includes("tree-sitter");
+  const isTaintFlow = prov.includes("taint-flow") || prov.includes("cross-file-taint");
+  const isRegexConfirmed = prov.includes("regex-pattern-match");
+
+  if (isAstConfirmed) {
+    score += 0.15;
+  }
+  if (isTaintFlow) {
+    score += 0.18;
+  }
+  if (isRegexConfirmed && !isAstConfirmed) {
+    score += 0.08;
+  }
+
+  // ── Evidence tier 6: Domain-severity alignment ────────────────────────
+  // Security judges finding critical/high issues in their core domain
+  // are more reliable than low/info advisory findings.
+  const securityPrefixes = ["CYBER-", "AUTH-", "DATA-", "AICS-", "IAC-"];
+  const isSecurityDomain = securityPrefixes.some((p) => finding.ruleId.startsWith(p));
+  if (isSecurityDomain && (finding.severity === "critical" || finding.severity === "high")) {
+    score += 0.04;
+  }
+
+  // ── Noisy evaluator cap: domain-specific noise ceilings ───────────────
+  // Different evaluator domains have different baseline noise levels.
+  // Low-evidence findings from noisy domains are capped to prevent inflation.
   const richEvidenceCount = [
     hasReference,
     hasSuggestedFix,
@@ -140,12 +169,23 @@ export function estimateFindingConfidence(finding: Finding): number {
     hasRichRecommendation,
     hasExactApiMatch,
     lineCount > 0,
+    isAstConfirmed,
+    isTaintFlow,
   ].filter(Boolean).length;
 
-  const noisyPrefixes = ["API-", "COMP-", "CONC-", "CYBER-", "DB-", "DEPS-", "ETHICS-", "LOGPRIV-", "OBS-", "PERF-"];
+  // Tiered noise caps: noisier evaluators get stricter caps
+  const noiseCapTier1 = ["COMP-", "ETHICS-", "SOV-", "COST-", "DOC-"]; // advisory domains — cap at 0.82
+  const noiseCapTier2 = ["API-", "CONC-", "DB-", "DEPS-", "LOGPRIV-", "OBS-", "PERF-"]; // moderately noisy — cap at 0.88
+  const noiseCapTier3 = ["CACHE-", "CFG-", "COMPAT-", "MAINT-", "SWDEV-", "TEST-"]; // occasional noise — cap at 0.92
 
-  if (noisyPrefixes.some((prefix) => finding.ruleId.startsWith(prefix)) && richEvidenceCount < 4) {
-    score = Math.min(score, 0.89);
+  if (richEvidenceCount < 4) {
+    if (noiseCapTier1.some((p) => finding.ruleId.startsWith(p))) {
+      score = Math.min(score, 0.82);
+    } else if (noiseCapTier2.some((p) => finding.ruleId.startsWith(p))) {
+      score = Math.min(score, 0.88);
+    } else if (noiseCapTier3.some((p) => finding.ruleId.startsWith(p))) {
+      score = Math.min(score, 0.92);
+    }
   }
 
   return Number(clampConfidence(score).toFixed(2));

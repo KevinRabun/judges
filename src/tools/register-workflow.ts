@@ -8,8 +8,10 @@ import { z } from "zod";
 
 import { JUDGES } from "../judges/index.js";
 import { evaluateProject, evaluateDiff, analyzeDependencies, runAppBuilderWorkflow } from "../evaluators/index.js";
+import { evaluateWithTribunal } from "../evaluators/index.js";
 import { generatePublicRepoReport } from "../reports/public-repo-report.js";
 import { configSchema, toJudgesConfig } from "./schemas.js";
+import { benchmarkGate, formatBenchmarkReport } from "../commands/benchmark.js";
 
 /**
  * Register workflow-focused tools: evaluate_public_repo_report, evaluate_project,
@@ -21,6 +23,8 @@ export function registerWorkflowTools(server: McpServer): void {
   registerEvaluateProject(server);
   registerEvaluateDiff(server);
   registerAnalyzeDependencies(server);
+  registerBenchmarkGate(server);
+  registerEvaluateBatch(server);
 }
 
 // ─── evaluate_public_repo_report ─────────────────────────────────────────────
@@ -467,6 +471,108 @@ function registerAnalyzeDependencies(server: McpServer): void {
           isError: true,
         };
       }
+    },
+  );
+}
+
+// ─── benchmark_gate ──────────────────────────────────────────────────────────
+
+function registerBenchmarkGate(server: McpServer): void {
+  server.tool(
+    "benchmark_gate",
+    "Run the benchmark suite and check results against quality thresholds. Returns pass/fail with metric details including F1, precision, recall, and detection rate. Use in CI pipelines to prevent quality regressions.",
+    {
+      minF1: z.number().min(0).max(1).optional().describe("Minimum F1 score (0-1, default: 0.6)"),
+      minPrecision: z.number().min(0).max(1).optional().describe("Minimum precision (0-1, default: 0.5)"),
+      minRecall: z.number().min(0).max(1).optional().describe("Minimum recall (0-1, default: 0.5)"),
+      minDetectionRate: z.number().min(0).max(1).optional().describe("Minimum detection rate (0-1, default: 0.5)"),
+    },
+    async (params) => {
+      const gate = benchmarkGate({
+        minF1: params.minF1,
+        minPrecision: params.minPrecision,
+        minRecall: params.minRecall,
+        minDetectionRate: params.minDetectionRate,
+      });
+
+      const report = formatBenchmarkReport(gate.result);
+      const status = gate.passed ? "✅ PASSED" : "❌ FAILED";
+      const failureSection =
+        gate.failures.length > 0 ? `\n\n**Failures:**\n${gate.failures.map((f) => `- ${f}`).join("\n")}` : "";
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `# Benchmark Gate: ${status}${failureSection}\n\n${report}`,
+          },
+        ],
+      };
+    },
+  );
+}
+
+// ─── evaluate_batch ──────────────────────────────────────────────────────────
+
+function registerEvaluateBatch(server: McpServer): void {
+  server.tool(
+    "evaluate_batch",
+    "Evaluate multiple code files in a single call. Returns per-file verdicts with scores and findings, plus aggregate statistics.",
+    {
+      files: z
+        .array(
+          z.object({
+            path: z.string().describe("File path or name"),
+            code: z.string().describe("Source code content"),
+            language: z.string().describe("Programming language"),
+          }),
+        )
+        .describe("Array of files to evaluate"),
+      config: configSchema.optional(),
+    },
+    async (params) => {
+      const config = params.config ? toJudgesConfig(params.config) : undefined;
+      const results: Array<{ path: string; score: number; findingCount: number; criticalCount: number }> = [];
+      const allFindings: string[] = [];
+
+      for (const file of params.files) {
+        const verdict = evaluateWithTribunal(file.code, file.language, undefined, config ? { config } : undefined);
+        const criticals = verdict.findings.filter((f) => f.severity === "critical").length;
+        results.push({
+          path: file.path,
+          score: verdict.overallScore,
+          findingCount: verdict.findings.length,
+          criticalCount: criticals,
+        });
+
+        if (verdict.findings.length > 0) {
+          allFindings.push(
+            `### ${file.path} (${verdict.overallScore}/100, ${verdict.findings.length} findings)\n` +
+              verdict.findings
+                .slice(0, 10)
+                .map((f) => `- **[${f.severity.toUpperCase()}]** \`${f.ruleId}\`: ${f.title}`)
+                .join("\n") +
+              (verdict.findings.length > 10 ? `\n- ... and ${verdict.findings.length - 10} more` : ""),
+          );
+        }
+      }
+
+      const totalFindings = results.reduce((s, r) => s + r.findingCount, 0);
+      const avgScore = Math.round(results.reduce((s, r) => s + r.score, 0) / results.length);
+      const totalCriticals = results.reduce((s, r) => s + r.criticalCount, 0);
+
+      const summary =
+        `# Batch Evaluation Results\n\n` +
+        `**Files:** ${results.length}  |  **Avg Score:** ${avgScore}/100  |  ` +
+        `**Total Findings:** ${totalFindings}  |  **Critical:** ${totalCriticals}\n\n` +
+        `| File | Score | Findings | Critical |\n|------|-------|----------|----------|\n` +
+        results.map((r) => `| ${r.path} | ${r.score} | ${r.findingCount} | ${r.criticalCount} |`).join("\n") +
+        "\n\n" +
+        allFindings.join("\n\n");
+
+      return {
+        content: [{ type: "text" as const, text: summary }],
+      };
     },
   );
 }

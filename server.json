@@ -7,12 +7,12 @@
     "url": "https://github.com/kevinrabun/judges",
     "source": "github"
   },
-  "version": "3.21.0",
+  "version": "3.22.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@kevinrabun/judges",
-      "version": "3.21.0",
+      "version": "3.22.0",
       "transport": {
         "type": "stdio"
       }
@@ -70,6 +70,18 @@
     {
       "name": "evaluate_with_progress",
       "description": "Evaluate code with progressive judge-by-judge reporting. Returns intermediate counts as each judge completes, useful for large files."
+    },
+    {
+      "name": "benchmark_gate",
+      "description": "Run the benchmark suite and check results against quality thresholds. Returns pass/fail with metric details. Use in CI to prevent quality regressions."
+    },
+    {
+      "name": "compare_benchmarks",
+      "description": "Compare two benchmark runs and report metric deltas. Useful for verifying that code changes haven't degraded detection accuracy."
+    },
+    {
+      "name": "evaluate_batch",
+      "description": "Evaluate multiple files in a single call with bounded concurrency. Returns per-file verdicts and aggregate statistics."
     }
   ],
   "prompts": [

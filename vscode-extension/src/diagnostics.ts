@@ -112,6 +112,15 @@ export class JudgesDiagnosticProvider {
     const config = vscode.workspace.getConfiguration("judges");
     const minSeverity = config.get<string>("minSeverity", "medium");
     const enabledJudges = config.get<string[]>("enabledJudges", []);
+    const confidenceTier = config.get<string>("confidenceTier", "important");
+
+    // Confidence tier → minimum confidence threshold
+    const confidenceThresholds: Record<string, number> = {
+      essential: 0.8,
+      important: 0.6,
+      supplementary: 0,
+    };
+    const minConfidence = confidenceThresholds[confidenceTier] ?? 0.6;
 
     try {
       const verdict = evaluateWithTribunal(code, language);
@@ -120,10 +129,15 @@ export class JudgesDiagnosticProvider {
       // Filter by severity
       const severityOrder = ["critical", "high", "medium", "low", "info"];
       const minIdx = severityOrder.indexOf(minSeverity);
-      const filtered = allFindings.filter((f) => {
+      let filtered = allFindings.filter((f) => {
         const idx = severityOrder.indexOf(f.severity);
         return idx >= 0 && idx <= minIdx;
       });
+
+      // Filter by confidence tier
+      if (minConfidence > 0) {
+        filtered = filtered.filter((f) => (f.confidence ?? 0.5) >= minConfidence);
+      }
 
       // Filter by enabled judges
       const finalFindings =

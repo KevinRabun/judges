@@ -8,6 +8,7 @@
 import type { Finding, ProjectVerdict, Verdict, Severity, TribunalVerdict } from "../types.js";
 import { analyzeCrossFileTaint } from "../ast/index.js";
 import { applyConfidenceThreshold, isAbsenceBasedFinding } from "../scoring.js";
+import { crossFileDedup } from "../dedup.js";
 import { LRUCache, contentHash } from "../cache.js";
 import type { EvaluationOptions } from "./index.js";
 
@@ -748,23 +749,34 @@ export function evaluateProject(
   // Overall scores
   const allFindings = fileResults.flatMap((f) => f.findings);
 
-  // ── Project-level absence dedup ─────────────────────────────────────────
-  // Absence-based findings ("No health check", "No rate limiting", etc.) fire
-  // on every file that lacks the pattern.  At project level we only want ONE
-  // instance per rule title — the one with the highest confidence — to avoid
-  // flooding the report with duplicates.
-  const deduplicatedFindings: Finding[] = [];
+  // ── Project-level cross-file dedup ──────────────────────────────────────
+  // 1. Absence-based findings fire on every file missing the pattern.
+  //    Keep only the highest-confidence instance per title.
+  // 2. Concrete findings with the same known topic + ruleId across files
+  //    are consolidated into a single representative finding.
   const absenceBestByTitle = new Map<string, Finding>();
-  for (const f of allFindings) {
-    if (isAbsenceBasedFinding(f)) {
-      const existing = absenceBestByTitle.get(f.title);
-      if (!existing || (f.confidence ?? 0) > (existing.confidence ?? 0)) {
-        absenceBestByTitle.set(f.title, f);
+  const nonAbsenceFileFindings: Array<{ path: string; findings: Finding[] }> = [];
+
+  // Partition each file's findings into absence vs non-absence
+  for (const fr of fileResults) {
+    const nonAbsence: Finding[] = [];
+    for (const f of fr.findings) {
+      if (isAbsenceBasedFinding(f)) {
+        const existing = absenceBestByTitle.get(f.title);
+        if (!existing || (f.confidence ?? 0) > (existing.confidence ?? 0)) {
+          absenceBestByTitle.set(f.title, f);
+        }
+      } else {
+        nonAbsence.push(f);
       }
-    } else {
-      deduplicatedFindings.push(f);
+    }
+    if (nonAbsence.length > 0) {
+      nonAbsenceFileFindings.push({ path: fr.path, findings: nonAbsence });
     }
   }
+
+  // Cross-file dedup on concrete findings
+  const deduplicatedFindings = crossFileDedup(nonAbsenceFileFindings);
   deduplicatedFindings.push(...absenceBestByTitle.values());
 
   // ── Cross-file taint analysis ───────────────────────────────────────────

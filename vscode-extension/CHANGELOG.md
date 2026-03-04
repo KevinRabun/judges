@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.22.0] — 2026-03-04
+
+### Added
+- **File filtering settings** — New `judges.exclude` and `judges.include` glob-array settings with `judges.maxFiles` limit for workspace reviews
+- **Confidence tier filtering** — New `judges.confidenceTier` setting (essential/important/supplementary) filters diagnostics and workspace review findings by confidence threshold
+- **Preset composition** — `judges.preset` now accepts composite values for combining multiple presets
+
+### Changed
+- **Workspace review** — Respects `maxFiles`, `exclude`, `include`, and `confidenceTier` settings; configurable file limits replace hardcoded cap
+- **Core engine** — 16 new features: cross-file dedup, CLI filtering, cascading config, streaming API, CSV formatter, benchmark gate, 3 new MCP tools, confidence tuning, dedup expansion; see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.21.0] — 2026-03-05
 
 ### Added

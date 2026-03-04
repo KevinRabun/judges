@@ -44,7 +44,7 @@ import { runBaseline } from "./commands/baseline.js";
 import { runCompletions } from "./commands/completions.js";
 import { runDocs } from "./commands/docs.js";
 import { generateGitLabCi, generateAzurePipelines, generateBitbucketPipelines } from "./commands/ci-templates.js";
-import { getPreset, listPresets } from "./presets.js";
+import { getPreset, listPresets, composePresets } from "./presets.js";
 import { parseConfig } from "./config.js";
 import type { JudgesConfig } from "./types.js";
 import { applyPatches, type PatchCandidate } from "./commands/fix.js";
@@ -117,6 +117,9 @@ interface CliArgs {
   verbose: boolean;
   quiet: boolean;
   fix: boolean;
+  exclude: string[];
+  include: string[];
+  maxFiles: number | undefined;
 }
 
 function parseCliArgs(argv: string[]): CliArgs {
@@ -137,6 +140,9 @@ function parseCliArgs(argv: string[]): CliArgs {
     verbose: false,
     quiet: false,
     fix: false,
+    exclude: [],
+    include: [],
+    maxFiles: undefined,
   };
 
   // First non-flag arg is the command
@@ -202,6 +208,17 @@ function parseCliArgs(argv: string[]): CliArgs {
       case "--fix":
         args.fix = true;
         break;
+      case "--exclude":
+      case "-x":
+        args.exclude.push(argv[++i]);
+        break;
+      case "--include":
+      case "-i":
+        args.include.push(argv[++i]);
+        break;
+      case "--max-files":
+        args.maxFiles = parseInt(argv[++i], 10);
+        break;
       default:
         // If it looks like a file path (not a flag), treat as --file
         if (!arg.startsWith("-") && !args.file) {
@@ -254,7 +271,11 @@ EVAL OPTIONS:
   --summary                  Show one-line summary instead of full output
   --config, -c <path>        Path to .judgesrc config file
   --preset, -p <name>        Use a named preset (strict, lenient, security-only, startup, compliance, performance)
+                             Compose presets with commas: --preset security-only,performance
   --min-score <n>            Fail if score drops below threshold (0-100)
+  --exclude, -x <glob>       Exclude files matching glob pattern (repeatable)
+  --include, -i <glob>       Only include files matching glob pattern (repeatable)
+  --max-files <n>            Maximum number of files to analyze in directory mode
   --no-color                 Disable colored output
   --verbose                  Show detailed evaluation information
   --quiet                    Suppress non-essential output
@@ -302,6 +323,9 @@ EXAMPLES:
   judges eval --preset security-only src/app.ts
   judges eval --config .judgesrc src/app.ts
   judges eval --min-score 80 src/app.ts
+  judges eval src/ --exclude "**/*.test.ts" --exclude "**/__mocks__/**"
+  judges eval src/ --include "**/*.py" --include "**/*.ts"
+  judges eval src/ --max-files 50
   judges init
   judges fix src/app.ts --apply
   judges watch src/
@@ -350,11 +374,60 @@ function readCode(filePath: string | undefined): { code: string; resolvedPath: s
   process.exit(1);
 }
 
+// ─── Glob Matching ──────────────────────────────────────────────────────────
+
+/**
+ * Simple glob pattern matching (supports *, **, and ?).
+ * Matches against relative file paths using forward slashes.
+ */
+export function globToRegex(pattern: string): RegExp {
+  // Normalize to forward slashes
+  let p = pattern.replace(/\\/g, "/");
+  // Escape regex chars except * and ?
+  p = p.replace(/[.+^${}()|[\]]/g, "\\$&");
+  // ** matches any path segment(s)
+  p = p.replace(/\*\*/g, "{{GLOBSTAR}}");
+  // * matches anything except /
+  p = p.replace(/\*/g, "[^/]*");
+  // ? matches any single char except /
+  p = p.replace(/\?/g, "[^/]");
+  // Restore globstar
+  p = p.replace(/\{\{GLOBSTAR\}\}/g, ".*");
+  return new RegExp(`^${p}$`, "i");
+}
+
+export function matchesGlob(filePath: string, patterns: string[]): boolean {
+  if (patterns.length === 0) return false;
+  const normalized = filePath.replace(/\\/g, "/");
+  return patterns.some((pat) => {
+    const re = globToRegex(pat);
+    // Match against full path or just the filename
+    return re.test(normalized) || re.test(normalized.split("/").pop() || "");
+  });
+}
+
 // ─── Glob / Multi-File Resolution ───────────────────────────────────────────
 
 const SUPPORTED_EXTENSIONS = new Set(Object.keys(EXT_TO_LANG));
 
-function collectFiles(target: string): string[] {
+const DEFAULT_SKIP_DIRS = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  ".next",
+  "__pycache__",
+  "target",
+  "vendor",
+]);
+
+interface CollectOptions {
+  exclude?: string[];
+  include?: string[];
+  maxFiles?: number;
+}
+
+export function collectFiles(target: string, options: CollectOptions = {}): string[] {
   const resolved = resolve(target);
   if (!existsSync(resolved)) return [];
 
@@ -363,27 +436,44 @@ function collectFiles(target: string): string[] {
 
   if (stat.isDirectory()) {
     const files: string[] = [];
-    walkDir(resolved, files);
+    walkDir(resolved, resolved, files, options);
+    if (options.maxFiles && files.length > options.maxFiles) {
+      return files.slice(0, options.maxFiles);
+    }
     return files;
   }
 
   return [];
 }
 
-function walkDir(dir: string, results: string[]): void {
+function walkDir(dir: string, root: string, results: string[], options: CollectOptions): void {
   const entries = readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
+    const relPath = relative(root, fullPath);
+
     // Skip common non-source directories
     if (entry.isDirectory()) {
-      if (["node_modules", ".git", "dist", "build", ".next", "__pycache__", "target", "vendor"].includes(entry.name))
-        continue;
-      walkDir(fullPath, results);
+      if (DEFAULT_SKIP_DIRS.has(entry.name)) continue;
+      // Check if directory matches an exclude pattern
+      if (options.exclude && matchesGlob(relPath + "/", options.exclude)) continue;
+      walkDir(fullPath, root, results, options);
     } else if (entry.isFile()) {
-      const ext = extname(entry.name);
-      if (SUPPORTED_EXTENSIONS.has(ext)) {
-        results.push(fullPath);
+      // Apply exclude patterns
+      if (options.exclude && matchesGlob(relPath, options.exclude)) continue;
+
+      // Apply include patterns — if include patterns are specified, ONLY include matching files
+      if (options.include && options.include.length > 0) {
+        if (!matchesGlob(relPath, options.include)) continue;
+      } else {
+        // Default: only include files with supported extensions
+        const ext = extname(entry.name);
+        if (!SUPPORTED_EXTENSIONS.has(ext)) continue;
       }
+
+      results.push(fullPath);
+      // Early exit if we've hit maxFiles
+      if (options.maxFiles && results.length >= options.maxFiles) return;
     }
   }
 }
@@ -700,7 +790,16 @@ export async function runCli(argv: string[]): Promise<void> {
     // ── Multi-file / directory mode ──────────────────────────────────────
     const target = args.file;
     if (target && isDirectory(target)) {
-      const files = collectFiles(target);
+      // Merge exclude/include from config if not overridden by CLI
+      const excludePatterns = args.exclude.length > 0 ? args.exclude : (evalConfig?.exclude ?? []);
+      const includePatterns = args.include.length > 0 ? args.include : (evalConfig?.include ?? []);
+      const maxFilesLimit = args.maxFiles ?? evalConfig?.maxFiles;
+
+      const files = collectFiles(target, {
+        exclude: excludePatterns,
+        include: includePatterns,
+        maxFiles: maxFilesLimit,
+      });
       if (files.length === 0) {
         console.error(`No supported source files found in: ${target}`);
         process.exit(1);
@@ -996,19 +1095,35 @@ function printSummaryLine(verdict: string, score: number, findings: number): voi
 function loadEvalConfig(args: CliArgs): JudgesConfig | undefined {
   let config: JudgesConfig | undefined;
 
-  // 1. Load from preset
+  // 1. Load from preset (supports comma-separated composition: "security-only,performance")
   if (args.preset) {
-    const preset = getPreset(args.preset);
-    if (!preset) {
-      console.error(`Unknown preset: ${args.preset}`);
-      console.error(
-        `Available: ${listPresets()
-          .map((p) => p.name)
-          .join(", ")}`,
-      );
-      process.exit(1);
+    const presetNames = args.preset.split(",").map((n) => n.trim());
+    if (presetNames.length === 1) {
+      const preset = getPreset(presetNames[0]);
+      if (!preset) {
+        console.error(`Unknown preset: ${presetNames[0]}`);
+        console.error(
+          `Available: ${listPresets()
+            .map((p) => p.name)
+            .join(", ")}`,
+        );
+        process.exit(1);
+      }
+      config = { ...preset.config };
+    } else {
+      // Multi-preset composition
+      const composed = composePresets(presetNames);
+      if (!composed) {
+        console.error(`No valid presets found in: ${args.preset}`);
+        console.error(
+          `Available: ${listPresets()
+            .map((p) => p.name)
+            .join(", ")}`,
+        );
+        process.exit(1);
+      }
+      config = { ...composed.config };
     }
-    config = { ...preset.config };
   }
 
   // 2. Load from --config file (overrides preset)

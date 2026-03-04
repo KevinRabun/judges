@@ -123,6 +123,12 @@ export interface JudgesConfig {
   minSeverity?: Severity;
   /** Languages to restrict analysis to (empty = all) */
   languages?: string[];
+  /** Glob patterns to exclude files from analysis */
+  exclude?: string[];
+  /** Glob patterns to include only matching files */
+  include?: string[];
+  /** Maximum number of files to analyze in directory mode */
+  maxFiles?: number;
 }
 
 // ─── Project / Multi-file Types ──────────────────────────────────────────────

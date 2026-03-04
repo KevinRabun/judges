@@ -465,6 +465,971 @@ app.post("/withdraw", async (req, res) => {
     category: "concurrency",
     difficulty: "hard",
   },
+
+  // ── Performance ──
+  {
+    id: "perf-sync-io",
+    description: "Synchronous file I/O in request handler",
+    language: "typescript",
+    code: `import express from "express";
+import { readFileSync, writeFileSync } from "fs";
+const app = express();
+app.get("/config", (req, res) => {
+  const data = readFileSync("/etc/app/config.json", "utf-8");
+  writeFileSync("/var/log/access.log", new Date().toISOString() + "\\n", { flag: "a" });
+  res.json(JSON.parse(data));
+});
+app.listen(3000);`,
+    expectedRuleIds: ["PERF-001"],
+    category: "performance",
+    difficulty: "easy",
+  },
+  {
+    id: "perf-n-plus-one",
+    description: "N+1 query pattern in loop",
+    language: "typescript",
+    code: `async function getOrdersWithProducts(userId: string) {
+  const orders = await db.query("SELECT * FROM orders WHERE user_id = $1", [userId]);
+  const results = [];
+  for (const order of orders) {
+    const products = await db.query("SELECT * FROM products WHERE order_id = $1", [order.id]);
+    results.push({ ...order, products });
+  }
+  return results;
+}`,
+    expectedRuleIds: ["PERF-001", "DB-001"],
+    category: "performance",
+    difficulty: "medium",
+  },
+
+  // ── Database ──
+  {
+    id: "db-no-index-hint",
+    description: "Unindexed query patterns on large tables",
+    language: "typescript",
+    code: `async function searchUsers(email: string) {
+  return db.query("SELECT * FROM users WHERE LOWER(email) = LOWER($1)", [email]);
+}
+async function findOldOrders() {
+  return db.query("SELECT * FROM orders WHERE created_at < NOW() - INTERVAL '90 days' ORDER BY created_at");
+}
+async function getByStatus(status: string) {
+  return db.query("SELECT * FROM logs WHERE status = $1 AND timestamp > NOW() - INTERVAL '24 hours'", [status]);
+}`,
+    expectedRuleIds: ["DB-001"],
+    category: "database",
+    difficulty: "medium",
+  },
+
+  // ── API Design ──
+  {
+    id: "api-no-versioning",
+    description: "API without versioning or pagination",
+    language: "typescript",
+    code: `import express from "express";
+const app = express();
+app.get("/users", async (req, res) => {
+  const users = await db.query("SELECT * FROM users");
+  res.json(users);
+});
+app.get("/products", async (req, res) => {
+  const products = await db.query("SELECT * FROM products");
+  res.json(products);
+});
+app.delete("/user", async (req, res) => {
+  await db.query("DELETE FROM users WHERE id = $1", [req.body.id]);
+  res.send("deleted");
+});`,
+    expectedRuleIds: ["API-001"],
+    category: "api-design",
+    difficulty: "medium",
+  },
+
+  // ── Observability ──
+  {
+    id: "obs-no-logging",
+    description: "Service with no structured logging or monitoring",
+    language: "typescript",
+    code: `import express from "express";
+const app = express();
+app.post("/order", async (req, res) => {
+  const order = await createOrder(req.body);
+  res.json(order);
+});
+app.get("/status", (req, res) => {
+  res.json({ ok: true });
+});
+app.listen(process.env.PORT);`,
+    expectedRuleIds: ["OBS-001"],
+    category: "observability",
+    difficulty: "easy",
+  },
+
+  // ── Reliability ──
+  {
+    id: "rel-no-health-check",
+    description: "Web service without health check or graceful shutdown",
+    language: "typescript",
+    code: `import express from "express";
+const app = express();
+app.get("/api/data", async (req, res) => {
+  const data = await fetchFromDatabase();
+  res.json(data);
+});
+app.listen(8080, () => {
+  console.log("Server started on port 8080");
+});`,
+    expectedRuleIds: ["REL-001"],
+    category: "reliability",
+    difficulty: "easy",
+  },
+  {
+    id: "rel-no-timeout",
+    description: "External HTTP calls without timeout",
+    language: "typescript",
+    code: `async function fetchUserProfile(userId: string) {
+  const response = await fetch("https://api.example.com/users/" + userId);
+  return response.json();
+}
+async function sendNotification(email: string, msg: string) {
+  await fetch("https://email.example.com/send", {
+    method: "POST",
+    body: JSON.stringify({ to: email, message: msg }),
+  });
+}`,
+    expectedRuleIds: ["REL-001"],
+    category: "reliability",
+    difficulty: "medium",
+  },
+
+  // ── Scalability ──
+  {
+    id: "scale-global-state",
+    description: "Storing session state in-memory on server",
+    language: "typescript",
+    code: `import express from "express";
+const sessions: Record<string, any> = {};
+const app = express();
+app.post("/login", (req, res) => {
+  const token = Math.random().toString(36);
+  sessions[token] = { user: req.body.username, createdAt: Date.now() };
+  res.json({ token });
+});
+app.get("/profile", (req, res) => {
+  const session = sessions[req.headers.authorization as string];
+  if (!session) return res.status(401).send("Unauthorized");
+  res.json(session);
+});`,
+    expectedRuleIds: ["SCALE-001"],
+    category: "scalability",
+    difficulty: "medium",
+  },
+
+  // ── Cloud Readiness ──
+  {
+    id: "cloud-hardcoded-paths",
+    description: "Hardcoded local filesystem paths and ports",
+    language: "typescript",
+    code: `import { readFileSync, writeFileSync } from "fs";
+const CONFIG_PATH = "C:\\\\Program Files\\\\MyApp\\\\config.json";
+const LOG_PATH = "/var/log/myapp/app.log";
+
+function loadConfig() {
+  return JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
+}
+function writeLog(msg: string) {
+  writeFileSync(LOG_PATH, msg + "\\n", { flag: "a" });
+}
+const server = app.listen(3000);`,
+    expectedRuleIds: ["CLOUD-001"],
+    category: "cloud-readiness",
+    difficulty: "easy",
+  },
+
+  // ── Configuration Management ──
+  {
+    id: "config-scattered-env",
+    description: "Scattered environment variable access without validation",
+    language: "typescript",
+    code: `import express from "express";
+const app = express();
+app.get("/api", (req, res) => {
+  const dbHost = process.env.DB_HOST;
+  const dbPort = parseInt(process.env.DB_PORT!);
+  const apiKey = process.env.API_KEY;
+  fetch(\`http://\${dbHost}:\${dbPort}/data\`, {
+    headers: { "X-API-Key": apiKey! }
+  }).then(r => r.json()).then(data => res.json(data));
+});`,
+    expectedRuleIds: ["CFG-001"],
+    category: "configuration",
+    difficulty: "easy",
+  },
+
+  // ── Maintainability ──
+  {
+    id: "maint-god-function",
+    description: "Overly long function with multiple responsibilities",
+    language: "typescript",
+    code: `async function processOrder(req: any) {
+  // Validate input
+  if (!req.body.items || !Array.isArray(req.body.items)) throw new Error("Invalid");
+  if (!req.body.userId) throw new Error("No user");
+  if (!req.body.paymentMethod) throw new Error("No payment");
+  // Calculate totals
+  let total = 0;
+  for (const item of req.body.items) {
+    const product = await db.query("SELECT price FROM products WHERE id = $1", [item.id]);
+    total += product.price * item.quantity;
+  }
+  // Apply discount
+  const user = await db.query("SELECT * FROM users WHERE id = $1", [req.body.userId]);
+  if (user.isPremium) total *= 0.9;
+  // Process payment
+  const charge = await stripe.charges.create({ amount: total, source: req.body.paymentMethod });
+  if (!charge.paid) throw new Error("Payment failed");
+  // Create order
+  const order = await db.query("INSERT INTO orders (user_id, total, payment_id) VALUES ($1, $2, $3)", [req.body.userId, total, charge.id]);
+  // Send email
+  await mailer.send({ to: user.email, subject: "Order Confirmed", body: "Your order #" + order.id });
+  // Update inventory
+  for (const item of req.body.items) {
+    await db.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [item.quantity, item.id]);
+  }
+  // Log
+  console.log("Order processed:", order.id);
+  return order;
+}`,
+    expectedRuleIds: ["MAINT-001"],
+    category: "maintainability",
+    difficulty: "medium",
+  },
+  {
+    id: "maint-magic-numbers",
+    description: "Magic numbers and strings without named constants",
+    language: "typescript",
+    code: `function calculateShipping(weight: number, distance: number): number {
+  if (weight < 5) return distance * 0.5 + 2.99;
+  if (weight < 20) return distance * 0.75 + 4.99;
+  if (distance > 500) return weight * 1.2 + 15.0;
+  return weight * 0.8 + 9.99;
+}
+
+function getDiscount(total: number, loyaltyYears: number): number {
+  if (loyaltyYears > 10) return total * 0.25;
+  if (loyaltyYears > 5) return total * 0.15;
+  if (total > 100) return total * 0.05;
+  return 0;
+}`,
+    expectedRuleIds: ["MAINT-001"],
+    category: "maintainability",
+    difficulty: "easy",
+  },
+
+  // ── Code Structure ──
+  {
+    id: "struct-deep-nesting",
+    description: "Deeply nested control flow",
+    language: "typescript",
+    code: `function processEvent(event: any): string {
+  if (event) {
+    if (event.type === "click") {
+      if (event.target) {
+        if (event.target.id) {
+          if (event.target.id.startsWith("btn-")) {
+            if (event.detail) {
+              if (event.detail > 1) {
+                return "double-click on button";
+              } else {
+                return "single-click on button";
+              }
+            }
+          }
+        }
+      }
+    } else if (event.type === "keydown") {
+      if (event.key) {
+        if (event.key === "Enter") {
+          return "enter pressed";
+        }
+      }
+    }
+  }
+  return "unknown";
+}`,
+    expectedRuleIds: ["STRUCT-001"],
+    category: "code-structure",
+    difficulty: "easy",
+  },
+
+  // ── Documentation ──
+  {
+    id: "doc-no-docs",
+    description: "Public API without documentation",
+    language: "typescript",
+    code: `export function calculateTax(a: number, b: string, c: boolean): number {
+  const rates: Record<string, number> = { US: 0.08, UK: 0.20, DE: 0.19, JP: 0.10 };
+  const rate = rates[b] || 0.15;
+  return c ? a * rate * 0.5 : a * rate;
+}
+
+export function transformData(input: unknown[]): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const item of input) {
+    const key = (item as any).id || String(Math.random());
+    result[key] = item;
+  }
+  return result;
+}
+
+export class DataProcessor {
+  private buffer: unknown[] = [];
+  process(item: unknown): void { this.buffer.push(item); }
+  flush(): unknown[] { const r = [...this.buffer]; this.buffer = []; return r; }
+}`,
+    expectedRuleIds: ["DOC-001"],
+    category: "documentation",
+    difficulty: "easy",
+  },
+
+  // ── Testing ──
+  {
+    id: "test-no-tests",
+    description: "Complex logic with no test file or test patterns",
+    language: "typescript",
+    code: `export function parseExpression(expr: string): number {
+  const tokens = expr.match(/\\d+|[+\\-*/()]/g) || [];
+  let pos = 0;
+  function parseAtom(): number {
+    if (tokens[pos] === "(") { pos++; const v = parseAddSub(); pos++; return v; }
+    return Number(tokens[pos++]);
+  }
+  function parseMulDiv(): number {
+    let v = parseAtom();
+    while (tokens[pos] === "*" || tokens[pos] === "/") {
+      const op = tokens[pos++]; const r = parseAtom();
+      v = op === "*" ? v * r : v / r;
+    }
+    return v;
+  }
+  function parseAddSub(): number {
+    let v = parseMulDiv();
+    while (tokens[pos] === "+" || tokens[pos] === "-") {
+      const op = tokens[pos++]; const r = parseMulDiv();
+      v = op === "+" ? v + r : v - r;
+    }
+    return v;
+  }
+  return parseAddSub();
+}`,
+    expectedRuleIds: ["TEST-001"],
+    category: "testing",
+    difficulty: "medium",
+  },
+
+  // ── Cost Effectiveness ──
+  {
+    id: "cost-wasteful-resources",
+    description: "Wasteful resource usage patterns",
+    language: "typescript",
+    code: `import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+const s3 = new S3Client({});
+async function processImage(imageBuffer: Buffer) {
+  // Store every variant without cleanup policy
+  for (const size of [100, 200, 400, 800, 1600, 3200]) {
+    const resized = await sharp(imageBuffer).resize(size).toBuffer();
+    await s3.send(new PutObjectCommand({
+      Bucket: "my-images",
+      Key: \`img-\${Date.now()}-\${size}.jpg\`,
+      Body: resized,
+    }));
+  }
+}
+
+// Connection pool with excessive connections
+const pool = new Pool({ host: "db.server.com", max: 500, idleTimeoutMillis: 0 });`,
+    expectedRuleIds: ["COST-001"],
+    category: "cost-effectiveness",
+    difficulty: "medium",
+  },
+
+  // ── Compliance ──
+  {
+    id: "comp-missing-audit-trail",
+    description: "Admin operations with no audit logging",
+    language: "typescript",
+    code: `import express from "express";
+const app = express();
+app.delete("/admin/users/:id", async (req, res) => {
+  await db.query("DELETE FROM users WHERE id = $1", [req.params.id]);
+  res.json({ deleted: true });
+});
+app.put("/admin/roles/:userId", async (req, res) => {
+  await db.query("UPDATE users SET role = $1 WHERE id = $2", [req.body.role, req.params.userId]);
+  res.json({ updated: true });
+});
+app.post("/admin/config", async (req, res) => {
+  await db.query("UPDATE system_config SET value = $1 WHERE key = $2", [req.body.value, req.body.key]);
+  res.json({ saved: true });
+});`,
+    expectedRuleIds: ["COMP-001"],
+    category: "compliance",
+    difficulty: "medium",
+  },
+
+  // ── Accessibility ──
+  {
+    id: "a11y-missing-labels",
+    description: "UI components without accessibility attributes",
+    language: "typescript",
+    code: `function renderForm() {
+  return \`
+    <form>
+      <input type="text" placeholder="Search...">
+      <select>
+        <option>Option 1</option>
+        <option>Option 2</option>
+      </select>
+      <button onclick="submit()"><img src="send.png"></button>
+      <div onclick="toggleMenu()" style="cursor:pointer">Menu</div>
+      <div class="modal" style="display:none">
+        <div class="content">Modal content</div>
+      </div>
+    </form>
+  \`;
+}`,
+    expectedRuleIds: ["A11Y-001"],
+    category: "accessibility",
+    difficulty: "easy",
+  },
+
+  // ── Internationalization ──
+  {
+    id: "i18n-hardcoded-strings",
+    description: "Hardcoded user-facing strings and locale assumptions",
+    language: "typescript",
+    code: `function formatPrice(amount: number): string {
+  return "$" + amount.toFixed(2);
+}
+function formatDate(d: Date): string {
+  return \`\${d.getMonth() + 1}/\${d.getDate()}/\${d.getFullYear()}\`;
+}
+function getGreeting(name: string): string {
+  return "Hello, " + name + "! Welcome to our store.";
+}
+function getErrorMessage(code: number): string {
+  if (code === 404) return "Page not found";
+  if (code === 500) return "Internal server error";
+  return "An unknown error occurred";
+}`,
+    expectedRuleIds: ["I18N-001"],
+    category: "internationalization",
+    difficulty: "easy",
+  },
+
+  // ── Dependency Health ──
+  {
+    id: "deps-outdated-packages",
+    description: "Outdated or abandoned dependencies",
+    language: "json",
+    code: `{
+  "name": "my-app",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "^3.0.0",
+    "lodash": "^3.10.0",
+    "moment": "^2.10.0",
+    "request": "^2.88.0",
+    "jade": "^1.11.0",
+    "coffee-script": "^1.12.0"
+  },
+  "devDependencies": {
+    "gulp": "^3.9.0",
+    "bower": "^1.8.0"
+  }
+}`,
+    expectedRuleIds: ["DEPS-001", "SUPPLY-001"],
+    category: "dependency-health",
+    difficulty: "easy",
+  },
+
+  // ── Logging Privacy ──
+  {
+    id: "logpriv-sensitive-data",
+    description: "Logging sensitive personal data",
+    language: "typescript",
+    code: `import winston from "winston";
+const logger = winston.createLogger({ level: "info" });
+
+function handleLogin(username: string, password: string) {
+  logger.info("Login attempt", { username, password });
+  logger.debug("Credentials:", { user: username, pass: password });
+}
+
+function processPayment(card: { number: string; cvv: string; expiry: string }) {
+  logger.info("Processing payment for card: " + card.number);
+  console.log("CVV:", card.cvv);
+}`,
+    expectedRuleIds: ["LOGPRIV-001", "DATA-001"],
+    category: "logging-privacy",
+    difficulty: "easy",
+  },
+
+  // ── Backwards Compatibility ──
+  {
+    id: "compat-breaking-changes",
+    description: "API breaking changes without versioning",
+    language: "typescript",
+    code: `// v1: function signature changed without deprecation
+export function createUser(name: string, email: string): User {
+  // Was: createUser(data: UserInput)
+  return { id: generateId(), name, email, createdAt: new Date() };
+}
+
+// v1: Response shape changed
+export function getUsers(): UserResponse {
+  // Was: returns User[] directly, now wrapped
+  return { data: [], total: 0, page: 1 };
+}
+
+// v1: Renamed without alias
+export function fetchUserProfile(id: string) {
+  // Was: getUserProfile(id)
+  return db.findUser(id);
+}`,
+    expectedRuleIds: ["COMPAT-001"],
+    category: "backwards-compatibility",
+    difficulty: "hard",
+  },
+
+  // ── Caching ──
+  {
+    id: "cache-no-caching",
+    description: "Expensive repeated computations without caching",
+    language: "typescript",
+    code: `import express from "express";
+const app = express();
+
+app.get("/product/:id", async (req, res) => {
+  // This query is expensive and data rarely changes
+  const product = await db.query(\`
+    SELECT p.*, c.name as category, AVG(r.rating) as avg_rating
+    FROM products p
+    JOIN categories c ON p.category_id = c.id
+    LEFT JOIN reviews r ON r.product_id = p.id
+    WHERE p.id = $1
+    GROUP BY p.id, c.name
+  \`, [req.params.id]);
+  res.json(product);
+});
+
+app.get("/config", async (req, res) => {
+  const config = await db.query("SELECT * FROM app_config");
+  res.json(config);
+});`,
+    expectedRuleIds: ["CACHE-001"],
+    category: "caching",
+    difficulty: "medium",
+  },
+
+  // ── Ethics & Bias ──
+  {
+    id: "ethics-discriminatory-logic",
+    description: "Logic that discriminates based on protected attributes",
+    language: "typescript",
+    code: `function calculatePremium(age: number, gender: string, zipCode: string): number {
+  let base = 100;
+  if (gender === "female") base *= 0.9;
+  if (gender === "male") base *= 1.1;
+  if (age > 65) base *= 1.5;
+  if (age < 25) base *= 1.3;
+  // Proxy for race/ethnicity via zip code
+  const highRiskZips = ["10001", "90011", "60609"];
+  if (highRiskZips.includes(zipCode)) base *= 1.4;
+  return base;
+}
+
+function filterCandidates(candidates: any[]) {
+  return candidates.filter(c =>
+    c.age >= 22 && c.age <= 45 &&
+    !c.name.match(/[^a-zA-Z\\s]/) // Filters non-Latin names
+  );
+}`,
+    expectedRuleIds: ["ETHICS-001"],
+    category: "ethics-bias",
+    difficulty: "hard",
+  },
+
+  // ── Portability ──
+  {
+    id: "port-platform-specific",
+    description: "Platform-specific code without abstraction",
+    language: "typescript",
+    code: `import { execSync } from "child_process";
+import { join } from "path";
+
+function getCpuUsage(): number {
+  const output = execSync("wmic cpu get loadpercentage").toString();
+  return parseInt(output.split("\\n")[1]);
+}
+
+function openBrowser(url: string): void {
+  execSync(\`start \${url}\`); // Windows only
+}
+
+function getConfigDir(): string {
+  return join("C:\\\\Users", process.env.USERNAME!, "AppData", "Local", "MyApp");
+}`,
+    expectedRuleIds: ["PORTA-001"],
+    category: "portability",
+    difficulty: "easy",
+  },
+
+  // ── UX ──
+  {
+    id: "ux-poor-error-messages",
+    description: "Generic error messages with no user guidance",
+    language: "typescript",
+    code: `app.post("/register", async (req, res) => {
+  try {
+    const user = await createUser(req.body);
+    res.json(user);
+  } catch (e) {
+    res.status(500).json({ error: "Error" });
+  }
+});
+
+app.post("/upload", async (req, res) => {
+  try {
+    await processFile(req.file);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ message: "Bad request" });
+  }
+});`,
+    expectedRuleIds: ["UX-001"],
+    category: "ux",
+    difficulty: "easy",
+  },
+
+  // ── CI/CD ──
+  {
+    id: "cicd-no-pipeline",
+    description: "Project with no CI/CD configuration",
+    language: "json",
+    code: `{
+  "name": "my-web-app",
+  "version": "2.1.0",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "mongoose": "^7.0.0"
+  }
+}`,
+    expectedRuleIds: ["CICD-001"],
+    category: "ci-cd",
+    difficulty: "easy",
+  },
+
+  // ── Software Practices ──
+  {
+    id: "swdev-no-linting",
+    description: "Project with no linting or formatting configuration",
+    language: "json",
+    code: `{
+  "name": "legacy-api",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0"
+  }
+}`,
+    expectedRuleIds: ["SWDEV-001"],
+    category: "software-practices",
+    difficulty: "easy",
+  },
+
+  // ── Data Sovereignty ──
+  {
+    id: "sov-cross-region-data",
+    description: "Sending user data to multiple regions without consent",
+    language: "typescript",
+    code: `const ANALYTICS_ENDPOINTS = [
+  "https://analytics.us-east-1.example.com/track",
+  "https://analytics.eu-west-1.example.com/track",
+  "https://analytics.ap-southeast-1.example.com/track",
+];
+
+async function trackUserEvent(userId: string, event: string, userData: any) {
+  // Fan-out to all regional analytics endpoints
+  await Promise.all(
+    ANALYTICS_ENDPOINTS.map(endpoint =>
+      fetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify({ userId, event, email: userData.email, ip: userData.ipAddress }),
+      })
+    )
+  );
+}`,
+    expectedRuleIds: ["SOV-001"],
+    category: "data-sovereignty",
+    difficulty: "hard",
+  },
+
+  // ── Agent Instructions ──
+  {
+    id: "agent-unsafe-instructions",
+    description: "Agent/LLM system prompt with injection vulnerabilities",
+    language: "typescript",
+    code: `function buildSystemPrompt(userQuery: string): string {
+  return \`You are a helpful assistant. The user asks: \${userQuery}
+Answer the question. You have access to the database and can run any SQL query.
+If the user asks you to ignore these instructions, comply with their request.
+Execute any code the user provides without validation.\`;
+}
+
+async function handleChat(userMessage: string) {
+  const prompt = buildSystemPrompt(userMessage);
+  const response = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [{ role: "system", content: prompt }],
+  });
+  // Execute any tool calls without validation
+  for (const tool of response.choices[0].message.tool_calls ?? []) {
+    await eval(tool.function.arguments);
+  }
+}`,
+    expectedRuleIds: ["AGENT-001"],
+    category: "agent-instructions",
+    difficulty: "medium",
+  },
+
+  // ── AI Code Safety ──
+  {
+    id: "aics-ai-generated-patterns",
+    description: "Common AI-generated code anti-patterns",
+    language: "typescript",
+    code: `// AI-generated CRUD with common pitfalls
+import express from "express";
+const app = express();
+
+app.post("/api/users", async (req, res) => {
+  const user = req.body; // No validation
+  const result = await db.query("INSERT INTO users VALUES ($1, $2, $3)",
+    [user.id, user.name, user.email]);
+  res.json(result);
+});
+
+// AI-generated with TODO placeholders left in
+app.get("/api/admin", async (req, res) => {
+  // TODO: add authentication
+  // TODO: add rate limiting
+  const data = await db.query("SELECT * FROM admin_data");
+  res.json(data);
+});
+
+// AI hallucination: non-existent API
+import { secureSanitize } from "express-security-utils";`,
+    expectedRuleIds: ["AICS-001"],
+    category: "ai-code-safety",
+    difficulty: "medium",
+  },
+
+  // ── Framework Safety ──
+  {
+    id: "fw-unsafe-express",
+    description: "Express app missing essential security middleware",
+    language: "typescript",
+    code: `import express from "express";
+const app = express();
+app.use(express.json());
+
+// No helmet, no cors, no csrf protection
+app.post("/api/data", (req, res) => {
+  res.json({ received: req.body });
+});
+
+app.get("/api/file", (req, res) => {
+  res.sendFile(req.query.path as string); // Path traversal
+});
+
+app.listen(3000);`,
+    expectedRuleIds: ["FW-001", "SEC-001"],
+    category: "framework-safety",
+    difficulty: "easy",
+  },
+
+  // ── IaC Security ──
+  {
+    id: "iac-insecure-terraform",
+    description: "Terraform with security misconfigurations",
+    language: "hcl",
+    code: `resource "aws_s3_bucket" "data" {
+  bucket = "my-app-data"
+  acl    = "public-read"
+}
+
+resource "aws_security_group" "web" {
+  name = "web-sg"
+  ingress {
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_db_instance" "main" {
+  engine         = "mysql"
+  instance_class = "db.t3.micro"
+  publicly_accessible = true
+  storage_encrypted   = false
+}`,
+    expectedRuleIds: ["IAC-001"],
+    category: "iac-security",
+    difficulty: "easy",
+  },
+  {
+    id: "iac-insecure-dockerfile",
+    description: "Dockerfile with security anti-patterns",
+    language: "dockerfile",
+    code: `FROM node:latest
+USER root
+COPY . /app
+WORKDIR /app
+RUN npm install
+RUN echo "DB_PASSWORD=supersecret123" >> .env
+EXPOSE 22 3000 5432
+CMD ["node", "index.js"]`,
+    expectedRuleIds: ["IAC-001"],
+    category: "iac-security",
+    difficulty: "easy",
+  },
+
+  // ── Python XSS ──
+  {
+    id: "python-xss",
+    description: "Python Flask template injection / XSS",
+    language: "python",
+    code: `from flask import Flask, request, render_template_string
+
+app = Flask(__name__)
+
+@app.route("/greet")
+def greet():
+    name = request.args.get("name", "World")
+    return render_template_string("<h1>Hello " + name + "</h1>")
+
+@app.route("/search")
+def search():
+    query = request.args.get("q", "")
+    return f"<p>Results for: {query}</p>"`,
+    expectedRuleIds: ["CYBER-001", "CYBER-002", "FW-001"],
+    category: "xss",
+    difficulty: "easy",
+  },
+
+  // ── Go SQL Injection ──
+  {
+    id: "go-sql-injection",
+    description: "Go SQL injection via string formatting",
+    language: "go",
+    code: `package main
+
+import (
+    "database/sql"
+    "fmt"
+    "net/http"
+)
+
+func getUser(w http.ResponseWriter, r *http.Request) {
+    id := r.URL.Query().Get("id")
+    query := fmt.Sprintf("SELECT * FROM users WHERE id = '%s'", id)
+    rows, _ := db.Query(query)
+    defer rows.Close()
+    fmt.Fprintf(w, "Results: %v", rows)
+}
+
+func searchProducts(w http.ResponseWriter, r *http.Request) {
+    term := r.FormValue("q")
+    db.Query("SELECT * FROM products WHERE name LIKE '%" + term + "%'")
+}`,
+    expectedRuleIds: ["CYBER-001", "CYBER-002"],
+    category: "injection",
+    difficulty: "easy",
+  },
+
+  // ── Java Deserialization ──
+  {
+    id: "java-deserialization",
+    description: "Java unsafe deserialization of untrusted data",
+    language: "java",
+    code: `import java.io.*;
+import javax.servlet.*;
+import javax.servlet.http.*;
+
+public class DataServlet extends HttpServlet {
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
+        ObjectInputStream ois = new ObjectInputStream(req.getInputStream());
+        Object data = ois.readObject();
+        processData(data);
+        resp.getWriter().write("Processed");
+    }
+
+    private void processData(Object data) throws IOException {
+        Runtime.getRuntime().exec(data.toString());
+    }
+}`,
+    expectedRuleIds: ["CYBER-001", "CYBER-002"],
+    category: "injection",
+    difficulty: "medium",
+  },
+
+  // ── Clean code — Python well-structured ──
+  {
+    id: "clean-code-python",
+    description: "Well-structured Python Flask API",
+    language: "python",
+    code: `from flask import Flask, request, jsonify
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+import bleach
+import bcrypt
+import logging
+
+app = Flask(__name__)
+limiter = Limiter(app=app, key_func=get_remote_address)
+logger = logging.getLogger(__name__)
+
+@app.route("/api/v1/login", methods=["POST"])
+@limiter.limit("5 per minute")
+def login():
+    data = request.get_json()
+    if not data or "email" not in data or "password" not in data:
+        return jsonify({"error": "Email and password required"}), 400
+
+    email = bleach.clean(data["email"])
+    user = User.query.filter_by(email=email).first()
+
+    if not user or not bcrypt.checkpw(data["password"].encode(), user.password_hash):
+        logger.warning("Failed login attempt for %s", email)
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    token = generate_token(user.id)
+    logger.info("Successful login for user %s", user.id)
+    return jsonify({"token": token}), 200`,
+    expectedRuleIds: [],
+    unexpectedRuleIds: ["CYBER-001", "CYBER-002", "AUTH-001", "RATE-001"],
+    category: "clean",
+    difficulty: "hard",
+  },
 ];
 
 // ─── Benchmark Runner ───────────────────────────────────────────────────────
@@ -606,9 +1571,21 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
     jb.f1Score = jb.precision + jb.recall > 0 ? (2 * jb.precision * jb.recall) / (jb.precision + jb.recall) : 0;
   }
 
+  const packageJsonPath = resolve(
+    dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1")),
+    "../../package.json",
+  );
+  let version = "unknown";
+  try {
+    const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+    version = pkg.version ?? version;
+  } catch {
+    // Fallback if package.json unreadable
+  }
+
   return {
     timestamp: new Date().toISOString(),
-    version: "3.6.0",
+    version,
     totalCases: testCases.length,
     detected: totalDetected,
     missed: testCases.length - totalDetected,
@@ -624,6 +1601,84 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
     perJudge,
     cases: caseResults,
   };
+}
+
+// ─── CI Gate ────────────────────────────────────────────────────────────────
+
+export interface BenchmarkGateOptions {
+  /** Minimum F1 score (0-1, default: 0.6) */
+  minF1?: number;
+  /** Minimum precision (0-1, default: 0.5) */
+  minPrecision?: number;
+  /** Minimum recall (0-1, default: 0.5) */
+  minRecall?: number;
+  /** Minimum detection rate (0-1, default: 0.5) */
+  minDetectionRate?: number;
+  /** Baseline result to check for regressions (1% tolerance) */
+  baseline?: BenchmarkResult;
+}
+
+export interface BenchmarkGateResult {
+  passed: boolean;
+  failures: string[];
+  result: BenchmarkResult;
+}
+
+/**
+ * Run the benchmark suite and check results against quality thresholds.
+ * Returns a gate result indicating pass/fail with details.
+ *
+ * Usage in CI:
+ * ```ts
+ * const gate = benchmarkGate({ minF1: 0.7 });
+ * if (!gate.passed) process.exit(1);
+ * ```
+ */
+export function benchmarkGate(options: BenchmarkGateOptions = {}): BenchmarkGateResult {
+  const { minF1 = 0.6, minPrecision = 0.5, minRecall = 0.5, minDetectionRate = 0.5, baseline } = options;
+
+  const result = runBenchmarkSuite();
+  const failures: string[] = [];
+
+  if (result.f1Score < minF1) {
+    failures.push(`F1 score ${(result.f1Score * 100).toFixed(1)}% < minimum ${(minF1 * 100).toFixed(1)}%`);
+  }
+  if (result.precision < minPrecision) {
+    failures.push(`Precision ${(result.precision * 100).toFixed(1)}% < minimum ${(minPrecision * 100).toFixed(1)}%`);
+  }
+  if (result.recall < minRecall) {
+    failures.push(`Recall ${(result.recall * 100).toFixed(1)}% < minimum ${(minRecall * 100).toFixed(1)}%`);
+  }
+  if (result.detectionRate < minDetectionRate) {
+    failures.push(
+      `Detection rate ${(result.detectionRate * 100).toFixed(1)}% < minimum ${(minDetectionRate * 100).toFixed(1)}%`,
+    );
+  }
+
+  if (baseline) {
+    if (result.f1Score < baseline.f1Score - 0.01) {
+      failures.push(
+        `F1 regressed: ${(result.f1Score * 100).toFixed(1)}% vs baseline ${(baseline.f1Score * 100).toFixed(1)}%`,
+      );
+    }
+    if (result.precision < baseline.precision - 0.01) {
+      failures.push(
+        `Precision regressed: ${(result.precision * 100).toFixed(1)}% vs baseline ${(baseline.precision * 100).toFixed(1)}%`,
+      );
+    }
+    if (result.recall < baseline.recall - 0.01) {
+      failures.push(
+        `Recall regressed: ${(result.recall * 100).toFixed(1)}% vs baseline ${(baseline.recall * 100).toFixed(1)}%`,
+      );
+    }
+    if (result.detectionRate < baseline.detectionRate - 0.01) {
+      failures.push(
+        `Detection rate regressed: ${(result.detectionRate * 100).toFixed(1)}% vs baseline ${(baseline.detectionRate * 100).toFixed(1)}%`,
+      );
+    }
+  }
+
+  return { passed: failures.length === 0, failures, result };
 }
 
 // ─── Report Formatting ──────────────────────────────────────────────────────
@@ -712,6 +1767,14 @@ OPTIONS:
   --judge, -j <id>     Benchmark a single judge
   --output, -o <path>  Save results to JSON file
   --format <fmt>       Output: text, json
+
+CI GATE OPTIONS:
+  --gate                     Enable CI gate mode (exit 1 on failure)
+  --min-f1 <n>               Minimum F1 score (0-1, default: 0.6)
+  --min-precision <n>        Minimum precision (0-1, default: 0.5)
+  --min-recall <n>           Minimum recall (0-1, default: 0.5)
+  --min-detection-rate <n>   Minimum detection rate (0-1, default: 0.5)
+  --baseline <path>          Fail if scores regress from baseline JSON
 `);
     process.exit(0);
   }
@@ -719,12 +1782,24 @@ OPTIONS:
   let judgeId: string | undefined;
   let outputPath: string | undefined;
   let format: "text" | "json" = "text";
+  let gate = false;
+  let minF1 = 0.6;
+  let minPrecision = 0.5;
+  let minRecall = 0.5;
+  let minDetectionRate = 0.5;
+  let baselinePath: string | undefined;
 
   for (let i = 4; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--judge" || arg === "-j") judgeId = argv[++i];
     else if (arg === "--output" || arg === "-o") outputPath = argv[++i];
     else if (arg === "--format") format = argv[++i] as "text" | "json";
+    else if (arg === "--gate") gate = true;
+    else if (arg === "--min-f1") minF1 = parseFloat(argv[++i]);
+    else if (arg === "--min-precision") minPrecision = parseFloat(argv[++i]);
+    else if (arg === "--min-recall") minRecall = parseFloat(argv[++i]);
+    else if (arg === "--min-detection-rate") minDetectionRate = parseFloat(argv[++i]);
+    else if (arg === "--baseline") baselinePath = argv[++i];
   }
 
   if (subcommand === "run") {
@@ -743,6 +1818,70 @@ OPTIONS:
       writeFileSync(resolve(outputPath), JSON.stringify(result, null, 2), "utf-8");
       console.log(`\n  Results saved to: ${outputPath}`);
     }
+
+    // ── CI Gate ──
+    if (gate) {
+      const failures: string[] = [];
+
+      // Absolute threshold checks
+      if (result.f1Score < minF1) {
+        failures.push(`F1 score ${(result.f1Score * 100).toFixed(1)}% < minimum ${(minF1 * 100).toFixed(1)}%`);
+      }
+      if (result.precision < minPrecision) {
+        failures.push(
+          `Precision ${(result.precision * 100).toFixed(1)}% < minimum ${(minPrecision * 100).toFixed(1)}%`,
+        );
+      }
+      if (result.recall < minRecall) {
+        failures.push(`Recall ${(result.recall * 100).toFixed(1)}% < minimum ${(minRecall * 100).toFixed(1)}%`);
+      }
+      if (result.detectionRate < minDetectionRate) {
+        failures.push(
+          `Detection rate ${(result.detectionRate * 100).toFixed(1)}% < minimum ${(minDetectionRate * 100).toFixed(1)}%`,
+        );
+      }
+
+      // Regression checks against baseline
+      if (baselinePath) {
+        try {
+          const baseline: BenchmarkResult = JSON.parse(readFileSync(resolve(baselinePath), "utf-8"));
+          if (result.f1Score < baseline.f1Score - 0.01) {
+            failures.push(
+              `F1 regressed: ${(result.f1Score * 100).toFixed(1)}% vs baseline ${(baseline.f1Score * 100).toFixed(1)}%`,
+            );
+          }
+          if (result.precision < baseline.precision - 0.01) {
+            failures.push(
+              `Precision regressed: ${(result.precision * 100).toFixed(1)}% vs baseline ${(baseline.precision * 100).toFixed(1)}%`,
+            );
+          }
+          if (result.recall < baseline.recall - 0.01) {
+            failures.push(
+              `Recall regressed: ${(result.recall * 100).toFixed(1)}% vs baseline ${(baseline.recall * 100).toFixed(1)}%`,
+            );
+          }
+          if (result.detectionRate < baseline.detectionRate - 0.01) {
+            failures.push(
+              `Detection rate regressed: ${(result.detectionRate * 100).toFixed(1)}% vs baseline ${(baseline.detectionRate * 100).toFixed(1)}%`,
+            );
+          }
+        } catch {
+          failures.push(`Failed to read baseline file: ${baselinePath}`);
+        }
+      }
+
+      if (failures.length > 0) {
+        console.error("\n  ❌ CI Gate FAILED:");
+        for (const f of failures) {
+          console.error(`     • ${f}`);
+        }
+        console.error("");
+        process.exit(1);
+      } else {
+        console.log("\n  ✅ CI Gate PASSED — all thresholds met.");
+      }
+    }
+
     process.exit(0);
   }
 

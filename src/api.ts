@@ -42,7 +42,7 @@ export type {
 export { JudgesError, ConfigError, EvaluationError, ParseError } from "./errors.js";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
-export { parseConfig, defaultConfig } from "./config.js";
+export { parseConfig, defaultConfig, mergeConfigs, discoverCascadingConfigs, loadCascadingConfig } from "./config.js";
 
 // ─── Judge Registry ──────────────────────────────────────────────────────────
 export { JUDGES, getJudge, getJudgeSummaries } from "./judges/index.js";
@@ -90,6 +90,7 @@ export { clearProjectCache } from "./evaluators/project.js";
 // ─── Formatters ──────────────────────────────────────────────────────────────
 export { findingsToSarif, evaluationToSarif, verdictToSarif, validateSarifLog } from "./formatters/sarif.js";
 export type { SarifValidationError } from "./formatters/sarif.js";
+export { verdictToCsvRows, verdictsToCsv, findingsToCsv } from "./formatters/csv.js";
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 export { runCli } from "./cli.js";
@@ -159,6 +160,10 @@ export {
 } from "./comparison.js";
 export type { ToolProfile, ToolCapability, ComparisonResult } from "./comparison.js";
 
+// ─── Benchmark Gate ──────────────────────────────────────────────────────────
+export { runBenchmarkSuite, benchmarkGate, formatBenchmarkReport } from "./commands/benchmark.js";
+export type { BenchmarkResult, BenchmarkGateOptions, BenchmarkGateResult } from "./commands/benchmark.js";
+
 // ─── Language Packs ──────────────────────────────────────────────────────────
 export { getLanguagePack, listLanguagePacks, suggestPack, LANGUAGE_PACKS } from "./commands/language-packs.js";
 
@@ -212,3 +217,80 @@ export function evaluateCodeSingleJudge(
 
 export { filterFalsePositiveHeuristics } from "./evaluators/false-positive-review.js";
 export type { FpFilterResult } from "./evaluators/false-positive-review.js";
+
+// ─── Streaming / Async API ──────────────────────────────────────────────────
+
+export interface FileInput {
+  /** Relative or absolute file path */
+  path: string;
+  /** Source code content */
+  code: string;
+  /** Programming language */
+  language: string;
+}
+
+export interface FileEvaluationResult {
+  /** File path that was evaluated */
+  path: string;
+  /** Tribunal verdict for this file */
+  verdict: TribunalVerdict;
+  /** Index in the input sequence */
+  index: number;
+}
+
+/**
+ * Async generator that evaluates files one at a time, yielding results
+ * as they complete. Useful for progress reporting and streaming UIs.
+ *
+ * @example
+ * ```ts
+ * for await (const result of evaluateFilesStream(files)) {
+ *   console.log(`${result.path}: ${result.verdict.overallScore}/100`);
+ * }
+ * ```
+ */
+export async function* evaluateFilesStream(
+  files: FileInput[],
+  options?: EvaluationOptions,
+): AsyncGenerator<FileEvaluationResult> {
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const verdict = evaluateWithTribunal(file.code, file.language, undefined, options);
+    yield { path: file.path, verdict, index: i };
+  }
+}
+
+/**
+ * Evaluate multiple files in parallel with bounded concurrency.
+ * Returns results in the order files were provided.
+ *
+ * @param files       - Array of file inputs to evaluate
+ * @param concurrency - Maximum parallel evaluations (default: 4)
+ * @param options     - Evaluation options
+ * @param onProgress  - Optional callback for progress reporting
+ */
+export async function evaluateFilesBatch(
+  files: FileInput[],
+  concurrency = 4,
+  options?: EvaluationOptions,
+  onProgress?: (completed: number, total: number) => void,
+): Promise<FileEvaluationResult[]> {
+  const results: FileEvaluationResult[] = new Array(files.length);
+  let completed = 0;
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < files.length) {
+      const i = nextIndex++;
+      const file = files[i];
+      const verdict = evaluateWithTribunal(file.code, file.language, undefined, options);
+      results[i] = { path: file.path, verdict, index: i };
+      completed++;
+      onProgress?.(completed, files.length);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, files.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}

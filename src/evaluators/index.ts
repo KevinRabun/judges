@@ -648,4 +648,4 @@ export function runAppBuilderWorkflow(
 
 export { formatVerdictAsMarkdown, formatEvaluationAsMarkdown };
 export { enrichWithPatches } from "../patches/index.js";
-export { crossEvaluatorDedup } from "../dedup.js";
+export { crossEvaluatorDedup, crossFileDedup } from "../dedup.js";

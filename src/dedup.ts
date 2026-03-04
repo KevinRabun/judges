@@ -4,6 +4,9 @@
  * Extracted from the evaluators monolith. Uses union-find to cluster findings
  * from different evaluators that flag the same line(s) for the same root cause,
  * keeping the highest-severity instance and annotating cross-references.
+ *
+ * Also provides cross-file deduplication for project-level analysis, merging
+ * identical-topic findings across different files into single consolidated entries.
  */
 
 import type { Finding, Severity } from "./types.js";
@@ -73,6 +76,53 @@ const DEDUP_TOPIC_PATTERNS: Array<[RegExp, string]> = [
     /abrupt.*(?:termination|exit|shutdown)|(?:process|hard).*(?:termination|exit)|panic.*exit|process\.exit|graceful.*(?:shutdown|lifecycle)/i,
     "abrupt-termination",
   ],
+
+  // ── Extended coverage (v3.22.0) ───────────────────────────────────────────
+  // Authentication & session
+  [/session\s*(?:fixation|hijack|management)|insecure.*session/i, "session-vulnerability"],
+  [/auth(?:entication)?\s*bypass|bypass.*auth/i, "auth-bypass"],
+  [/\bJWT\b.*(?:verif|valid|exp)|token.*expir|expired?\s*token/i, "jwt-validation"],
+  [/password.*(?:plain|clear|unhash|weak)|plain.*password|bcrypt|argon2|pbkdf/i, "password-handling"],
+
+  // Concurrency
+  [/race\s*condition|data\s*race|toctou|time.*of.*check/i, "race-condition"],
+  [/deadlock|dead\s*lock|circular.*(?:wait|lock)/i, "deadlock"],
+  [/(?:thread|goroutine|async)\s*(?:safe|safety|unsafe)|shared\s*(?:state|mutable)/i, "thread-safety"],
+
+  // Database & data
+  [/connection\s*pool|pool.*(?:exhaust|leak|size)|max.*connect/i, "connection-pooling"],
+  [/(?:missing|no)\s*(?:db\s*)?(?:transact|commit|rollback)|transact.*(?:missing|absent)/i, "missing-transaction"],
+  [/(?:missing|no)\s*(?:db\s*)?(?:index|indices)|table\s*scan|full\s*scan/i, "missing-index"],
+  [/(?:unescaped|unsanitized).*(?:output|render|template)|template\s*inject/i, "template-injection"],
+
+  // Logging & privacy
+  [/(?:log|print|console).*(?:sensitive|pii|credential|password|secret|token)/i, "sensitive-data-logging"],
+  [/\bpii\b|personal.*(?:data|information)|data.*(?:privacy|protection)/i, "pii-exposure"],
+
+  // Configuration & infrastructure
+  [/(?:cors|cross.?origin).*(?:permissive|wildcard|\*)|allow.*origin.*\*/i, "cors-misconfiguration"],
+  [
+    /tls|ssl|https.*(?:missing|disabled|insecure)|(?:insecure|plain|cleartext)\s*(?:http|connect)/i,
+    "insecure-transport",
+  ],
+  [/debug.*(?:mode|enabled|production)|(?:production|prod).*debug/i, "debug-in-production"],
+  [/env(?:ironment)?\s*var.*(?:missing|unset|undefined|fallback)|missing.*env/i, "missing-env-var"],
+
+  // Dependency & supply-chain
+  [/(?:outdated|vulnerable)\s*(?:dep|package|lib)|known\s*vulnerabilit/i, "vulnerable-dependency"],
+  [/unpinned.*(?:dep|version)|version.*(?:range|wildcard|\^|~)/i, "unpinned-dependency"],
+  [/(?:unused|dead)\s*(?:dep|import|require|package)/i, "unused-dependency"],
+
+  // Resource management
+  [
+    /(?:resource|file|handle|stream|socket)\s*leak|(?:unclosed|leaked)\s*(?:resource|file|handle|connection)/i,
+    "resource-leak",
+  ],
+  [/memory\s*leak|(?:unbounded|growing)\s*(?:cache|queue|buffer|array)/i, "memory-leak"],
+
+  // Error handling
+  [/(?:unchecked|unhandled)\s*(?:error|exception|rejection|promise)/i, "unhandled-error"],
+  [/(?:generic|bare)\s*(?:catch|except)|catch.*(?:Exception|Error)\s*[^a-z]/i, "generic-catch"],
 ];
 
 const TOPIC_STOP_WORDS = new Set([
@@ -264,6 +314,99 @@ export function crossEvaluatorDedup(findings: Finding[]): Finding[] {
     }
     if (allLines.size > 0) {
       best.lineNumbers = [...allLines].sort((a, b) => a - b);
+    }
+
+    result.push(best);
+  }
+
+  return result;
+}
+
+// ─── Cross-File Deduplication (Project Level) ────────────────────────────────
+
+/**
+ * Deduplicate non-absence findings across files in project-level analysis.
+ *
+ * When the same concrete issue (e.g., sql-injection, xss, hardcoded-secret) is
+ * identified with the SAME rule ID in multiple files, the finding is likely a
+ * repeated pattern rather than independent vulnerabilities. This function
+ * consolidates those into a single representative finding annotated with the
+ * list of affected files and combined line counts.
+ *
+ * Only groups findings that share BOTH a known topic AND the same ruleId.
+ * Findings with fallback topics (no known-pattern match) are left as-is since
+ * fallback topic collisions are unreliable.
+ *
+ * @param fileFindings Array of per-file findings with their source file paths
+ * @returns Deduplicated findings with file-count annotations
+ */
+export function crossFileDedup(fileFindings: Array<{ path: string; findings: Finding[] }>): Finding[] {
+  if (fileFindings.length <= 1) {
+    return fileFindings.flatMap((f) => f.findings);
+  }
+
+  const knownTopics = new Set(DEDUP_TOPIC_PATTERNS.map(([, t]) => t));
+
+  // Index: (topic + ruleId) → list of { path, finding }
+  const topicRuleGroups = new Map<string, Array<{ path: string; finding: Finding }>>();
+  const ungrouped: Finding[] = [];
+
+  for (const ff of fileFindings) {
+    for (const finding of ff.findings) {
+      const topic = extractFindingTopic(finding);
+
+      // Only group on known topics with a ruleId — fallback topics are too noisy
+      if (knownTopics.has(topic) && finding.ruleId) {
+        const key = `${topic}::${finding.ruleId}`;
+        const group = topicRuleGroups.get(key) ?? [];
+        group.push({ path: ff.path, finding });
+        topicRuleGroups.set(key, group);
+      } else {
+        ungrouped.push(finding);
+      }
+    }
+  }
+
+  const result: Finding[] = [...ungrouped];
+
+  for (const entries of topicRuleGroups.values()) {
+    if (entries.length === 1) {
+      // Single occurrence — keep as-is
+      result.push(entries[0].finding);
+      continue;
+    }
+
+    // Multiple files have the same topic + ruleId — consolidate
+    // Sort by severity desc → confidence desc → description length desc
+    const sorted = entries.sort((a, b) => {
+      const sevDiff = severityRank(b.finding.severity) - severityRank(a.finding.severity);
+      if (sevDiff !== 0) return sevDiff;
+      const confDiff = (b.finding.confidence ?? 0) - (a.finding.confidence ?? 0);
+      if (confDiff !== 0) return confDiff;
+      return b.finding.description.length - a.finding.description.length;
+    });
+
+    const best = { ...sorted[0].finding };
+
+    // Collect all affected file paths (deduplicated, sorted)
+    const affectedFiles = [...new Set(sorted.map((e) => e.path))].sort();
+
+    // Merge all line numbers (per-file line numbers aren't meaningful
+    // in a cross-file context, but keep them for reference)
+    const allLines = new Set<number>();
+    for (const entry of sorted) {
+      for (const l of entry.finding.lineNumbers ?? []) allLines.add(l);
+    }
+    if (allLines.size > 0) {
+      best.lineNumbers = [...allLines].sort((a, b) => a - b);
+    }
+
+    // Annotate description with cross-file information
+    best.description += `\n\n_Pattern repeated in ${affectedFiles.length} file(s): ${affectedFiles.join(", ")}_`;
+
+    // Boost confidence slightly for findings confirmed across multiple files
+    if (best.confidence !== undefined) {
+      best.confidence = Math.min(1.0, best.confidence + 0.05 * Math.min(affectedFiles.length - 1, 3));
     }
 
     result.push(best);

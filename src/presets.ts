@@ -120,6 +120,88 @@ export function getPreset(name: string): Preset | undefined {
 }
 
 /**
+ * Compose multiple presets into a single merged config.
+ * Rules:
+ * - disabledJudges: intersection (only disable judges disabled in ALL specified presets)
+ * - disabledRules: union (disable rules disabled in ANY preset)
+ * - minSeverity: most permissive (lowest threshold) wins
+ * - ruleOverrides: merge all, later presets override earlier for same rule
+ * - languages: union of all specified languages (empty = all)
+ * - exclude/include: union of all patterns
+ *
+ * This enables stacking presets like "security-only,performance" to get
+ * both security AND performance judges without unnecessary judges.
+ */
+export function composePresets(names: string[]): Preset | undefined {
+  const resolved = names.map((n) => PRESETS[n.trim()]).filter(Boolean);
+  if (resolved.length === 0) return undefined;
+  if (resolved.length === 1) return resolved[0];
+
+  const severityOrder: Severity[] = ["critical", "high", "medium", "low", "info"];
+
+  // Start with the first preset's config
+  const merged: JudgesConfig = { ...resolved[0].config };
+
+  for (let i = 1; i < resolved.length; i++) {
+    const cfg = resolved[i].config;
+
+    // disabledJudges: intersection — only keep judges disabled in BOTH
+    if (merged.disabledJudges && cfg.disabledJudges) {
+      const otherSet = new Set(cfg.disabledJudges);
+      merged.disabledJudges = merged.disabledJudges.filter((j) => otherSet.has(j));
+    } else {
+      // If either has no disabled list, the intersection is empty (enable all)
+      merged.disabledJudges = [];
+    }
+
+    // disabledRules: union
+    if (cfg.disabledRules) {
+      merged.disabledRules = [...new Set([...(merged.disabledRules || []), ...cfg.disabledRules])];
+    }
+
+    // minSeverity: most permissive (lower index = more restrictive)
+    if (cfg.minSeverity) {
+      const currentIdx = severityOrder.indexOf(merged.minSeverity || "info");
+      const newIdx = severityOrder.indexOf(cfg.minSeverity);
+      if (newIdx > currentIdx) {
+        merged.minSeverity = cfg.minSeverity;
+      }
+    }
+
+    // ruleOverrides: merge
+    if (cfg.ruleOverrides) {
+      merged.ruleOverrides = { ...(merged.ruleOverrides || {}), ...cfg.ruleOverrides };
+    }
+
+    // languages: union
+    if (cfg.languages) {
+      merged.languages = [...new Set([...(merged.languages || []), ...cfg.languages])];
+    }
+
+    // exclude: union
+    if (cfg.exclude) {
+      merged.exclude = [...new Set([...(merged.exclude || []), ...cfg.exclude])];
+    }
+
+    // include: union
+    if (cfg.include) {
+      merged.include = [...new Set([...(merged.include || []), ...cfg.include])];
+    }
+
+    // maxFiles: take the smaller limit
+    if (cfg.maxFiles !== undefined) {
+      merged.maxFiles = merged.maxFiles !== undefined ? Math.min(merged.maxFiles, cfg.maxFiles) : cfg.maxFiles;
+    }
+  }
+
+  return {
+    name: resolved.map((r) => r.name).join(" + "),
+    description: `Composed: ${resolved.map((r) => r.name).join(" + ")}`,
+    config: merged,
+  };
+}
+
+/**
  * List all available preset names and descriptions.
  */
 export function listPresets(): Array<{ name: string; description: string }> {

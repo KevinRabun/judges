@@ -59,6 +59,14 @@ inputs:
     description: "Path to a .judges-baseline.json file. Only new findings (not in baseline) are reported."
     required: false
     default: ""
+  exclude:
+    description: "Glob patterns to exclude files (comma-separated, e.g. '**/*.test.ts,**/fixtures/**')"
+    required: false
+    default: ""
+  include:
+    description: "Glob patterns to include only matching files (comma-separated, e.g. '**/*.py,**/*.ts')"
+    required: false
+    default: ""
 
 outputs:
   verdict:
@@ -109,6 +117,8 @@ runs:
         INPUT_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
         INPUT_DIFF_ONLY: ${{ inputs.diff-only }}
         INPUT_BASELINE_FILE: ${{ inputs.baseline-file }}
+        INPUT_EXCLUDE: ${{ inputs.exclude }}
+        INPUT_INCLUDE: ${{ inputs.include }}
         GITHUB_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
@@ -163,6 +173,18 @@ runs:
           if [ -n "$INPUT_PRESET" ]; then ARGS+=(--preset "$INPUT_PRESET"); fi
           if [ -n "$INPUT_CONFIG" ]; then ARGS+=(--config "$INPUT_CONFIG"); fi
           if [ "$INPUT_FIX" = "true" ]; then ARGS+=(--fix); fi
+          if [ -n "$INPUT_EXCLUDE" ]; then
+            IFS=',' read -ra EXCLUDE_PATTERNS <<< "$INPUT_EXCLUDE"
+            for pat in "${EXCLUDE_PATTERNS[@]}"; do
+              ARGS+=(--exclude "$(echo "$pat" | xargs)")
+            done
+          fi
+          if [ -n "$INPUT_INCLUDE" ]; then
+            IFS=',' read -ra INCLUDE_PATTERNS <<< "$INPUT_INCLUDE"
+            for pat in "${INCLUDE_PATTERNS[@]}"; do
+              ARGS+=(--include "$(echo "$pat" | xargs)")
+            done
+          fi
 
           judges "${ARGS[@]}" --format json > judges-results.json 2>&1 || true
         fi
