@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.21.0] — 2026-03-05
+
+### Added
+- **Findings panel** — New TreeView-based panel (`judges.showFindingsPanel`) displays all findings with sort-by-severity/judge, filter controls, and click-to-navigate-to-line; 7 new commands for panel interaction
+- **FindingsChangedEvent** — `diagnostics.ts` now emits events when findings update, enabling the panel to refresh automatically
+
+### Changed
+- **Extension activation** — Panel and commands registered at activation; contributes views container, tree view, and context menus in `package.json`
+- **Core engine** — Major expansion: 4 new languages (PHP/Ruby/Kotlin/Swift), framework version awareness, 20+ auto-fix patches, cross-file tracking, 3 new MCP tools; see [core CHANGELOG](../CHANGELOG.md) for full details
+
+### Tests
+- 1006 core tests, 392 subsystem tests — all passing
+
 ## [3.20.14] — 2026-03-04
 
 ### Added

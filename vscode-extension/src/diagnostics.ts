@@ -38,6 +38,11 @@ interface FindingWithPatch extends Finding {
   patch?: Patch;
 }
 
+export interface FindingsChangedEvent {
+  uri: vscode.Uri;
+  findings: Finding[];
+}
+
 /**
  * Manages diagnostics and findings for the Judges extension.
  * Caches findings per-document for code action support.
@@ -47,6 +52,11 @@ export class JudgesDiagnosticProvider {
   private findingsMap = new Map<string, FindingWithPatch[]>();
   /** Code snapshot at the time findings were cached — used to detect stale patches. */
   private codeSnapshotMap = new Map<string, string>();
+  /** Emitted whenever findings are published for a file (used by the findings panel). */
+  private _onFindingsChanged = new vscode.EventEmitter<FindingsChangedEvent>();
+
+  /** Subscribe to findings updates (used by the findings panel TreeView). */
+  onFindingsChanged = this._onFindingsChanged.event;
 
   constructor(diagnosticCollection: vscode.DiagnosticCollection) {
     this.diagnosticCollection = diagnosticCollection;
@@ -146,6 +156,7 @@ export class JudgesDiagnosticProvider {
     }
     const diagnostics = findings.map((f) => this.findingToDiagnostic(document, f));
     this.diagnosticCollection.set(document.uri, diagnostics);
+    this._onFindingsChanged.fire({ uri: document.uri, findings });
   }
 
   /**

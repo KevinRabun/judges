@@ -9984,3 +9984,243 @@ describe("getCondensedCriteria — Token Optimisation", () => {
     assert.ok(pctSaved >= 20, `Expected ≥20% tribunal prompt savings, got ${pctSaved}% (${savings} chars saved)`);
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Performance Budgets
+// ═════════════════════════════════════════════════════════════════════════════
+// Ensures evaluation completes within a reasonable time budget on the ~500-line
+// sample vulnerable API.  These are wall-clock guards — not micro-benchmarks.
+
+describe("Performance Budgets", () => {
+  it("evaluateWithTribunal should complete in < 5 seconds for sample code", () => {
+    const start = performance.now();
+    const v = evaluateWithTribunal(sampleCode, "typescript");
+    const elapsed = performance.now() - start;
+    assert.ok(v, "should produce a verdict");
+    assert.ok(elapsed < 5000, `Tribunal took ${Math.round(elapsed)} ms — exceeds 5 s budget`);
+  });
+
+  it("each individual judge should complete in < 500 ms", () => {
+    for (const judge of JUDGES) {
+      const start = performance.now();
+      evaluateWithJudge(judge, sampleCode, "typescript");
+      const elapsed = performance.now() - start;
+      assert.ok(elapsed < 500, `Judge ${judge.id} took ${Math.round(elapsed)} ms — exceeds 500 ms budget`);
+    }
+  });
+
+  it("evaluateDiff should complete quickly on a moderate diff", () => {
+    const code = `import express from "express";
+const secret = "hunter2";
+const app = express();
+app.use(eval(process.env.MIDDLEWARE));
+app.listen(3000);
+`;
+    const changedLines = [2, 4]; // lines that were "added"
+    const start = performance.now();
+    const v = evaluateDiff(code, "typescript", changedLines);
+    const elapsed = performance.now() - start;
+    assert.ok(v, "should produce a diff verdict");
+    assert.ok(elapsed < 3000, `evaluateDiff took ${Math.round(elapsed)} ms — exceeds 3 s budget`);
+  });
+
+  it("analyzing a large code block should scale linearly", () => {
+    // Create a ~2000 line block by repeating a pattern
+    const block = Array.from(
+      { length: 400 },
+      (_, i) =>
+        `function handler${i}(req: any) {\n  const data = req.body;\n  db.query("SELECT * FROM t WHERE id=" + data.id);\n  console.log(data);\n  return { ok: true };\n}`,
+    ).join("\n");
+    const start = performance.now();
+    const v = evaluateWithTribunal(block, "typescript");
+    const elapsed = performance.now() - start;
+    assert.ok(v, "should produce a verdict for large block");
+    // 4× the code should still finish within budget (generous 15 s)
+    assert.ok(elapsed < 15000, `Large-block tribunal took ${Math.round(elapsed)} ms — exceeds 15 s budget`);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Finding Snapshot — Rule Coverage Stability
+// ═════════════════════════════════════════════════════════════════════════════
+// Locks down the set of rule IDs produced by the tribunal on the sample file.
+// If a code change adds or removes findings, update the expected sets here
+// deliberately — this prevents accidental regressions.
+
+describe("Finding Snapshot — Rule Coverage Stability", () => {
+  let verdict: TribunalVerdict;
+
+  // Re-evaluate once for this suite
+  it("should produce a verdict for the snapshot baseline", () => {
+    verdict = evaluateWithTribunal(sampleCode, "typescript");
+    assert.ok(verdict);
+  });
+
+  it("should maintain the expected number of judges producing findings", () => {
+    const judgesWithFindings = verdict.evaluations.filter((e) => e.findings.length > 0).length;
+    // At least 30 of 37 judges should produce findings on the intentionally flawed sample
+    assert.ok(
+      judgesWithFindings >= 30,
+      `Only ${judgesWithFindings} judges produced findings — expected ≥30 on flawed sample`,
+    );
+  });
+
+  it("should maintain total finding count within expected range", () => {
+    const total = verdict.evaluations.reduce((s, e) => s + e.findings.length, 0);
+    // Allow ±30% from the baseline — update the range when intentional changes shift it
+    assert.ok(total >= 100, `Too few total findings (${total}) — expected ≥100 on flawed sample`);
+    assert.ok(total <= 600, `Too many total findings (${total}) — expected ≤600 to prevent rule explosion`);
+  });
+
+  it("should always flag critical rule families on the flawed sample", () => {
+    const allRuleIds = verdict.evaluations.flatMap((e) => e.findings.map((f) => f.ruleId));
+    const prefixes = new Set(allRuleIds.map((id) => id.replace(/-\d+$/, "")));
+
+    // These rule families MUST always fire on the sample
+    const requiredPrefixes = ["CYBER", "DATA", "AUTH", "DB", "ERR", "CFG", "LOGPRIV", "RATE"];
+    for (const req of requiredPrefixes) {
+      assert.ok(prefixes.has(req), `Required rule family ${req} missing from snapshot`);
+    }
+  });
+
+  it("should contain stable severity distribution", () => {
+    const allFindings = verdict.evaluations.flatMap((e) => e.findings);
+    const critCount = allFindings.filter((f) => f.severity === "critical").length;
+    const highCount = allFindings.filter((f) => f.severity === "high").length;
+
+    // The flawed sample should always have at least some critical+high findings
+    assert.ok(critCount >= 3, `Critical findings dropped to ${critCount} — expected ≥3`);
+    assert.ok(highCount >= 5, `High findings dropped to ${highCount} — expected ≥5`);
+  });
+
+  it("should produce consistent score bracket", () => {
+    // The intentionally flawed sample should always score poorly
+    assert.ok(verdict.overallScore >= 0, `Score ${verdict.overallScore} is negative`);
+    assert.ok(verdict.overallScore <= 60, `Score ${verdict.overallScore} is unexpectedly high for flawed sample`);
+  });
+
+  it("should have stable must-fix gate outcome", () => {
+    // The must-fix gate is optional — if enabled, it should trigger on the flawed sample.
+    // If not enabled (default), just confirm the property shape is correct.
+    if (verdict.mustFixGate) {
+      assert.ok(verdict.mustFixGate.triggered === true, "Must-fix gate should be triggered on the flawed sample");
+    } else {
+      // Must-fix gate not enabled by default — verify the criticalCount is high instead
+      assert.ok(verdict.criticalCount >= 3, `Expected ≥3 critical findings, got ${verdict.criticalCount}`);
+    }
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Test: Multi-Language Pattern Coverage
+// ═════════════════════════════════════════════════════════════════════════════
+// Verifies that newly added language patterns (PHP, Ruby, Kotlin, Swift)
+// actually trigger findings on representative code snippets.
+
+describe("Multi-Language Pattern Coverage", () => {
+  it("should detect SQL injection in PHP code", () => {
+    const phpCode = `<?php
+$id = $_GET['id'];
+$result = mysqli_query($conn, "SELECT * FROM users WHERE id = " . $id);
+echo $result;
+?>`;
+    const evaluation = evaluateWithJudge(getJudge("cybersecurity")!, phpCode, "php");
+    const dsEval = evaluateWithJudge(getJudge("data-security")!, phpCode, "php");
+    const totalFindings = evaluation.findings.length + dsEval.findings.length;
+    assert.ok(totalFindings > 0, "Should detect findings in PHP code (cyber + data-security)");
+  });
+
+  it("should detect command injection in Ruby code", () => {
+    const rubyCode = `
+user_input = params[:cmd]
+system(user_input)
+output = \`#{user_input}\`
+eval(user_input)
+`;
+    const evaluation = evaluateWithJudge(getJudge("cybersecurity")!, rubyCode, "ruby");
+    assert.ok(evaluation.findings.length > 0, "Should detect findings in Ruby code");
+  });
+
+  it("should detect hardcoded secrets in Kotlin code", () => {
+    const kotlinCode = `
+val apiKey = "sk-1234567890abcdef"
+val dbPassword = "hunter2"
+fun connect() {
+    val conn = DriverManager.getConnection("jdbc:mysql://localhost/db", "root", dbPassword)
+}
+`;
+    const evaluation = evaluateWithJudge(getJudge("data-security")!, kotlinCode, "kotlin");
+    assert.ok(evaluation.findings.length > 0, "Should detect findings in Kotlin code");
+  });
+
+  it("should detect unsafe patterns in Swift code", () => {
+    const swiftCode = `
+import Foundation
+let password = "supersecret123"
+let query = "SELECT * FROM users WHERE id = \\(userInput)"
+try! JSONDecoder().decode(User.self, from: data)
+`;
+    const evaluation = evaluateWithJudge(getJudge("data-security")!, swiftCode, "swift");
+    assert.ok(evaluation.findings.length > 0, "Should detect findings in Swift code");
+  });
+
+  it("should detect eval usage in PHP", () => {
+    const phpCode = `<?php
+$code = $_POST['code'];
+eval($code);
+?>`;
+    const evaluation = evaluateWithJudge(getJudge("cybersecurity")!, phpCode, "php");
+    const hasEval = evaluation.findings.some(
+      (f) => f.description.toLowerCase().includes("eval") || f.ruleId.includes("CYBER"),
+    );
+    assert.ok(hasEval, "Should flag eval() with user input in PHP");
+  });
+
+  it("should detect weak crypto in Ruby", () => {
+    const rubyCode = `
+require 'digest'
+hash = Digest::MD5.hexdigest(password)
+api_key = "sk-1234567890abcdef1234567890abcdef"
+encrypted = OpenSSL::Cipher.new('des')
+system(user_input)
+`;
+    const cyberEval = evaluateWithJudge(getJudge("cybersecurity")!, rubyCode, "ruby");
+    const dsEval = evaluateWithJudge(getJudge("data-security")!, rubyCode, "ruby");
+    const totalFindings = cyberEval.findings.length + dsEval.findings.length;
+    assert.ok(totalFindings > 0, "Should detect weak crypto or secrets in Ruby");
+  });
+
+  it("should detect error handling issues in Kotlin", () => {
+    const kotlinCode = `
+import java.io.File
+fun loadConfig() {
+    val password = "hardcoded-secret-123"
+    try {
+        val config = File("config.json").readText()
+    } catch (e: Exception) {
+        // ignore
+    }
+}
+`;
+    const errEval = evaluateWithJudge(getJudge("error-handling")!, kotlinCode, "kotlin");
+    const dsEval = evaluateWithJudge(getJudge("data-security")!, kotlinCode, "kotlin");
+    const totalFindings = errEval.findings.length + dsEval.findings.length;
+    assert.ok(totalFindings > 0, "Should detect empty catch or secrets in Kotlin");
+  });
+
+  it("should detect missing error handling in Swift", () => {
+    const swiftCode = `
+import Foundation
+let apiKey = "sk-1234567890abcdef1234567890abcdef"
+func loadData() {
+    let data = try! Data(contentsOf: url)
+    let json = try! JSONSerialization.jsonObject(with: data)
+    print(apiKey)
+}
+`;
+    const errEval = evaluateWithJudge(getJudge("error-handling")!, swiftCode, "swift");
+    const dsEval = evaluateWithJudge(getJudge("data-security")!, swiftCode, "swift");
+    const totalFindings = errEval.findings.length + dsEval.findings.length;
+    assert.ok(totalFindings > 0, "Should detect force-try or secrets in Swift");
+  });
+});

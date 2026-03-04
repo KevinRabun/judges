@@ -178,6 +178,135 @@ export function shouldRunAbsenceRules(category: FileCategory): boolean {
 /** A framework or middleware detected from code patterns (no AST required). */
 export type DetectedFramework = string;
 
+/** Version hint extracted from code or manifest patterns. */
+export interface FrameworkVersionHint {
+  framework: DetectedFramework;
+  /** Detected major version (e.g. 4 for Django 4.x). null if unknown. */
+  major: number | null;
+  /** Detected minor version if available. null if unknown. */
+  minor: number | null;
+  /** Raw version string found in source (e.g. "4.2.1", ">=3.0"). */
+  raw: string | null;
+}
+
+/**
+ * Patterns that extract version hints from code, config, or comments.
+ * Each entry: [framework, regex with capture group 1 = version string].
+ */
+const VERSION_DETECT_PATTERNS: [DetectedFramework, RegExp][] = [
+  // Python requirements / pyproject.toml
+  ["django", /django\s*[=~><]{1,2}\s*([\d.]+)/i],
+  ["flask", /flask\s*[=~><]{1,2}\s*([\d.]+)/i],
+  ["fastapi", /fastapi\s*[=~><]{1,2}\s*([\d.]+)/i],
+  // JavaScript package.json style
+  ["express", /["']express["']\s*:\s*["'][~^]?([\d.]+)/i],
+  ["next", /["']next["']\s*:\s*["'][~^]?([\d.]+)/i],
+  // Java / Kotlin — Spring Boot
+  ["spring", /spring-boot(?:-starter)?[:\-](\d+\.\d+[\d.]*)/i],
+  ["spring", /org\.springframework\.boot.*version\s*=?\s*['"]?(\d+\.\d+[\d.]*)/i],
+  // C# — ASP.NET
+  ["aspnet", /Microsoft\.AspNetCore[.\w]*Version=["']?([\d.]+)/i],
+  ["aspnet", /net(\d+\.\d+)/i],
+  // Ruby Gemfile
+  ["rails", /['"]rails['"],?\s*['"]~>\s*([\d.]+)/i],
+  // Go go.mod
+  ["gin", /github\.com\/gin-gonic\/gin\s+v([\d.]+)/i],
+  // PHP composer.json
+  ["laravel", /["']laravel\/framework["']\s*:\s*["'][~^]?([\d.]+)/i],
+  // Generic version comment
+  ["django", /@version\s+Django\s+([\d.]+)/i],
+  ["spring", /@version\s+Spring\s+(?:Boot\s+)?([\d.]+)/i],
+];
+
+/**
+ * Extract framework version hints from code content.
+ * Scans for version specifiers in requirements, package.json, go.mod,
+ * Gemfile, composer.json, and version comments.
+ */
+export function detectFrameworkVersions(code: string): FrameworkVersionHint[] {
+  const hints: FrameworkVersionHint[] = [];
+  const seen = new Set<string>();
+
+  for (const [fw, regex] of VERSION_DETECT_PATTERNS) {
+    const match = code.match(regex);
+    if (match && match[1]) {
+      const key = `${fw}:${match[1]}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const parts = match[1].split(".");
+      hints.push({
+        framework: fw,
+        major: parts[0] ? parseInt(parts[0], 10) : null,
+        minor: parts[1] ? parseInt(parts[1], 10) : null,
+        raw: match[1],
+      });
+    }
+  }
+
+  return hints;
+}
+
+/**
+ * Version-aware confidence adjustments. Some security concerns only apply to
+ * specific framework versions. Returns the confidence delta (negative = reduce,
+ * positive = increase).
+ *
+ * Examples:
+ * - Django ≥4.0 has CSRF enabled by default → reduce CSRF-finding confidence
+ * - Spring Boot ≥3.0 requires explicit security configuration → raise concern
+ * - Express 5.x deprecates certain middleware → raise concern for old patterns
+ */
+export function getVersionConfidenceAdjustment(finding: Finding, versions: FrameworkVersionHint[]): number {
+  for (const v of versions) {
+    if (v.major === null) continue;
+
+    if (v.framework === "django") {
+      // Django 4.0+ has async view support and improved CSRF
+      if (v.major >= 4 && /csrf/i.test(finding.title)) return -0.15;
+      // Django 3.x deprecated certain auth patterns
+      if (v.major >= 3 && /password.*reset.*insecure/i.test(finding.title)) return -0.1;
+    }
+
+    if (v.framework === "spring") {
+      // Spring Boot 3.x requires Spring Security 6 — no more auto-CSRF
+      if (v.major >= 3 && /csrf.*auto|default.*csrf/i.test(finding.title)) return 0.1;
+      // Spring Boot 2.x had auto-configured security
+      if (v.major <= 2 && /security.*missing|no.*security/i.test(finding.title)) return -0.15;
+    }
+
+    if (v.framework === "next") {
+      // Next.js 13+ App Router has built-in security headers
+      if (v.major >= 13 && /security.?header/i.test(finding.title)) return -0.15;
+      // Next.js 14+ has improved Server Action security
+      if (v.major >= 14 && /server.?action.*insecure/i.test(finding.title)) return -0.1;
+    }
+
+    if (v.framework === "express") {
+      // Express 5.x deprecated several patterns
+      if (v.major >= 5 && /deprecated/i.test(finding.title)) return 0.1;
+    }
+
+    if (v.framework === "rails") {
+      // Rails 7+ has strong defaults for parameter filtering
+      if (v.major >= 7 && /mass.?assign|strong.?param/i.test(finding.title)) return -0.1;
+      // Rails 6+ has per-form CSRF tokens
+      if (v.major >= 6 && /csrf/i.test(finding.title)) return -0.1;
+    }
+
+    if (v.framework === "laravel") {
+      // Laravel 9+ has improved validation and typed request factories
+      if (v.major >= 9 && /input.?valid|request.?valid/i.test(finding.title)) return -0.1;
+    }
+
+    if (v.framework === "aspnet") {
+      // .NET 8+ has built-in rate limiting middleware
+      if (v.major >= 8 && /rate.?limit/i.test(finding.title)) return -0.15;
+    }
+  }
+
+  return 0;
+}
+
 const FRAMEWORK_DETECT_PATTERNS: [DetectedFramework, RegExp][] = [
   // ── JavaScript / TypeScript ──
   ["express", /\brequire\s*\(\s*['"]express['"]\)|from\s+['"]express['"]/],
@@ -240,26 +369,45 @@ export function detectFrameworks(code: string): DetectedFramework[] {
 
 /**
  * Reduce confidence on findings that are mitigated by a detected framework
- * or middleware. This is complementary to AST-based import awareness —
- * it works for all languages and detects framework-level mitigations
- * (e.g. Django CSRF, FastAPI validation) that import-level checks miss.
+ * or middleware. Also applies version-aware adjustments when version hints
+ * are found in the code. This is complementary to AST-based import
+ * awareness — it works for all languages and detects framework-level
+ * mitigations (e.g. Django CSRF, FastAPI validation) that import checks miss.
  */
 export function applyFrameworkAwareness(findings: Finding[], code: string): Finding[] {
   const frameworks = detectFrameworks(code);
-  if (frameworks.length === 0) return findings;
+  const versions = detectFrameworkVersions(code);
+  if (frameworks.length === 0 && versions.length === 0) return findings;
 
   return findings.map((f) => {
+    let currentConf = f.confidence ?? 0.5;
+    let provenanceNote = "";
+
+    // Framework mitigation adjustments
     for (const fw of frameworks) {
       const pattern = FRAMEWORK_MITIGATIONS[fw];
       if (pattern && pattern.test(f.title)) {
-        const currentConf = f.confidence ?? 0.5;
-        const newConf = Math.max(0, Math.min(1, currentConf - FRAMEWORK_CONFIDENCE_REDUCTION));
-        return {
-          ...f,
-          confidence: newConf,
-          provenance: f.provenance ? `${f.provenance}; ${fw}-mitigated` : `${fw}-mitigated`,
-        };
+        currentConf = Math.max(0, Math.min(1, currentConf - FRAMEWORK_CONFIDENCE_REDUCTION));
+        provenanceNote += provenanceNote ? `; ${fw}-mitigated` : `${fw}-mitigated`;
       }
+    }
+
+    // Version-aware fine-tuning
+    if (versions.length > 0) {
+      const versionDelta = getVersionConfidenceAdjustment(f, versions);
+      if (versionDelta !== 0) {
+        currentConf = Math.max(0, Math.min(1, currentConf + versionDelta));
+        const versionLabel = versions.map((v) => `${v.framework}@${v.raw}`).join(",");
+        provenanceNote += provenanceNote ? `; version-adjusted(${versionLabel})` : `version-adjusted(${versionLabel})`;
+      }
+    }
+
+    if (provenanceNote) {
+      return {
+        ...f,
+        confidence: currentConf,
+        provenance: f.provenance ? `${f.provenance}; ${provenanceNote}` : provenanceNote,
+      };
     }
     return f;
   });

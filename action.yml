@@ -47,6 +47,18 @@ inputs:
     description: "Fail the action if critical or high findings are detected"
     required: false
     default: "false"
+  pr-review:
+    description: "Post findings as inline PR review comments on changed lines (requires pull-requests: write)"
+    required: false
+    default: "false"
+  diff-only:
+    description: "Only evaluate changed lines in a PR (requires pull-requests: read). Dramatically reduces noise."
+    required: false
+    default: "false"
+  baseline-file:
+    description: "Path to a .judges-baseline.json file. Only new findings (not in baseline) are reported."
+    required: false
+    default: ""
 
 outputs:
   verdict:
@@ -95,77 +107,95 @@ runs:
         INPUT_MIN_CONFIDENCE: ${{ inputs.min-confidence }}
         INPUT_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
         INPUT_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
+        INPUT_DIFF_ONLY: ${{ inputs.diff-only }}
+        INPUT_BASELINE_FILE: ${{ inputs.baseline-file }}
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
 
-        ARGS=()
+        # ── Diff-only mode: evaluate only changed files/lines in a PR ──
+        if [ "$INPUT_DIFF_ONLY" = "true" ] && [ -n "${GITHUB_BASE_REF:-}" ]; then
+          echo "::group::Diff-only mode: evaluating changed files"
+          git fetch origin "$GITHUB_BASE_REF" --depth=1 2>/dev/null || true
+          git diff "origin/$GITHUB_BASE_REF"...HEAD > /tmp/judges-pr.diff 2>/dev/null || true
 
-        # Determine if path is file or directory
-        if [ -f "$INPUT_PATH" ]; then
-          ARGS+=(eval --file "$INPUT_PATH")
-        elif [ -d "$INPUT_PATH" ]; then
-          # For directories, use the report generator
-          echo "::group::Analyzing directory: $INPUT_PATH"
-
-          REPORT_ARGS=(
-            npx tsx "$(npm root -g)/@kevinrabun/judges/scripts/generate-public-repo-report.ts"
-            --repoUrl "file://$INPUT_PATH"
-            --quickStart
-            --maxFiles "$INPUT_MAX_FILES"
-            --output judges-report.md
-          )
-
-          if [ -n "$INPUT_MIN_CONFIDENCE" ] && [ "$INPUT_MIN_CONFIDENCE" != "0" ]; then
-            REPORT_ARGS+=(--minConfidence "$INPUT_MIN_CONFIDENCE")
+          if [ -s /tmp/judges-pr.diff ]; then
+            judges diff --file /tmp/judges-pr.diff --format json > judges-results.json 2>&1 || true
+          else
+            echo '{"files":[],"totalFindings":0,"worstScore":100}' > judges-results.json
           fi
-
-          "${REPORT_ARGS[@]}" 2>&1 || true
           echo "::endgroup::"
-
-          # Extract summary from report
-          if [ -f judges-report.md ]; then
-            echo "verdict=WARNING" >> "$GITHUB_OUTPUT"
-            echo "score=0" >> "$GITHUB_OUTPUT"
-            echo "findings=0" >> "$GITHUB_OUTPUT"
-            echo "critical=0" >> "$GITHUB_OUTPUT"
-            echo "high=0" >> "$GITHUB_OUTPUT"
-          fi
-          exit 0
         else
-          echo "::error::Path not found: $INPUT_PATH"
-          exit 1
+          ARGS=()
+
+          # Determine if path is file or directory
+          if [ -f "$INPUT_PATH" ]; then
+            ARGS+=(eval --file "$INPUT_PATH")
+          elif [ -d "$INPUT_PATH" ]; then
+            echo "::group::Analyzing directory: $INPUT_PATH"
+            REPORT_ARGS=(
+              npx tsx "$(npm root -g)/@kevinrabun/judges/scripts/generate-public-repo-report.ts"
+              --repoUrl "file://$INPUT_PATH"
+              --quickStart
+              --maxFiles "$INPUT_MAX_FILES"
+              --output judges-report.md
+            )
+            if [ -n "$INPUT_MIN_CONFIDENCE" ] && [ "$INPUT_MIN_CONFIDENCE" != "0" ]; then
+              REPORT_ARGS+=(--minConfidence "$INPUT_MIN_CONFIDENCE")
+            fi
+            "${REPORT_ARGS[@]}" 2>&1 || true
+            echo "::endgroup::"
+            if [ -f judges-report.md ]; then
+              echo "verdict=WARNING" >> "$GITHUB_OUTPUT"
+              echo "score=0" >> "$GITHUB_OUTPUT"
+              echo "findings=0" >> "$GITHUB_OUTPUT"
+              echo "critical=0" >> "$GITHUB_OUTPUT"
+              echo "high=0" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          else
+            echo "::error::Path not found: $INPUT_PATH"
+            exit 1
+          fi
+
+          if [ -n "$INPUT_LANGUAGE" ]; then ARGS+=(--language "$INPUT_LANGUAGE"); fi
+          if [ -n "$INPUT_JUDGE" ]; then ARGS+=(--judge "$INPUT_JUDGE"); fi
+          if [ -n "$INPUT_PRESET" ]; then ARGS+=(--preset "$INPUT_PRESET"); fi
+          if [ -n "$INPUT_CONFIG" ]; then ARGS+=(--config "$INPUT_CONFIG"); fi
+          if [ "$INPUT_FIX" = "true" ]; then ARGS+=(--fix); fi
+
+          judges "${ARGS[@]}" --format json > judges-results.json 2>&1 || true
         fi
 
-        # Add optional arguments for file mode
-        if [ -n "$INPUT_LANGUAGE" ]; then
-          ARGS+=(--language "$INPUT_LANGUAGE")
+        # ── Baseline filtering: suppress known findings ──
+        if [ -n "$INPUT_BASELINE_FILE" ] && [ -f "$INPUT_BASELINE_FILE" ]; then
+          echo "::group::Filtering against baseline: $INPUT_BASELINE_FILE"
+          node -e "
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('judges-results.json', 'utf8'));
+            const baseline = JSON.parse(fs.readFileSync('$INPUT_BASELINE_FILE', 'utf8'));
+            const baselineKeys = new Set(
+              (baseline.findings || []).map(f => f.ruleId + ':' + (f.lineNumbers || []).sort().join(','))
+            );
+            const allFindings = results.findings || (results.files || []).flatMap(f => (f.verdict?.findings || []));
+            const newFindings = allFindings.filter(f => {
+              const key = f.ruleId + ':' + (f.lineNumbers || []).sort().join(',');
+              return !baselineKeys.has(key);
+            });
+            results.findings = newFindings;
+            results._baselineFiltered = allFindings.length - newFindings.length;
+            fs.writeFileSync('judges-results.json', JSON.stringify(results, null, 2));
+            console.log('Baseline: suppressed ' + (allFindings.length - newFindings.length) + ' known findings, ' + newFindings.length + ' new findings remain');
+          " 2>&1 || true
+          echo "::endgroup::"
         fi
 
-        if [ -n "$INPUT_JUDGE" ]; then
-          ARGS+=(--judge "$INPUT_JUDGE")
-        fi
-
-        if [ -n "$INPUT_PRESET" ]; then
-          ARGS+=(--preset "$INPUT_PRESET")
-        fi
-
-        if [ -n "$INPUT_CONFIG" ]; then
-          ARGS+=(--config "$INPUT_CONFIG")
-        fi
-
-        if [ "$INPUT_FIX" = "true" ]; then
-          ARGS+=(--fix)
-        fi
-
-        # Always get JSON output for parsing, then convert
-        judges "${ARGS[@]}" --format json > judges-results.json 2>&1 || true
-
-        # Extract scores from JSON
-        VERDICT=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log(r.verdict||'UNKNOWN')")
-        SCORE=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log(r.score||0)")
-        TOTAL=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log((r.findings||[]).length)")
-        CRITICAL=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log((r.findings||[]).filter(f=>f.severity==='critical').length)")
-        HIGH=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log((r.findings||[]).filter(f=>f.severity==='high').length)")
+        # ── Extract scores ──
+        VERDICT=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log(r.verdict||r.overallVerdict||'UNKNOWN')" 2>/dev/null || echo "UNKNOWN")
+        SCORE=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log(r.score||r.overallScore||r.worstScore||0)" 2>/dev/null || echo "0")
+        TOTAL=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); const f=r.findings||(r.files||[]).flatMap(x=>(x.verdict?.findings||[])); console.log(f.length)" 2>/dev/null || echo "0")
+        CRITICAL=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); const f=r.findings||(r.files||[]).flatMap(x=>(x.verdict?.findings||[])); console.log(f.filter(x=>x.severity==='critical').length)" 2>/dev/null || echo "0")
+        HIGH=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); const f=r.findings||(r.files||[]).flatMap(x=>(x.verdict?.findings||[])); console.log(f.filter(x=>x.severity==='high').length)" 2>/dev/null || echo "0")
 
         echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
         echo "score=$SCORE" >> "$GITHUB_OUTPUT"
@@ -175,27 +205,137 @@ runs:
 
         # Display results in requested format
         if [ "$INPUT_FORMAT" = "sarif" ] || [ "$INPUT_UPLOAD_SARIF" = "true" ]; then
-          judges "${ARGS[@]}" --format sarif > judges-results.sarif 2>&1 || true
+          judges eval --file "$INPUT_PATH" --format sarif > judges-results.sarif 2>&1 || true
           echo "sarif_file=judges-results.sarif" >> "$GITHUB_OUTPUT"
         fi
-
         if [ "$INPUT_FORMAT" = "text" ]; then
-          judges "${ARGS[@]}" --format text 2>&1 || true
+          cat judges-results.json | node -e "const r=JSON.parse(require('fs').readFileSync(0,'utf8')); const f=r.findings||(r.files||[]).flatMap(x=>(x.verdict?.findings||[])); f.forEach(x=>console.log('['+x.severity.toUpperCase()+'] '+x.ruleId+': '+x.title))"
         elif [ "$INPUT_FORMAT" = "markdown" ]; then
-          judges "${ARGS[@]}" --format markdown 2>&1 || true
+          cat judges-results.json | node -e "const r=JSON.parse(require('fs').readFileSync(0,'utf8')); const f=r.findings||(r.files||[]).flatMap(x=>(x.verdict?.findings||[])); f.forEach(x=>console.log('- **['+x.severity.toUpperCase()+']** \`'+x.ruleId+'\`: '+x.title))"
         elif [ "$INPUT_FORMAT" = "sarif" ]; then
-          cat judges-results.sarif
+          cat judges-results.sarif 2>/dev/null || true
         else
           cat judges-results.json
         fi
 
         # Summary annotation
-        echo "### Judges Results" >> "$GITHUB_STEP_SUMMARY"
+        BASELINE_NOTE=""
+        if [ -n "$INPUT_BASELINE_FILE" ] && [ -f "$INPUT_BASELINE_FILE" ]; then
+          BASELINE_SUPPRESSED=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log(r._baselineFiltered||0)" 2>/dev/null || echo "0")
+          BASELINE_NOTE=" (${BASELINE_SUPPRESSED} baseline findings suppressed)"
+        fi
+        DIFF_NOTE=""
+        if [ "$INPUT_DIFF_ONLY" = "true" ]; then
+          DIFF_NOTE=" (diff-only mode)"
+        fi
+
+        echo "### 🔍 Judges Code Review${DIFF_NOTE}" >> "$GITHUB_STEP_SUMMARY"
         echo "" >> "$GITHUB_STEP_SUMMARY"
-        echo "- **Verdict:** $VERDICT" >> "$GITHUB_STEP_SUMMARY"
-        echo "- **Score:** $SCORE/100" >> "$GITHUB_STEP_SUMMARY"
-        echo "- **Findings:** $TOTAL (critical: $CRITICAL, high: $HIGH)" >> "$GITHUB_STEP_SUMMARY"
+        echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+        echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+        echo "| Verdict | **$VERDICT** |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| Score | $SCORE/100 |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| Total Findings | $TOTAL${BASELINE_NOTE} |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| Critical | $CRITICAL |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| High | $HIGH |" >> "$GITHUB_STEP_SUMMARY"
         echo "" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Post PR review comments
+      if: inputs.pr-review == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        set -euo pipefail
+
+        if [ ! -f judges-results.json ]; then
+          echo "No results file found — skipping PR review"
+          exit 0
+        fi
+
+        # Generate PR review comments from findings using the GitHub API
+        node -e "
+          const https = require('https');
+          const fs = require('fs');
+
+          const results = JSON.parse(fs.readFileSync('judges-results.json', 'utf8'));
+          const findings = results.findings || (results.files || []).flatMap(f => {
+            const filePath = f.file || '';
+            return (f.verdict?.findings || []).map(v => ({ ...v, _file: filePath }));
+          });
+
+          if (findings.length === 0) {
+            console.log('No findings to post as PR comments.');
+            process.exit(0);
+          }
+
+          const repo = process.env.GITHUB_REPOSITORY;
+          const prNumber = process.env.PR_NUMBER;
+          const token = process.env.GITHUB_TOKEN;
+
+          // Map severity to emoji
+          const severityIcon = { critical: '🔴', high: '🟠', medium: '🟡', low: '🔵' };
+
+          // Build review comments (max 50 to avoid API limits)
+          const comments = [];
+          for (const f of findings.slice(0, 50)) {
+            const filePath = f._file || f.filePath || results.filePath || '';
+            const line = (f.lineNumbers && f.lineNumbers[0]) || 1;
+            if (!filePath) continue;
+
+            const icon = severityIcon[f.severity] || '⚪';
+            let body = icon + ' **' + f.severity.toUpperCase() + '** \`' + f.ruleId + '\`: ' + f.title + '\n\n';
+            body += f.description + '\n\n';
+            if (f.recommendation) body += '**Recommendation:** ' + f.recommendation + '\n\n';
+            if (f.suggestedFix) body += '**Suggested Fix:**\n\`\`\`\n' + f.suggestedFix + '\n\`\`\`\n';
+            if (f.reference) body += '📚 ' + f.reference + '\n';
+
+            comments.push({ path: filePath, line: line, body: body });
+          }
+
+          if (comments.length === 0) {
+            console.log('No comments with file paths to post.');
+            process.exit(0);
+          }
+
+          // Post as a PR review via the GitHub API
+          const reviewBody = JSON.stringify({
+            event: findings.some(f => f.severity === 'critical') ? 'REQUEST_CHANGES' : 'COMMENT',
+            body: '## 🔍 Judges Code Review\n\nFound **' + findings.length + '** finding(s). See inline comments below.\n\n' +
+              (findings.length > 50 ? '> ⚠️ Showing top 50 of ' + findings.length + ' findings.\n' : ''),
+            comments: comments,
+          });
+
+          const options = {
+            hostname: 'api.github.com',
+            path: '/repos/' + repo + '/pulls/' + prNumber + '/reviews',
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + token,
+              'Accept': 'application/vnd.github.v3+json',
+              'User-Agent': 'judges-action',
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(reviewBody),
+            },
+          };
+
+          const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => {
+              if (res.statusCode >= 200 && res.statusCode < 300) {
+                console.log('✅ Posted PR review with ' + comments.length + ' inline comment(s)');
+              } else {
+                console.error('⚠️ PR review API returned ' + res.statusCode + ': ' + data);
+                // Don't fail the action — review comments are best-effort
+              }
+            });
+          });
+          req.on('error', (e) => console.error('⚠️ PR review request failed:', e.message));
+          req.write(reviewBody);
+          req.end();
+        "
 
     - name: Upload SARIF to GitHub Code Scanning
       if: inputs.upload-sarif == 'true' && steps.run.outputs.sarif_file != ''

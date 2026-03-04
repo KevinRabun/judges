@@ -2,7 +2,7 @@
   "name": "judges-panel",
   "displayName": "Judges Panel",
   "description": "37 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.20.14",
+  "version": "3.21.0",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -48,6 +48,31 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "judges",
+          "title": "Judges Panel",
+          "icon": "$(shield)"
+        }
+      ]
+    },
+    "views": {
+      "judges": [
+        {
+          "id": "judges.findingsPanel",
+          "name": "Findings",
+          "icon": "$(checklist)",
+          "contextualTitle": "Judges Findings"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "judges.findingsPanel",
+        "contents": "No findings yet.\n[Evaluate Current File](command:judges.evaluateFile)\n[Evaluate Workspace](command:judges.evaluateWorkspace)"
+      }
+    ],
     "commands": [
       {
         "command": "judges.evaluateFile",
@@ -84,8 +109,117 @@
         "command": "judges.deepReview",
         "title": "Judges: Deep Review (Layer 1 + Layer 2)",
         "icon": "$(rocket)"
+      },
+      {
+        "command": "judges.sortBySeverity",
+        "title": "Sort by Severity",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "judges.sortByFile",
+        "title": "Sort by Line",
+        "icon": "$(list-ordered)"
+      },
+      {
+        "command": "judges.sortByRule",
+        "title": "Sort by Rule",
+        "icon": "$(tag)"
+      },
+      {
+        "command": "judges.filterAll",
+        "title": "Filter: All Severities",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "judges.filterCritical",
+        "title": "Filter: Critical Only",
+        "icon": "$(error)"
+      },
+      {
+        "command": "judges.filterHigh",
+        "title": "Filter: High+",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "judges.filterMedium",
+        "title": "Filter: Medium+",
+        "icon": "$(info)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "judges.evaluateWorkspace",
+          "when": "view == judges.findingsPanel",
+          "group": "navigation@1"
+        },
+        {
+          "command": "judges.clearDiagnostics",
+          "when": "view == judges.findingsPanel",
+          "group": "navigation@2"
+        },
+        {
+          "command": "judges.sortBySeverity",
+          "when": "view == judges.findingsPanel",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "judges.sortByFile",
+          "when": "view == judges.findingsPanel",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "judges.sortByRule",
+          "when": "view == judges.findingsPanel",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "judges.filterAll",
+          "when": "view == judges.findingsPanel",
+          "group": "2_filter@1"
+        },
+        {
+          "command": "judges.filterCritical",
+          "when": "view == judges.findingsPanel",
+          "group": "2_filter@2"
+        },
+        {
+          "command": "judges.filterHigh",
+          "when": "view == judges.findingsPanel",
+          "group": "2_filter@3"
+        },
+        {
+          "command": "judges.filterMedium",
+          "when": "view == judges.findingsPanel",
+          "group": "2_filter@4"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "judges.evaluateFile",
+          "group": "navigation",
+          "when": "editorLangId =~ /typescript|javascript|python|go|rust|java|csharp|cpp/"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "judges.evaluateFile",
+          "group": "judges@1"
+        },
+        {
+          "command": "judges.fixFile",
+          "group": "judges@2"
+        },
+        {
+          "command": "judges.refineWithAI",
+          "group": "judges@3"
+        },
+        {
+          "command": "judges.deepReview",
+          "group": "judges@4"
+        }
+      ]
+    },
     "mcpServerDefinitionProviders": [
       {
         "id": "judges-mcp",
@@ -137,33 +271,6 @@
           "description": "Debounce delay in milliseconds for on-save evaluation."
         }
       }
-    },
-    "menus": {
-      "editor/title": [
-        {
-          "command": "judges.evaluateFile",
-          "group": "navigation",
-          "when": "editorLangId =~ /typescript|javascript|python|go|rust|java|csharp|cpp/"
-        }
-      ],
-      "editor/context": [
-        {
-          "command": "judges.evaluateFile",
-          "group": "judges@1"
-        },
-        {
-          "command": "judges.fixFile",
-          "group": "judges@2"
-        },
-        {
-          "command": "judges.refineWithAI",
-          "group": "judges@3"
-        },
-        {
-          "command": "judges.deepReview",
-          "group": "judges@4"
-        }
-      ]
     },
     "chatParticipants": [
       {

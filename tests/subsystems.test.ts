@@ -32,6 +32,8 @@ import {
   applyConfig,
   detectFrameworks,
   applyFrameworkAwareness,
+  detectFrameworkVersions,
+  getVersionConfidenceAdjustment,
   stripCommentsAndStrings,
   testCode,
   getContextWindow,
@@ -1081,6 +1083,143 @@ describe("Framework-Aware Confidence — applyFrameworkAwareness", () => {
     const result = applyFrameworkAwareness(findings, code);
     assert.ok(result[0].provenance?.includes("absence-of-pattern"), "Should keep original");
     assert.ok(result[0].provenance?.includes("helmet-mitigated"), "Should add framework");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 20b. Framework Version Detection — detectFrameworkVersions
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Framework Version Detection — detectFrameworkVersions", () => {
+  it("should detect Django version from requirements.txt style", () => {
+    const code = `Django==4.2.1\npsycopg2-binary>=2.9`;
+    const versions = detectFrameworkVersions(code);
+    const django = versions.find((v) => v.framework === "django");
+    assert.ok(django, "Should detect Django");
+    assert.equal(django!.major, 4);
+    assert.equal(django!.minor, 2);
+    assert.equal(django!.raw, "4.2.1");
+  });
+
+  it("should detect Flask version from ~= constraint", () => {
+    const code = `flask~=2.3.0`;
+    const versions = detectFrameworkVersions(code);
+    const flask = versions.find((v) => v.framework === "flask");
+    assert.ok(flask, "Should detect Flask");
+    assert.equal(flask!.major, 2);
+  });
+
+  it("should detect Express version from package.json", () => {
+    const code = `"express": "^4.18.2"`;
+    const versions = detectFrameworkVersions(code);
+    const express = versions.find((v) => v.framework === "express");
+    assert.ok(express, "Should detect Express");
+    assert.equal(express!.major, 4);
+    assert.equal(express!.minor, 18);
+  });
+
+  it("should detect Next.js version from package.json", () => {
+    const code = `"next": "~14.1.0"`;
+    const versions = detectFrameworkVersions(code);
+    const next = versions.find((v) => v.framework === "next");
+    assert.ok(next, "Should detect Next");
+    assert.equal(next!.major, 14);
+  });
+
+  it("should detect Spring Boot version from dependency", () => {
+    const code = `implementation 'org.springframework.boot:spring-boot-starter:3.2.1'`;
+    const versions = detectFrameworkVersions(code);
+    const spring = versions.find((v) => v.framework === "spring");
+    assert.ok(spring, "Should detect Spring Boot");
+    assert.equal(spring!.major, 3);
+  });
+
+  it("should detect ASP.NET version from target framework", () => {
+    const code = `<TargetFramework>net8.0</TargetFramework>`;
+    const versions = detectFrameworkVersions(code);
+    const aspnet = versions.find((v) => v.framework === "aspnet");
+    assert.ok(aspnet, "Should detect ASP.NET");
+    assert.equal(aspnet!.major, 8);
+  });
+
+  it("should detect Rails version from Gemfile", () => {
+    const code = `gem 'rails', '~> 7.1'`;
+    const versions = detectFrameworkVersions(code);
+    const rails = versions.find((v) => v.framework === "rails");
+    assert.ok(rails, "Should detect Rails");
+    assert.equal(rails!.major, 7);
+  });
+
+  it("should detect Gin version from go.mod", () => {
+    const code = `require github.com/gin-gonic/gin v1.9.1`;
+    const versions = detectFrameworkVersions(code);
+    const gin = versions.find((v) => v.framework === "gin");
+    assert.ok(gin, "Should detect Gin");
+    assert.equal(gin!.major, 1);
+  });
+
+  it("should detect Laravel version from composer.json", () => {
+    const code = `"laravel/framework": "^10.0"`;
+    const versions = detectFrameworkVersions(code);
+    const laravel = versions.find((v) => v.framework === "laravel");
+    assert.ok(laravel, "Should detect Laravel");
+    assert.equal(laravel!.major, 10);
+  });
+
+  it("should return empty for code without version specifiers", () => {
+    const code = `function add(a, b) { return a + b; }`;
+    const versions = detectFrameworkVersions(code);
+    assert.equal(versions.length, 0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 20c. Version-Aware Confidence — getVersionConfidenceAdjustment
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Version-Aware Confidence — getVersionConfidenceAdjustment", () => {
+  it("should reduce CSRF confidence for Django 4+", () => {
+    const finding = makeFinding({ title: "No CSRF protection detected", confidence: 0.7 });
+    const versions = [{ framework: "django", major: 4, minor: 2, raw: "4.2.1" }];
+    const delta = getVersionConfidenceAdjustment(finding, versions);
+    assert.ok(delta < 0, "Should reduce confidence for Django 4+ CSRF");
+  });
+
+  it("should increase concern for Spring Boot 3+ missing default CSRF", () => {
+    const finding = makeFinding({ title: "Default CSRF auto-configuration removed", confidence: 0.5 });
+    const versions = [{ framework: "spring", major: 3, minor: 0, raw: "3.0.0" }];
+    const delta = getVersionConfidenceAdjustment(finding, versions);
+    assert.ok(delta > 0, "Should raise concern for Spring 3+ CSRF");
+  });
+
+  it("should reduce security header concern for Next.js 13+", () => {
+    const finding = makeFinding({ title: "Missing security headers", confidence: 0.8 });
+    const versions = [{ framework: "next", major: 13, minor: 4, raw: "13.4.0" }];
+    const delta = getVersionConfidenceAdjustment(finding, versions);
+    assert.ok(delta < 0, "Next.js 13+ has built-in security headers");
+  });
+
+  it("should reduce mass assignment concern for Rails 7+", () => {
+    const finding = makeFinding({ title: "Potential mass assignment vulnerability", confidence: 0.7 });
+    const versions = [{ framework: "rails", major: 7, minor: 1, raw: "7.1.0" }];
+    const delta = getVersionConfidenceAdjustment(finding, versions);
+    assert.ok(delta < 0, "Rails 7+ has strong parameter filtering");
+  });
+
+  it("should return 0 for unrecognised frameworks or versions", () => {
+    const finding = makeFinding({ title: "SQL injection", confidence: 0.9 });
+    const versions = [{ framework: "unknown-fw", major: 1, minor: 0, raw: "1.0.0" }];
+    const delta = getVersionConfidenceAdjustment(finding, versions);
+    assert.equal(delta, 0, "Should not adjust for unknown frameworks");
+  });
+
+  it("should apply version adjustments through applyFrameworkAwareness", () => {
+    const code = `from django.middleware.csrf import CsrfViewMiddleware\nDjango==4.2\nINSTALLED_APPS = ['django.contrib.auth']`;
+    const findings = [makeFinding({ title: "No CSRF protection detected", confidence: 0.8 })];
+    const result = applyFrameworkAwareness(findings, code);
+    // Both framework mitigation AND version adjustment should apply
+    assert.ok(result[0].confidence! < 0.6, "Should have stacked confidence reductions");
+    assert.ok(result[0].provenance?.includes("version-adjusted"), "Should include version note");
   });
 });
 

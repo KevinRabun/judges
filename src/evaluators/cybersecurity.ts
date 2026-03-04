@@ -1,16 +1,37 @@
-import type { Finding } from "../types.js";
+import type { Finding, AnalyzeContext } from "../types.js";
 import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
-export function analyzeCybersecurity(code: string, language: string): Finding[] {
+export function analyzeCybersecurity(code: string, language: string, context?: AnalyzeContext): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "CYBER";
   const lang = getLangFamily(language);
 
+  // ── AST context (optional — makes detection scope-aware) ──────────────────
+  const ast = context?.ast;
+  const astImports = new Set(
+    (ast?.imports ?? []).map((i) => {
+      const parts = i.split("/");
+      return (i.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0]).toLowerCase();
+    }),
+  );
+  const astFunctions = ast?.functions ?? [];
+
   // eval() / exec() usage (multi-language)
   const evalLines = getLangLineNumbers(code, language, LP.EVAL_USAGE);
   if (evalLines.length > 0) {
+    // AST scope analysis: lower confidence when eval is inside a build/config/codegen
+    // utility function with no user-input parameters
+    let evalConfidence = 0.95;
+    if (astFunctions.length > 0) {
+      const evalInSafe = evalLines.every((ln) => {
+        const fn = astFunctions.find((f) => ln >= f.startLine && ln <= f.endLine);
+        if (!fn) return false;
+        return /^(?:compile|codegen|build|generate|transform|transpile|parse|serialize)/i.test(fn.name);
+      });
+      if (evalInSafe) evalConfidence = 0.7;
+    }
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
@@ -22,7 +43,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
         "Remove eval() entirely. Use JSON.parse() for data parsing (JS/TS), ast.literal_eval (Python), or a proper expression parser.",
       reference: "OWASP Code Injection — CWE-94",
       suggestedFix: LP.isJsTs(lang) ? "Replace eval(expr) with JSON.parse(expr) or a safe parser." : undefined,
-      confidence: 0.95,
+      confidence: evalConfidence,
     });
   }
 
@@ -70,6 +91,20 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
   });
 
   if (filteredCmdLines.length > 0) {
+    // AST: boost confidence when the command injection is inside a route handler
+    // (function with decorators like @app.route or HTTP method names)
+    let cmdConfidence = 0.9;
+    if (astFunctions.length > 0) {
+      const inRouteHandler = filteredCmdLines.some((ln) => {
+        const fn = astFunctions.find((f) => ln >= f.startLine && ln <= f.endLine);
+        if (!fn) return false;
+        return (
+          fn.decorators?.some((d) => /route|get|post|put|delete|patch|api_view/i.test(d)) ||
+          /handler|controller|endpoint|route/i.test(fn.name)
+        );
+      });
+      if (inRouteHandler) cmdConfidence = 0.95;
+    }
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
@@ -82,7 +117,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       reference: "OWASP Command Injection — CWE-78",
       suggestedFix:
         "Replace exec(cmd) with execFile('program', [arg1, arg2]) to prevent shell interpretation of user input.",
-      confidence: 0.9,
+      confidence: cmdConfidence,
     });
   }
 
@@ -337,11 +372,18 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     /helmet|X-Content-Type-Options|Content-Security-Policy|X-Frame-Options|Strict-Transport-Security|X-XSS-Protection|SecurityHeaders|secure_headers/gi.test(
       code,
     );
+  // AST: also check imports for security header libraries
+  const hasSecurityHeaderImport =
+    astImports.has("helmet") ||
+    astImports.has("secure-headers") ||
+    astImports.has("django-security") ||
+    astImports.has("flask-talisman") ||
+    astImports.has("fastify-helmet");
   const hasServer =
     /app\.(listen|use)|createServer|express\(\)|Flask\(|Django|WebApplication|Startup|actix.web|gin\.Default|SpringBoot|@RestController|http\.ListenAndServe/gi.test(
       code,
     );
-  if (hasServer && !hasHelmet) {
+  if (hasServer && !hasHelmet && !hasSecurityHeaderImport) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -491,6 +533,19 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
     /(?:\.find|\.findOne|\.deleteOne|\.deleteMany|\.updateOne|\.updateMany|\.aggregate|\.countDocuments)\s*\(\s*(?:req\.body|req\.query|request\.body|request\.json|request\.data)/gi;
   const nosqlDirectLines = getLineNumbers(code, nosqlDirectPattern);
   if (nosqlDirectLines.length > 0) {
+    // AST: boost confidence when inside a request handler function
+    let nosqlConfidence = 0.9;
+    if (astFunctions.length > 0) {
+      const inHandler = nosqlDirectLines.some((ln) => {
+        const fn = astFunctions.find((f) => ln >= f.startLine && ln <= f.endLine);
+        if (!fn) return false;
+        return (
+          fn.decorators?.some((d) => /route|get|post|put|delete|api_view/i.test(d)) ||
+          /handler|controller|endpoint|route|api/i.test(fn.name)
+        );
+      });
+      if (inHandler) nosqlConfidence = 0.95;
+    }
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
@@ -503,7 +558,7 @@ export function analyzeCybersecurity(code: string, language: string): Finding[] 
       reference: "OWASP NoSQL Injection — CWE-943",
       suggestedFix:
         "Validate input with a schema: const { email } = schema.parse(req.body); db.collection.find({ email });",
-      confidence: 0.9,
+      confidence: nosqlConfidence,
     });
   }
 

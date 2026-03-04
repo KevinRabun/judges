@@ -1,4 +1,4 @@
-import type { Finding } from "../types.js";
+import type { Finding, AnalyzeContext } from "../types.js";
 import {
   getLineNumbers,
   getLangLineNumbers,
@@ -76,12 +76,41 @@ function getWeakCredentialHashLines(code: string): number[] {
   return flagged;
 }
 
-export function analyzeAuthentication(code: string, language: string): Finding[] {
+export function analyzeAuthentication(code: string, language: string, context?: AnalyzeContext): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "AUTH";
   const _lang = getLangFamily(language);
   const lines = code.split("\n");
+
+  // ── AST context (optional — enables decorator and import awareness) ───────
+  const ast = context?.ast;
+  const astImports = new Set(
+    (ast?.imports ?? []).map((i) => {
+      const parts = i.split("/");
+      return (i.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0]).toLowerCase();
+    }),
+  );
+  const astFunctions = ast?.functions ?? [];
+  // Detect auth-related decorators across all functions
+  const hasAuthDecorator = astFunctions.some((f) =>
+    f.decorators?.some((d) =>
+      /login_required|requires_auth|Authorize|PreAuthorize|Secured|RequiresAuthentication|authenticate|protected/i.test(
+        d,
+      ),
+    ),
+  );
+  // Detect auth library imports via AST
+  const hasAuthImport =
+    astImports.has("passport") ||
+    astImports.has("jsonwebtoken") ||
+    astImports.has("jose") ||
+    astImports.has("bcrypt") ||
+    astImports.has("argon2") ||
+    astImports.has("passport-jwt") ||
+    astImports.has("express-jwt") ||
+    astImports.has("next-auth") ||
+    astImports.has("@auth0/nextjs-auth0");
 
   // Hardcoded credentials
   const credentialLines = getHardcodedCredentialLinesWithoutPlaceholders(code);
@@ -139,6 +168,8 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
     !hasPublicEndpointMarker &&
     !isHealthCheckOnly &&
     !isLikelyAnalysisCode &&
+    !hasAuthDecorator &&
+    !hasAuthImport &&
     code.split("\n").length > 20
   ) {
     findings.push({
@@ -181,6 +212,9 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
   const weakHashByLang = getLangLineNumbers(code, language, LP.WEAK_HASH);
   const weakHashLines = weakHashByLang.length > 0 ? weakHashByLang : getWeakCredentialHashLines(code);
   if (weakHashLines.length > 0) {
+    // AST: lower confidence when a strong hashing library is imported — the weak
+    // hash may be used for non-credential purposes (checksums, cache keys, etc.)
+    const hasStrongHashImport = astImports.has("bcrypt") || astImports.has("argon2") || astImports.has("scrypt");
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
@@ -193,7 +227,7 @@ export function analyzeAuthentication(code: string, language: string): Finding[]
       reference: "OWASP Password Storage Cheat Sheet / NIST 800-63b",
       suggestedFix:
         "Replace with bcrypt/argon2: bcrypt.hash(password, 12) (JS), bcrypt.hashpw(password, bcrypt.gensalt()) (Python), Argon2::default().hash_password() (Rust), BCrypt.HashPassword() (C#).",
-      confidence: 0.9,
+      confidence: hasStrongHashImport ? 0.7 : 0.9,
     });
   }
 

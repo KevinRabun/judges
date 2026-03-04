@@ -47,6 +47,15 @@ const LANG_ALIAS_MAP: Record<string, LangFamily> = {
   arm: "arm",
   armtemplate: "arm",
   "arm-template": "arm",
+  php: "php",
+  php8: "php",
+  php7: "php",
+  ruby: "ruby",
+  rb: "ruby",
+  kotlin: "kotlin",
+  kt: "kotlin",
+  kts: "kotlin",
+  swift: "swift",
 };
 
 /**
@@ -68,7 +77,14 @@ export function isJsTs(lang: LangFamily): boolean {
  * Returns true if the language uses braces for blocks (all except Python and IaC).
  */
 export function isBraceLang(lang: LangFamily): boolean {
-  return lang !== "python" && lang !== "unknown" && lang !== "terraform" && lang !== "bicep" && lang !== "arm";
+  return (
+    lang !== "python" &&
+    lang !== "ruby" &&
+    lang !== "unknown" &&
+    lang !== "terraform" &&
+    lang !== "bicep" &&
+    lang !== "arm"
+  );
 }
 
 /**
@@ -151,6 +167,10 @@ export const ENV_ACCESS = {
   java: String.raw`System\.getenv\s*\(`,
   go: String.raw`os\.(?:Getenv|LookupEnv)\s*\(`,
   powershell: String.raw`\$env:\w+`,
+  php: String.raw`\$_(?:ENV|SERVER)\[|getenv\s*\(`,
+  ruby: String.raw`ENV\[|ENV\.fetch\s*\(`,
+  kotlin: String.raw`System\.getenv\s*\(`,
+  swift: String.raw`ProcessInfo\.processInfo\.environment\[`,
 };
 
 export const HARDCODED_ENV = {
@@ -173,6 +193,10 @@ export const FUNCTION_DEF = {
   java: String.raw`(?:public|private|protected|static|final|synchronized|abstract)\s+[\w<>\[\]]+\s+\w+\s*\(`,
   go: String.raw`func\s+(?:\(\w+\s+\*?\w+\)\s+)?\w+\s*\(`,
   powershell: String.raw`function\s+[\w-]+\s*(?:\(|\{)`,
+  php: String.raw`(?:public|private|protected|static)?\s*function\s+\w+\s*\(`,
+  ruby: String.raw`def\s+\w+`,
+  kotlin: String.raw`(?:fun|suspend\s+fun)\s+\w+\s*\(`,
+  swift: String.raw`(?:func|class\s+func|static\s+func)\s+\w+\s*\(`,
 };
 
 // ── Error Handling ───────────────────────────────────────────────────────────
@@ -185,6 +209,10 @@ export const TRY_CATCH = {
   java: String.raw`try\s*\{`,
   go: String.raw`if\s+err\s*!=\s*nil`,
   powershell: String.raw`try\s*\{`,
+  php: String.raw`try\s*\{`,
+  ruby: String.raw`begin\s*$|rescue\b`,
+  kotlin: String.raw`try\s*\{`,
+  swift: String.raw`do\s*\{.*catch`,
 };
 
 export const EMPTY_CATCH = {
@@ -195,6 +223,10 @@ export const EMPTY_CATCH = {
   java: String.raw`catch\s*\([^)]*\)\s*\{\s*\}`,
   go: String.raw`if\s+err\s*!=\s*nil\s*\{\s*\}|_\s*=\s*\w+\(`,
   powershell: String.raw`catch\s*\{\s*\}`,
+  php: String.raw`catch\s*\([^)]*\)\s*\{\s*\}`,
+  ruby: String.raw`rescue\s*(?:=>\s*\w+)?\s*$`,
+  kotlin: String.raw`catch\s*\([^)]*\)\s*\{\s*\}`,
+  swift: String.raw`catch\s*\{\s*\}`,
 };
 
 export const GENERIC_CATCH = {
@@ -204,6 +236,10 @@ export const GENERIC_CATCH = {
   java: String.raw`catch\s*\(\s*(?:Exception|Throwable)\s`,
   // Go intentionally omitted: `if err != nil` is idiomatic, not a generic catch
   powershell: String.raw`catch\s*\{|catch\s*\[\s*System\.Exception\s*\]`,
+  php: String.raw`catch\s*\(\s*(?:\\?Exception|\\?Throwable)\s`,
+  ruby: String.raw`rescue\s*$|rescue\s+(?:Exception|StandardError)\b`,
+  kotlin: String.raw`catch\s*\(\s*\w+\s*:\s*(?:Exception|Throwable)\s*\)`,
+  swift: String.raw`catch\s*\{|catch\s+let\s+\w+\s*\{`,
 };
 
 export const PANIC_UNWRAP = {
@@ -214,6 +250,10 @@ export const PANIC_UNWRAP = {
   csharp: String.raw`Environment\.Exit\s*\(|Environment\.FailFast\s*\(`,
   java: String.raw`System\.exit\s*\(|Runtime\.getRuntime\(\)\.halt\s*\(`,
   powershell: String.raw`\[Environment\]::Exit\s*\(|exit\s+\d|throw\s`,
+  php: String.raw`die\s*\(|exit\s*\(`,
+  ruby: String.raw`exit\s*\(!?|abort\s*\(|Kernel\.exit`,
+  kotlin: String.raw`exitProcess\s*\(|error\s*\(`,
+  swift: String.raw`fatalError\s*\(|preconditionFailure\s*\(|exit\s*\(`,
 };
 
 // ── Weak / Dynamic Types ────────────────────────────────────────────────────
@@ -229,6 +269,9 @@ export const WEAK_TYPE = {
   // unsafe pointer casts which genuinely bypass the type system.
   go: String.raw`unsafe\.Pointer`,
   powershell: String.raw`\[object\]|\[psobject\]|\[System\.Object\]`,
+  php: String.raw`mixed\b|\$\w+\s*\/\*\*.*@var\s+mixed`,
+  kotlin: String.raw`:\s*Any\??\b|as\??\s+Any\b`,
+  swift: String.raw`:\s*Any\b|as!\s|unsafeBitCast\s*\(`,
 };
 
 // ── Async / Concurrency ─────────────────────────────────────────────────────
@@ -241,6 +284,10 @@ export const ASYNC_FUNCTION = {
   java: String.raw`CompletableFuture|@Async|ExecutorService`,
   go: String.raw`go\s+\w+\s*\(|go\s+func\s*\(`,
   powershell: String.raw`Start-Job|Start-ThreadJob|ForEach-Object\s+-Parallel`,
+  php: String.raw`(?:Amp|React)\\Promise|async\s*\(|Fiber::`,
+  ruby: String.raw`Async\b|Thread\.new|Concurrent::`,
+  kotlin: String.raw`suspend\s+fun|launch\s*\{|async\s*\{|withContext\s*\(`,
+  swift: String.raw`async\s+func|Task\s*\{|TaskGroup`,
 };
 
 export const MISSING_AWAIT = {
@@ -258,6 +305,10 @@ export const SHARED_MUTABLE = {
   csharp: String.raw`(?:static\s+(?!readonly)[\w<>\[\]]+\s+\w+\s*=|volatile\s)`,
   java: String.raw`(?:static\s+(?!final)[\w<>\[\]]+\s+\w+\s*=)`,
   go: String.raw`(?:var\s+\w+\s+\w+\s*\n.*go\s+func|sync\.Mutex)`,
+  php: String.raw`(?:static\s+\$\w+\s*=|global\s+\$)`,
+  ruby: String.raw`(?:@@\w+\s*=|\$\w+\s*=)`,
+  kotlin: String.raw`(?:companion\s+object.*var\b|@Volatile)`,
+  swift: String.raw`(?:static\s+var\b|class\s+var\b)`,
 };
 
 // ── Imports / Dependencies ───────────────────────────────────────────────────
@@ -267,6 +318,8 @@ export const WILDCARD_IMPORT = {
   python: String.raw`from\s+\w+\s+import\s+\*`,
   java: String.raw`import\s+[\w.]+\.\*\s*;`,
   csharp: String.raw`using\s+static\s+[\w.]+\.\*`,
+  php: String.raw`use\s+[\w\\]+\\\{[^}]*\}`,
+  kotlin: String.raw`import\s+[\w.]+\.\*\s*$`,
 };
 
 export const DEPRECATED_IMPORT = {
@@ -285,6 +338,10 @@ export const SQL_INJECTION = {
   java: String.raw`(?:executeQuery|executeUpdate|prepareStatement|createQuery)\s*\(\s*(?:["'].*\+\s*\w+|String\.format)`,
   go: String.raw`(?:db\.(?:Query|Exec|QueryRow)|\.Raw)\s*\(\s*(?:fmt\.Sprintf|["'].*\+\s*\w+)`,
   powershell: String.raw`Invoke-Sqlcmd.*["'].*\$|Invoke-DbaQuery.*["'].*\$`,
+  php: String.raw`(?:mysqli?_query|\$(?:pdo|db|conn)->query)\s*\(\s*(?:["'].*\.\s*\$|\$\w+)`,
+  ruby: String.raw`(?:ActiveRecord|\w+\.(?:where|find_by_sql|execute))\s*\(\s*(?:["'].*#\{|["'].*\+)`,
+  kotlin: String.raw`(?:executeQuery|createQuery|nativeQuery)\s*\(\s*(?:["'].*\+|\$["'])`,
+  swift: String.raw`(?:execute|prepare)\s*\(\s*(?:["'].*\\\(|["'].*\+)`,
 };
 
 // ── Security: Command Injection ──────────────────────────────────────────────
@@ -297,6 +354,10 @@ export const COMMAND_INJECTION = {
   java: String.raw`Runtime\.getRuntime\(\)\.exec\s*\(.*\+|ProcessBuilder\s*\(.*\+`,
   go: String.raw`exec\.Command\s*\(.*(?:\+|fmt\.Sprintf)`,
   powershell: String.raw`Invoke-Expression.*\$|Start-Process.*\$|&\s*\$\w+`,
+  php: String.raw`(?:exec|system|passthru|shell_exec|popen|proc_open)\s*\(.*\$`,
+  ruby: String.raw`(?:system|exec|\x60|%x).*#\{|Kernel\.system\s*\(.*\+`,
+  kotlin: String.raw`Runtime\.getRuntime\(\)\.exec\s*\(.*\+|ProcessBuilder\s*\(.*\+`,
+  swift: String.raw`Process\(\).*arguments.*\+|NSTask\b`,
 };
 
 // ── Security: Hardcoded Secrets ──────────────────────────────────────────────
@@ -323,6 +384,10 @@ export const WEAK_HASH = {
   java: String.raw`MessageDigest\.getInstance\s*\(\s*["'](?:MD5|SHA-?1)["']\)`,
   go: String.raw`(?:md5|sha1)\.(?:New|Sum)\s*\(`,
   powershell: String.raw`\[System\.Security\.Cryptography\.(?:MD5|SHA1)\]::Create`,
+  php: String.raw`md5\s*\(|sha1\s*\(`,
+  ruby: String.raw`Digest::(?:MD5|SHA1)`,
+  kotlin: String.raw`MessageDigest\.getInstance\s*\(\s*["'](?:MD5|SHA-?1)["']\)`,
+  swift: String.raw`CC_MD5|CC_SHA1|Insecure\.(?:MD5|SHA1)`,
 };
 
 // ── Security: Eval / Dynamic Execution ───────────────────────────────────────
@@ -335,6 +400,10 @@ export const EVAL_USAGE = {
   java: String.raw`ScriptEngine\.eval\s*\(|Nashorn|Groovy`,
   go: String.raw`(?!)`, // Go has no eval equivalent
   powershell: String.raw`Invoke-Expression|iex\s`,
+  php: String.raw`\beval\s*\(|\bcreate_function\s*\(|\bpreg_replace\b.*\/e`,
+  ruby: String.raw`\beval\s*\(|\bsend\s*\(|\binstance_eval\s*\(|\bclass_eval\s*\(`,
+  kotlin: String.raw`ScriptEngine\.eval\s*\(`,
+  swift: String.raw`NSExpression\b|JSContext\b.*evaluateScript`,
 };
 
 // ── Security: TLS / Certificate ──────────────────────────────────────────────
@@ -347,6 +416,10 @@ export const TLS_DISABLED = {
   java: String.raw`TrustAllCerts|X509TrustManager|trustAllCerts`,
   go: String.raw`InsecureSkipVerify\s*:\s*true`,
   powershell: String.raw`\[System\.Net\.ServicePointManager\]::ServerCertificateValidationCallback|\-SkipCertificateCheck`,
+  php: String.raw`CURLOPT_SSL_VERIFYPEER\s*=>\s*false|verify_peer\s*=>\s*false`,
+  ruby: String.raw`verify_mode\s*=\s*OpenSSL::SSL::VERIFY_NONE|ssl_verify_mode.*VERIFY_NONE`,
+  kotlin: String.raw`TrustAllCerts|X509TrustManager|trustAllCerts`,
+  swift: String.raw`ServerTrustPolicy\.disableEvaluation|allowsSelfSignedCertificates\s*=\s*true`,
 };
 
 // ── Security: CORS ───────────────────────────────────────────────────────────
@@ -357,6 +430,10 @@ export const CORS_WILDCARD = {
   csharp: String.raw`AllowAnyOrigin\s*\(\)|WithOrigins\s*\(\s*["']\*["']\s*\)`,
   java: String.raw`@CrossOrigin\s*$|allowedOrigins\s*=.*\*|addMapping\s*\(\s*["']/\*\*["']\s*\)`,
   go: String.raw`AllowAllOrigins\s*:\s*true|Access-Control-Allow-Origin.*\*`,
+  php: String.raw`header\s*\(\s*["']Access-Control-Allow-Origin:\s*\*`,
+  ruby: String.raw`allow_origin\s+["']\*["']|origins\s+["']\*["']`,
+  kotlin: String.raw`@CrossOrigin\s*$|allowedOrigins\s*=.*\*`,
+  swift: String.raw`Access-Control-Allow-Origin.*\*`,
 };
 
 // ── Web Framework Routes ─────────────────────────────────────────────────────
@@ -368,6 +445,10 @@ export const HTTP_ROUTE = {
   csharp: String.raw`\[Http(?:Get|Post|Put|Delete|Patch)\]|MapGet|MapPost|MapPut|MapDelete`,
   java: String.raw`@(?:Get|Post|Put|Delete|Patch)Mapping|@RequestMapping`,
   go: String.raw`\.(?:GET|POST|PUT|DELETE|Handle|HandleFunc)\s*\(`,
+  php: String.raw`Route::(?:get|post|put|delete|patch)\s*\(|->(?:get|post|put|delete)\s*\(`,
+  ruby: String.raw`(?:get|post|put|delete|patch)\s+["']/|resources?\s+:\w+`,
+  kotlin: String.raw`@(?:Get|Post|Put|Delete|Patch)Mapping|routing\s*\{`,
+  swift: String.raw`\.(?:get|post|put|delete|patch)\s*\(|@(?:GET|POST|PUT|DELETE)`,
 };
 
 // ── Logging ──────────────────────────────────────────────────────────────────
@@ -380,6 +461,10 @@ export const CONSOLE_LOG = {
   java: String.raw`System\.(?:out|err)\.print(?:ln)?\s*\(`,
   go: String.raw`fmt\.Print(?:ln|f)?\s*\(`,
   powershell: String.raw`Write-(?:Host|Output|Warning|Error|Verbose|Debug)\s`,
+  php: String.raw`(?:echo|print|var_dump|print_r|error_log)\s*\(`,
+  ruby: String.raw`(?:puts|p|pp|print|warn)\s`,
+  kotlin: String.raw`println\s*\(|print\s*\(`,
+  swift: String.raw`print\s*\(|debugPrint\s*\(|dump\s*\(`,
 };
 
 export const STRUCTURED_LOG = {
@@ -389,6 +474,10 @@ export const STRUCTURED_LOG = {
   csharp: String.raw`(?:ILogger|_logger|Logger)\.\w+\s*\(|Log\.(?:Information|Warning|Error)`,
   java: String.raw`(?:Logger|LOG|log|logger)\.\w+\s*\(|LoggerFactory\.getLogger`,
   go: String.raw`(?:log|zap|logrus|slog)\.\w+\s*\(`,
+  php: String.raw`(?:Monolog|Log|\$logger)->\w+\s*\(|error_log\s*\(`,
+  ruby: String.raw`(?:Rails\.logger|Logger\.new|logger)\.\w+\s*\(`,
+  kotlin: String.raw`(?:Logger|log|logger)\.\w+\s*\(|LoggerFactory\.getLogger`,
+  swift: String.raw`(?:Logger|os_log|OSLog)\.\w+\s*\(|Logger\(`,
 };
 
 // ── Testing ──────────────────────────────────────────────────────────────────
@@ -401,6 +490,10 @@ export const TEST_FUNCTION = {
   java: String.raw`@(?:Test|Before|After|BeforeEach)\b`,
   go: String.raw`func\s+Test\w+\s*\(\s*t\s+\*testing\.T`,
   powershell: String.raw`Describe\s+["']|It\s+["']|Context\s+["']|BeforeAll\s*\{|BeforeEach\s*\{|AfterAll\s*\{|AfterEach\s*\{`,
+  php: String.raw`(?:public\s+)?function\s+test\w+|@test\b|\$this->assert`,
+  ruby: String.raw`(?:describe|it|context|before|after)\s+["']|def\s+test_`,
+  kotlin: String.raw`@Test\b|@BeforeEach|@AfterEach`,
+  swift: String.raw`func\s+test\w+\s*\(|XCTAssert`,
 };
 
 export const ASSERTION = {
@@ -411,6 +504,10 @@ export const ASSERTION = {
   java: String.raw`assert(?:Equals|True|False|NotNull|Throws)\s*\(|assertThat\s*\(`,
   go: String.raw`(?:t\.(?:Error|Fatal|Log|Run)|assert\.\w+|require\.\w+)\s*\(`,
   powershell: String.raw`Should\s+-`,
+  php: String.raw`\$this->assert\w+\s*\(|Assert::\w+\s*\(`,
+  ruby: String.raw`(?:expect\(|assert_|should\b|must_)`,
+  kotlin: String.raw`assert(?:Equals|True|False|NotNull|Throws)\s*\(|assertEquals\s*\(`,
+  swift: String.raw`XCTAssert\w*\s*\(|#expect\s*\(`,
 };
 
 // ── Documentation ────────────────────────────────────────────────────────────
@@ -423,6 +520,10 @@ export const DOC_COMMENT = {
   java: String.raw`/\*\*[\s\S]*?\*/`,
   go: String.raw`//\s+\w+\s`,
   powershell: String.raw`<#[\s\S]*?#>|\.SYNOPSIS|\.DESCRIPTION|\.PARAMETER|\.EXAMPLE`,
+  php: String.raw`/\*\*[\s\S]*?\*/|///\s`,
+  ruby: String.raw`#\s+@(?:param|return|note|example)|=begin[\s\S]*?=end`,
+  kotlin: String.raw`/\*\*[\s\S]*?\*/|///\s`,
+  swift: String.raw`///\s|/\*\*[\s\S]*?\*/`,
 };
 
 // ── Loop Constructs ──────────────────────────────────────────────────────────
@@ -435,6 +536,10 @@ export const FOR_LOOP = {
   java: String.raw`for\s*\(|\.forEach\s*\(|\.stream\(\)`,
   go: String.raw`for\s+(?:\w+\s*:?=|range\s)`,
   powershell: String.raw`foreach\s*\(|for\s*\(|ForEach-Object|%\s*\{|\|\s*ForEach\b`,
+  php: String.raw`for(?:each)?\s*\(|array_map\s*\(|array_walk\s*\(`,
+  ruby: String.raw`\.each\b|\.map\b|\.select\b|\.inject\b|for\s+\w+\s+in\b`,
+  kotlin: String.raw`for\s*\(|\.forEach\s*\{|\.map\s*\{`,
+  swift: String.raw`for\s+\w+\s+in\s|\.forEach\s*\{|\.map\s*\{`,
 };
 
 // ── Type / Class Definitions ─────────────────────────────────────────────────
@@ -447,6 +552,10 @@ export const CLASS_DEF = {
   java: String.raw`(?:public|private|protected)\s+(?:class|interface|enum|record)\s+\w+`,
   go: String.raw`type\s+\w+\s+struct`,
   powershell: String.raw`class\s+\w+`,
+  php: String.raw`(?:class|interface|trait|enum)\s+\w+`,
+  ruby: String.raw`(?:class|module)\s+\w+`,
+  kotlin: String.raw`(?:class|data\s+class|object|interface|sealed\s+class|enum\s+class)\s+\w+`,
+  swift: String.raw`(?:class|struct|enum|protocol|actor)\s+\w+`,
 };
 
 // ── Package Manifests ────────────────────────────────────────────────────────
@@ -464,6 +573,10 @@ export const MANIFEST_FILES: Record<LangFamily, string[]> = {
   terraform: ["*.tf", "terraform.tfvars", ".terraform.lock.hcl"],
   bicep: ["*.bicep", "bicepconfig.json"],
   arm: ["*.json"],
+  php: ["composer.json", "composer.lock"],
+  ruby: ["Gemfile", "Gemfile.lock", "*.gemspec"],
+  kotlin: ["build.gradle.kts", "build.gradle", "pom.xml"],
+  swift: ["Package.swift", "*.xcodeproj", "Podfile"],
   unknown: [],
 };
 
@@ -477,6 +590,10 @@ export const INPUT_VALIDATION = {
   java: String.raw`@RequestParam|@PathVariable|@RequestBody|request\.getParameter`,
   go: String.raw`r\.(?:URL\.Query|FormValue|PostFormValue)\(`,
   powershell: String.raw`\[Parameter\s*\(Mandatory|\[ValidateNotNullOrEmpty\s*\(\)|\[ValidateSet\s*\(|\[ValidateRange\s*\(|\$PSBoundParameters`,
+  php: String.raw`\$_(?:GET|POST|REQUEST)\[|\$request->(?:input|get|post)\s*\(`,
+  ruby: String.raw`params\[|params\.(?:require|permit)\s*\(`,
+  kotlin: String.raw`@RequestParam|@PathVariable|@RequestBody|call\.receive\b`,
+  swift: String.raw`request\.(?:content|query|parameters)\b|req\.(?:content|query)\b`,
 };
 
 // ── Mutex / Lock ─────────────────────────────────────────────────────────────
@@ -488,6 +605,10 @@ export const MUTEX = {
   csharp: String.raw`(?:lock\s*\(|Monitor\.|Mutex\.|SemaphoreSlim)`,
   java: String.raw`(?:synchronized\b|ReentrantLock|Semaphore|CountDownLatch)`,
   go: String.raw`(?:sync\.(?:Mutex|RWMutex|WaitGroup)|<-\s*\w+)`,
+  php: String.raw`flock\s*\(|sem_acquire\s*\(`,
+  ruby: String.raw`Mutex\.new|Monitor\.new|\bsynchronize\b`,
+  kotlin: String.raw`(?:synchronized\b|Mutex|ReentrantLock|Semaphore)`,
+  swift: String.raw`NSLock|NSRecursiveLock|DispatchSemaphore|os_unfair_lock`,
 };
 
 // ── Database Access ──────────────────────────────────────────────────────────
@@ -500,6 +621,10 @@ export const DB_QUERY = {
   java: String.raw`\.(?:executeQuery|executeUpdate|createQuery|persist|merge|find)\s*\(`,
   go: String.raw`db\.(?:Query|QueryRow|Exec|QueryContext|ExecContext)\s*\(`,
   powershell: String.raw`Invoke-Sqlcmd|Invoke-DbaQuery|\[System\.Data\.SqlClient`,
+  php: String.raw`\$(?:pdo|db|conn)->(?:query|prepare|exec)\s*\(|DB::(?:table|select|insert)\s*\(`,
+  ruby: String.raw`ActiveRecord|\w+\.(?:where|find|find_by|select|pluck)\s*\(`,
+  kotlin: String.raw`\.(?:executeQuery|createQuery|persist|find)\s*\(|transaction\s*\{`,
+  swift: String.raw`\.(?:execute|prepare|query)\s*\(|NSFetchRequest`,
 };
 
 // ── HTTP Client ──────────────────────────────────────────────────────────────
@@ -512,6 +637,10 @@ export const HTTP_CLIENT = {
   java: String.raw`HttpClient\.\w+\s*\(|OkHttpClient|RestTemplate\.\w+\s*\(|WebClient\.\w+\s*\(`,
   go: String.raw`http\.(?:Get|Post|NewRequest)\s*\(|http\.Client`,
   powershell: String.raw`Invoke-(?:WebRequest|RestMethod)\s`,
+  php: String.raw`curl_\w+\s*\(|file_get_contents\s*\(|Guzzle|Http::(?:get|post)`,
+  ruby: String.raw`Net::HTTP|HTTParty|Faraday|RestClient`,
+  kotlin: String.raw`HttpClient\.\w+\s*\(|OkHttpClient|Fuel\.\w+\s*\(|ktor.*client`,
+  swift: String.raw`URLSession\.\w+\s*\(|URLRequest\s*\(|Alamofire`,
 };
 
 // ── Config / Constants ───────────────────────────────────────────────────────
@@ -542,6 +671,10 @@ export const LINTER_DISABLE = {
   java: String.raw`@SuppressWarnings|NOSONAR|noinspection`,
   go: String.raw`//nolint`,
   powershell: String.raw`\[Diagnostics\.CodeAnalysis\.SuppressMessage|#\s*PSScriptAnalyzer`,
+  php: String.raw`@phpstan-ignore|@psalm-suppress|phpcs:ignore`,
+  ruby: String.raw`rubocop:disable|# :nocov:|# :reek:`,
+  kotlin: String.raw`@Suppress\(|@SuppressWarnings|detekt:`,
+  swift: String.raw`swiftlint:disable|nolint`,
 };
 
 // ── Serialization ────────────────────────────────────────────────────────────
@@ -554,6 +687,10 @@ export const UNSAFE_DESERIALIZATION = {
   java: String.raw`ObjectInputStream\.readObject|XMLDecoder\.readObject|readUnshared`,
   go: String.raw`encoding/gob|json\.Unmarshal\(.*(?:req\.|request\.)`,
   powershell: String.raw`Import-Clixml|\[System\.Runtime\.Serialization.*Deserialize|ConvertFrom-Json.*\$`,
+  php: String.raw`unserialize\s*\(|json_decode\s*\(\s*\$_`,
+  ruby: String.raw`Marshal\.load|YAML\.load(?!_safe)|Oj\.load`,
+  kotlin: String.raw`ObjectInputStream\.readObject|readObject\s*\(`,
+  swift: String.raw`NSKeyedUnarchiver\.unarchiveObject|JSONDecoder\(\)\.decode.*(?:request|input)`,
 };
 
 // ── Memory / Resource ────────────────────────────────────────────────────────
@@ -566,6 +703,10 @@ export const RESOURCE_LEAK = {
   java: String.raw`new\s+(?:FileInputStream|FileOutputStream|BufferedReader|Connection|Socket)\s*\(`,
   go: String.raw`os\.(?:Open|Create)\s*\(|net\.(?:Dial|Listen)\s*\(`,
   powershell: String.raw`New-Object\s+System\.IO\.(?:StreamReader|StreamWriter|FileStream)|\[System\.IO\.File\]::Open`,
+  php: String.raw`fopen\s*\(|fsockopen\s*\(|stream_socket_client\s*\(`,
+  ruby: String.raw`File\.open\s*\((?!.*\bdo\b)|IO\.(?:popen|sysopen)\s*\(`,
+  kotlin: String.raw`FileInputStream\s*\(|FileOutputStream\s*\(|Socket\s*\(`,
+  swift: String.raw`FileHandle\(|InputStream\(|OutputStream\(`,
 };
 
 // ── Deprecated APIs ──────────────────────────────────────────────────────────
@@ -577,6 +718,10 @@ export const DEPRECATED_API = {
   csharp: String.raw`WebClient\b|\.GetSection\s*\(\s*["']appSettings["']\)`,
   java: String.raw`\.newInstance\s*\(\s*\)(?!\s*;.*class)|Date\s*\(\s*\)|Thread\.stop\s*\(`,
   go: String.raw`ioutil\.\w+|syscall\.StringToUTF16Ptr`,
+  php: String.raw`mysql_\w+\s*\(|ereg\s*\(|split\s*\(|create_function\s*\(`,
+  ruby: String.raw`File\.exists\?|URI\.escape|Fixnum\b|Bignum\b`,
+  kotlin: String.raw`\.newInstance\s*\(\s*\)|Date\s*\(\s*\)`,
+  swift: String.raw`URLRequest.*HTTPBody|NSURLConnection\b`,
 };
 
 // ── Framework-Specific Security Patterns ─────────────────────────────────────
@@ -588,6 +733,10 @@ export const FRAMEWORK_DEBUG_MODE = {
   jsts: String.raw`app\.set\s*\(\s*['"]env['"]\s*,\s*['"]development['"]`,
   csharp: String.raw`\.UseDeveloperExceptionPage\s*\(`,
   java: String.raw`server\.error\.include-stacktrace\s*=\s*always`,
+  php: String.raw`APP_DEBUG\s*=\s*true|'debug'\s*=>\s*true|display_errors.*On`,
+  ruby: String.raw`config\.consider_all_requests_local\s*=\s*true`,
+  kotlin: String.raw`server\.error\.include-stacktrace\s*=\s*always`,
+  swift: String.raw`\.environment\s*=\s*\.development`,
 };
 
 /** Missing HTTPS / security middleware in frameworks */
@@ -597,6 +746,9 @@ export const FRAMEWORK_MISSING_SECURITY = {
   java: String.raw`\.antMatchers\s*\(\s*["']/\*\*["']\s*\)\s*\.permitAll`,
   csharp: String.raw`\.AllowAnonymous\b.*(?:Delete|Admin|Update|Transfer)`,
   go: String.raw`http\.ListenAndServe\s*\((?!.*tls|.*TLS)`,
+  php: String.raw`Route::(?:get|post)\s*\((?!.*middleware|.*auth)`,
+  ruby: String.raw`skip_before_action\s*:\s*(?:authenticate|verify)`,
+  swift: String.raw`app\.http\.server\.configuration\.hostname\s*=\s*["']0\.0\.0\.0`,
 };
 
 /** Framework-specific secret key / session misconfigurations */
@@ -605,6 +757,8 @@ export const FRAMEWORK_SECRET_KEY = {
   jsts: String.raw`secret\s*:\s*["'][^"']{0,15}["'](?=.*(?:session|cookie|jwt))`,
   java: String.raw`secret\.key\s*=\s*["'][^"']{0,20}["']`,
   csharp: String.raw`\.AddJwtBearer\s*\([^)]*(?:["']secret["']|IssuerSigningKey\s*=\s*new\s+SymmetricSecurityKey\s*\(\s*Encoding\.\w+\.GetBytes\s*\(\s*["'][^"']{0,20}["'])`,
+  php: String.raw`APP_KEY\s*=\s*["'][^"']{0,15}["']|'key'\s*=>\s*["'][^"']{0,15}["']`,
+  ruby: String.raw`secret_key_base\s*=\s*["'][^"']{0,20}["']|config\.secret_key_base\s*=\s*["']`,
 };
 
 /** Framework-specific mass assignment / over-posting vulnerabilities */
@@ -613,6 +767,8 @@ export const FRAMEWORK_MASS_ASSIGNMENT = {
   jsts: String.raw`Object\.assign\s*\(\s*\w+\s*,\s*req\.body|\.create\s*\(\s*req\.body\s*\)|\.update\s*\(\s*req\.body\s*\)|spread.*req\.body`,
   java: String.raw`@ModelAttribute\b.*(?:without|no).*(?:binding|whitelist)|setAllowedFields\s*\(\s*\)`,
   csharp: String.raw`\[Bind\s*\(\s*\)\]|TryUpdateModelAsync\s*\(\s*\w+\s*\)|\.FromBody\].*(?:without|no).*(?:validation)`,
+  php: String.raw`\$request->all\s*\(\)|\$fillable\s*=\s*\[\s*\]|\$guarded\s*=\s*\[\s*\]`,
+  ruby: String.raw`params\.permit!|attr_accessible.*:all|without.*strong_parameters`,
 };
 
 /** Go-specific: Gin/Echo/Fiber security patterns */

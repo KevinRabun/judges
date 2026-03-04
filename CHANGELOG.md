@@ -2,6 +2,41 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.21.0] — 2026-03-05
+
+### Added — P0: GitHub Action CI/CD
+- **PR inline review comments** — New `pr-review` input in `action.yml` posts findings as inline PR review comments with severity badges, auto-fix hints, and judge attribution
+- **Diff-only mode** — New `diff-only` input restricts analysis to changed files using `git diff`, dramatically reducing CI noise on large repos
+- **Baseline filtering** — New `baseline-file` input suppresses known findings via a baseline JSON, surfacing only new issues in PRs
+- **Improved step summary** — GitHub Actions summary now includes findings table, score badge, and must-fix gate status
+
+### Added — P1: Core Engine Enhancements
+- **AST context in more evaluators** — `AnalyzeContext` interface pipes tree-sitter AST data into cybersecurity (scope-aware taint), performance (async/complexity detection), and authentication (decorator/import awareness) evaluators
+- **`fix_code` MCP tool** — New tool evaluates code and auto-applies all available patches, returning fixed code + summary of remaining findings
+- **Multi-language framework evaluators** — Extended `framework-safety.ts` from JS/TS-only to 8 frameworks: Django (6 rules), Flask (4), FastAPI (1), Spring Boot (6), ASP.NET Core (6), Go/Gin/Echo/Fiber (5)
+
+### Added — P2: Depth & Tooling
+- **20+ new auto-fix patches** — Added patches for Python (7), Go (2), Java (5), C# (4), Rust (2) covering SQL injection, command injection, weak hashing, empty catch, and more
+- **VS Code findings panel** — TreeView-based panel with sort-by-severity/judge, filter controls, go-to-line navigation, and 7 new commands (`judges.showFindingsPanel`, `judges.sortBySeverity`, etc.)
+- **Cross-file type/state tracking** — Three new project-level detectors: `detectSharedMutableState()`, `detectTypeSafetyGaps()`, `detectScatteredEnvAccess()` in `project.ts`
+- **Taint tracker language depth** — Expanded from 5 to 9 language-specific pattern sets with `LanguagePatternSet` interface; each set defines sources, sinks, sanitizers, assign patterns, and guard conditions
+
+### Added — P3: Breadth & Polish
+- **PHP/Ruby/Kotlin/Swift language support** — Added 4 new languages to `LangFamily`, expanded all ~35 pattern constants in `language-patterns.ts`, added 4 complete taint tracker pattern sets (PHP: 7 sources/11 sinks/11 sanitizers, Ruby: 9/11/10, Kotlin: 9/8/8, Swift: 8/9/6)
+- **Performance & snapshot tests** — 3 new test suites: performance budgets (tribunal <5s, per-judge <500ms, evaluateDiff <3s, large-block <15s), rule coverage stability (≥30 judges, 100-600 findings, required families, severity distribution), multi-language pattern coverage (8 tests for PHP/Ruby/Kotlin/Swift)
+- **Framework version awareness** — `detectFrameworkVersions()` extracts versions from 14 manifest/config patterns; `getVersionConfidenceAdjustment()` applies version-specific confidence rules for Django 4+, Spring 3+, Next.js 13+/14+, Express 5+, Rails 6+/7+, Laravel 9+, ASP.NET 8+; integrated into `applyFrameworkAwareness()`
+- **MCP workspace & streaming tools** — 3 new MCP tools: `list_files` (recursive directory listing with skip-dirs), `read_file` (content reading with line-range slicing), `evaluate_with_progress` (progressive judge-by-judge reporting with count updates)
+
+### Changed
+- **MCP tool count** — 10 → 13 tools registered in `server.json`
+- **`applyFrameworkAwareness()` rewritten** — Now combines framework mitigation with version-aware confidence adjustments and stacked provenance notes
+- **`register.ts` modular architecture** — Now orchestrates 4 registration modules: evaluation, workflow, fix, workspace
+
+### Tests
+- 19 new performance/snapshot/multi-language tests in `judges.test.ts`
+- 19 new framework version awareness tests in `subsystems.test.ts`
+- 1006 tests in judges.test.ts, 392 tests in subsystems.test.ts — all passing
+
 ## [3.20.14] — 2026-03-04
 
 ### Added

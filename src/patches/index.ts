@@ -487,6 +487,205 @@ const PATCH_RULES: Array<{
       return { oldText: m[0], newText: `${m[1]}{ noent: false, dtd: false })` };
     },
   },
+
+  // ── Python Patches ──
+
+  // Python: hashlib.md5/sha1 → sha256
+  {
+    match: /weak.*hash|weak.*crypto|insecure.*hash/i,
+    generate: (line) => {
+      const m = line.match(/hashlib\.(md5|sha1)\s*\(/i);
+      if (!m) return null;
+      return { oldText: m[0], newText: "hashlib.sha256(" };
+    },
+  },
+  // Python: random.random() → secrets.token_hex()
+  {
+    match: /insecure.*random|weak.*random/i,
+    generate: (line) => {
+      const m = line.match(/random\.(?:random|randint|choice)\s*\([^)]*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "secrets.token_hex(32)" };
+    },
+  },
+  // Python: pickle.loads → json.loads
+  {
+    match: /unsafe.*deseri|pickle.*untrusted|insecure.*deseri/i,
+    generate: (line) => {
+      const m = line.match(/pickle\.loads?\s*\(/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "json.loads(" };
+    },
+  },
+  // Python: yaml.load(data) → yaml.safe_load(data)
+  {
+    match: /unsafe.*yaml|yaml.*load|insecure.*yaml/i,
+    generate: (line) => {
+      const m = line.match(/yaml\.load\s*\(/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "yaml.safe_load(" };
+    },
+  },
+  // Python: os.system → subprocess.run
+  {
+    match: /command.*inject|os\.system|shell.*inject/i,
+    generate: (line) => {
+      const m = line.match(/os\.system\s*\(\s*(f?["'])/);
+      if (!m) return null;
+      return { oldText: "os.system(", newText: "subprocess.run(" };
+    },
+  },
+  // Python: assert for validation → raise ValueError
+  {
+    match: /assert.*valid|assert.*production|assert.*security/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)assert\s+(.*),\s*["'](.*?)["']\s*$/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}if not (${m[2]}): raise ValueError("${m[3]}")` };
+    },
+  },
+  // Python DEBUG=True → environment variable
+  {
+    match: /debug.*true|debug.*production/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)DEBUG\s*=\s*True\s*$/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}DEBUG = os.environ.get('DEBUG', 'False') == 'True'` };
+    },
+  },
+
+  // ── Go Patches ──
+
+  // Go: fmt.Sprintf in SQL → parameterized query marker
+  {
+    match: /sql.*inject|string.*format.*sql/i,
+    generate: (line) => {
+      const m = line.match(/fmt\.Sprintf\s*\(\s*["']([^"']*?)%[sdv]/);
+      if (!m) return null;
+      if (!/SELECT|INSERT|UPDATE|DELETE|WHERE/i.test(m[1])) return null;
+      return { oldText: "fmt.Sprintf(", newText: "/* TODO: use parameterized query ($1) */ fmt.Sprintf(" };
+    },
+  },
+  // Go: http.ListenAndServe → http.ListenAndServeTLS
+  {
+    match: /unencrypted.*http|http.*tls|insecure.*transport/i,
+    generate: (line) => {
+      const m = line.match(/http\.ListenAndServe\s*\(/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "http.ListenAndServeTLS(" };
+    },
+  },
+
+  // ── Java Patches ──
+
+  // Java: MessageDigest MD5/SHA-1 → SHA-256
+  {
+    match: /weak.*hash|weak.*digest|insecure.*hash/i,
+    generate: (line) => {
+      const m = line.match(/MessageDigest\.getInstance\s*\(\s*["'](MD5|SHA-1)["']\s*\)/i);
+      if (!m) return null;
+      return { oldText: m[0], newText: `MessageDigest.getInstance("SHA-256")` };
+    },
+  },
+  // Java: new Random() → SecureRandom
+  {
+    match: /insecure.*random|predictable.*random/i,
+    generate: (line) => {
+      const m = line.match(/new\s+Random\s*\(\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "new SecureRandom()" };
+    },
+  },
+  // Java: DES/3DES → AES (cipher)
+  {
+    match: /weak.*cipher|insecure.*cipher|des.*encrypt/i,
+    generate: (line) => {
+      const m = line.match(/Cipher\.getInstance\s*\(\s*["'](?:DES|DESede|3DES)(?:\/[^"']*)?["']\s*\)/i);
+      if (!m) return null;
+      return { oldText: m[0], newText: `Cipher.getInstance("AES/GCM/NoPadding")` };
+    },
+  },
+  // Java: Runtime.exec with string → ProcessBuilder
+  {
+    match: /command.*inject|runtime.*exec|os.*command/i,
+    generate: (line) => {
+      const m = line.match(/Runtime\.getRuntime\s*\(\s*\)\.exec\s*\(/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "new ProcessBuilder(" };
+    },
+  },
+  // Java: XMLInputFactory without disabling DTD
+  {
+    match: /xxe|xml.*injection|xml.*entity/i,
+    generate: (line) => {
+      const m = line.match(/XMLInputFactory\.newInstance\s*\(\s*\)/);
+      if (!m) return null;
+      return {
+        oldText: m[0],
+        newText: `XMLInputFactory.newInstance() /* TODO: factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false) */`,
+      };
+    },
+  },
+
+  // ── C# Patches ──
+
+  // C#: MD5/SHA1 → SHA256
+  {
+    match: /weak.*hash|insecure.*hash|obsolete.*hash/i,
+    generate: (line) => {
+      const m = line.match(/(MD5|SHA1)\.Create\s*\(\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "SHA256.Create()" };
+    },
+  },
+  // C#: new Random() → RandomNumberGenerator
+  {
+    match: /insecure.*random|predictable.*random/i,
+    generate: (line) => {
+      const m = line.match(/new\s+Random\s*\(\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "RandomNumberGenerator.Create()" };
+    },
+  },
+  // C#: AllowAnyOrigin → specific origin comment
+  {
+    match: /cors.*wildcard|permissive.*cors|cors.*any/i,
+    generate: (line) => {
+      const m = line.match(/\.AllowAnyOrigin\s*\(\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `.WithOrigins("https://your-domain.com") /* TODO: restrict origins */` };
+    },
+  },
+  // C#: FromSqlRaw with interpolation → FromSqlInterpolated
+  {
+    match: /sql.*inject|raw.*sql/i,
+    generate: (line) => {
+      const m = line.match(/FromSqlRaw\s*\(\s*\$/);
+      if (!m) return null;
+      return { oldText: "FromSqlRaw($", newText: "FromSqlInterpolated($" };
+    },
+  },
+
+  // ── Rust Patches ──
+
+  // Rust: unwrap() → expect() with message
+  {
+    match: /unwrap.*panic|unwrap.*error|unhandled.*unwrap/i,
+    generate: (line) => {
+      const m = line.match(/\.unwrap\s*\(\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `.expect("TODO: handle this error")` };
+    },
+  },
+  // Rust: unsafe block → comment marker
+  {
+    match: /unsafe.*block|unsafe.*usage/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)unsafe\s*\{/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}// SAFETY: TODO: document why unsafe is needed\n${m[1]}unsafe {` };
+    },
+  },
 ];
 
 /**

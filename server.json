@@ -7,12 +7,12 @@
     "url": "https://github.com/kevinrabun/judges",
     "source": "github"
   },
-  "version": "3.20.14",
+  "version": "3.21.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@kevinrabun/judges",
-      "version": "3.20.14",
+      "version": "3.21.0",
       "transport": {
         "type": "stdio"
       }
@@ -54,6 +54,22 @@
     {
       "name": "evaluate_public_repo_report",
       "description": "Clone a public repository URL, run the full judges panel, and generate a consolidated markdown report."
+    },
+    {
+      "name": "fix_code",
+      "description": "Evaluate code and automatically apply all available auto-fix patches. Returns the fixed code along with a summary of applied and remaining findings."
+    },
+    {
+      "name": "list_files",
+      "description": "List files and directories in the workspace. Useful for exploring project structure before evaluating code."
+    },
+    {
+      "name": "read_file",
+      "description": "Read the contents of a file in the workspace. Returns the file text with optional line-range slicing."
+    },
+    {
+      "name": "evaluate_with_progress",
+      "description": "Evaluate code with progressive judge-by-judge reporting. Returns intermediate counts as each judge completes, useful for large files."
     }
   ],
   "prompts": [

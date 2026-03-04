@@ -1,14 +1,29 @@
 import * as vscode from "vscode";
 import { JudgesDiagnosticProvider } from "./diagnostics";
 import { JudgesCodeActionProvider } from "./code-actions";
+import { JudgesFindingsPanel } from "./findings-panel";
 import { registerChatParticipant } from "./chat-participant";
 import { registerLmTools } from "./lm-tool";
 
 let diagnosticProvider: JudgesDiagnosticProvider;
+let findingsPanel: JudgesFindingsPanel;
 
 export function activate(context: vscode.ExtensionContext): void {
   const diagnosticCollection = vscode.languages.createDiagnosticCollection("judges");
   diagnosticProvider = new JudgesDiagnosticProvider(diagnosticCollection);
+
+  // ─── Findings Panel (Tree View) ──────────────────────────────────────
+  findingsPanel = new JudgesFindingsPanel();
+  const treeView = vscode.window.createTreeView("judges.findingsPanel", {
+    treeDataProvider: findingsPanel,
+    showCollapseAll: true,
+  });
+  context.subscriptions.push(treeView);
+
+  // Wire diagnostic provider → findings panel so the panel updates live
+  diagnosticProvider.onFindingsChanged((e) => {
+    findingsPanel.updateFindings(e.uri, e.findings);
+  });
 
   // ─── MCP Server Auto-Configuration ───────────────────────────────────
   // Register the Judges MCP server so Copilot / LMs can use Layer 2
@@ -71,6 +86,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.commands.registerCommand("judges.clearDiagnostics", () => {
       diagnosticCollection.clear();
+      findingsPanel.clearAll();
       vscode.window.showInformationMessage("Judges: Diagnostics cleared.");
     }),
 
@@ -138,7 +154,35 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand("judges.showPanel", () => {
-      vscode.window.showInformationMessage("Judges: Results panel coming soon.");
+      vscode.commands.executeCommand("judges.findingsPanel.focus");
+    }),
+
+    vscode.commands.registerCommand("judges.sortBySeverity", () => {
+      findingsPanel.setSortMode("severity");
+    }),
+
+    vscode.commands.registerCommand("judges.sortByFile", () => {
+      findingsPanel.setSortMode("file");
+    }),
+
+    vscode.commands.registerCommand("judges.sortByRule", () => {
+      findingsPanel.setSortMode("rule");
+    }),
+
+    vscode.commands.registerCommand("judges.filterAll", () => {
+      findingsPanel.setFilterSeverity("all");
+    }),
+
+    vscode.commands.registerCommand("judges.filterCritical", () => {
+      findingsPanel.setFilterSeverity("critical");
+    }),
+
+    vscode.commands.registerCommand("judges.filterHigh", () => {
+      findingsPanel.setFilterSeverity("high");
+    }),
+
+    vscode.commands.registerCommand("judges.filterMedium", () => {
+      findingsPanel.setFilterSeverity("medium");
     }),
 
     vscode.commands.registerCommand("judges.configureMcp", () => configureMcpManually()),

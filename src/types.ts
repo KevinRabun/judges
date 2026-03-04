@@ -1,3 +1,6 @@
+import type { CodeStructure } from "./ast/types.js";
+import type { TaintFlow } from "./ast/taint-tracker.js";
+
 /**
  * Severity levels for judge findings.
  */
@@ -86,6 +89,10 @@ export type LangFamily =
   | "java"
   | "go"
   | "cpp"
+  | "php"
+  | "ruby"
+  | "kotlin"
+  | "swift"
   | "powershell"
   | "terraform"
   | "bicep"
@@ -447,6 +454,18 @@ export interface MustFixGateResult {
 /**
  * Definition of a judge — their identity, expertise, and evaluation criteria.
  */
+/**
+ * Optional context passed to judge analyze functions. Provides pre-computed
+ * AST structure and taint flows so evaluators can make scope-aware, import-
+ * aware, and data-flow-aware decisions without re-parsing.
+ */
+export interface AnalyzeContext {
+  /** Pre-computed AST structure (functions, imports, classes, decorators, etc.) */
+  ast?: CodeStructure;
+  /** Pre-computed taint flows (source → sink data-flow chains) */
+  taintFlows?: TaintFlow[];
+}
+
 export interface JudgeDefinition {
   /** Unique identifier */
   id: string;
@@ -464,6 +483,9 @@ export interface JudgeDefinition {
    * The analyzer function for this judge. Each judge carries its own analysis
    * logic, eliminating the need for a central dispatch switch. Wired up
    * automatically in the judge registry (judges/index.ts).
+   *
+   * The optional third parameter provides pre-computed AST data (structure,
+   * taint flows) so evaluators can make scope-aware decisions without re-parsing.
    */
-  analyze?: (code: string, language: string) => Finding[];
+  analyze?: (code: string, language: string, context?: AnalyzeContext) => Finding[];
 }

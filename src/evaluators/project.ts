@@ -286,6 +286,232 @@ function applyProjectWideAbsenceResolution(findings: Finding[], projectWideCateg
   });
 }
 
+// ─── Cross-File Shared State & Type Safety Analysis ──────────────────────────
+
+/**
+ * Detect exported mutable state (let/var bindings, mutable objects) that is
+ * imported and potentially written from multiple files — a common source of
+ * race conditions and hard-to-debug state corruption.
+ */
+function detectSharedMutableState(files: Array<{ path: string; content: string; language: string }>): Finding[] {
+  const findings: Finding[] = [];
+
+  // Find exported `let`/`var` variables (mutable by definition)
+  const mutableExports = new Map<string, { file: string; line: number; name: string }>();
+  // Use a RegExp that matches `export let` or `export var` variable declarations
+  const mutableExportRe = /^[ \t]*export\s+(?:let|var)\s+(\w+)/;
+
+  for (const f of files) {
+    const lines = f.content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const m = mutableExportRe.exec(lines[i]);
+      if (m) {
+        const key = `${f.path}:${m[1]}`;
+        mutableExports.set(key, { file: f.path, line: i + 1, name: m[1] });
+      }
+    }
+  }
+
+  // Find files that import and mutate these
+  for (const [key, info] of mutableExports) {
+    const importers: string[] = [];
+    const nameEsc = info.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const importRe = new RegExp(`import\\s+\\{[^}]*\\b${nameEsc}\\b[^}]*\\}\\s+from`, "m");
+    const writeRe = new RegExp(`\\b${nameEsc}\\s*(?:=(?!=)|\\+\\+|--|\\+=|-=|\\*=|\\/=|\\|=|&=)`, "m");
+
+    for (const f of files) {
+      if (f.path === info.file) continue;
+      if (importRe.test(f.content) && writeRe.test(f.content)) {
+        importers.push(f.path);
+      }
+    }
+
+    if (importers.length > 0) {
+      findings.push({
+        ruleId: "STATE-001",
+        severity: "high",
+        title: `Shared mutable export \`${info.name}\` modified across files`,
+        description:
+          `\`${info.name}\` is exported as \`let\`/\`var\` from ${info.file} (line ${info.line}) and mutated ` +
+          `in ${importers.length} other file(s): ${importers.join(", ")}. ` +
+          `Shared mutable state across modules causes race conditions, non-deterministic behavior, ` +
+          `and makes testing extremely difficult.`,
+        lineNumbers: [info.line],
+        recommendation:
+          "Replace shared mutable state with an immutable export + setter function, use a state management pattern " +
+          "(e.g., event bus, Redux store), or pass state explicitly through function parameters.",
+        reference: "CWE-362: Concurrent Execution Using Shared Resource with Improper Synchronization",
+        confidence: 0.85,
+      });
+    }
+  }
+
+  // Detect exported mutable singleton patterns (module-level objects with mutation methods)
+  for (const f of files) {
+    if (f.language !== "typescript" && f.language !== "javascript") continue;
+    // Match `export const state = { ... }` that is later mutated via `state.x = ...`
+    const singletonRe = /^[ \t]*export\s+const\s+(\w+)\s*(?::\s*\w[^=]*)?\s*=\s*\{/gm;
+    let sm;
+    while ((sm = singletonRe.exec(f.content)) !== null) {
+      const objName = sm[1];
+      const nameEsc = objName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const mutationRe = new RegExp(`\\b${nameEsc}\\.\\w+\\s*=(?!=)`, "m");
+
+      // Check if any other file imports and mutates this object
+      const mutators: string[] = [];
+      const importRe = new RegExp(`import\\s+\\{[^}]*\\b${nameEsc}\\b[^}]*\\}\\s+from`, "m");
+      for (const other of files) {
+        if (other.path === f.path) continue;
+        if (importRe.test(other.content) && mutationRe.test(other.content)) {
+          mutators.push(other.path);
+        }
+      }
+
+      if (mutators.length > 0) {
+        const lineNum = f.content.substring(0, sm.index).split("\n").length;
+        findings.push({
+          ruleId: "STATE-002",
+          severity: "high",
+          title: `Exported object \`${objName}\` mutated from other modules`,
+          description:
+            `\`${objName}\` is exported from ${f.path} (line ${lineNum}) and its properties are ` +
+            `mutated in: ${mutators.join(", ")}. Mutating imported objects breaks encapsulation ` +
+            `and creates hidden coupling between modules.`,
+          lineNumbers: [lineNum],
+          recommendation:
+            "Freeze the exported object with Object.freeze(), expose setter functions, or use a " +
+            "centralized state management pattern instead of direct property mutation.",
+          confidence: 0.8,
+        });
+      }
+    }
+  }
+
+  return findings;
+}
+
+/**
+ * Detect type safety gaps across file boundaries — exported functions or
+ * values with `any` type, untyped parameters crossing module boundaries,
+ * and inconsistent null checking patterns.
+ */
+function detectTypeSafetyGaps(files: Array<{ path: string; content: string; language: string }>): Finding[] {
+  const findings: Finding[] = [];
+
+  // Only applicable to TypeScript files
+  const tsFiles = files.filter((f) => f.language === "typescript");
+  if (tsFiles.length < 2) return findings;
+
+  // Find exported functions with `any` in their signatures
+  const anyExportRe = /^[ \t]*export\s+(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)\s*(?::\s*([^\n{]+))?/gm;
+
+  for (const f of tsFiles) {
+    let m;
+    anyExportRe.lastIndex = 0;
+    while ((m = anyExportRe.exec(f.content)) !== null) {
+      const fnName = m[1];
+      const params = m[2] ?? "";
+      const retType = m[3] ?? "";
+
+      const hasAny = /\bany\b/.test(params) || /\bany\b/.test(retType);
+      if (!hasAny) continue;
+
+      // Check if other files import this function
+      const nameEsc = fnName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const importers = tsFiles.filter(
+        (o) =>
+          o.path !== f.path && new RegExp(`import\\s+\\{[^}]*\\b${nameEsc}\\b[^}]*\\}\\s+from`, "m").test(o.content),
+      );
+
+      if (importers.length > 0) {
+        const lineNum = f.content.substring(0, m.index).split("\n").length;
+        findings.push({
+          ruleId: "TYPE-001",
+          severity: "medium",
+          title: `Exported function \`${fnName}\` uses \`any\` type`,
+          description:
+            `Function \`${fnName}\` exported from ${f.path} (line ${lineNum}) has \`any\` in its signature ` +
+            `and is imported by ${importers.length} file(s). Using \`any\` at module boundaries defeats ` +
+            `TypeScript's type safety and can introduce type errors that propagate across the project.`,
+          lineNumbers: [lineNum],
+          recommendation:
+            "Replace `any` with a specific type, `unknown`, or a generic type parameter. " +
+            "At minimum, use `unknown` and narrow the type with runtime checks.",
+          reference: "TypeScript Handbook: The any type",
+          confidence: 0.75,
+        });
+      }
+    }
+  }
+
+  return findings;
+}
+
+/**
+ * Detect environment variables used across multiple files without centralized
+ * validation. Scattered env var access with no single point of validation
+ * leads to runtime crashes and configuration drift.
+ */
+function detectScatteredEnvAccess(files: Array<{ path: string; content: string; language: string }>): Finding[] {
+  const findings: Finding[] = [];
+
+  // Track env var access per file
+  const envVarUsage = new Map<string, Set<string>>(); // envVar → set of file paths
+  const envAccessPatterns: Array<{ pattern: RegExp; lang: string[] }> = [
+    { pattern: /process\.env\.(\w+)/g, lang: ["typescript", "javascript"] },
+    { pattern: /os\.environ(?:\.get)?\s*\[\s*['"](\w+)['"]\s*\]/g, lang: ["python"] },
+    { pattern: /os\.environ\.get\s*\(\s*['"](\w+)['"]/g, lang: ["python"] },
+    { pattern: /os\.Getenv\s*\(\s*"(\w+)"/g, lang: ["go"] },
+    { pattern: /System\.getenv\s*\(\s*"(\w+)"/g, lang: ["java"] },
+    { pattern: /Environment\.GetEnvironmentVariable\s*\(\s*"(\w+)"/g, lang: ["csharp"] },
+  ];
+
+  // Detect config files (these centralize env access, which is the desired pattern)
+  const configFilePattern = /(?:config|settings|env|environment)\.\w+$/i;
+  const configFiles = new Set(files.filter((f) => configFilePattern.test(f.path)).map((f) => f.path));
+
+  for (const f of files) {
+    if (configFiles.has(f.path)) continue; // Skip config files — centralized access is good
+
+    for (const ap of envAccessPatterns) {
+      if (!ap.lang.includes(f.language)) continue;
+      ap.pattern.lastIndex = 0;
+      let m;
+      while ((m = ap.pattern.exec(f.content)) !== null) {
+        const envVar = m[1];
+        if (!envVarUsage.has(envVar)) envVarUsage.set(envVar, new Set());
+        envVarUsage.get(envVar)!.add(f.path);
+      }
+    }
+  }
+
+  // Flag env vars accessed in 3+ non-config files without centralized validation
+  const scattered = [...envVarUsage.entries()].filter(([, paths]) => paths.size >= 3);
+  if (scattered.length > 0) {
+    const examples = scattered
+      .slice(0, 5)
+      .map(([v, paths]) => `${v} (${paths.size} files)`)
+      .join(", ");
+
+    findings.push({
+      ruleId: "CONFIG-001",
+      severity: "medium",
+      title: "Environment variables accessed from multiple files without centralization",
+      description:
+        `${scattered.length} env variable(s) are accessed directly in 3+ files each: ${examples}. ` +
+        `Scattered env access leads to missing validation, inconsistent defaults, and runtime crashes ` +
+        `when variables are undefined.`,
+      recommendation:
+        "Create a centralized config module that validates all env vars at startup (e.g., using envalid, " +
+        "zod, or a Config class), then import typed config values instead of accessing process.env directly.",
+      reference: "12-Factor App: Config",
+      confidence: 0.7,
+    });
+  }
+
+  return findings;
+}
+
 // ─── Project Evaluation ───────────────────────────────────────────────────────
 
 /**
@@ -375,6 +601,11 @@ export function evaluateProject(
       recommendation: "Standardize on a single error handling strategy across the project.",
     });
   }
+
+  // ── Cross-file state, type-safety & config analysis ────────────────────
+  architecturalFindings.push(...detectSharedMutableState(files));
+  architecturalFindings.push(...detectTypeSafetyGaps(files));
+  architecturalFindings.push(...detectScatteredEnvAccess(files));
 
   const filteredArchitecturalFindings = applyConfidenceThreshold(architecturalFindings, options);
 

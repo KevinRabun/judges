@@ -384,7 +384,12 @@ export function evaluateWithJudge(
 
   // ── Registry-based dispatch: each judge carries its own analyze() method ──
   if (judge.analyze) {
-    findings.push(...judge.analyze(code, language));
+    // Pass pre-computed AST context so evaluators can make scope-aware decisions
+    const analyzeCtx =
+      options?._astCache || options?._taintFlows
+        ? { ast: options._astCache, taintFlows: options._taintFlows }
+        : undefined;
+    findings.push(...judge.analyze(code, language, analyzeCtx));
   }
 
   // ── Absence gating ──

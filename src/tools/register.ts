@@ -5,12 +5,16 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerEvaluationTools } from "./register-evaluation.js";
 import { registerWorkflowTools } from "./register-workflow.js";
+import { registerFixTools } from "./register-fix.js";
+import { registerWorkspaceTools } from "./register-workspace.js";
 
 /**
  * Register all MCP tools on the given server instance.
- * Delegates to focused modules for evaluation and workflow tools.
+ * Delegates to focused modules for evaluation, workflow, fix, and workspace tools.
  */
 export function registerTools(server: McpServer): void {
   registerEvaluationTools(server);
   registerWorkflowTools(server);
+  registerFixTools(server);
+  registerWorkspaceTools(server);
 }

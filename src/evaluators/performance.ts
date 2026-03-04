@@ -1,13 +1,17 @@
-import type { Finding } from "../types.js";
+import type { Finding, AnalyzeContext } from "../types.js";
 import { getLangLineNumbers, getLangFamily, isCommentLine, isStringLiteralLine, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
-export function analyzePerformance(code: string, language: string): Finding[] {
+export function analyzePerformance(code: string, language: string, context?: AnalyzeContext): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "PERF";
   let ruleNum = 1;
   const lang = getLangFamily(language);
+
+  // ── AST context (optional — enables scope-aware detection) ────────────────
+  const ast = context?.ast;
+  const astFunctions = ast?.functions ?? [];
 
   // Detect N+1 query patterns (multi-language)
   const nPlusOneLines: number[] = [];
@@ -57,12 +61,27 @@ export function analyzePerformance(code: string, language: string): Finding[] {
     }
   });
   if (syncIOLines.length > 0) {
+    // AST: elevate severity when synchronous I/O is inside an async function
+    // (blocks the event loop / async runtime, far worse than in sync context)
+    let syncSeverity: "medium" | "high" = "medium";
+    let syncDescription =
+      "Synchronous file or blocking operations can block the event loop (Node.js), thread, or async runtime, degrading throughput under concurrent load.";
+    if (astFunctions.length > 0) {
+      const inAsync = syncIOLines.some((ln) => {
+        const fn = astFunctions.find((f) => ln >= f.startLine && ln <= f.endLine);
+        return fn?.isAsync === true;
+      });
+      if (inAsync) {
+        syncSeverity = "high";
+        syncDescription =
+          "Synchronous/blocking I/O detected inside an async function. This blocks the event loop or async runtime, defeating the purpose of async execution and degrading throughput under concurrent load.";
+      }
+    }
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
-      severity: "medium",
+      severity: syncSeverity,
       title: "Synchronous / blocking I/O detected",
-      description:
-        "Synchronous file or blocking operations can block the event loop (Node.js), thread, or async runtime, degrading throughput under concurrent load.",
+      description: syncDescription,
       lineNumbers: syncIOLines,
       recommendation:
         "Use async/await versions, non-blocking APIs, or spawn blocking work on a separate thread/runtime. Sync I/O is only acceptable at startup.",
@@ -497,11 +516,22 @@ export function analyzePerformance(code: string, language: string): Finding[] {
     }
   }
   if (nestedLoopLines.length > 0) {
+    // AST: annotate with function-level complexity via AST metrics
+    let nestedDescription = `${nestedLoopLines.length} nested loop(s) detected. Nested loops scale quadratically or worse with input size and can cause severe performance degradation on large datasets.`;
+    if (astFunctions.length > 0) {
+      const complexFns = nestedLoopLines
+        .map((ln) => astFunctions.find((f) => ln >= f.startLine && ln <= f.endLine))
+        .filter((f): f is NonNullable<typeof f> => f !== undefined && f !== null && f.cyclomaticComplexity > 5);
+      if (complexFns.length > 0) {
+        const names = [...new Set(complexFns.map((f) => `${f.name}() CC=${f.cyclomaticComplexity}`))];
+        nestedDescription += ` High-complexity functions containing nested loops: ${names.slice(0, 3).join(", ")}.`;
+      }
+    }
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Nested loops detected — O(n²) or worse complexity",
-      description: `${nestedLoopLines.length} nested loop(s) detected. Nested loops scale quadratically or worse with input size and can cause severe performance degradation on large datasets.`,
+      description: nestedDescription,
       lineNumbers: nestedLoopLines.slice(0, 8),
       recommendation:
         "Replace nested loops with hash maps (O(n)) for lookups, pre-sorted data with binary search, or purpose-built data structures. Consider if the algorithm can be flattened.",
