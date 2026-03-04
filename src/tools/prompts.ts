@@ -65,7 +65,7 @@ export function getCondensedCriteria(systemPrompt: string): string {
   }
 
   // 3. Strip boilerplate rule lines that duplicate tribunal-level guidance
-  text = text.replace(/- Assign rule IDs with prefix "[^"]*" \(e\.g\.[^)]*\)\.\n?/g, "");
+  text = text.replace(/- Assign rule IDs with prefix "[^"\n]*" \(e\.g\.[^)\n]*\)\.\n?/g, "");
   text = text.replace(/- Score from 0-100 where 100 means [^\n]+\n?/g, "");
 
   return text.trim();

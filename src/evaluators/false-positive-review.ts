@@ -452,7 +452,11 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
   // local lock is a documented single-instance fallback, not a scaling issue.
   if (
     /^SCALE-/.test(finding.ruleId) &&
-    /local.*lock|process.*lock|file.*lock|asyncio\.Lock|threading\.Lock/i.test(finding.title)
+    (((finding.title.toLowerCase().includes("local") ||
+      finding.title.toLowerCase().includes("process") ||
+      finding.title.toLowerCase().includes("file")) &&
+      finding.title.toLowerCase().includes("lock")) ||
+      /asyncio\.Lock|threading\.Lock/i.test(finding.title))
   ) {
     const fullCode = lines.join("\n");
     const hasDistributedLock =
@@ -470,7 +474,9 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
   // equivalent or better resilience than a simple circuit breaker.
   if (
     /^(?:SOV-001|REL-)/.test(finding.ruleId) &&
-    /circuit.?breaker|resilience|without.*(?:retry|fallback)/i.test(finding.title)
+    (/circuit.?breaker|resilience/i.test(finding.title) ||
+      (finding.title.toLowerCase().includes("without") &&
+        (finding.title.toLowerCase().includes("retry") || finding.title.toLowerCase().includes("fallback"))))
   ) {
     const fullCode = lines.join("\n");
     const hasRetryPattern =
@@ -489,7 +495,11 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
   // ── 14. Constant definitions suppress I18N hardcoded-string findings ──
   // I18N-001 flags hardcoded strings, but constant definitions like
   // _F_TITLE = 'title' are JSON field-name keys, not user-facing text.
-  if (/^I18N-/.test(finding.ruleId) && /hardcoded.*string/i.test(finding.title)) {
+  if (
+    /^I18N-/.test(finding.ruleId) &&
+    finding.title.toLowerCase().includes("hardcoded") &&
+    finding.title.toLowerCase().includes("string")
+  ) {
     if (finding.lineNumbers && finding.lineNumbers.length > 0) {
       const allConstants = finding.lineNumbers.every((ln) => {
         const line = lines[ln - 1];
@@ -511,7 +521,11 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
   // ── 15. Bounded-dataset tree traversal suppresses O(n²) nested-loop findings ──
   // PERF-002/COST-001 flag nested loops as O(n²), but tree traversals
   // (chapters → sections → articles) iterate each item once — O(n total).
-  if (/^(?:PERF|COST)-/.test(finding.ruleId) && /nested.*loop|O\(n[²2]\)|quadratic/i.test(finding.title)) {
+  if (
+    /^(?:PERF|COST)-/.test(finding.ruleId) &&
+    ((finding.title.toLowerCase().includes("nested") && finding.title.toLowerCase().includes("loop")) ||
+      /O\(n[²2]\)|quadratic/i.test(finding.title))
+  ) {
     const fullCode = lines.join("\n");
     // Detect documented bounded datasets or tree-traversal patterns
     const hasBoundedDatasetDoc =
@@ -525,7 +539,11 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
   // ── 16. Read-only content fetch suppresses cross-border data egress findings ──
   // SOV-002 flags external API calls as cross-border data egress, but read-only
   // fetches of public regulatory/reference content are not personal data transfers.
-  if (/^SOV-002/.test(finding.ruleId) && /cross.?border|data.*egress|jurisdiction/i.test(finding.title)) {
+  if (
+    /^SOV-002/.test(finding.ruleId) &&
+    (/cross.?border|jurisdiction/i.test(finding.title) ||
+      (finding.title.toLowerCase().includes("data") && finding.title.toLowerCase().includes("egress")))
+  ) {
     const fullCode = lines.join("\n");
     const isReadOnlyFetch =
       /\bfetch\b.*\b(?:regulation|reference|content|static|public|gdpr|law)\b|\breadonly\b|\bread[_-]only\b/i.test(

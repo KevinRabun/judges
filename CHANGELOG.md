@@ -2,6 +2,16 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.10] — 2026-03-03
+
+### Fixed
+- **Security — 6 polynomial-ReDoS vulnerabilities fixed (CodeQL `js/polynomial-redos`)** — All 6 open code-scanning alerts resolved:
+  - **`src/tools/prompts.ts`**: Bounded negated character classes in the rule-ID stripping regex with `\n` anchors (`[^"]*` → `[^"\n]*`, `[^)]*` → `[^)\n]*`) to prevent cross-line polynomial backtracking
+  - **`src/evaluators/false-positive-review.ts`** (5 alerts): Replaced `word1.*word2` regex patterns in `finding.title` checks with equivalent `.includes()` string method calls that eliminate polynomial backtracking entirely — affects heuristics for scalability/lock detection, resilience/retry detection, i18n hardcoded-string detection, performance nested-loop detection, and sovereignty data-egress detection. Identical matching semantics preserved.
+
+### Tests
+- 1657 tests, 0 failures
+
 ## [3.20.9] — 2026-03-03
 
 ### Changed

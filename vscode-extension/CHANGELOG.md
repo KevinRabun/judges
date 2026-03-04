@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.10] — 2026-03-03
+
+### Fixed
+- **Security — 6 polynomial-ReDoS vulnerabilities fixed** — Eliminated all open CodeQL `js/polynomial-redos` alerts in core engine regex patterns; see [core CHANGELOG](../CHANGELOG.md) for full details
+
+### Tests
+- 1657 tests, 0 failures
+
 ## [3.20.9] — 2026-03-03
 
 ### Changed
