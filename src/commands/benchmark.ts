@@ -57,20 +57,39 @@ export interface BenchmarkResult {
   falseNegatives: number;
   /** False positives: unexpected findings that were detected */
   falsePositives: number;
-  /** Precision: TP / (TP + FP) */
+  /** Precision: TP / (TP + FP) — prefix-based matching */
   precision: number;
-  /** Recall: TP / (TP + FN) */
+  /** Recall: TP / (TP + FN) — prefix-based matching */
   recall: number;
-  /** F1 score: harmonic mean of precision and recall */
+  /** F1 score: harmonic mean of precision and recall — prefix-based */
   f1Score: number;
   /** Detection rate: cases detected / total cases */
   detectionRate: number;
+  /** Strict true positives: exact rule-ID match */
+  strictTruePositives: number;
+  /** Strict false negatives: exact rule-ID not matched */
+  strictFalseNegatives: number;
+  /** Strict precision: TP / (TP + FP) using exact rule-ID matching */
+  strictPrecision: number;
+  /** Strict recall: TP / (TP + FN) using exact rule-ID matching */
+  strictRecall: number;
+  /** Strict F1 score: exact rule-ID matching */
+  strictF1Score: number;
   /** Per-category results */
   perCategory: Record<string, CategoryResult>;
   /** Per-judge results */
   perJudge: Record<string, JudgeBenchmarkResult>;
+  /** Per-difficulty breakdown */
+  perDifficulty: Record<string, DifficultyResult>;
   /** Individual case results */
   cases: CaseResult[];
+}
+
+export interface DifficultyResult {
+  difficulty: string;
+  total: number;
+  detected: number;
+  detectionRate: number;
 }
 
 export interface CategoryResult {
@@ -1430,6 +1449,318 @@ def login():
     category: "clean",
     difficulty: "hard",
   },
+
+  // ── Hard Cases: Subtle/Obfuscated Vulnerabilities ────────────────────────
+
+  // ── Indirect injection through helper function ──
+  {
+    id: "hard-indirect-sql-injection",
+    description: "SQL injection hidden behind helper function indirection",
+    language: "typescript",
+    code: `function buildQuery(table: string, filter: string): string {
+  return "SELECT * FROM " + table + " WHERE " + filter;
+}
+app.get("/search", (req, res) => {
+  const query = buildQuery("users", "name = '" + req.query.name + "'");
+  db.query(query);
+  res.send("ok");
+});`,
+    expectedRuleIds: ["CYBER-001", "CYBER-002"],
+    category: "injection",
+    difficulty: "hard",
+  },
+
+  // ── SSRF via parameter composition ──
+  {
+    id: "hard-ssrf",
+    description: "Server-side request forgery via user-controlled URL",
+    language: "typescript",
+    code: `import express from "express";
+const app = express();
+app.get("/proxy", async (req, res) => {
+  const targetUrl = req.query.url as string;
+  const response = await fetch(targetUrl);
+  const body = await response.text();
+  res.send(body);
+});`,
+    expectedRuleIds: ["CYBER-001", "CYBER-002", "SEC-001"],
+    category: "injection",
+    difficulty: "hard",
+  },
+
+  // ── Prototype pollution ──
+  {
+    id: "hard-prototype-pollution",
+    description: "Prototype pollution via recursive merge of user input",
+    language: "javascript",
+    code: `function deepMerge(target, source) {
+  for (const key in source) {
+    if (typeof source[key] === "object" && source[key] !== null) {
+      if (!target[key]) target[key] = {};
+      deepMerge(target[key], source[key]);
+    } else {
+      target[key] = source[key];
+    }
+  }
+  return target;
+}
+app.post("/config", (req, res) => {
+  const config = deepMerge({}, req.body);
+  res.json(config);
+});`,
+    expectedRuleIds: ["CYBER-001", "SEC-001"],
+    category: "injection",
+    difficulty: "hard",
+  },
+
+  // ── JWT none algorithm attack ──
+  {
+    id: "hard-jwt-none-algorithm",
+    description: "JWT verification allowing none algorithm",
+    language: "typescript",
+    code: `import jwt from "jsonwebtoken";
+app.use((req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).send("No token");
+  const decoded = jwt.decode(token);
+  if (decoded && (decoded as any).role === "admin") {
+    req.user = decoded;
+    next();
+  } else {
+    res.status(403).send("Forbidden");
+  }
+});`,
+    expectedRuleIds: ["AUTH-001", "AUTH-002", "SEC-001"],
+    category: "auth",
+    difficulty: "hard",
+  },
+
+  // ── Mass assignment ──
+  {
+    id: "hard-mass-assignment",
+    description: "Mass assignment allowing privilege escalation",
+    language: "typescript",
+    code: `app.put("/api/users/:id", async (req, res) => {
+  // Directly spreading user input into DB update — allows setting isAdmin, role, etc.
+  await db.query("UPDATE users SET ? WHERE id = ?", [req.body, req.params.id]);
+  res.json({ updated: true });
+});
+
+app.post("/api/register", async (req, res) => {
+  const user = { ...req.body, createdAt: new Date() };
+  await db.query("INSERT INTO users SET ?", [user]);
+  res.json({ id: user.id });
+});`,
+    expectedRuleIds: ["CYBER-001", "SEC-001"],
+    category: "security",
+    difficulty: "hard",
+  },
+
+  // ── Open redirect ──
+  {
+    id: "hard-open-redirect",
+    description: "Open redirect via unvalidated user-controlled redirect URL",
+    language: "typescript",
+    code: `app.get("/login/callback", (req, res) => {
+  const returnTo = req.query.returnTo as string || "/dashboard";
+  // Authenticate user...
+  res.redirect(returnTo);
+});
+
+app.get("/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.redirect(req.query.next as string);
+  });
+});`,
+    expectedRuleIds: ["CYBER-001", "SEC-001"],
+    category: "security",
+    difficulty: "hard",
+  },
+
+  // ── Timing attack on comparison ──
+  {
+    id: "hard-timing-attack",
+    description: "Non-constant-time string comparison for secrets",
+    language: "typescript",
+    code: `app.post("/api/webhook", (req, res) => {
+  const signature = req.headers["x-webhook-signature"] as string;
+  const expected = computeHmac(req.body, process.env.WEBHOOK_SECRET!);
+  if (signature === expected) {
+    processWebhook(req.body);
+    res.json({ ok: true });
+  } else {
+    res.status(401).json({ error: "Invalid signature" });
+  }
+});`,
+    expectedRuleIds: ["AUTH-001", "SEC-001", "CYBER-001"],
+    category: "auth",
+    difficulty: "hard",
+  },
+
+  // ── Python pickle deserialization ──
+  {
+    id: "hard-python-pickle",
+    description: "Python pickle deserialization of untrusted data",
+    language: "python",
+    code: `import pickle
+import base64
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/load", methods=["POST"])
+def load_data():
+    encoded = request.form.get("data")
+    data = pickle.loads(base64.b64decode(encoded))
+    return str(data)`,
+    expectedRuleIds: ["CYBER-001", "CYBER-002"],
+    category: "injection",
+    difficulty: "hard",
+  },
+
+  // ── Go race condition with shared state ──
+  {
+    id: "hard-go-race-condition",
+    description: "Go HTTP handler with unsynchronized shared map",
+    language: "go",
+    code: `package main
+
+import (
+    "net/http"
+    "encoding/json"
+)
+
+var cache = make(map[string]string)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    key := r.URL.Query().Get("key")
+    if r.Method == "GET" {
+        json.NewEncoder(w).Encode(cache[key])
+    } else {
+        val := r.URL.Query().Get("val")
+        cache[key] = val
+        w.Write([]byte("ok"))
+    }
+}`,
+    expectedRuleIds: ["CONC-001"],
+    category: "concurrency",
+    difficulty: "hard",
+  },
+
+  // ── Java XXE ──
+  {
+    id: "hard-java-xxe",
+    description: "Java XML External Entity injection",
+    language: "java",
+    code: `import javax.xml.parsers.*;
+import org.w3c.dom.*;
+import javax.servlet.http.*;
+import java.io.*;
+
+public class XmlServlet extends HttpServlet {
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document doc = builder.parse(req.getInputStream());
+        String name = doc.getElementsByTagName("name").item(0).getTextContent();
+        resp.getWriter().write("Hello " + name);
+    }
+}`,
+    expectedRuleIds: ["CYBER-001", "CYBER-002", "SEC-001"],
+    category: "injection",
+    difficulty: "hard",
+  },
+
+  // ── C# SQL injection via dynamic LINQ ──
+  {
+    id: "hard-csharp-sql-injection",
+    description: "C# SQL injection via string interpolation in Entity Framework",
+    language: "csharp",
+    code: `using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+[ApiController]
+[Route("api/[controller]")]
+public class UsersController : ControllerBase
+{
+    private readonly AppDbContext _db;
+
+    [HttpGet("search")]
+    public async Task<IActionResult> Search(string query)
+    {
+        var users = await _db.Users
+            .FromSqlRaw($"SELECT * FROM Users WHERE Name LIKE '%{query}%'")
+            .ToListAsync();
+        return Ok(users);
+    }
+}`,
+    expectedRuleIds: ["CYBER-001", "CYBER-002"],
+    category: "injection",
+    difficulty: "hard",
+  },
+
+  // ── Rust unsafe memory access ──
+  {
+    id: "hard-rust-unsafe",
+    description: "Rust unsafe block with unchecked pointer arithmetic",
+    language: "rust",
+    code: `use std::io::Read;
+
+fn parse_packet(data: &[u8]) -> u64 {
+    unsafe {
+        let ptr = data.as_ptr();
+        let len_ptr = ptr.add(4) as *const u32;
+        let payload_len = *len_ptr as usize;
+        // No bounds check — could read past buffer
+        let value_ptr = ptr.add(8 + payload_len) as *const u64;
+        *value_ptr
+    }
+}`,
+    expectedRuleIds: ["CYBER-001", "SEC-001"],
+    category: "security",
+    difficulty: "hard",
+  },
+
+  // ── Clean code — hardened Node.js (hard negative) ──
+  {
+    id: "clean-code-hardened-node",
+    description: "Hardened Node.js service with CSP, rate-limit, validation, structured logging",
+    language: "typescript",
+    code: `import express from "express";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import { z } from "zod";
+import pino from "pino";
+import crypto from "crypto";
+
+const logger = pino({ level: "info" });
+const app = express();
+app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"] } } }));
+app.use(express.json({ limit: "1kb" }));
+app.use(rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true }));
+
+const LoginSchema = z.object({
+  email: z.string().email().max(254),
+  password: z.string().min(12).max(128),
+});
+
+app.post("/api/v1/login", async (req, res) => {
+  const parsed = LoginSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues });
+  const user = await db.users.findUnique({ where: { email: parsed.data.email } });
+  if (!user) return res.status(401).json({ error: "Invalid credentials" });
+  const valid = await argon2.verify(user.passwordHash, parsed.data.password);
+  if (!valid) { logger.warn({ email: parsed.data.email }, "Failed login"); return res.status(401).json({ error: "Invalid credentials" }); }
+  const token = crypto.randomBytes(32).toString("hex");
+  logger.info({ userId: user.id }, "Login success");
+  res.json({ token });
+});`,
+    expectedRuleIds: [],
+    unexpectedRuleIds: ["CYBER-001", "CYBER-002", "AUTH-001", "SEC-001", "RATE-001"],
+    category: "clean",
+    difficulty: "hard",
+  },
 ];
 
 // ─── Benchmark Runner ───────────────────────────────────────────────────────
@@ -1439,11 +1770,14 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
   const caseResults: CaseResult[] = [];
   const perCategory: Record<string, CategoryResult> = {};
   const perJudge: Record<string, JudgeBenchmarkResult> = {};
+  const perDifficulty: Record<string, DifficultyResult> = {};
 
   let totalTP = 0;
   let totalFN = 0;
   let totalFP = 0;
   let totalDetected = 0;
+  let totalStrictTP = 0;
+  let totalStrictFN = 0;
 
   for (const tc of testCases) {
     let findings: Finding[];
@@ -1460,7 +1794,7 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
 
     const foundRuleIds = [...new Set(findings.map((f) => f.ruleId))];
 
-    // Compute TP/FN/FP for this case
+    // Prefix-based matching (lenient — CYBER-001 matches any CYBER-*)
     const expectedPrefixes = new Set(tc.expectedRuleIds.map((r) => r.split("-")[0]));
     const detectedPrefixes = new Set(foundRuleIds.map((r) => r.split("-")[0]));
 
@@ -1481,6 +1815,11 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
         })
       : [];
 
+    // Strict matching (exact rule-ID: CYBER-001 only matches CYBER-001)
+    const foundRuleIdSet = new Set(foundRuleIds);
+    const strictMatchedExpected = tc.expectedRuleIds.filter((expected) => foundRuleIdSet.has(expected));
+    const strictMissedExpected = tc.expectedRuleIds.filter((expected) => !foundRuleIdSet.has(expected));
+
     const caseTP = matchedExpected.length;
     const caseFN = missedExpected.length;
     const caseFP = falsePositiveIds.length;
@@ -1490,6 +1829,15 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
     totalTP += caseTP;
     totalFN += caseFN;
     totalFP += caseFP;
+    totalStrictTP += strictMatchedExpected.length;
+    totalStrictFN += strictMissedExpected.length;
+
+    // Per-difficulty tracking
+    if (!perDifficulty[tc.difficulty]) {
+      perDifficulty[tc.difficulty] = { difficulty: tc.difficulty, total: 0, detected: 0, detectionRate: 0 };
+    }
+    perDifficulty[tc.difficulty].total++;
+    if (casePassed) perDifficulty[tc.difficulty].detected++;
 
     caseResults.push({
       caseId: tc.id,
@@ -1553,6 +1901,17 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
   const recall = totalTP + totalFN > 0 ? totalTP / (totalTP + totalFN) : 1;
   const f1Score = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
 
+  // Strict metrics (exact rule-ID matching)
+  const strictPrecision = totalStrictTP + totalFP > 0 ? totalStrictTP / (totalStrictTP + totalFP) : 1;
+  const strictRecall = totalStrictTP + totalStrictFN > 0 ? totalStrictTP / (totalStrictTP + totalStrictFN) : 1;
+  const strictF1Score =
+    strictPrecision + strictRecall > 0 ? (2 * strictPrecision * strictRecall) / (strictPrecision + strictRecall) : 0;
+
+  // Compute per-difficulty rates
+  for (const d of Object.values(perDifficulty)) {
+    d.detectionRate = d.total > 0 ? d.detected / d.total : 0;
+  }
+
   // Compute per-category metrics
   for (const cat of Object.values(perCategory)) {
     cat.precision =
@@ -1597,8 +1956,14 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
     recall,
     f1Score,
     detectionRate: testCases.length > 0 ? totalDetected / testCases.length : 0,
+    strictTruePositives: totalStrictTP,
+    strictFalseNegatives: totalStrictFN,
+    strictPrecision,
+    strictRecall,
+    strictF1Score,
     perCategory,
     perJudge,
+    perDifficulty,
     cases: caseResults,
   };
 }
@@ -1693,14 +2058,36 @@ export function formatBenchmarkReport(result: BenchmarkResult): string {
   lines.push(`  Version        : ${result.version}`);
   lines.push(`  Test Cases     : ${result.totalCases}`);
   lines.push(`  Detection Rate : ${(result.detectionRate * 100).toFixed(1)}%`);
-  lines.push(`  Precision      : ${(result.precision * 100).toFixed(1)}%`);
-  lines.push(`  Recall         : ${(result.recall * 100).toFixed(1)}%`);
-  lines.push(`  F1 Score       : ${(result.f1Score * 100).toFixed(1)}%`);
   lines.push("");
-  lines.push(`  True Positives  : ${result.truePositives}`);
-  lines.push(`  False Negatives : ${result.falseNegatives}`);
+  lines.push("  Prefix-Based Matching (lenient):");
+  lines.push(`    Precision    : ${(result.precision * 100).toFixed(1)}%`);
+  lines.push(`    Recall       : ${(result.recall * 100).toFixed(1)}%`);
+  lines.push(`    F1 Score     : ${(result.f1Score * 100).toFixed(1)}%`);
+  lines.push("");
+  lines.push("  Exact Rule-ID Matching (strict):");
+  lines.push(`    Precision    : ${(result.strictPrecision * 100).toFixed(1)}%`);
+  lines.push(`    Recall       : ${(result.strictRecall * 100).toFixed(1)}%`);
+  lines.push(`    F1 Score     : ${(result.strictF1Score * 100).toFixed(1)}%`);
+  lines.push("");
+  lines.push(`  True Positives  : ${result.truePositives} (strict: ${result.strictTruePositives})`);
+  lines.push(`  False Negatives : ${result.falseNegatives} (strict: ${result.strictFalseNegatives})`);
   lines.push(`  False Positives : ${result.falsePositives}`);
   lines.push("");
+
+  // Per-difficulty breakdown
+  if (result.perDifficulty && Object.keys(result.perDifficulty).length > 0) {
+    lines.push("  Per-Difficulty Detection Rates:");
+    lines.push("  " + "─".repeat(40));
+    for (const diff of ["easy", "medium", "hard"]) {
+      const d = result.perDifficulty[diff];
+      if (d) {
+        const rate = `${d.detected}/${d.total}`.padStart(6);
+        const pct = `${(d.detectionRate * 100).toFixed(1)}%`.padStart(6);
+        lines.push(`  ${diff.padEnd(10)} ${rate}  ${pct}`);
+      }
+    }
+    lines.push("");
+  }
 
   // Per-category breakdown
   lines.push("  Per-Category Results:");
@@ -1766,6 +2153,7 @@ USAGE:
 OPTIONS:
   --judge, -j <id>     Benchmark a single judge
   --output, -o <path>  Save results to JSON file
+  --save               Save results to benchmark-results.json
   --format <fmt>       Output: text, json
 
 CI GATE OPTIONS:
@@ -1783,6 +2171,7 @@ CI GATE OPTIONS:
   let outputPath: string | undefined;
   let format: "text" | "json" = "text";
   let gate = false;
+  let save = false;
   let minF1 = 0.6;
   let minPrecision = 0.5;
   let minRecall = 0.5;
@@ -1793,6 +2182,7 @@ CI GATE OPTIONS:
     const arg = argv[i];
     if (arg === "--judge" || arg === "-j") judgeId = argv[++i];
     else if (arg === "--output" || arg === "-o") outputPath = argv[++i];
+    else if (arg === "--save") save = true;
     else if (arg === "--format") format = argv[++i] as "text" | "json";
     else if (arg === "--gate") gate = true;
     else if (arg === "--min-f1") minF1 = parseFloat(argv[++i]);
@@ -1817,6 +2207,13 @@ CI GATE OPTIONS:
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
       writeFileSync(resolve(outputPath), JSON.stringify(result, null, 2), "utf-8");
       console.log(`\n  Results saved to: ${outputPath}`);
+    }
+
+    // Auto-save to benchmark-results.json
+    if (save && !outputPath) {
+      const savePath = resolve("benchmark-results.json");
+      writeFileSync(savePath, JSON.stringify(result, null, 2), "utf-8");
+      console.log(`\n  Results saved to: benchmark-results.json`);
     }
 
     // ── CI Gate ──

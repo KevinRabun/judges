@@ -37,6 +37,8 @@ export interface FeedbackEntry {
   title?: string;
   /** Finding severity at time of feedback */
   severity?: string;
+  /** Contributor identifier (username, email, etc.) for team aggregation */
+  contributor?: string;
 }
 
 export interface FeedbackStore {
@@ -85,6 +87,32 @@ export interface JudgeFeedbackStats {
   fp: number;
   wontfix: number;
   fpRate: number;
+}
+
+/**
+ * Team-wide aggregated feedback statistics from multiple contributors.
+ */
+export interface TeamFeedbackStats extends FeedbackStats {
+  /** Number of distinct feedback sources merged */
+  contributorCount: number;
+  /** Per-rule details including contributor consensus */
+  perRuleTeam: Map<string, RuleTeamStats>;
+  /** Rules where ≥2 contributors independently flagged as FP */
+  consensusFpRules: string[];
+  /** Rules where feedback is split (some say TP, others say FP) */
+  disputedRules: string[];
+}
+
+/**
+ * Per-rule stats with multi-contributor consensus data.
+ */
+export interface RuleTeamStats extends RuleFeedbackStats {
+  /** Number of distinct contributors who provided feedback for this rule */
+  contributors: number;
+  /** How many distinct contributors marked this rule as FP */
+  fpContributors: number;
+  /** Consensus strength: fpContributors / contributors (0-1) */
+  consensus: number;
 }
 
 // ─── Feedback Store Operations ──────────────────────────────────────────────
@@ -214,6 +242,159 @@ export function getFpRateByRule(store: FeedbackStore): Map<string, number> {
     }
   }
   return result;
+}
+
+// ─── Team-wide Feedback Aggregation ─────────────────────────────────────────
+
+/**
+ * Merge multiple feedback stores into a single aggregate store.
+ * Entries are deduplicated by {ruleId + verdict + timestamp + filePath}.
+ * Each source can be tagged with a contributor identifier.
+ */
+export function mergeFeedbackStores(stores: FeedbackStore[], contributorLabels?: string[]): FeedbackStore {
+  const merged = createEmptyStore();
+  const seen = new Set<string>();
+
+  for (let i = 0; i < stores.length; i++) {
+    const store = stores[i];
+    const label = contributorLabels?.[i];
+
+    for (const entry of store.entries) {
+      // Tag with contributor if not already set
+      const tagged = label && !entry.contributor ? { ...entry, contributor: label } : entry;
+
+      // Dedup key: ruleId + verdict + timestamp + filePath
+      const key = `${tagged.ruleId}::${tagged.verdict}::${tagged.timestamp}::${tagged.filePath || ""}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.entries.push(tagged);
+      }
+    }
+  }
+
+  merged.metadata.totalSubmissions = merged.entries.length;
+  merged.metadata.lastUpdated = new Date().toISOString();
+  return merged;
+}
+
+/**
+ * Compute team-wide feedback statistics with multi-contributor consensus.
+ * Identifies rules where multiple contributors independently flagged issues
+ * as FP (consensus) or where feedback is split between TP and FP (disputed).
+ */
+export function computeTeamFeedbackStats(store: FeedbackStore): TeamFeedbackStats {
+  const base = computeFeedbackStats(store);
+
+  // Track per-rule contributor data
+  const ruleContributors = new Map<string, Set<string>>();
+  const ruleFpContributors = new Map<string, Set<string>>();
+
+  for (const entry of store.entries) {
+    const contributor = entry.contributor || "anonymous";
+
+    const rc = ruleContributors.get(entry.ruleId) ?? new Set();
+    rc.add(contributor);
+    ruleContributors.set(entry.ruleId, rc);
+
+    if (entry.verdict === "fp") {
+      const fc = ruleFpContributors.get(entry.ruleId) ?? new Set();
+      fc.add(contributor);
+      ruleFpContributors.set(entry.ruleId, fc);
+    }
+  }
+
+  // Build per-rule team stats
+  const perRuleTeam = new Map<string, RuleTeamStats>();
+  for (const [ruleId, ruleStats] of base.perRule) {
+    const contributors = ruleContributors.get(ruleId)?.size ?? 1;
+    const fpContributors = ruleFpContributors.get(ruleId)?.size ?? 0;
+    perRuleTeam.set(ruleId, {
+      ...ruleStats,
+      contributors,
+      fpContributors,
+      consensus: contributors > 0 ? fpContributors / contributors : 0,
+    });
+  }
+
+  // Identify consensus FP rules (≥2 contributors independently flagged FP)
+  const consensusFpRules: string[] = [];
+  const disputedRules: string[] = [];
+
+  for (const [ruleId, teamStats] of perRuleTeam) {
+    if (teamStats.fpContributors >= 2) {
+      consensusFpRules.push(ruleId);
+    }
+    // Disputed: has both TP and FP verdicts from different contributors
+    if (teamStats.tp > 0 && teamStats.fp > 0 && teamStats.contributors >= 2) {
+      disputedRules.push(ruleId);
+    }
+  }
+
+  // Count distinct contributors across all entries
+  const allContributors = new Set(store.entries.map((e) => e.contributor || "anonymous"));
+
+  return {
+    ...base,
+    contributorCount: allContributors.size,
+    perRuleTeam,
+    consensusFpRules: consensusFpRules.sort(),
+    disputedRules: disputedRules.sort(),
+  };
+}
+
+/**
+ * Format team feedback stats as a human-readable summary.
+ */
+export function formatTeamStatsOutput(stats: TeamFeedbackStats): string {
+  const lines: string[] = [];
+
+  lines.push("╔══════════════════════════════════════════════════════════════╗");
+  lines.push("║        Judges Panel — Team Feedback Statistics              ║");
+  lines.push("╚══════════════════════════════════════════════════════════════╝");
+  lines.push("");
+  lines.push(`  Contributors       : ${stats.contributorCount}`);
+  lines.push(`  Total Feedback     : ${stats.total}`);
+  lines.push(`  True Positives     : ${stats.truePositives}`);
+  lines.push(`  False Positives    : ${stats.falsePositives}`);
+  lines.push(`  Won't Fix          : ${stats.wontFix}`);
+  lines.push(`  Team FP Rate       : ${(stats.falsePositiveRate * 100).toFixed(1)}%`);
+  lines.push("");
+
+  if (stats.consensusFpRules.length > 0) {
+    lines.push("  ⚠ Consensus FP Rules (≥2 contributors agree):");
+    lines.push("  " + "─".repeat(55));
+    for (const ruleId of stats.consensusFpRules) {
+      const rs = stats.perRuleTeam.get(ruleId)!;
+      lines.push(
+        `    ${ruleId.padEnd(12)} ${rs.fpContributors}/${rs.contributors} contributors flagged FP (${(rs.fpRate * 100).toFixed(0)}% FP rate)`,
+      );
+    }
+    lines.push("");
+  }
+
+  if (stats.disputedRules.length > 0) {
+    lines.push("  ⚡ Disputed Rules (mixed TP/FP verdicts):");
+    lines.push("  " + "─".repeat(55));
+    for (const ruleId of stats.disputedRules) {
+      const rs = stats.perRuleTeam.get(ruleId)!;
+      lines.push(`    ${ruleId.padEnd(12)} ${rs.tp}tp / ${rs.fp}fp from ${rs.contributors} contributors`);
+    }
+    lines.push("");
+  }
+
+  if (stats.perJudge.size > 0) {
+    lines.push("  Per-Judge FP Rates:");
+    lines.push("  " + "─".repeat(55));
+    const sorted = [...stats.perJudge.values()].sort((a, b) => b.fpRate - a.fpRate);
+    for (const j of sorted) {
+      const prefix = j.judgePrefix.padEnd(12);
+      const rate = `${(j.fpRate * 100).toFixed(1)}%`.padStart(6);
+      lines.push(`  ${prefix} FP: ${rate}   (${j.tp}tp / ${j.fp}fp / ${j.wontfix}wf)`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
 }
 
 // ─── CLI Command ────────────────────────────────────────────────────────────

@@ -36,13 +36,24 @@ export type {
   PlainLanguageFinding,
   WorkflowTask,
   PolicyProfile,
+  SuppressionRecord,
+  SuppressionResult,
 } from "./types.js";
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
 export { JudgesError, ConfigError, EvaluationError, ParseError } from "./errors.js";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
-export { parseConfig, defaultConfig, mergeConfigs, discoverCascadingConfigs, loadCascadingConfig } from "./config.js";
+export {
+  parseConfig,
+  defaultConfig,
+  mergeConfigs,
+  discoverCascadingConfigs,
+  loadCascadingConfig,
+  loadPluginJudges,
+  validatePluginSpecifiers,
+  isValidJudgeDefinition,
+} from "./config.js";
 
 // ─── Judge Registry ──────────────────────────────────────────────────────────
 export { JUDGES, getJudge, getJudgeSummaries } from "./judges/index.js";
@@ -57,12 +68,16 @@ export {
   analyzeDependencies,
   enrichWithPatches,
   crossEvaluatorDedup,
+  diffFindings,
+  formatFindingDiff,
   applyInlineSuppressions,
+  applyInlineSuppressionsWithAudit,
   runAppBuilderWorkflow,
   formatVerdictAsMarkdown,
   formatEvaluationAsMarkdown,
   clearEvaluationCaches,
 } from "./evaluators/index.js";
+export type { FindingDiff } from "./evaluators/index.js";
 
 // ─── V2 Policy-Aware API ────────────────────────────────────────────────────
 export { evaluateCodeV2, evaluateProjectV2, getSupportedPolicyProfiles } from "./evaluators/v2.js";
@@ -118,8 +133,23 @@ export { buildCalibrationProfile, calibrateFindings, autoCalibrateFindings } fro
 export type { CalibrationProfile } from "./calibration.js";
 
 // ─── Feedback ────────────────────────────────────────────────────────────────
-export { loadFeedbackStore, saveFeedbackStore, computeFeedbackStats, getFpRateByRule } from "./commands/feedback.js";
-export type { FeedbackEntry, FeedbackStore, FeedbackVerdict, FeedbackStats } from "./commands/feedback.js";
+export {
+  loadFeedbackStore,
+  saveFeedbackStore,
+  computeFeedbackStats,
+  getFpRateByRule,
+  mergeFeedbackStores,
+  computeTeamFeedbackStats,
+  formatTeamStatsOutput,
+} from "./commands/feedback.js";
+export type {
+  FeedbackEntry,
+  FeedbackStore,
+  FeedbackVerdict,
+  FeedbackStats,
+  TeamFeedbackStats,
+  RuleTeamStats,
+} from "./commands/feedback.js";
 
 // ─── Fix History / Learning ──────────────────────────────────────────────────
 export {
@@ -132,6 +162,16 @@ export {
   getLowAcceptanceRules,
 } from "./fix-history.js";
 export type { FixOutcome, FixHistory, FixStats } from "./fix-history.js";
+
+// ─── Custom Rule Testing ────────────────────────────────────────────────────
+export {
+  testRule,
+  runRuleTests,
+  validateRuleTestSuite,
+  formatRuleTestResults,
+  deserializeRule,
+} from "./commands/rule.js";
+export type { RuleTestCase, RuleTestResult, RuleTestSuiteResult } from "./commands/rule.js";
 
 // ─── IDE Diagnostics ─────────────────────────────────────────────────────────
 export {
@@ -166,7 +206,52 @@ export type { BenchmarkResult, BenchmarkGateOptions, BenchmarkGateResult } from 
 
 // ─── Language Packs ──────────────────────────────────────────────────────────
 export { getLanguagePack, listLanguagePacks, suggestPack, LANGUAGE_PACKS } from "./commands/language-packs.js";
+// ─── Doctor Diagnostics ──────────────────────────────────────────────────
+export {
+  runDoctorChecks,
+  formatDoctorReport,
+  checkNodeVersion,
+  checkConfigFile,
+  checkJudgesLoaded,
+  checkPlugins,
+  checkFeedbackStore,
+  checkBaselineFile,
+  checkPresets,
+} from "./commands/doctor.js";
+export type { DoctorCheck, DoctorReport, CheckStatus } from "./commands/doctor.js";
 
+// ─── Language Coverage ──────────────────────────────────────────────────────
+export { computeLanguageCoverage, formatCoverageReport, detectFileLanguage } from "./commands/coverage.js";
+export type { LanguageCoverageReport, LanguageCoverageEntry } from "./commands/coverage.js";
+
+// ─── Finding Snapshots & Trends ─────────────────────────────────────────────
+export {
+  createSnapshotStore,
+  loadSnapshotStore,
+  saveSnapshotStore,
+  recordSnapshot,
+  computeTrend,
+  formatTrendReport,
+} from "./commands/snapshot.js";
+export type { FindingSnapshot, SnapshotStore, TrendPoint, TrendReport } from "./commands/snapshot.js";
+
+// ─── Rule Hit Metrics ───────────────────────────────────────────────────────
+export { findJudgeForRule, computeRuleHitMetrics, formatRuleHitReport } from "./commands/rule-metrics.js";
+export type { RuleHitEntry, RuleHitMetrics } from "./commands/rule-metrics.js";
+
+// ─── Project Auto-Detection ─────────────────────────────────────────────────
+export {
+  detectLanguages,
+  detectFrameworksFromFiles,
+  classifyProjectType,
+  detectCI,
+  detectMonorepo,
+  detectProjectSignals,
+  recommendPreset,
+  formatProjectSummary,
+  formatRecommendation,
+} from "./commands/auto-detect.js";
+export type { ProjectSignals, ProjectType, PresetRecommendation } from "./commands/auto-detect.js";
 // ─── Smart Output ────────────────────────────────────────────────────────────
 export { formatSmartOutput, formatSmartSingleJudge } from "./commands/smart-output.js";
 export type { SmartOutputOptions } from "./commands/smart-output.js";

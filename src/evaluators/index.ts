@@ -13,6 +13,8 @@ import type {
   Verdict,
   MustFixGateOptions,
   JudgesConfig,
+  SuppressionRecord,
+  SuppressionResult,
 } from "../types.js";
 import { JUDGES } from "../judges/index.js";
 import { analyzeStructure } from "../ast/index.js";
@@ -40,6 +42,8 @@ import { evaluateMustFixGate, clampConfidence, applyConfidenceThreshold, isAbsen
 import { enrichWithPatches } from "../patches/index.js";
 import { crossEvaluatorDedup, severityRank } from "../dedup.js";
 import { filterFalsePositiveHeuristics } from "./false-positive-review.js";
+import { buildCalibrationProfile, calibrateFindings, loadCalibrationProfile } from "../calibration.js";
+import type { CalibrationOptions, CalibrationProfile } from "../calibration.js";
 
 // ─── Individual Analyzers ────────────────────────────────────────────────────
 // NOTE: Analyzer functions are now registered directly on each JudgeDefinition
@@ -71,6 +75,18 @@ export interface EvaluationOptions {
    * single file — the missing capability may exist in another module.
    */
   projectMode?: boolean;
+  /**
+   * Additional judges loaded from plugins (via config.plugins).
+   * These are appended to the built-in JUDGES array before evaluation.
+   */
+  pluginJudges?: JudgeDefinition[];
+  /**
+   * Enable feedback-driven confidence calibration.
+   * When true, loads the feedback store and adjusts finding confidence
+   * based on historical FP rates. Set to a CalibrationOptions object
+   * for fine-grained control (minSamples, maxReduction, maxBoost).
+   */
+  calibrate?: boolean | CalibrationOptions;
   /** @internal — pre-computed AST structure for the file (set by evaluateWithTribunal) */
   _astCache?: CodeStructure;
   /** @internal — pre-computed taint flows for the file (set by evaluateWithTribunal) */
@@ -258,54 +274,103 @@ function findMatchingTaintFlows(finding: Finding, flowsBySinkLine: Map<number, T
 // ── Inline suppression comment support ──────────────────────────────────────
 
 /**
- * Scan source code for inline `// judges-ignore RULE-ID` or
- * `// judges-ignore-next-line RULE-ID` comments. Returns a set of suppressed
- * {ruleId, line} pairs and a set of globally suppressed rule IDs.
+ * Metadata captured per suppression directive during parsing.
+ */
+interface SuppressionDirective {
+  /** Normalised rule ID (uppercased) or "*" */
+  ruleId: string;
+  /** Type of directive that created this suppression */
+  kind: "line" | "next-line" | "block" | "file";
+  /** 1-based line number of the suppression comment itself */
+  commentLine: number;
+  /** Optional reason text extracted from the comment */
+  reason?: string;
+}
+
+/**
+ * Parsed result of inline suppression comments in source code.
+ *
+ * Supports five directive styles:
+ *   // judges-ignore RULE-ID              → suppress on same line
+ *   // judges-ignore-next-line RULE-ID    → suppress on the next line
+ *   // judges-ignore-block RULE-ID        → suppress until matching end
+ *   // judges-end-block                   → ends block suppression
+ *   // judges-file-ignore RULE-ID         → suppress across entire file
+ *
+ * All directive styles also accept # and /* comment prefixes for
+ * Python/YAML/CSS compatibility.
+ *
+ * An optional reason can be appended after " -- ":
+ *   // judges-ignore SEC-001 -- legacy code, tracked in JIRA-123
  */
 function parseInlineSuppressions(code: string): {
-  lineSuppressed: Map<number, Set<string>>;
-  globalSuppressed: Set<string>;
+  lineSuppressed: Map<number, SuppressionDirective[]>;
+  globalSuppressed: SuppressionDirective[];
 } {
   const lines = code.split("\n");
-  const lineSuppressed = new Map<number, Set<string>>();
-  const globalSuppressed = new Set<string>();
+  const lineSuppressed = new Map<number, SuppressionDirective[]>();
+  const globalSuppressed: SuppressionDirective[] = [];
 
-  // Pattern: // judges-ignore RULE-ID [, RULE-ID ...]
-  //          // judges-ignore-next-line RULE-ID [, RULE-ID ...]
-  //          # judges-ignore RULE-ID  (Python, YAML, etc.)
-  const suppressPattern = /(?:\/\/|#|\/\*)\s*judges-ignore(?:-next-line)?\s+([\w*,\s-]+)/gi;
-  const isNextLine = /judges-ignore-next-line/i;
+  // Active block suppressions: ruleId → { commentLine, reason }
+  const activeBlocks = new Map<string, { commentLine: number; reason?: string }>();
+
+  // Pattern: // judges-ignore[-next-line|-block] RULE-ID [, RULE-ID ...] [-- reason]
+  const suppressPattern =
+    /(?:\/\/|#|\/\*)\s*judges-ignore(?:-(next-line|block))?\s+([\w*,\s-]+?)(?:\s+--\s+(.+?))?(?:\s*\*\/)?$/gi;
+  const endBlockPattern = /(?:\/\/|#|\/\*)\s*judges-end-block/i;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const lineNum = i + 1; // 1-indexed
+
+    // Check for block-end
+    if (endBlockPattern.test(line)) {
+      activeBlocks.clear();
+    }
+
+    // Apply any active block suppressions to this line
+    for (const [ruleId, meta] of activeBlocks) {
+      const arr = lineSuppressed.get(lineNum) ?? [];
+      arr.push({ ruleId, kind: "block", commentLine: meta.commentLine, reason: meta.reason });
+      lineSuppressed.set(lineNum, arr);
+    }
+
+    // Parse suppression directives
     let match;
     suppressPattern.lastIndex = 0;
     while ((match = suppressPattern.exec(line)) !== null) {
-      const ruleIds = match[1].split(/[,\s]+/).filter(Boolean);
-      const targetLine = isNextLine.test(match[0]) ? i + 2 : i + 1; // 1-indexed
+      const modifier = match[1]?.toLowerCase(); // "next-line", "block", or undefined
+      const ruleIds = match[2].split(/[,\s]+/).filter(Boolean);
+      const reason = match[3]?.trim() || undefined;
 
-      for (const ruleId of ruleIds) {
-        if (ruleId === "*") {
-          // Wildcard: suppress all rules on this line
-          const set = lineSuppressed.get(targetLine) ?? new Set();
-          set.add("*");
-          lineSuppressed.set(targetLine, set);
+      const kind: SuppressionDirective["kind"] =
+        modifier === "next-line" ? "next-line" : modifier === "block" ? "block" : "line";
+      const targetLine = kind === "next-line" ? lineNum + 1 : lineNum;
+
+      for (const rawId of ruleIds) {
+        const ruleId = rawId === "*" ? "*" : rawId.toUpperCase();
+
+        if (kind === "block") {
+          // Start block suppression — applies to all subsequent lines until end-block
+          activeBlocks.set(ruleId, { commentLine: lineNum, reason });
         } else {
-          const set = lineSuppressed.get(targetLine) ?? new Set();
-          set.add(ruleId.toUpperCase());
-          lineSuppressed.set(targetLine, set);
+          const arr = lineSuppressed.get(targetLine) ?? [];
+          arr.push({ ruleId, kind, commentLine: lineNum, reason });
+          lineSuppressed.set(targetLine, arr);
         }
       }
     }
 
-    // File-level suppression: // judges-file-ignore RULE-ID
-    const filePattern = /(?:\/\/|#|\/\*)\s*judges-file-ignore\s+([\w*,\s-]+)/gi;
+    // File-level suppression: // judges-file-ignore RULE-ID [-- reason]
+    const filePattern = /(?:\/\/|#|\/\*)\s*judges-file-ignore\s+([\w*,\s-]+?)(?:\s+--\s+(.+?))?(?:\s*\*\/)?$/gi;
     let fileMatch;
     filePattern.lastIndex = 0;
     while ((fileMatch = filePattern.exec(line)) !== null) {
       const ruleIds = fileMatch[1].split(/[,\s]+/).filter(Boolean);
-      for (const ruleId of ruleIds) {
-        globalSuppressed.add(ruleId === "*" ? "*" : ruleId.toUpperCase());
+      const reason = fileMatch[2]?.trim() || undefined;
+      for (const rawId of ruleIds) {
+        const ruleId = rawId === "*" ? "*" : rawId.toUpperCase();
+        globalSuppressed.push({ ruleId, kind: "file", commentLine: lineNum, reason });
       }
     }
   }
@@ -314,53 +379,103 @@ function parseInlineSuppressions(code: string): {
 }
 
 /**
- * Filter findings based on inline suppression comments in the source code.
+ * Check whether a rule ID matches a set of suppression directives.
+ * Supports exact match, wildcard "*", and prefix wildcards like "AUTH-*".
  */
-export function applyInlineSuppressions(findings: Finding[], code: string): Finding[] {
+function matchesSuppression(ruleUpper: string, directives: SuppressionDirective[]): SuppressionDirective | undefined {
+  for (const d of directives) {
+    if (d.ruleId === "*" || d.ruleId === ruleUpper) {
+      return d;
+    }
+    if (d.ruleId.endsWith("-*") && ruleUpper.startsWith(d.ruleId.slice(0, -1))) {
+      return d;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Apply inline suppression comments and return both filtered findings
+ * and a full audit trail of what was suppressed.
+ */
+export function applyInlineSuppressionsWithAudit(findings: Finding[], code: string): SuppressionResult {
   const { lineSuppressed, globalSuppressed } = parseInlineSuppressions(code);
 
-  if (lineSuppressed.size === 0 && globalSuppressed.size === 0) {
-    return findings;
+  if (lineSuppressed.size === 0 && globalSuppressed.length === 0) {
+    return { findings, suppressed: [] };
   }
 
-  return findings.filter((f) => {
+  const kept: Finding[] = [];
+  const suppressed: SuppressionRecord[] = [];
+
+  for (const f of findings) {
     const ruleUpper = f.ruleId.toUpperCase();
 
     // Check file-level suppression
-    if (globalSuppressed.has("*") || globalSuppressed.has(ruleUpper)) {
-      return false;
-    }
-    // Check prefix wildcards: "AUTH-*" suppresses "AUTH-001"
-    for (const suppressed of globalSuppressed) {
-      if (suppressed.endsWith("-*") && ruleUpper.startsWith(suppressed.slice(0, -1))) {
-        return false;
-      }
+    const globalMatch = matchesSuppression(ruleUpper, globalSuppressed);
+    if (globalMatch) {
+      suppressed.push({
+        ruleId: f.ruleId,
+        severity: f.severity,
+        title: f.title,
+        kind: globalMatch.kind,
+        commentLine: globalMatch.commentLine,
+        findingLines: f.lineNumbers,
+        reason: globalMatch.reason,
+      });
+      continue;
     }
 
     // Check line-level suppressions
+    let wasLineSuppressed = false;
     if (f.lineNumbers && f.lineNumbers.length > 0) {
       for (const lineNum of f.lineNumbers) {
-        const suppressed = lineSuppressed.get(lineNum);
-        if (suppressed) {
-          if (suppressed.has("*") || suppressed.has(ruleUpper)) {
-            return false;
-          }
-          for (const s of suppressed) {
-            if (s.endsWith("-*") && ruleUpper.startsWith(s.slice(0, -1))) {
-              return false;
-            }
+        const directives = lineSuppressed.get(lineNum);
+        if (directives) {
+          const lineMatch = matchesSuppression(ruleUpper, directives);
+          if (lineMatch) {
+            suppressed.push({
+              ruleId: f.ruleId,
+              severity: f.severity,
+              title: f.title,
+              kind: lineMatch.kind,
+              commentLine: lineMatch.commentLine,
+              findingLines: f.lineNumbers,
+              reason: lineMatch.reason,
+            });
+            wasLineSuppressed = true;
+            break;
           }
         }
       }
     }
 
-    return true;
-  });
+    if (!wasLineSuppressed) {
+      kept.push(f);
+    }
+  }
+
+  return { findings: kept, suppressed };
+}
+
+/**
+ * Filter findings based on inline suppression comments in the source code.
+ * Drop-in backward-compatible wrapper around `applyInlineSuppressionsWithAudit`.
+ */
+export function applyInlineSuppressions(findings: Finding[], code: string): Finding[] {
+  return applyInlineSuppressionsWithAudit(findings, code).findings;
 }
 
 function resolveJudgeSet(options?: EvaluationOptions): JudgeDefinition[] {
   const includeAstFindings = options?.includeAstFindings ?? true;
   let judges = includeAstFindings ? JUDGES : JUDGES.filter((judge) => judge.id !== "code-structure");
+
+  // Append plugin judges if provided
+  if (options?.pluginJudges && options.pluginJudges.length > 0) {
+    const builtInIds = new Set(judges.map((j) => j.id));
+    const uniquePlugins = options.pluginJudges.filter((j) => !builtInIds.has(j.id));
+    judges = [...judges, ...uniquePlugins];
+  }
 
   // Apply config-based judge filtering
   if (options?.config?.disabledJudges && options.config.disabledJudges.length > 0) {
@@ -433,7 +548,10 @@ export function evaluateWithJudge(
     : frameworkAware;
 
   // ── Inline suppression: respect // judges-ignore RULE-ID comments ──
-  const unsuppressed = applyInlineSuppressions(refinedFindings, code);
+  const { findings: unsuppressed, suppressed: suppressionRecords } = applyInlineSuppressionsWithAudit(
+    refinedFindings,
+    code,
+  );
 
   // ── Auto-fix patches: attach machine-applicable patches where possible ──
   const patchEnriched = enrichWithPatches(unsuppressed, code);
@@ -451,6 +569,7 @@ export function evaluateWithJudge(
     score,
     summary,
     findings: configFiltered,
+    suppressions: suppressionRecords.length > 0 ? suppressionRecords : undefined,
   };
 }
 
@@ -541,8 +660,26 @@ export function evaluateWithTribunal(
     enrichedOptions?.filePath,
   );
   const configFiltered = applyConfig(fpFiltered, options?.config);
+
+  // ── Feedback-driven confidence calibration ──
+  // When options.calibrate is set, load the feedback store and adjust
+  // confidence scores based on historical FP rates.
+  let calibrated = configFiltered;
+  if (enrichedOptions.calibrate) {
+    try {
+      const calOpts: CalibrationOptions | undefined =
+        typeof enrichedOptions.calibrate === "object" ? enrichedOptions.calibrate : undefined;
+      const profile = loadCalibrationProfile(calOpts);
+      if (profile.isActive) {
+        calibrated = calibrateFindings(calibrated, profile, calOpts);
+      }
+    } catch {
+      // Calibration failure is non-fatal — continue with uncalibrated findings
+    }
+  }
+
   const maxFindings = options?.maxFindingsPerFile ?? DEFAULT_MAX_FINDINGS_PER_FILE;
-  const cappedFindings = applyPerFileFindingCap(configFiltered, maxFindings);
+  const cappedFindings = applyPerFileFindingCap(calibrated, maxFindings);
 
   // ── Confidence-based tiering for progressive disclosure ──
   // Tag each finding with a disclosure tier so downstream consumers (CLI,
@@ -566,6 +703,9 @@ export function evaluateWithTribunal(
       ? `\n\n## Must-Fix Gate\n\n- Status: **${mustFixGate.triggered ? "TRIGGERED" : "PASS"}**\n- Minimum confidence: **${Math.round(mustFixGate.minConfidence * 100)}%**\n- Matched findings: **${mustFixGate.matchedCount}**\n- Matched rule IDs: ${mustFixGate.matchedRuleIds.length > 0 ? mustFixGate.matchedRuleIds.map((id: string) => `\`${id}\``).join(", ") : "none"}\n`
       : "");
 
+  // ── Aggregate suppression audit trail across all judges ──
+  const allSuppressions = evaluations.flatMap((e) => e.suppressions ?? []);
+
   return {
     overallVerdict: effectiveVerdict,
     overallScore,
@@ -576,6 +716,7 @@ export function evaluateWithTribunal(
     highCount,
     timestamp: new Date().toISOString(),
     mustFixGate,
+    ...(allSuppressions.length > 0 ? { suppressions: allSuppressions } : {}),
   };
 }
 
@@ -648,4 +789,5 @@ export function runAppBuilderWorkflow(
 
 export { formatVerdictAsMarkdown, formatEvaluationAsMarkdown };
 export { enrichWithPatches } from "../patches/index.js";
-export { crossEvaluatorDedup, crossFileDedup } from "../dedup.js";
+export { crossEvaluatorDedup, crossFileDedup, diffFindings, formatFindingDiff } from "../dedup.js";
+export type { FindingDiff } from "../dedup.js";

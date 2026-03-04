@@ -61,6 +61,37 @@ export interface Finding {
 }
 
 /**
+ * Audit record for a suppressed finding — captures what was suppressed,
+ * how (which directive type), and where the suppression comment lives.
+ */
+export interface SuppressionRecord {
+  /** The ruleId that was suppressed (e.g. "SEC-001") */
+  ruleId: string;
+  /** The severity of the suppressed finding */
+  severity: Severity;
+  /** The title of the suppressed finding */
+  title: string;
+  /** Which type of suppression directive matched */
+  kind: "line" | "next-line" | "block" | "file";
+  /** 1-based line number where the suppression comment appears */
+  commentLine: number;
+  /** 1-based line number(s) of the suppressed finding */
+  findingLines?: number[];
+  /** Optional reason provided in the suppression comment */
+  reason?: string;
+}
+
+/**
+ * Result of applying inline suppressions with full audit trail.
+ */
+export interface SuppressionResult {
+  /** Findings that survived suppression */
+  findings: Finding[];
+  /** Audit trail of all suppressed findings */
+  suppressed: SuppressionRecord[];
+}
+
+/**
  * A structured, machine-applicable patch describing an exact text replacement
  * within a source file.
  */
@@ -129,6 +160,16 @@ export interface JudgesConfig {
   include?: string[];
   /** Maximum number of files to analyze in directory mode */
   maxFiles?: number;
+  /** Named preset to apply as a base (e.g. "strict", "security-only,performance") */
+  preset?: string;
+  /** Exit with code 1 when verdict is fail — useful for CI pipelines */
+  failOnFindings?: boolean;
+  /** Path to a baseline JSON file — findings matching the baseline are suppressed */
+  baseline?: string;
+  /** Default output format */
+  format?: "text" | "json" | "sarif" | "markdown" | "html" | "junit" | "codeclimate";
+  /** Plugin module specifiers to load custom judges (npm packages or relative paths) */
+  plugins?: string[];
 }
 
 // ─── Project / Multi-file Types ──────────────────────────────────────────────
@@ -408,6 +449,8 @@ export interface JudgeEvaluation {
   summary: string;
   /** List of specific findings */
   findings: Finding[];
+  /** Audit trail of findings suppressed by inline comments for this judge */
+  suppressions?: SuppressionRecord[];
 }
 
 /**
@@ -431,6 +474,8 @@ export interface TribunalVerdict {
   timestamp: string;
   /** Optional high-confidence must-fix gate outcome */
   mustFixGate?: MustFixGateResult;
+  /** Audit trail of inline-suppressed findings (present when suppressions exist) */
+  suppressions?: SuppressionRecord[];
 }
 
 /**

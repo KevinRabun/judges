@@ -262,7 +262,7 @@ runs:
         echo "| High | $HIGH |" >> "$GITHUB_STEP_SUMMARY"
         echo "" >> "$GITHUB_STEP_SUMMARY"
 
-    - name: Post PR review comments
+    - name: Post PR review comments (with dedup)
       if: inputs.pr-review == 'true' && github.event_name == 'pull_request'
       shell: bash
       env:
@@ -276,7 +276,7 @@ runs:
           exit 0
         fi
 
-        # Generate PR review comments from findings using the GitHub API
+        # Dismiss previous Judges reviews + post deduped findings
         node -e "
           const https = require('https');
           const fs = require('fs');
@@ -287,76 +287,227 @@ runs:
             return (f.verdict?.findings || []).map(v => ({ ...v, _file: filePath }));
           });
 
-          if (findings.length === 0) {
-            console.log('No findings to post as PR comments.');
-            process.exit(0);
-          }
-
           const repo = process.env.GITHUB_REPOSITORY;
           const prNumber = process.env.PR_NUMBER;
           const token = process.env.GITHUB_TOKEN;
 
-          // Map severity to emoji
-          const severityIcon = { critical: '🔴', high: '🟠', medium: '🟡', low: '🔵' };
+          // ── Helper: promisified HTTPS request ──
+          function ghApi(method, path, body) {
+            return new Promise((resolve, reject) => {
+              const payload = body ? JSON.stringify(body) : '';
+              const opts = {
+                hostname: 'api.github.com',
+                path: path,
+                method: method,
+                headers: {
+                  'Authorization': 'Bearer ' + token,
+                  'Accept': 'application/vnd.github.v3+json',
+                  'User-Agent': 'judges-action',
+                  'Content-Type': 'application/json',
+                  ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
+                },
+              };
+              const req = https.request(opts, (res) => {
+                let data = '';
+                res.on('data', (chunk) => data += chunk);
+                res.on('end', () => resolve({ status: res.statusCode, data: data ? JSON.parse(data) : null }));
+              });
+              req.on('error', reject);
+              if (payload) req.write(payload);
+              req.end();
+            });
+          }
 
-          // Build review comments (max 50 to avoid API limits)
-          const comments = [];
-          for (const f of findings.slice(0, 50)) {
+          async function run() {
+            // ── Step 1: Dismiss previous Judges reviews to avoid duplicates ──
+            try {
+              const reviewsRes = await ghApi('GET', '/repos/' + repo + '/pulls/' + prNumber + '/reviews');
+              if (reviewsRes.status === 200 && Array.isArray(reviewsRes.data)) {
+                const judgesReviews = reviewsRes.data.filter(r =>
+                  r.body && r.body.includes('Judges Code Review') &&
+                  (r.state === 'COMMENTED' || r.state === 'CHANGES_REQUESTED')
+                );
+                for (const review of judgesReviews) {
+                  try {
+                    await ghApi('PUT', '/repos/' + repo + '/pulls/' + prNumber + '/reviews/' + review.id + '/dismissals', {
+                      message: 'Superseded by new Judges analysis run',
+                    });
+                    console.log('Dismissed previous Judges review #' + review.id);
+                  } catch (e) {
+                    // Dismissal requires maintainer permission — skip silently
+                    console.log('Could not dismiss review #' + review.id + ' (may lack permissions)');
+                  }
+                }
+              }
+            } catch (e) {
+              console.log('Could not fetch existing reviews: ' + e.message);
+            }
+
+            if (findings.length === 0) {
+              console.log('No findings to post as PR comments.');
+              return;
+            }
+
+            // Map severity to emoji
+            const severityIcon = { critical: '🔴', high: '🟠', medium: '🟡', low: '🔵' };
+
+            // ── Step 2: Build deduped review comments (max 50) ──
+            // Dedup key: ruleId + file + line — prevents identical comments on unchanged lines
+            const seen = new Set();
+            const comments = [];
+            for (const f of findings) {
+              if (comments.length >= 50) break;
+
+              const filePath = f._file || f.filePath || results.filePath || '';
+              const line = (f.lineNumbers && f.lineNumbers[0]) || 1;
+              if (!filePath) continue;
+
+              const dedupKey = f.ruleId + '::' + filePath + '::' + line;
+              if (seen.has(dedupKey)) continue;
+              seen.add(dedupKey);
+
+              const icon = severityIcon[f.severity] || '⚪';
+              let body = icon + ' **' + f.severity.toUpperCase() + '** \`' + f.ruleId + '\`: ' + f.title + '\n\n';
+              body += f.description + '\n\n';
+              if (f.recommendation) body += '**Recommendation:** ' + f.recommendation + '\n\n';
+              if (f.suggestedFix) body += '**Suggested Fix:**\n\`\`\`\n' + f.suggestedFix + '\n\`\`\`\n';
+              if (f.reference) body += '📚 ' + f.reference + '\n';
+
+              comments.push({ path: filePath, line: line, body: body });
+            }
+
+            if (comments.length === 0) {
+              console.log('No comments with file paths to post.');
+              return;
+            }
+
+            // ── Step 3: Post new review ──
+            const reviewRes = await ghApi('POST', '/repos/' + repo + '/pulls/' + prNumber + '/reviews', {
+              event: findings.some(f => f.severity === 'critical') ? 'REQUEST_CHANGES' : 'COMMENT',
+              body: '## 🔍 Judges Code Review\n\nFound **' + findings.length + '** finding(s). See inline comments below.\n\n' +
+                (findings.length > 50 ? '> ⚠️ Showing top 50 of ' + findings.length + ' findings.\n' : ''),
+              comments: comments,
+            });
+
+            if (reviewRes.status >= 200 && reviewRes.status < 300) {
+              console.log('✅ Posted PR review with ' + comments.length + ' inline comment(s)');
+            } else {
+              console.error('⚠️ PR review API returned ' + reviewRes.status + ': ' + JSON.stringify(reviewRes.data));
+            }
+          }
+
+          run().catch(e => console.error('⚠️ PR review failed:', e.message));
+        "
+
+    - name: Create Check Run with annotations
+      if: always() && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        set -euo pipefail
+
+        if [ ! -f judges-results.json ]; then
+          echo "No results file found — skipping Check Run"
+          exit 0
+        fi
+
+        # Create a GitHub Check Run with inline annotations for each finding
+        node -e "
+          const https = require('https');
+          const fs = require('fs');
+
+          const results = JSON.parse(fs.readFileSync('judges-results.json', 'utf8'));
+          const findings = results.findings || (results.files || []).flatMap(f => {
+            const filePath = f.file || '';
+            return (f.verdict?.findings || []).map(v => ({ ...v, _file: filePath }));
+          });
+
+          const repo = process.env.GITHUB_REPOSITORY;
+          const headSha = process.env.HEAD_SHA;
+          const token = process.env.GITHUB_TOKEN;
+
+          function ghApi(method, path, body) {
+            return new Promise((resolve, reject) => {
+              const payload = body ? JSON.stringify(body) : '';
+              const opts = {
+                hostname: 'api.github.com',
+                path: path,
+                method: method,
+                headers: {
+                  'Authorization': 'Bearer ' + token,
+                  'Accept': 'application/vnd.github.v3+json',
+                  'User-Agent': 'judges-action',
+                  'Content-Type': 'application/json',
+                  ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
+                },
+              };
+              const req = https.request(opts, (res) => {
+                let data = '';
+                res.on('data', (chunk) => data += chunk);
+                res.on('end', () => resolve({ status: res.statusCode, data: data ? JSON.parse(data) : null }));
+              });
+              req.on('error', reject);
+              if (payload) req.write(payload);
+              req.end();
+            });
+          }
+
+          // Map severity → annotation level
+          const levelMap = { critical: 'failure', high: 'failure', medium: 'warning', low: 'notice' };
+
+          // Build annotations (Check Runs API allows max 50 per call)
+          const annotations = [];
+          const seen = new Set();
+          for (const f of findings) {
+            if (annotations.length >= 50) break;
             const filePath = f._file || f.filePath || results.filePath || '';
             const line = (f.lineNumbers && f.lineNumbers[0]) || 1;
             if (!filePath) continue;
 
-            const icon = severityIcon[f.severity] || '⚪';
-            let body = icon + ' **' + f.severity.toUpperCase() + '** \`' + f.ruleId + '\`: ' + f.title + '\n\n';
-            body += f.description + '\n\n';
-            if (f.recommendation) body += '**Recommendation:** ' + f.recommendation + '\n\n';
-            if (f.suggestedFix) body += '**Suggested Fix:**\n\`\`\`\n' + f.suggestedFix + '\n\`\`\`\n';
-            if (f.reference) body += '📚 ' + f.reference + '\n';
+            const dedupKey = f.ruleId + '::' + filePath + '::' + line;
+            if (seen.has(dedupKey)) continue;
+            seen.add(dedupKey);
 
-            comments.push({ path: filePath, line: line, body: body });
-          }
-
-          if (comments.length === 0) {
-            console.log('No comments with file paths to post.');
-            process.exit(0);
-          }
-
-          // Post as a PR review via the GitHub API
-          const reviewBody = JSON.stringify({
-            event: findings.some(f => f.severity === 'critical') ? 'REQUEST_CHANGES' : 'COMMENT',
-            body: '## 🔍 Judges Code Review\n\nFound **' + findings.length + '** finding(s). See inline comments below.\n\n' +
-              (findings.length > 50 ? '> ⚠️ Showing top 50 of ' + findings.length + ' findings.\n' : ''),
-            comments: comments,
-          });
-
-          const options = {
-            hostname: 'api.github.com',
-            path: '/repos/' + repo + '/pulls/' + prNumber + '/reviews',
-            method: 'POST',
-            headers: {
-              'Authorization': 'Bearer ' + token,
-              'Accept': 'application/vnd.github.v3+json',
-              'User-Agent': 'judges-action',
-              'Content-Type': 'application/json',
-              'Content-Length': Buffer.byteLength(reviewBody),
-            },
-          };
-
-          const req = https.request(options, (res) => {
-            let data = '';
-            res.on('data', (chunk) => data += chunk);
-            res.on('end', () => {
-              if (res.statusCode >= 200 && res.statusCode < 300) {
-                console.log('✅ Posted PR review with ' + comments.length + ' inline comment(s)');
-              } else {
-                console.error('⚠️ PR review API returned ' + res.statusCode + ': ' + data);
-                // Don't fail the action — review comments are best-effort
-              }
+            annotations.push({
+              path: filePath,
+              start_line: line,
+              end_line: line,
+              annotation_level: levelMap[f.severity] || 'notice',
+              title: f.ruleId + ': ' + f.title,
+              message: f.description + (f.recommendation ? '\n\nRecommendation: ' + f.recommendation : ''),
+              raw_details: f.suggestedFix || undefined,
             });
-          });
-          req.on('error', (e) => console.error('⚠️ PR review request failed:', e.message));
-          req.write(reviewBody);
-          req.end();
+          }
+
+          const verdict = (results.verdict || results.overallVerdict || 'unknown').toUpperCase();
+          const score = results.score || results.overallScore || results.worstScore || 0;
+          const critCount = findings.filter(f => f.severity === 'critical').length;
+          const highCount = findings.filter(f => f.severity === 'high').length;
+          const conclusion = (critCount > 0 || highCount > 0) ? 'failure' : (findings.length > 0 ? 'neutral' : 'success');
+
+          async function run() {
+            const checkRes = await ghApi('POST', '/repos/' + repo + '/check-runs', {
+              name: 'Judges Code Review',
+              head_sha: headSha,
+              status: 'completed',
+              conclusion: conclusion,
+              output: {
+                title: verdict + ' — Score ' + score + '/100',
+                summary: '**' + findings.length + '** finding(s): ' + critCount + ' critical, ' + highCount + ' high\n\nSee annotations below for details.',
+                annotations: annotations,
+              },
+            });
+
+            if (checkRes.status >= 200 && checkRes.status < 300) {
+              console.log('✅ Created Check Run with ' + annotations.length + ' annotation(s) — ' + conclusion);
+            } else {
+              console.error('⚠️ Check Run API returned ' + checkRes.status + ': ' + JSON.stringify(checkRes.data));
+            }
+          }
+
+          run().catch(e => console.error('⚠️ Check Run creation failed:', e.message));
         "
 
     - name: Upload SARIF to GitHub Code Scanning

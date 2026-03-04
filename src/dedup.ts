@@ -414,3 +414,135 @@ export function crossFileDedup(fileFindings: Array<{ path: string; findings: Fin
 
   return result;
 }
+
+// ─── Finding Diff Between Runs ──────────────────────────────────────────────
+
+/**
+ * Diff result comparing two sets of findings.
+ */
+export interface FindingDiff {
+  /** Findings present in current but not in previous (new issues) */
+  newFindings: Finding[];
+  /** Findings present in previous but not in current (resolved) */
+  fixedFindings: Finding[];
+  /** Findings present in both runs */
+  recurringFindings: Finding[];
+  /** Summary statistics */
+  stats: {
+    totalPrevious: number;
+    totalCurrent: number;
+    newCount: number;
+    fixedCount: number;
+    recurringCount: number;
+    /** Net change: positive means more findings, negative means fewer */
+    delta: number;
+  };
+}
+
+/**
+ * Generate a stable key for a finding to match across runs.
+ * Uses ruleId + file path + first line number for identity.
+ */
+function findingDiffKey(f: Finding, filePath?: string): string {
+  const path = filePath || f.filePath || "";
+  const line = f.lineNumbers?.[0] ?? 0;
+  return `${f.ruleId}::${path}::${line}`;
+}
+
+/**
+ * Compare two sets of findings to identify new, fixed, and recurring issues.
+ * Useful for tracking regression between evaluation runs.
+ *
+ * @param previous  - Findings from the previous run
+ * @param current   - Findings from the current run
+ * @param filePath  - Optional file path context (used when findings lack filePath)
+ * @returns Diff with new, fixed, and recurring findings plus stats
+ */
+export function diffFindings(previous: Finding[], current: Finding[], filePath?: string): FindingDiff {
+  const prevKeys = new Map<string, Finding>();
+  for (const f of previous) {
+    prevKeys.set(findingDiffKey(f, filePath), f);
+  }
+
+  const currKeys = new Map<string, Finding>();
+  for (const f of current) {
+    currKeys.set(findingDiffKey(f, filePath), f);
+  }
+
+  const newFindings: Finding[] = [];
+  const recurringFindings: Finding[] = [];
+  const fixedFindings: Finding[] = [];
+
+  for (const [key, f] of currKeys) {
+    if (prevKeys.has(key)) {
+      recurringFindings.push(f);
+    } else {
+      newFindings.push(f);
+    }
+  }
+
+  for (const [key, f] of prevKeys) {
+    if (!currKeys.has(key)) {
+      fixedFindings.push(f);
+    }
+  }
+
+  return {
+    newFindings,
+    fixedFindings,
+    recurringFindings,
+    stats: {
+      totalPrevious: previous.length,
+      totalCurrent: current.length,
+      newCount: newFindings.length,
+      fixedCount: fixedFindings.length,
+      recurringCount: recurringFindings.length,
+      delta: current.length - previous.length,
+    },
+  };
+}
+
+/**
+ * Format a finding diff as human-readable text.
+ */
+export function formatFindingDiff(diff: FindingDiff): string {
+  const lines: string[] = [];
+
+  lines.push("╔══════════════════════════════════════════════════════════════╗");
+  lines.push("║              Judges Panel — Finding Diff                    ║");
+  lines.push("╚══════════════════════════════════════════════════════════════╝");
+  lines.push("");
+  lines.push(`  Previous run  : ${diff.stats.totalPrevious} finding(s)`);
+  lines.push(`  Current run   : ${diff.stats.totalCurrent} finding(s)`);
+  lines.push(`  Delta         : ${diff.stats.delta >= 0 ? "+" : ""}${diff.stats.delta}`);
+  lines.push("");
+
+  if (diff.newFindings.length > 0) {
+    lines.push(`  🆕 New Findings (${diff.stats.newCount}):`);
+    lines.push("  " + "─".repeat(55));
+    for (const f of diff.newFindings) {
+      lines.push(`    ${f.ruleId.padEnd(12)} [${f.severity}] ${f.title} (line ${f.lineNumbers?.[0] ?? "?"})`);
+    }
+    lines.push("");
+  }
+
+  if (diff.fixedFindings.length > 0) {
+    lines.push(`  ✅ Fixed Findings (${diff.stats.fixedCount}):`);
+    lines.push("  " + "─".repeat(55));
+    for (const f of diff.fixedFindings) {
+      lines.push(`    ${f.ruleId.padEnd(12)} [${f.severity}] ${f.title} (line ${f.lineNumbers?.[0] ?? "?"})`);
+    }
+    lines.push("");
+  }
+
+  if (diff.recurringFindings.length > 0) {
+    lines.push(`  🔄 Recurring Findings (${diff.stats.recurringCount}):`);
+    lines.push("  " + "─".repeat(55));
+    for (const f of diff.recurringFindings) {
+      lines.push(`    ${f.ruleId.padEnd(12)} [${f.severity}] ${f.title} (line ${f.lineNumbers?.[0] ?? "?"})`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}

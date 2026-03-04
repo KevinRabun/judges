@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.0] — 2026-03-05
+
+### Added
+- **Doctor diagnostics** — New `judges doctor` command provides healthcheck of Node version, config, plugins, baseline, and feedback store; available via CLI `--json` flag
+- **Language coverage report** — `judges coverage` analyzes which project languages are covered by the 37-judge panel
+- **Finding trend tracking** — Snapshot persistence and trend analysis (improving/stable/regressing) for tracking code quality over time
+- **Rule hit metrics** — Identify noisy and silent rules to tune judge configuration
+- **Project auto-detection** — Init wizard now auto-detects languages, frameworks, and project type; recommends optimal preset with confidence scoring
+
+### Changed
+- **Core engine** — 16 strategic gap implementations: expanded benchmarks, 104 patch rules, V2 baselines, suppression audit trail, team feedback, rule test assertions, calibration pipeline, finding diff, and more; see [core CHANGELOG](../CHANGELOG.md) for full details
+- **1982 tests passing** across all test suites
+
 ## [3.22.1] — 2026-03-04
 
 ### Fixed

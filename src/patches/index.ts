@@ -686,6 +686,253 @@ const PATCH_RULES: Array<{
       return { oldText: m[0], newText: `${m[1]}// SAFETY: TODO: document why unsafe is needed\n${m[1]}unsafe {` };
     },
   },
+
+  // ── Hardcoded Secrets ──
+  // Hardcoded password/secret → environment variable
+  {
+    match: /hardcoded.*password|password.*literal|hardcoded.*secret|hardcoded.*credential/i,
+    generate: (line) => {
+      const m = line.match(/(password|passwd|pwd|secret)\s*[:=]\s*(["'])([^"']{4,})\2/i);
+      if (!m) return null;
+      const envVar = m[1].toUpperCase();
+      return { oldText: `${m[2]}${m[3]}${m[2]}`, newText: `process.env.${envVar} || ${m[2]}${m[2]}` };
+    },
+  },
+  // Hardcoded API key → environment variable
+  {
+    match: /hardcoded.*api.?key|api.?key.*hardcoded|hardcoded.*token|secret.*key.*literal/i,
+    generate: (line) => {
+      const m = line.match(/(api_?[Kk]ey|api_?[Tt]oken|auth_?[Tt]oken|access_?[Tt]oken)\s*[:=]\s*(["'])([^"']{8,})\2/i);
+      if (!m) return null;
+      const normalized = m[1].toUpperCase().replace(/([a-z])([A-Z])/g, "$1_$2");
+      return { oldText: `${m[2]}${m[3]}${m[2]}`, newText: `process.env.${normalized} || ${m[2]}${m[2]}` };
+    },
+  },
+
+  // ── Path Traversal ──
+  {
+    match: /path.*traversal|directory.*traversal|path.*manipulation/i,
+    generate: (line) => {
+      const m = line.match(/path\.join\s*\(([^,]+),\s*(\w+)\s*\)/);
+      if (!m) return null;
+      return {
+        oldText: m[0],
+        newText: `path.resolve(${m[1]}, path.basename(${m[2]})) /* TODO: validate no traversal */`,
+      };
+    },
+  },
+
+  // ── Open Redirect ──
+  {
+    match: /open.*redirect|unvalidat.*redirect|redirect.*user.*input/i,
+    generate: (line) => {
+      const m = line.match(/(res\.redirect\s*\(\s*)(req\.(?:query|params|body)\.\w+)\s*\)/);
+      if (!m) return null;
+      return {
+        oldText: m[0],
+        newText: `${m[1]}/* TODO: validate against allowlist */ new URL(${m[2]}, \`\${req.protocol}://\${req.get("host")}\`).pathname)`,
+      };
+    },
+  },
+
+  // ── Timing-Safe Comparison ──
+  {
+    match: /timing.*attack|constant.*time.*compar|timing.*safe/i,
+    generate: (line) => {
+      const m = line.match(/([\w.]+)\s*===?\s*([\w.]*(?:secret|token|key|hash|digest|signature)[\w.]*)/i);
+      if (!m) return null;
+      return {
+        oldText: m[0],
+        newText: `crypto.timingSafeEqual(Buffer.from(String(${m[1]})), Buffer.from(String(${m[2]})))`,
+      };
+    },
+  },
+
+  // ── Error Information Leakage ──
+  {
+    match: /error.*leak|stack.*trace.*expos|error.*information.*disclos|sensitive.*error/i,
+    generate: (line) => {
+      const m = line.match(/(res\.(?:send|json)\s*\(\s*(?:err|error))\.stack\b/);
+      if (!m) return null;
+      return { oldText: `${m[1]}.stack`, newText: `${m[1]}.message || "Internal server error"` };
+    },
+  },
+
+  // ── Link Security ──
+  // target="_blank" without rel="noopener"
+  {
+    match: /noopener|reverse.*tabnab|target.*blank.*rel/i,
+    generate: (line) => {
+      const m = line.match(/(target\s*=\s*["']_blank["'])(?!.*rel\s*=)/);
+      if (!m) return null;
+      return { oldText: m[1], newText: `${m[1]} rel="noopener noreferrer"` };
+    },
+  },
+
+  // ── Password Hashing ──
+  {
+    match: /bcrypt.*rounds|salt.*rounds|weak.*hash.*factor|low.*cost.*factor/i,
+    generate: (line) => {
+      const m = line.match(/(bcrypt\.(?:hash|genSalt)\s*\(\s*\w+\s*,\s*)(\d+)/);
+      if (!m) return null;
+      if (parseInt(m[2]) >= 10) return null;
+      return { oldText: m[0], newText: `${m[1]}12` };
+    },
+  },
+
+  // ── Log Injection ──
+  {
+    match: /log.*inject|logging.*untrusted|unsanit.*log/i,
+    generate: (line) => {
+      const m = line.match(/((?:console|logger)\.\w+\s*\(\s*)(req\.(?:body|query|params)\.\w+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}String(${m[2]}).replace(/[\\n\\r]/g, ""))` };
+    },
+  },
+
+  // ── Python: f-string in SQL execute ──
+  {
+    match: /sql.*injection.*f.?string|f.?string.*sql|python.*sql.*inject/i,
+    generate: (line) => {
+      const m = line.match(/\.execute\s*\(\s*f(["'])/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `.execute(/* TODO: use parameterized query with %s placeholders */ f${m[1]}` };
+    },
+  },
+
+  // ── Python: Flask debug mode ──
+  {
+    match: /flask.*debug|debug.*production.*flask/i,
+    generate: (line) => {
+      const m = line.match(/(app\.run\s*\([^)]*debug\s*=\s*)True/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}os.environ.get("FLASK_DEBUG", "False") == "True"` };
+    },
+  },
+
+  // ── Python: bare except clause ──
+  {
+    match: /bare.*except|broad.*except|generic.*except.*clause/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)except\s*:/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}except Exception:  # TODO: use specific exception` };
+    },
+  },
+
+  // ── Python: hardcoded Flask secret key ──
+  {
+    match: /flask.*secret.*key|hardcoded.*secret.*key/i,
+    generate: (line) => {
+      const m = line.match(
+        /((?:app\.)?(?:config\s*\[\s*["']SECRET_KEY["']\s*\]\s*=|secret_key\s*=)\s*)(["'])([^"']+)\2/i,
+      );
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}os.environ.get("SECRET_KEY", secrets.token_hex(32))` };
+    },
+  },
+
+  // ── Python: insecure tempfile ──
+  {
+    match: /insecure.*temp|tempfile.*mktemp|predictable.*temp/i,
+    generate: (line) => {
+      const m = line.match(/tempfile\.mktemp\s*\(/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "tempfile.mkstemp(" };
+    },
+  },
+
+  // ── File Permissions ──
+  {
+    match: /insecure.*permission|chmod.*777|file.*permission.*broad|overly.*permissive/i,
+    generate: (line) => {
+      const mShell = line.match(/chmod\s+(777|666)\b/);
+      if (mShell) return { oldText: mShell[0], newText: `chmod ${mShell[1] === "777" ? "750" : "640"}` };
+      const mPy = line.match(/os\.chmod\s*\(\s*(\w+)\s*,\s*0o(777|666)\s*\)/);
+      if (mPy) return { oldText: mPy[0], newText: `os.chmod(${mPy[1]}, 0o${mPy[2] === "777" ? "750" : "640"})` };
+      return null;
+    },
+  },
+
+  // ── Go: unchecked error ──
+  {
+    match: /unchecked.*error|error.*not.*checked|ignored.*error.*return/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)\w+\s*,\s*_\s*:?=\s*/);
+      if (!m) return null;
+      return { oldText: ", _", newText: ", err" };
+    },
+  },
+
+  // ── Java: catching generic Exception ──
+  {
+    match: /catch.*generic.*exception|broad.*exception.*catch|catching.*exception.*instead/i,
+    generate: (line) => {
+      const m = line.match(/catch\s*\(\s*Exception\s+(\w+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `catch (/* TODO: use specific exception type */ Exception ${m[1]})` };
+    },
+  },
+
+  // ── Hardcoded Port ──
+  {
+    match: /hardcoded.*port|port.*hardcoded|magic.*number.*port/i,
+    generate: (line) => {
+      const m = line.match(/(\.listen\s*\(\s*)(\d{4,5})\s*([,)])/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}parseInt(process.env.PORT || "${m[2]}")${m[3]}` };
+    },
+  },
+
+  // ── Prototype Pollution ──
+  {
+    match: /prototype.*pollut|__proto__.*inject|property.*inject/i,
+    generate: (line) => {
+      const m = line.match(/(\w+)\[(\w+)\]\s*=\s*/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `/* TODO: validate key is not __proto__, constructor, or prototype */ ${m[0]}` };
+    },
+  },
+
+  // ── SSRF Prevention ──
+  {
+    match: /ssrf|server.?side.*request.*forg|unvalidat.*url.*fetch/i,
+    generate: (line) => {
+      const m = line.match(/((?:fetch|axios\.get|http\.get|got)\s*\(\s*)([\w.]+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}/* TODO: validate URL against allowlist to prevent SSRF */ ${m[2]})` };
+    },
+  },
+
+  // ── Mass Assignment ──
+  {
+    match: /mass.*assign|over.?post|unfiltered.*body|object.*spread.*request/i,
+    generate: (line) => {
+      const m = line.match(/(\.create\s*\(\s*)req\.body\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}{ /* TODO: allowlist specific fields */ ...req.body })` };
+    },
+  },
+
+  // ── HTML Sanitization ──
+  {
+    match: /xss.*sanitiz|unsanit.*html|html.*inject.*user/i,
+    generate: (line) => {
+      const m = line.match(/(\.innerHTML\s*=\s*)(\w+)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}DOMPurify.sanitize(${m[2]})` };
+    },
+  },
+
+  // ── Security Headers / Helmet ──
+  {
+    match: /missing.*helmet|security.*header.*missing|no.*security.*middleware/i,
+    generate: (line) => {
+      const m = line.match(/(const\s+app\s*=\s*express\s*\(\s*\)\s*;?)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[0]} /* TODO: add app.use(helmet()) for security headers */` };
+    },
+  },
 ];
 
 /**
@@ -827,6 +1074,178 @@ const MULTI_LINE_PATCH_RULES: MultiLinePatchRule[] = [
       const [, indent, from, image, alias] = m;
       const oldText = line;
       const newText = `${indent}# TODO: pin to a specific version for reproducibility\n${indent}${from}${image}:lts-slim${alias || ""}`;
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Express app without helmet → add helmet middleware ──
+  {
+    match: /missing.*helmet|security.*headers.*middleware|no.*helmet/i,
+    contextLines: 5,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)(const\s+app\s*=\s*express\s*\(\s*\)\s*;?\s*)$/);
+      if (!m) return null;
+      const [, indent, appInit] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}const helmet = require("helmet"); /* TODO: npm install helmet */`,
+        `${indent}${appInit}`,
+        `${indent}app.use(helmet());`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Missing rate limiting → add express-rate-limit middleware ──
+  {
+    match: /rate.*limit.*missing|no.*rate.*limit|missing.*rate.*limit/i,
+    contextLines: 5,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)(const\s+app\s*=\s*express\s*\(\s*\)\s*;?\s*)$/);
+      if (!m) return null;
+      const [, indent, appInit] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}const rateLimit = require("express-rate-limit"); /* TODO: npm install express-rate-limit */`,
+        `${indent}${appInit}`,
+        `${indent}app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── String concatenation SQL → parameterized query (Node.js) ──
+  {
+    match: /sql.*inject|sql.*concatenat|string.*concat.*query/i,
+    contextLines: 3,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)([\w.]+\.query\s*\(\s*)(["'`])(.+?)\3\s*\+\s*(\w+)\s*\)/);
+      if (!m) return null;
+      const [, indent, queryCall, quote, sql, param] = m;
+      const oldText = line;
+      const newText = `${indent}${queryCall}${quote}${sql}$1${quote}, [${param}])`;
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Error handler leaking stack trace → sanitized response ──
+  {
+    match: /error.*handler.*leak|stack.*trace.*response|error.*detail.*client/i,
+    contextLines: 6,
+    generate: (windowLines, windowStart) => {
+      for (let i = 0; i < windowLines.length; i++) {
+        const line = windowLines[i];
+        if (!line.match(/app\.use\s*\(\s*\(\s*(?:err|error)\s*,\s*req\s*,\s*res\s*,\s*next\s*\)/)) continue;
+        const indent = line.match(/^(\s*)/)?.[1] || "";
+        for (let j = i + 1; j < Math.min(i + 8, windowLines.length); j++) {
+          const bodyLine = windowLines[j];
+          if (bodyLine.match(/res\.(?:json|send)\s*\(\s*\{[^}]*(?:stack|trace)/)) {
+            const oldText = bodyLine;
+            const newText = `${indent}  res.status(err.status || 500).json({ error: process.env.NODE_ENV === "production" ? "Internal server error" : err.message });`;
+            return { oldText, newText, startLine: windowStart + j, endLine: windowStart + j };
+          }
+        }
+      }
+      return null;
+    },
+  },
+
+  // ── Missing input validation → add schema guard ──
+  {
+    match: /input.*validation.*missing|no.*input.*valid|request.*body.*unvalid/i,
+    contextLines: 3,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(
+        /^(\s*)(app\.(?:post|put|patch)\s*\(\s*["'][^"']+["']\s*,\s*(?:async\s*)?\(\s*req\s*,\s*res\s*\)\s*=>\s*\{)\s*$/,
+      );
+      if (!m) return null;
+      const [, indent, handler] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}${handler}`,
+        `${indent}  /* TODO: add input validation (e.g. Zod, Joi, or express-validator) */`,
+        `${indent}  if (!req.body || typeof req.body !== "object") { return res.status(400).json({ error: "Invalid request body" }); }`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Python: bare except with pass → specific exception with logging ──
+  {
+    match: /bare.*except|broad.*except.*python|pokemon.*except/i,
+    contextLines: 4,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)except\s*:\s*$/);
+      if (!m) return null;
+      const indent = m[1];
+      const nextIdx = idx + 1;
+      if (nextIdx < windowLines.length && windowLines[nextIdx].match(/^\s*pass\s*$/)) {
+        const oldText = windowLines.slice(idx, nextIdx + 1).join("\n");
+        const newText = `${indent}except Exception as e:  # TODO: use specific exception\n${indent}    logging.exception("Unexpected error: %s", e)`;
+        return { oldText, newText, startLine: findingLine, endLine: windowStart + nextIdx };
+      }
+      const oldText = line;
+      const newText = `${indent}except Exception as e:  # TODO: use specific exception`;
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Go HTTP server without timeout → add timeouts ──
+  {
+    match: /http.*server.*timeout|missing.*timeout.*server|server.*no.*timeout/i,
+    contextLines: 3,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)((?:srv|server|s)\s*:?=\s*&http\.Server\s*\{)\s*$/);
+      if (!m) return null;
+      const [, indent, serverInit] = m;
+      const rest = windowLines.slice(idx + 1, idx + 6).join("\n");
+      if (/ReadTimeout|WriteTimeout/.test(rest)) return null;
+      const oldText = line;
+      const newText = [
+        `${indent}${serverInit}`,
+        `${indent}\tReadTimeout:  15 * time.Second,`,
+        `${indent}\tWriteTimeout: 15 * time.Second,`,
+        `${indent}\tIdleTimeout:  60 * time.Second,`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Missing CORS configuration → proper CORS setup ──
+  {
+    match: /cors.*not.*config|missing.*cors|cors.*missing/i,
+    contextLines: 5,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)(const\s+app\s*=\s*express\s*\(\s*\)\s*;?\s*)$/);
+      if (!m) return null;
+      const [, indent, appInit] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}const cors = require("cors"); /* TODO: npm install cors */`,
+        `${indent}${appInit}`,
+        `${indent}app.use(cors({ origin: process.env.ALLOWED_ORIGIN || "http://localhost:3000", credentials: true }));`,
+      ].join("\n");
       return { oldText, newText, startLine: findingLine, endLine: findingLine };
     },
   },

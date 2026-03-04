@@ -5,10 +5,13 @@
 
 import { existsSync, readFileSync } from "fs";
 import { resolve, dirname, join } from "path";
-import type { JudgesConfig, Severity } from "./types.js";
+import type { JudgesConfig, Severity, JudgeDefinition } from "./types.js";
+import type { JudgesPlugin } from "./plugins.js";
+import { registerPlugin } from "./plugins.js";
 import { ConfigError } from "./errors.js";
 
 const VALID_SEVERITIES = new Set<Severity>(["critical", "high", "medium", "low", "info"]);
+const VALID_FORMATS = new Set(["text", "json", "sarif", "markdown", "html", "junit", "codeclimate"]);
 
 /**
  * Parse a JSON string into a JudgesConfig, with validation.
@@ -86,6 +89,72 @@ export function parseConfig(jsonStr: string): JudgesConfig {
     config.ruleOverrides = overrides;
   }
 
+  // exclude
+  if (obj.exclude !== undefined) {
+    if (!Array.isArray(obj.exclude) || !obj.exclude.every((e: unknown) => typeof e === "string")) {
+      throw new ConfigError('Invalid .judgesrc: "exclude" must be an array of strings');
+    }
+    config.exclude = obj.exclude as string[];
+  }
+
+  // include
+  if (obj.include !== undefined) {
+    if (!Array.isArray(obj.include) || !obj.include.every((e: unknown) => typeof e === "string")) {
+      throw new ConfigError('Invalid .judgesrc: "include" must be an array of strings');
+    }
+    config.include = obj.include as string[];
+  }
+
+  // maxFiles
+  if (obj.maxFiles !== undefined) {
+    if (typeof obj.maxFiles !== "number" || !Number.isInteger(obj.maxFiles) || obj.maxFiles < 1) {
+      throw new ConfigError('Invalid .judgesrc: "maxFiles" must be an integer >= 1');
+    }
+    config.maxFiles = obj.maxFiles;
+  }
+
+  // preset
+  if (obj.preset !== undefined) {
+    if (typeof obj.preset !== "string") {
+      throw new ConfigError('Invalid .judgesrc: "preset" must be a string');
+    }
+    config.preset = obj.preset;
+  }
+
+  // failOnFindings
+  if (obj.failOnFindings !== undefined) {
+    if (typeof obj.failOnFindings !== "boolean") {
+      throw new ConfigError('Invalid .judgesrc: "failOnFindings" must be a boolean');
+    }
+    config.failOnFindings = obj.failOnFindings;
+  }
+
+  // baseline
+  if (obj.baseline !== undefined) {
+    if (typeof obj.baseline !== "string") {
+      throw new ConfigError('Invalid .judgesrc: "baseline" must be a string (file path)');
+    }
+    config.baseline = obj.baseline;
+  }
+
+  // format
+  if (obj.format !== undefined) {
+    if (typeof obj.format !== "string" || !VALID_FORMATS.has(obj.format)) {
+      throw new ConfigError(
+        'Invalid .judgesrc: "format" must be one of text, json, sarif, markdown, html, junit, codeclimate',
+      );
+    }
+    config.format = obj.format as JudgesConfig["format"];
+  }
+
+  // plugins
+  if (obj.plugins !== undefined) {
+    if (!Array.isArray(obj.plugins) || !obj.plugins.every((p: unknown) => typeof p === "string")) {
+      throw new ConfigError('Invalid .judgesrc: "plugins" must be an array of strings (module specifiers)');
+    }
+    config.plugins = obj.plugins as string[];
+  }
+
   return config;
 }
 
@@ -141,8 +210,9 @@ export function discoverCascadingConfigs(startDir: string, rootDir?: string): Ju
 
 /**
  * Merge multiple configs (root → leaf order). Later entries override earlier.
- * Arrays (disabledRules, disabledJudges, languages, exclude, include) are
- * concatenated (union). Scalars (minSeverity, maxFiles) use the leaf value.
+ * Arrays (disabledRules, disabledJudges, languages, exclude, include, plugins) are
+ * concatenated (union). Scalars (minSeverity, maxFiles, preset, failOnFindings,
+ * baseline, format) use the leaf value.
  * ruleOverrides are deep-merged.
  */
 export function mergeConfigs(...configs: JudgesConfig[]): JudgesConfig {
@@ -165,10 +235,17 @@ export function mergeConfigs(...configs: JudgesConfig[]): JudgesConfig {
     if (cfg.include) {
       merged.include = [...new Set([...(merged.include ?? []), ...cfg.include])];
     }
+    if (cfg.plugins) {
+      merged.plugins = [...new Set([...(merged.plugins ?? []), ...cfg.plugins])];
+    }
 
     // Scalars: leaf wins
     if (cfg.minSeverity !== undefined) merged.minSeverity = cfg.minSeverity;
     if (cfg.maxFiles !== undefined) merged.maxFiles = cfg.maxFiles;
+    if (cfg.preset !== undefined) merged.preset = cfg.preset;
+    if (cfg.failOnFindings !== undefined) merged.failOnFindings = cfg.failOnFindings;
+    if (cfg.baseline !== undefined) merged.baseline = cfg.baseline;
+    if (cfg.format !== undefined) merged.format = cfg.format;
 
     // Deep-merge ruleOverrides
     if (cfg.ruleOverrides) {
@@ -187,4 +264,138 @@ export function loadCascadingConfig(filePath: string, rootDir?: string): JudgesC
   const dir = dirname(resolve(filePath));
   const configs = discoverCascadingConfigs(dir, rootDir);
   return configs.length > 0 ? mergeConfigs(...configs) : {};
+}
+
+// ─── Plugin Loading ─────────────────────────────────────────────────────────
+
+/**
+ * Validate that a value looks like a JudgeDefinition.
+ * Checks required string fields (id, name, domain, description, systemPrompt,
+ * rulePrefix) and an optional analyze function.
+ */
+export function isValidJudgeDefinition(val: unknown): val is JudgeDefinition {
+  if (typeof val !== "object" || val === null) return false;
+  const obj = val as Record<string, unknown>;
+  return (
+    typeof obj.id === "string" &&
+    typeof obj.name === "string" &&
+    typeof obj.domain === "string" &&
+    typeof obj.description === "string" &&
+    typeof obj.systemPrompt === "string" &&
+    typeof obj.rulePrefix === "string" &&
+    (obj.analyze === undefined || typeof obj.analyze === "function")
+  );
+}
+
+/**
+ * Validate that a value looks like a JudgesPlugin.
+ */
+function isValidPlugin(val: unknown): val is JudgesPlugin {
+  if (typeof val !== "object" || val === null) return false;
+  const obj = val as Record<string, unknown>;
+  return typeof obj.name === "string" && typeof obj.version === "string";
+}
+
+/**
+ * Load and register plugins from module specifiers declared in config.
+ *
+ * Each plugin is a module specifier (npm package name or relative/absolute
+ * file path) that must export one of:
+ *   - `default: JudgesPlugin`       — a full plugin object (name, version, judges, rules, hooks)
+ *   - `plugin: JudgesPlugin`        — named export
+ *   - `judges: JudgeDefinition[]`   — an array of judge definitions (auto-wrapped)
+ *   - `default: JudgeDefinition[]`  — default export as an array (auto-wrapped)
+ *
+ * Plugins that export a full JudgesPlugin object are registered via
+ * registerPlugin() to enable hooks, custom rules, and full lifecycle.
+ * Simple judge arrays are wrapped into a minimal plugin automatically.
+ *
+ * @param pluginSpecifiers - Array of module specifiers from config.plugins
+ * @param baseDir - Base directory for resolving relative paths
+ * @param logError - Optional error logger (defaults to console.error)
+ * @returns Array of plugin judge definitions that were loaded
+ */
+export async function loadPluginJudges(
+  pluginSpecifiers: string[],
+  baseDir?: string,
+  logError: (msg: string) => void = console.error,
+): Promise<JudgeDefinition[]> {
+  const loaded: JudgeDefinition[] = [];
+
+  for (const specifier of pluginSpecifiers) {
+    try {
+      // Resolve relative paths against baseDir
+      const resolvedSpec =
+        specifier.startsWith(".") || specifier.startsWith("/")
+          ? resolve(baseDir ?? process.cwd(), specifier)
+          : specifier;
+
+      // Dynamic import the module
+      const mod = (await import(resolvedSpec)) as Record<string, unknown>;
+
+      // Strategy 1: Full JudgesPlugin export (best — gets hooks, rules, etc.)
+      const pluginObj = isValidPlugin(mod.default) ? mod.default : isValidPlugin(mod.plugin) ? mod.plugin : null;
+      if (pluginObj) {
+        const reg = registerPlugin(pluginObj);
+        if (pluginObj.judges) {
+          loaded.push(...pluginObj.judges);
+        }
+        if (!reg.rulesRegistered && !reg.judgesRegistered) {
+          logError(`Plugin "${specifier}": registered but has no rules or judges`);
+        }
+        continue;
+      }
+
+      // Strategy 2: Bare JudgeDefinition array — wrap into a minimal plugin
+      let candidates: unknown[] = [];
+      if (Array.isArray(mod.judges)) {
+        candidates = mod.judges;
+      } else if (Array.isArray(mod.default)) {
+        candidates = mod.default;
+      }
+
+      const validJudges = candidates.filter(isValidJudgeDefinition);
+      if (validJudges.length > 0) {
+        registerPlugin({
+          name: specifier,
+          version: "0.0.0",
+          judges: validJudges,
+        });
+        loaded.push(...validJudges);
+        continue;
+      }
+
+      logError(
+        `Plugin "${specifier}": no valid plugin or judge definitions found. ` +
+          `Export a JudgesPlugin object or an array of JudgeDefinition objects.`,
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logError(`Plugin "${specifier}": failed to load — ${msg}`);
+    }
+  }
+
+  return loaded;
+}
+
+/**
+ * Synchronously validate plugin specifiers without loading them.
+ * Returns an array of validation error messages (empty if all valid).
+ */
+export function validatePluginSpecifiers(specifiers: string[]): string[] {
+  const errors: string[] = [];
+  const seen = new Set<string>();
+
+  for (const spec of specifiers) {
+    if (typeof spec !== "string" || spec.trim().length === 0) {
+      errors.push(`Invalid plugin specifier: must be a non-empty string`);
+      continue;
+    }
+    if (seen.has(spec)) {
+      errors.push(`Duplicate plugin specifier: "${spec}"`);
+    }
+    seen.add(spec);
+  }
+
+  return errors;
 }

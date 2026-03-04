@@ -40,7 +40,7 @@ import { runReport } from "./commands/report.js";
 import { runHook } from "./commands/hook.js";
 import { runDiff } from "./commands/diff.js";
 import { runDeps } from "./commands/deps.js";
-import { runBaseline } from "./commands/baseline.js";
+import { runBaseline, loadBaselineData, isBaselined, type LoadedBaseline } from "./commands/baseline.js";
 import { runCompletions } from "./commands/completions.js";
 import { runDocs } from "./commands/docs.js";
 import { generateGitLabCi, generateAzurePipelines, generateBitbucketPipelines } from "./commands/ci-templates.js";
@@ -53,6 +53,7 @@ import { runBenchmark } from "./commands/benchmark.js";
 import { runRule } from "./commands/rule.js";
 import { runPack } from "./commands/language-packs.js";
 import { runConfig } from "./commands/config-share.js";
+import { runDoctor } from "./commands/doctor.js";
 import { formatComparisonReport, formatFullComparisonMatrix, TOOL_PROFILES } from "./comparison.js";
 
 // ─── Language Detection from Extension ──────────────────────────────────────
@@ -247,6 +248,7 @@ USAGE:
   judges hook install                 Install pre-commit git hook
   judges diff                         Evaluate only changed lines from a diff
   judges deps [dir]                   Analyze dependencies for supply-chain risks
+  judges doctor                       Run diagnostic healthcheck
   judges baseline create <file>       Create a findings baseline
   judges ci-templates <provider>      Generate CI pipeline template
   judges completions <shell>          Generate shell completions
@@ -694,6 +696,12 @@ export async function runCli(argv: string[]): Promise<void> {
     return;
   }
 
+  // ─── Doctor Command ──────────────────────────────────────────────────
+  if (args.command === "doctor") {
+    runDoctor(argv);
+    return;
+  }
+
   // ─── Baseline Command ────────────────────────────────────────────────
   if (args.command === "baseline") {
     runBaseline(argv);
@@ -779,9 +787,9 @@ export async function runCli(argv: string[]): Promise<void> {
     const evalConfig = loadEvalConfig(args);
 
     // Load baseline if specified (from CLI flag — config doesn't carry baseline)
-    let baselineFindings: Set<string> | undefined;
+    let loadedBaseline: LoadedBaseline | undefined;
     if (args.baseline) {
-      baselineFindings = loadBaseline(args.baseline);
+      loadedBaseline = loadBaselineData(args.baseline);
     }
 
     // Build evaluation options from config
@@ -829,11 +837,13 @@ export async function runCli(argv: string[]): Promise<void> {
         const verdict = evaluateWithTribunal(fileCode, fileLang, undefined, evalOptions);
 
         // Apply baseline suppression
-        if (baselineFindings) {
+        if (loadedBaseline) {
           for (const evaluation of verdict.evaluations) {
-            evaluation.findings = evaluation.findings.filter((f) => !baselineFindings!.has(baselineKey(f)));
+            evaluation.findings = evaluation.findings.filter(
+              (f) => !isBaselined(f, loadedBaseline!, fileCode, relPath),
+            );
           }
-          verdict.findings = verdict.findings.filter((f) => !baselineFindings!.has(baselineKey(f)));
+          verdict.findings = verdict.findings.filter((f) => !isBaselined(f, loadedBaseline!, fileCode, relPath));
         }
 
         const fileFindings = verdict.evaluations.reduce((s, e) => s + e.findings.length, 0);
@@ -906,8 +916,8 @@ export async function runCli(argv: string[]): Promise<void> {
       const evaluation = evaluateWithJudge(judge, code, language);
 
       // Apply baseline suppression
-      if (baselineFindings) {
-        evaluation.findings = evaluation.findings.filter((f) => !baselineFindings!.has(baselineKey(f)));
+      if (loadedBaseline) {
+        evaluation.findings = evaluation.findings.filter((f) => !isBaselined(f, loadedBaseline!, code));
       }
 
       // Apply min-severity filter from config
@@ -979,11 +989,11 @@ export async function runCli(argv: string[]): Promise<void> {
       const verdict = evaluateWithTribunal(code, language, undefined, evalOptions);
 
       // Apply baseline suppression
-      if (baselineFindings) {
+      if (loadedBaseline) {
         for (const evaluation of verdict.evaluations) {
-          evaluation.findings = evaluation.findings.filter((f) => !baselineFindings!.has(baselineKey(f)));
+          evaluation.findings = evaluation.findings.filter((f) => !isBaselined(f, loadedBaseline!, code));
         }
-        verdict.findings = verdict.findings.filter((f) => !baselineFindings!.has(baselineKey(f)));
+        verdict.findings = verdict.findings.filter((f) => !isBaselined(f, loadedBaseline!, code));
       }
 
       // Apply min-severity filter from config
@@ -1057,31 +1067,8 @@ export async function runCli(argv: string[]): Promise<void> {
 }
 
 // ─── Baseline Support ───────────────────────────────────────────────────────
-
-function baselineKey(f: { ruleId: string; title: string; lineNumbers?: number[] }): string {
-  const line = f.lineNumbers?.[0] ?? 0;
-  return `${f.ruleId}::${line}::${f.title}`;
-}
-
-function loadBaseline(baselinePath: string): Set<string> {
-  const abs = resolve(baselinePath);
-  if (!existsSync(abs)) {
-    return new Set();
-  }
-  try {
-    const data = JSON.parse(readFileSync(abs, "utf-8"));
-    const keys = new Set<string>();
-    if (Array.isArray(data.findings)) {
-      for (const f of data.findings) {
-        keys.add(baselineKey(f));
-      }
-    }
-    return keys;
-  } catch {
-    console.error(`Warning: Could not parse baseline file: ${baselinePath}`);
-    return new Set();
-  }
-}
+// Baseline loading and matching is now handled by src/commands/baseline.ts
+// Exports: loadBaselineData, isBaselined, LoadedBaseline
 
 // ─── Summary Line Output ───────────────────────────────────────────────────
 
@@ -1095,7 +1082,7 @@ function printSummaryLine(verdict: string, score: number, findings: number): voi
 function loadEvalConfig(args: CliArgs): JudgesConfig | undefined {
   let config: JudgesConfig | undefined;
 
-  // 1. Load from preset (supports comma-separated composition: "security-only,performance")
+  // 1. Load from CLI --preset (supports comma-separated composition: "security-only,performance")
   if (args.preset) {
     const presetNames = args.preset.split(",").map((n) => n.trim());
     if (presetNames.length === 1) {
@@ -1149,6 +1136,38 @@ function loadEvalConfig(args: CliArgs): JudgesConfig | undefined {
         }
         break;
       }
+    }
+  }
+
+  // 4. Apply config.preset if no CLI --preset was given
+  if (config?.preset && !args.preset) {
+    const presetNames = config.preset.split(",").map((n) => n.trim());
+    let presetConfig: JudgesConfig | undefined;
+    if (presetNames.length === 1) {
+      const preset = getPreset(presetNames[0]);
+      if (preset) presetConfig = { ...preset.config };
+    } else {
+      const composed = composePresets(presetNames);
+      if (composed) presetConfig = { ...composed.config };
+    }
+    if (presetConfig) {
+      // Preset is the base; config file properties override it
+      const { preset: _p, ...rest } = config;
+      config = { ...presetConfig, ...rest };
+    }
+  }
+
+  // 5. Apply config-based defaults to CLI args (CLI flags always win)
+  if (config) {
+    if (config.failOnFindings && !args.failOnFindings) {
+      args.failOnFindings = true;
+    }
+    if (config.baseline && !args.baseline) {
+      args.baseline = config.baseline;
+    }
+    if (config.format && args.format === "text") {
+      // Only apply config format if CLI didn't explicitly set one
+      args.format = config.format;
     }
   }
 

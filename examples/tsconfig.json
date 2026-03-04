@@ -11,6 +11,6 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["demo.ts", "../src/**/*"],
+  "include": ["demo.ts", "generate-reports.ts", "../src/**/*"],
   "exclude": ["sample-vulnerable-api.ts"]
 }

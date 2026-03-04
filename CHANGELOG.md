@@ -2,6 +2,37 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.0] — 2026-03-05
+
+### Added — P0: Trust & Accuracy Foundation
+- **Hard/subtle benchmark cases** — 13 new benchmark cases targeting subtle vulnerabilities (prototype pollution, timing attacks, ReDoS, SSRF through URL parsing, null-byte injection, etc.) with `DifficultyResult` interface and strict metrics; `--save` CLI flag for benchmark persistence
+- **Autofix patch expansion** — 33 new patch rules (71→104 total): 25 single-line rules covering CSRF, prototype pollution, ReDoS, path traversal, insecure cookies, etc; 8 multi-line patch rules for complex fixes; 27 new patch tests
+- **V2 baseline with fingerprinting** — Complete `baseline.ts` rewrite (142→~510 lines) with V2 format: per-file fingerprinted findings, `baselineVersion: 2`, `fingerprintBaseline()` with line-context hashing, `diffBaseline()` showing new/fixed/carried findings with severity summaries; 17 new tests
+
+### Added — P1: Developer Experience & Adoption
+- **Sample report generation** — `examples/generate-reports.ts` script producing Markdown, JSON, and SARIF reports; 3 sample reports in `reports/`
+- **PR comment dedup & Check Runs** — Enhanced `action.yml` with deterministic comment fingerprinting to prevent duplicate PR comments, Check Runs API integration via `@octokit/rest`; 6 new tests
+- **Plugin loading infrastructure** — `loadPluginJudges()`, `validatePluginSpecifiers()`, `isValidJudgeDefinition()` in config.ts; `JudgesConfig` expanded with `preset`, `failOnFindings`, `baseline`, `format`, `plugins` fields; `mergeConfigs()` and `resolveJudgeSet()` plugin-aware; 30 new tests
+- **Suppression audit trail** — Full suppression rewrite with `judges-ignore-block`/`judges-end-block` block scope, reason capture, `applyInlineSuppressionsWithAudit()` returning `SuppressionResult` with `SuppressionRecord[]` audit trail; 14 new tests
+- **Team feedback aggregation** — `contributor` field on `FeedbackEntry`, `TeamFeedbackStats`/`RuleTeamStats` interfaces, `mergeFeedbackStores()`, `computeTeamFeedbackStats()`, `formatTeamStatsOutput()`; 16 new tests
+
+### Added — P2: Depth & Precision
+- **Rule test assertion framework** — `RuleTestCase`/`RuleTestResult`/`RuleTestSuiteResult` types, `runRuleTests()`, `validateRuleTestSuite()`, `formatRuleTestResults()` in rule.ts; 13 new tests
+- **Calibration pipeline integration** — `calibrate?: boolean | CalibrationOptions` on `EvaluationOptions`, wired `loadCalibrationProfile()` and `calibrateFindings()` into `evaluateWithTribunal()`; 5 new tests
+- **Finding diff between runs** — `FindingDiff` interface, `findingDiffKey()`, `diffFindings()` (classifies new/fixed/recurring), `formatFindingDiff()` in dedup.ts; 11 new tests
+- **`judges doctor` command** — Full diagnostic healthcheck: 7 checks (Node version, config file, judges loaded, plugins, feedback store, baseline file, presets), `runDoctorChecks()` runner, `formatDoctorReport()` formatter, `--json` CLI support; 12 new tests
+
+### Added — P3: Ecosystem & Integration
+- **Language coverage report** — `detectFileLanguage()`, `computeLanguageCoverage()`, `formatCoverageReport()` in coverage.ts; covers 16 languages with judge availability mapping; 11 new tests
+- **Finding snapshot & trend tracking** — `SnapshotStore` with versioned persistence, `recordSnapshot()` from findings, `computeTrend()` with improving/stable/regressing detection (10% threshold comparing recent vs early runs), `formatTrendReport()` with delta history; 12 new tests
+- **Rule hit metrics** — `computeRuleHitMetrics()` tracking active/silent rules, severity breakdown per rule, noisy-rule ranking with percentages, `findJudgeForRule()` prefix matching, `formatRuleHitReport()`; 11 new tests
+- **Project auto-detection for init wizard** — `detectLanguages()`, `detectFrameworksFromFiles()` (package.json + requirements.txt + file indicators), `classifyProjectType()` (9 project types), `detectCI()`, `detectMonorepo()`, `recommendPreset()` with confidence scoring, `formatProjectSummary()`, `formatRecommendation()`; 22 new tests
+
+### Tests
+- 1982 tests passing (0 failures)
+- 689 subsystem tests (up from 610), 45 new tests this release
+- New test sections: Finding Diff (§27), Doctor Diagnostics (§28), Language Coverage (§29), Finding Snapshot & Trend (§30), Rule Hit Metrics (§31), Project Auto-Detection (§32)
+
 ## [3.22.1] — 2026-03-04
 
 ### Fixed

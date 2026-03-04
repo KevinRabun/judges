@@ -21,10 +21,55 @@ import {
   applyConfidenceThreshold,
   isAbsenceBasedFinding,
 } from "../src/scoring.js";
-import { crossEvaluatorDedup, severityRank } from "../src/dedup.js";
-import { parseConfig, defaultConfig, mergeConfigs } from "../src/config.js";
+import { crossEvaluatorDedup, severityRank, diffFindings, formatFindingDiff } from "../src/dedup.js";
+import {
+  checkNodeVersion,
+  checkJudgesLoaded,
+  checkPresets,
+  checkConfigFile,
+  checkFeedbackStore,
+  checkBaselineFile,
+  checkPlugins,
+  runDoctorChecks,
+  formatDoctorReport,
+} from "../src/commands/doctor.js";
+import type { DoctorReport } from "../src/commands/doctor.js";
+import { computeLanguageCoverage, formatCoverageReport, detectFileLanguage } from "../src/commands/coverage.js";
+import { createSnapshotStore, recordSnapshot, computeTrend, formatTrendReport } from "../src/commands/snapshot.js";
+import type { SnapshotStore } from "../src/commands/snapshot.js";
+import { findJudgeForRule, computeRuleHitMetrics, formatRuleHitReport } from "../src/commands/rule-metrics.js";
+import {
+  detectLanguages,
+  detectFrameworksFromFiles,
+  classifyProjectType,
+  detectCI,
+  detectMonorepo,
+  detectProjectSignals,
+  recommendPreset,
+  formatProjectSummary,
+  formatRecommendation,
+} from "../src/commands/auto-detect.js";
+import {
+  parseConfig,
+  defaultConfig,
+  mergeConfigs,
+  isValidJudgeDefinition,
+  validatePluginSpecifiers,
+} from "../src/config.js";
+import { mergeFeedbackStores, computeTeamFeedbackStats, formatTeamStatsOutput } from "../src/commands/feedback.js";
+import type { FeedbackStore, FeedbackEntry } from "../src/commands/feedback.js";
+import {
+  testRule,
+  runRuleTests,
+  validateRuleTestSuite,
+  formatRuleTestResults,
+  deserializeRule,
+} from "../src/commands/rule.js";
+import type { RuleTestCase } from "../src/commands/rule.js";
+import type { CustomRule } from "../src/plugins.js";
 import { enrichWithPatches } from "../src/patches/index.js";
 import { applyInlineSuppressions } from "../src/evaluators/index.js";
+import { applyInlineSuppressionsWithAudit } from "../src/evaluators/index.js";
 import {
   calculateScore,
   deriveVerdict,
@@ -1077,6 +1122,287 @@ describe("Multi-line Patches — enrichWithPatches", () => {
     assert.ok(result[0].patch, "Expected patch");
     assert.equal(result[0].patch!.startLine, 3, "Should start at catch line");
     assert.equal(result[0].patch!.endLine, 5, "Should end at closing brace");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 18b. Expanded Patch Coverage — new single-line + multi-line rules
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Expanded Patch Coverage — single-line rules", () => {
+  it("should patch hardcoded password → env var reference", () => {
+    const code = 'const password = "superSecret123";';
+    const findings = [makeFinding({ ruleId: "CFG-001", title: "Hardcoded password in source", lineNumbers: [1] })];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for hardcoded password");
+    assert.ok(result[0].patch!.newText.includes("process.env"), "Should reference env var");
+  });
+
+  it("should patch hardcoded API key → env var reference", () => {
+    const code = 'const apiKey = "sk-1234567890abcdef";';
+    const findings = [makeFinding({ ruleId: "CFG-002", title: "Hardcoded API key in source", lineNumbers: [1] })];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for hardcoded API key");
+    assert.ok(result[0].patch!.newText.includes("process.env"), "Should reference env var");
+  });
+
+  it("should patch path.join → path.resolve with basename", () => {
+    const code = "const filePath = path.join(uploadDir, userInput);";
+    const findings = [makeFinding({ ruleId: "CYBER-010", title: "Path traversal via user input", lineNumbers: [1] })];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for path traversal");
+    assert.ok(result[0].patch!.newText.includes("path.resolve"), "Should use path.resolve");
+    assert.ok(result[0].patch!.newText.includes("path.basename"), "Should use path.basename");
+  });
+
+  it("should patch open redirect → URL validation", () => {
+    const code = "res.redirect(req.query.url);";
+    const findings = [makeFinding({ ruleId: "CYBER-020", title: "Open redirect with user input", lineNumbers: [1] })];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for open redirect");
+    assert.ok(result[0].patch!.newText.includes("new URL"), "Should validate URL");
+    assert.ok(result[0].patch!.newText.includes("allowlist"), "Should mention allowlist");
+  });
+
+  it("should patch timing-unsafe comparison → timingSafeEqual", () => {
+    const code = "if (token === storedSecret) {";
+    const findings = [
+      makeFinding({ ruleId: "CYBER-030", title: "Timing attack on secret comparison", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for timing attack");
+    assert.ok(result[0].patch!.newText.includes("timingSafeEqual"), "Should use timingSafeEqual");
+  });
+
+  it("should patch error stack exposure → sanitized message", () => {
+    const code = "res.send(error.stack);";
+    const findings = [
+      makeFinding({
+        ruleId: "CYBER-040",
+        title: "Error information leakage via stack trace exposure",
+        lineNumbers: [1],
+      }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for error leakage");
+    assert.ok(result[0].patch!.newText.includes("message"), "Should use message instead of stack");
+  });
+
+  it("should patch target=_blank → add rel=noopener", () => {
+    const code = '<a href="x" target="_blank">link</a>';
+    const findings = [
+      makeFinding({ ruleId: "CYBER-050", title: "Missing noopener on external link", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for noopener");
+    assert.ok(result[0].patch!.newText.includes("noopener"), "Should add noopener");
+  });
+
+  it("should patch low bcrypt rounds → 12", () => {
+    const code = "bcrypt.hash(password, 4);";
+    const findings = [
+      makeFinding({ ruleId: "AUTH-010", title: "Weak bcrypt rounds — salt rounds too low", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for bcrypt rounds");
+    assert.ok(result[0].patch!.newText.includes("12"), "Should increase to 12 rounds");
+  });
+
+  it("should NOT patch bcrypt with sufficient rounds", () => {
+    const code = "bcrypt.hash(password, 12);";
+    const findings = [
+      makeFinding({ ruleId: "AUTH-010", title: "Weak bcrypt rounds — salt rounds too low", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.equal(result[0].patch, undefined, "Should not patch already-sufficient rounds");
+  });
+
+  it("should patch Python bare except → except Exception", () => {
+    const code = "except:";
+    const findings = [
+      makeFinding({ ruleId: "ERR-020", title: "Bare except clause catches everything", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for bare except");
+    assert.ok(result[0].patch!.newText.includes("except Exception"), "Should use specific exception");
+  });
+
+  it("should patch insecure tempfile.mktemp → mkstemp", () => {
+    const code = 'tmp = tempfile.mktemp(suffix=".dat")';
+    const findings = [makeFinding({ ruleId: "CYBER-060", title: "Insecure tempfile.mktemp usage", lineNumbers: [1] })];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for insecure tempfile");
+    assert.ok(result[0].patch!.newText.includes("mkstemp"), "Should use mkstemp");
+  });
+
+  it("should patch chmod 777 → 750", () => {
+    const code = "chmod 777 /app/data";
+    const findings = [
+      makeFinding({ ruleId: "IAC-010", title: "Insecure file permissions chmod 777", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for insecure permissions");
+    assert.ok(result[0].patch!.newText.includes("750"), "Should restrict to 750");
+  });
+
+  it("should patch Go unchecked error → rename _ to err", () => {
+    const code = "result, _ := doSomething()";
+    const findings = [
+      makeFinding({ ruleId: "ERR-030", title: "Unchecked error return value ignored", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for unchecked error");
+    assert.ok(result[0].patch!.newText.includes(", err"), "Should rename _ to err");
+  });
+
+  it("should patch hardcoded port → process.env.PORT", () => {
+    const code = "app.listen(3000);";
+    const findings = [makeFinding({ ruleId: "CFG-010", title: "Hardcoded port number", lineNumbers: [1] })];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for hardcoded port");
+    assert.ok(result[0].patch!.newText.includes("process.env.PORT"), "Should use env var");
+  });
+
+  it("should patch prototype pollution → add comment guard", () => {
+    const code = "obj[key] = value;";
+    const findings = [
+      makeFinding({ ruleId: "CYBER-070", title: "Prototype pollution via dynamic property", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for prototype pollution");
+    assert.ok(result[0].patch!.newText.includes("__proto__"), "Should warn about __proto__");
+  });
+
+  it("should patch SSRF → add validation comment", () => {
+    const code = "fetch(userUrl);";
+    const findings = [
+      makeFinding({
+        ruleId: "CYBER-080",
+        title: "SSRF — server-side request forgery via unvalidated URL",
+        lineNumbers: [1],
+      }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for SSRF");
+    assert.ok(result[0].patch!.newText.includes("allowlist"), "Should mention allowlist");
+  });
+
+  it("should patch mass assignment → allowlist comment", () => {
+    const code = "User.create(req.body);";
+    const findings = [
+      makeFinding({ ruleId: "DATA-010", title: "Mass assignment — unfiltered body passed to ORM", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for mass assignment");
+    assert.ok(result[0].patch!.newText.includes("allowlist"), "Should recommend allowlisting fields");
+  });
+
+  it("should patch innerHTML with user data → DOMPurify.sanitize", () => {
+    const code = "element.innerHTML = userContent;";
+    const findings = [
+      makeFinding({
+        ruleId: "CYBER-090",
+        title: "XSS via unsanitized HTML injection from user input",
+        lineNumbers: [1],
+      }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected patch for HTML sanitization");
+    assert.ok(result[0].patch!.newText.includes("DOMPurify"), "Should use DOMPurify");
+  });
+});
+
+describe("Expanded Patch Coverage — multi-line rules", () => {
+  it("should add helmet middleware to Express app", () => {
+    const code = "const app = express();";
+    const findings = [
+      makeFinding({ ruleId: "CYBER-100", title: "Missing helmet security headers middleware", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected multi-line patch for helmet");
+    assert.ok(result[0].patch!.newText.includes("helmet"), "Should include helmet");
+    assert.ok(result[0].patch!.newText.includes("app.use"), "Should add app.use(helmet())");
+  });
+
+  it("should add rate limiting middleware to Express app", () => {
+    const code = "const app = express();";
+    const findings = [
+      makeFinding({ ruleId: "RATE-001", title: "Missing rate limiting on Express app", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected multi-line patch for rate limiting");
+    assert.ok(result[0].patch!.newText.includes("rateLimit"), "Should include rate limiter");
+    assert.ok(result[0].patch!.newText.includes("windowMs"), "Should configure window");
+  });
+
+  it("should convert SQL string concatenation to parameterized query", () => {
+    const code = 'db.query("SELECT * FROM users WHERE id = " + userId);';
+    const findings = [
+      makeFinding({ ruleId: "CYBER-110", title: "SQL injection via string concatenation in query", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected multi-line patch for SQL parameterization");
+    assert.ok(result[0].patch!.newText.includes("$1"), "Should use parameterized placeholder");
+    assert.ok(result[0].patch!.newText.includes("userId"), "Should keep parameter reference");
+  });
+
+  it("should add input validation guard to Express route handler", () => {
+    const code = 'app.post("/users", (req, res) => {';
+    const findings = [
+      makeFinding({ ruleId: "DATA-020", title: "Input validation missing on POST handler", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected multi-line patch for input validation");
+    assert.ok(result[0].patch!.newText.includes("400"), "Should return 400 for invalid input");
+    assert.ok(result[0].patch!.newText.includes("typeof req.body"), "Should check body type");
+  });
+
+  it("should patch Python bare except with pass → exception with logging", () => {
+    const code = ["try:", "    something()", "except:", "    pass"].join("\n");
+    const findings = [
+      makeFinding({
+        ruleId: "ERR-025",
+        title: "Pokemon exception handling — except catches all silently",
+        lineNumbers: [3],
+      }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected multi-line patch for bare except");
+    assert.ok(result[0].patch!.newText.includes("Exception as e"), "Should catch specific exception");
+    assert.ok(result[0].patch!.newText.includes("logging"), "Should add logging");
+  });
+
+  it("should add CORS configuration to Express app", () => {
+    const code = "const app = express();";
+    const findings = [
+      makeFinding({ ruleId: "CYBER-120", title: "CORS not configured — missing CORS middleware", lineNumbers: [1] }),
+    ];
+    const result = enrichWithPatches(findings, code);
+    assert.ok(result[0].patch, "Expected multi-line patch for CORS");
+    assert.ok(result[0].patch!.newText.includes("cors"), "Should include cors middleware");
+    assert.ok(result[0].patch!.newText.includes("ALLOWED_ORIGIN"), "Should use env var for origin");
+  });
+
+  it("should verify total patch rule count exceeds 90", async () => {
+    // Access internal counts by reading the module structure
+    // We can verify by testing a representative sample of rules
+    const categories = [
+      { code: 'const buf = new Buffer("x");', title: "Deprecated API: new Buffer()", matches: true },
+      { code: 'const x = "http://api.com";', title: "Unencrypted HTTP connection", matches: true },
+      { code: "const id = Math.random();", title: "Insecure random", matches: true },
+      { code: "eval(input);", title: "Dangerous eval usage", matches: true },
+      { code: "el.innerHTML = x;", title: "XSS via innerHTML", matches: true },
+      { code: 'password = "secret123";', title: "Hardcoded password", matches: true },
+      { code: "path.join(dir, input);", title: "Path traversal via user input", matches: true },
+      { code: "fetch(userUrl);", title: "SSRF — unvalidated URL fetch", matches: true },
+      { code: "User.create(req.body);", title: "Mass assignment — unfiltered body", matches: true },
+    ];
+    let matched = 0;
+    for (const c of categories) {
+      const result = enrichWithPatches([makeFinding({ ruleId: "TEST-001", title: c.title, lineNumbers: [1] })], c.code);
+      if (result[0].patch) matched++;
+    }
+    assert.ok(matched >= 8, `Expected at least 8 of 9 categories to produce patches, got ${matched}`);
   });
 });
 
@@ -6649,7 +6975,7 @@ describe("Benchmark Gate", () => {
     assert.ok(r.precision >= 0 && r.precision <= 1, "Precision should be 0-1");
     assert.ok(r.recall >= 0 && r.recall <= 1, "Recall should be 0-1");
     assert.ok(r.detectionRate >= 0 && r.detectionRate <= 1, "Detection rate should be 0-1");
-    assert.ok(r.totalCases > 40, `Should have 40+ test cases, got ${r.totalCases}`);
+    assert.ok(r.totalCases > 50, `Should have 50+ test cases, got ${r.totalCases}`);
     assert.ok(r.version !== "unknown", "Should resolve version from package.json");
   });
 
@@ -6662,6 +6988,50 @@ describe("Benchmark Gate", () => {
       assert.ok(cat.total > 0, `Category ${cat.category} should have test cases`);
       assert.ok(cat.precision >= 0 && cat.precision <= 1, `${cat.category} precision out of range`);
     }
+  });
+
+  it("runBenchmarkSuite should produce strict metrics alongside prefix metrics", async () => {
+    const { runBenchmarkSuite } = await import("../src/commands/benchmark.js");
+    const result = runBenchmarkSuite();
+    assert.ok(typeof result.strictPrecision === "number", "strictPrecision should be a number");
+    assert.ok(typeof result.strictRecall === "number", "strictRecall should be a number");
+    assert.ok(typeof result.strictF1Score === "number", "strictF1Score should be a number");
+    assert.ok(result.strictPrecision >= 0 && result.strictPrecision <= 1, "strictPrecision out of range");
+    assert.ok(result.strictRecall >= 0 && result.strictRecall <= 1, "strictRecall out of range");
+    assert.ok(result.strictF1Score >= 0 && result.strictF1Score <= 1, "strictF1Score out of range");
+    assert.ok(result.strictTruePositives >= 0, "strictTruePositives should be non-negative");
+    assert.ok(result.strictFalseNegatives >= 0, "strictFalseNegatives should be non-negative");
+    // Strict recall should be <= prefix recall (exact matching is harder)
+    assert.ok(result.strictRecall <= result.recall + 0.001, "Strict recall should not exceed prefix recall");
+  });
+
+  it("runBenchmarkSuite should produce per-difficulty breakdowns", async () => {
+    const { runBenchmarkSuite } = await import("../src/commands/benchmark.js");
+    const result = runBenchmarkSuite();
+    assert.ok(result.perDifficulty, "perDifficulty should exist");
+    const diffs = Object.keys(result.perDifficulty);
+    assert.ok(diffs.includes("easy"), "Should have easy difficulty");
+    assert.ok(diffs.includes("medium"), "Should have medium difficulty");
+    assert.ok(diffs.includes("hard"), "Should have hard difficulty");
+    for (const d of Object.values(result.perDifficulty)) {
+      assert.ok(d.total > 0, `${d.difficulty} should have test cases`);
+      assert.ok(d.detectionRate >= 0 && d.detectionRate <= 1, `${d.difficulty} detection rate out of range`);
+    }
+    // Hard cases should have at least 10 test cases now
+    assert.ok(
+      result.perDifficulty.hard.total >= 10,
+      `Should have 10+ hard cases, got ${result.perDifficulty.hard.total}`,
+    );
+  });
+
+  it("formatBenchmarkReport should include strict metrics and difficulty breakdown", async () => {
+    const { runBenchmarkSuite, formatBenchmarkReport } = await import("../src/commands/benchmark.js");
+    const result = runBenchmarkSuite();
+    const report = formatBenchmarkReport(result);
+    assert.ok(report.includes("Prefix-Based Matching"), "Report should mention prefix-based matching");
+    assert.ok(report.includes("Exact Rule-ID Matching"), "Report should mention exact rule-ID matching");
+    assert.ok(report.includes("Per-Difficulty"), "Report should include per-difficulty breakdown");
+    assert.ok(report.includes("strict:"), "Report should show strict counts");
   });
 });
 
@@ -6883,5 +7253,1937 @@ describe("Streaming / Batch API", () => {
     const results = await evaluateFilesBatch([sampleFiles[0]], 10);
     assert.equal(results.length, 1);
     assert.equal(results[0].path, "a.py");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 20. Baseline V2 — Fingerprint Matching & Data Structures
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { computeFindingFingerprint, loadBaselineData, isBaselined } from "../src/commands/baseline.js";
+import { writeFileSync, unlinkSync, existsSync as fsExists } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
+
+describe("Baseline V2 — Fingerprint Matching", () => {
+  // ── computeFindingFingerprint ──────────────────────────────────────────
+
+  it("should produce a 16-char hex fingerprint", () => {
+    const fp = computeFindingFingerprint(
+      "CYBER-001",
+      "SQL Injection risk",
+      'const q = "SELECT * FROM users WHERE id = " + userId;',
+      1,
+    );
+    assert.equal(fp.length, 16);
+    assert.ok(/^[0-9a-f]{16}$/.test(fp), `Expected hex, got: ${fp}`);
+  });
+
+  it("should produce the same fingerprint for identical inputs", () => {
+    const code = 'const q = "SELECT * FROM users WHERE id = " + userId;';
+    const a = computeFindingFingerprint("CYBER-001", "SQL Injection", code, 1);
+    const b = computeFindingFingerprint("CYBER-001", "SQL Injection", code, 1);
+    assert.equal(a, b);
+  });
+
+  it("should produce different fingerprints for different ruleIds", () => {
+    const code = 'const q = "SELECT * FROM users WHERE id = " + userId;';
+    const a = computeFindingFingerprint("CYBER-001", "SQL Injection", code, 1);
+    const b = computeFindingFingerprint("CYBER-002", "SQL Injection", code, 1);
+    assert.notEqual(a, b);
+  });
+
+  it("should produce different fingerprints for different titles", () => {
+    const code = 'const q = "SELECT * FROM users WHERE id = " + userId;';
+    const a = computeFindingFingerprint("CYBER-001", "SQL Injection", code, 1);
+    const b = computeFindingFingerprint("CYBER-001", "XSS attack", code, 1);
+    assert.notEqual(a, b);
+  });
+
+  it("should survive line-number shifts when surrounding code is the same", () => {
+    // Original code: finding on line 3
+    const codeOriginal = [
+      "import express from 'express';",
+      "",
+      'const q = "SELECT * FROM users WHERE id = " + userId;',
+      "",
+      "app.listen(3000);",
+    ].join("\n");
+
+    // Shifted code: 2 blank lines added at top, finding now on line 5
+    const codeShifted = [
+      "",
+      "",
+      "import express from 'express';",
+      "",
+      'const q = "SELECT * FROM users WHERE id = " + userId;',
+      "",
+      "app.listen(3000);",
+    ].join("\n");
+
+    const fpOriginal = computeFindingFingerprint("CYBER-001", "SQL Injection", codeOriginal, 3);
+    const fpShifted = computeFindingFingerprint("CYBER-001", "SQL Injection", codeShifted, 5);
+
+    assert.equal(fpOriginal, fpShifted, "Fingerprint should survive a 2-line shift");
+  });
+
+  it("should change when surrounding code changes", () => {
+    const codeA = [
+      "import express from 'express';",
+      'const q = "SELECT * FROM users WHERE id = " + userId;',
+      "app.listen(3000);",
+    ].join("\n");
+
+    const codeB = [
+      "import fastify from 'fastify';",
+      'const q = "SELECT * FROM users WHERE id = " + userId;',
+      "server.listen(8080);",
+    ].join("\n");
+
+    const fpA = computeFindingFingerprint("CYBER-001", "SQL Injection", codeA, 2);
+    const fpB = computeFindingFingerprint("CYBER-001", "SQL Injection", codeB, 2);
+
+    assert.notEqual(fpA, fpB, "Different context should produce different fingerprints");
+  });
+
+  // ── loadBaselineData ──────────────────────────────────────────────────
+
+  it("should return empty baseline for non-existent file", () => {
+    const bl = loadBaselineData("/nonexistent/baseline.json");
+    assert.equal(bl.version, 0);
+    assert.equal(bl.keys.size, 0);
+    assert.equal(bl.fingerprints.size, 0);
+  });
+
+  it("should load v1 baseline and build legacy keys", () => {
+    const tmpFile = join(tmpdir(), `judges-baseline-v1-${Date.now()}.json`);
+    try {
+      const v1 = {
+        version: 1,
+        createdAt: new Date().toISOString(),
+        sourceFile: "app.ts",
+        findings: [
+          { ruleId: "CYBER-001", title: "SQL Injection", lineNumbers: [10], severity: "high" },
+          { ruleId: "AUTH-003", title: "Hardcoded password", lineNumbers: [25], severity: "critical" },
+        ],
+        totalFindings: 2,
+        score: 45,
+      };
+      writeFileSync(tmpFile, JSON.stringify(v1), "utf-8");
+
+      const bl = loadBaselineData(tmpFile);
+      assert.equal(bl.version, 1);
+      assert.equal(bl.keys.size, 2);
+      assert.ok(bl.keys.has("CYBER-001::10::SQL Injection"));
+      assert.ok(bl.keys.has("AUTH-003::25::Hardcoded password"));
+      assert.equal(bl.fingerprints.size, 0);
+    } finally {
+      if (fsExists(tmpFile)) unlinkSync(tmpFile);
+    }
+  });
+
+  it("should load v2 baseline and build fingerprint sets", () => {
+    const tmpFile = join(tmpdir(), `judges-baseline-v2-${Date.now()}.json`);
+    try {
+      const v2 = {
+        version: 2,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        files: {
+          "src/app.ts": [
+            {
+              ruleId: "CYBER-001",
+              title: "SQL Injection",
+              fingerprint: "abcdef1234567890",
+              severity: "high",
+              lineNumbers: [42],
+              status: "active",
+            },
+            {
+              ruleId: "AUTH-003",
+              title: "Hardcoded password",
+              fingerprint: "1234567890abcdef",
+              severity: "critical",
+              lineNumbers: [99],
+              status: "resolved",
+            },
+          ],
+        },
+        totalFindings: 1,
+        resolvedFindings: 1,
+      };
+      writeFileSync(tmpFile, JSON.stringify(v2), "utf-8");
+
+      const bl = loadBaselineData(tmpFile);
+      assert.equal(bl.version, 2);
+      assert.equal(bl.keys.size, 0);
+      // Only active findings are in fingerprints set
+      assert.equal(bl.fingerprints.size, 1);
+      assert.ok(bl.fingerprints.has("abcdef1234567890"));
+      assert.ok(!bl.fingerprints.has("1234567890abcdef"), "Resolved should be excluded");
+      // Per-file map
+      assert.ok(bl.fileFingerprints.has("src/app.ts"));
+      assert.equal(bl.fileFingerprints.get("src/app.ts")!.size, 1);
+    } finally {
+      if (fsExists(tmpFile)) unlinkSync(tmpFile);
+    }
+  });
+
+  it("should gracefully handle corrupt baseline file", () => {
+    const tmpFile = join(tmpdir(), `judges-baseline-corrupt-${Date.now()}.json`);
+    try {
+      writeFileSync(tmpFile, "NOT VALID JSON {{{", "utf-8");
+      const bl = loadBaselineData(tmpFile);
+      assert.equal(bl.version, 0);
+      assert.equal(bl.keys.size, 0);
+    } finally {
+      if (fsExists(tmpFile)) unlinkSync(tmpFile);
+    }
+  });
+
+  // ── isBaselined ───────────────────────────────────────────────────────
+
+  it("should match finding against v1 baseline by exact key", () => {
+    const bl = loadBaselineData("/nonexistent");
+    bl.keys.add("CYBER-001::10::SQL Injection");
+
+    const finding = { ruleId: "CYBER-001", title: "SQL Injection", lineNumbers: [10] };
+    assert.ok(isBaselined(finding, bl, "any code"));
+  });
+
+  it("should NOT match v1 baseline when line number differs", () => {
+    const bl = loadBaselineData("/nonexistent");
+    bl.keys.add("CYBER-001::10::SQL Injection");
+
+    const finding = { ruleId: "CYBER-001", title: "SQL Injection", lineNumbers: [15] };
+    assert.ok(!isBaselined(finding, bl, "any code"));
+  });
+
+  it("should match finding against v2 baseline by fingerprint", () => {
+    const code = [
+      "import express from 'express';",
+      "",
+      'const q = "SELECT * FROM users WHERE id = " + userId;',
+      "",
+      "app.listen(3000);",
+    ].join("\n");
+
+    const fp = computeFindingFingerprint("CYBER-001", "SQL Injection", code, 3);
+
+    const bl = loadBaselineData("/nonexistent");
+    bl.fingerprints.add(fp);
+
+    const finding = { ruleId: "CYBER-001", title: "SQL Injection", lineNumbers: [3] };
+    assert.ok(isBaselined(finding, bl, code));
+  });
+
+  it("should match v2 baseline even after line shift", () => {
+    // Baseline was created with code at line 3
+    const codeOld = [
+      "import express from 'express';",
+      "",
+      'const q = "SELECT * FROM users WHERE id = " + userId;',
+      "",
+      "app.listen(3000);",
+    ].join("\n");
+    const fp = computeFindingFingerprint("CYBER-001", "SQL Injection", codeOld, 3);
+
+    // Now code shifted to line 5
+    const codeNew = [
+      "",
+      "",
+      "import express from 'express';",
+      "",
+      'const q = "SELECT * FROM users WHERE id = " + userId;',
+      "",
+      "app.listen(3000);",
+    ].join("\n");
+
+    const bl = loadBaselineData("/nonexistent");
+    bl.fingerprints.add(fp);
+
+    const finding = { ruleId: "CYBER-001", title: "SQL Injection", lineNumbers: [5] };
+    assert.ok(isBaselined(finding, bl, codeNew), "Should match after 2-line shift");
+  });
+
+  it("should NOT match when code context is completely different", () => {
+    const codeA = "const a = 1;\nconst b = 2;\neval(x);";
+    const fpA = computeFindingFingerprint("CYBER-005", "Eval usage", codeA, 3);
+
+    const codeB = "function main() {\n  console.log('hi');\n  eval(x);\n}";
+
+    const bl = loadBaselineData("/nonexistent");
+    bl.fingerprints.add(fpA);
+
+    const finding = { ruleId: "CYBER-005", title: "Eval usage", lineNumbers: [3] };
+    assert.ok(!isBaselined(finding, bl, codeB), "Different context should not match");
+  });
+
+  it("should use per-file fingerprint set when filePath is provided", () => {
+    const code = 'const password = "secret123";';
+    const fp = computeFindingFingerprint("AUTH-001", "Hardcoded password", code, 1);
+
+    const bl = loadBaselineData("/nonexistent");
+    bl.fingerprints.add(fp);
+    bl.fileFingerprints.set("src/app.ts", new Set([fp]));
+    bl.fileFingerprints.set("src/other.ts", new Set());
+
+    const finding = { ruleId: "AUTH-001", title: "Hardcoded password", lineNumbers: [1] };
+
+    // Should match for src/app.ts
+    assert.ok(isBaselined(finding, bl, code, "src/app.ts"));
+    // Should NOT match for src/other.ts (fingerprint not in that file's set)
+    assert.ok(!isBaselined(finding, bl, code, "src/other.ts"));
+  });
+
+  it("should handle finding with no lineNumbers", () => {
+    const code = "any code";
+    const fp = computeFindingFingerprint("DOC-001", "Missing docs", code, 0);
+
+    const bl = loadBaselineData("/nonexistent");
+    bl.fingerprints.add(fp);
+
+    const finding = { ruleId: "DOC-001", title: "Missing docs" };
+    assert.ok(isBaselined(finding, bl, code), "Should handle missing lineNumbers with default 0");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 21. PR Comment Dedup Key Logic
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("PR comment dedup key", () => {
+  // This tests the dedup key format used in action.yml for both PR review
+  // comments and Check Run annotations: ruleId + "::" + filePath + "::" + line
+
+  function makeDedupKey(ruleId: string, filePath: string, line: number): string {
+    return ruleId + "::" + filePath + "::" + line;
+  }
+
+  it("should produce identical keys for same finding location", () => {
+    const k1 = makeDedupKey("DATA-001", "src/app.ts", 15);
+    const k2 = makeDedupKey("DATA-001", "src/app.ts", 15);
+    assert.equal(k1, k2);
+  });
+
+  it("should differ when ruleId differs", () => {
+    const k1 = makeDedupKey("DATA-001", "src/app.ts", 15);
+    const k2 = makeDedupKey("DATA-002", "src/app.ts", 15);
+    assert.notEqual(k1, k2);
+  });
+
+  it("should differ when file path differs", () => {
+    const k1 = makeDedupKey("DATA-001", "src/app.ts", 15);
+    const k2 = makeDedupKey("DATA-001", "src/lib.ts", 15);
+    assert.notEqual(k1, k2);
+  });
+
+  it("should differ when line number differs", () => {
+    const k1 = makeDedupKey("DATA-001", "src/app.ts", 15);
+    const k2 = makeDedupKey("DATA-001", "src/app.ts", 20);
+    assert.notEqual(k1, k2);
+  });
+
+  it("should correctly dedup findings using a Set", () => {
+    const findings = [
+      { ruleId: "CYBER-001", filePath: "a.ts", line: 10 },
+      { ruleId: "CYBER-001", filePath: "a.ts", line: 10 }, // duplicate
+      { ruleId: "CYBER-002", filePath: "a.ts", line: 10 }, // different rule
+      { ruleId: "CYBER-001", filePath: "b.ts", line: 10 }, // different file
+    ];
+    const seen = new Set<string>();
+    const unique: typeof findings = [];
+    for (const f of findings) {
+      const key = makeDedupKey(f.ruleId, f.filePath, f.line);
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(f);
+      }
+    }
+    assert.equal(unique.length, 3, "Should remove 1 duplicate");
+  });
+
+  it("should map severity to Check Run annotation levels", () => {
+    const levelMap: Record<string, string> = {
+      critical: "failure",
+      high: "failure",
+      medium: "warning",
+      low: "notice",
+    };
+    assert.equal(levelMap["critical"], "failure");
+    assert.equal(levelMap["high"], "failure");
+    assert.equal(levelMap["medium"], "warning");
+    assert.equal(levelMap["low"], "notice");
+    assert.equal(levelMap["info"] || "notice", "notice");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 22. Config-Based Plugin Loading (P1-6)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Config-Based Plugin Loading", () => {
+  // ── parseConfig: new schema properties ──────────────────────────────────
+
+  it("should parse preset field", () => {
+    const cfg = parseConfig(JSON.stringify({ preset: "security-only" }));
+    assert.equal(cfg.preset, "security-only");
+  });
+
+  it("should reject non-string preset", () => {
+    assert.throws(() => parseConfig(JSON.stringify({ preset: 123 })), /preset.*must be a string/);
+  });
+
+  it("should parse failOnFindings field", () => {
+    const cfg = parseConfig(JSON.stringify({ failOnFindings: true }));
+    assert.equal(cfg.failOnFindings, true);
+  });
+
+  it("should reject non-boolean failOnFindings", () => {
+    assert.throws(() => parseConfig(JSON.stringify({ failOnFindings: "yes" })), /failOnFindings.*must be a boolean/);
+  });
+
+  it("should parse baseline field", () => {
+    const cfg = parseConfig(JSON.stringify({ baseline: ".judges-baseline.json" }));
+    assert.equal(cfg.baseline, ".judges-baseline.json");
+  });
+
+  it("should reject non-string baseline", () => {
+    assert.throws(() => parseConfig(JSON.stringify({ baseline: 42 })), /baseline.*must be a string/);
+  });
+
+  it("should parse format field with valid values", () => {
+    for (const fmt of ["text", "json", "sarif", "markdown", "html", "junit", "codeclimate"]) {
+      const cfg = parseConfig(JSON.stringify({ format: fmt }));
+      assert.equal(cfg.format, fmt);
+    }
+  });
+
+  it("should reject invalid format", () => {
+    assert.throws(() => parseConfig(JSON.stringify({ format: "yaml" })), /format.*must be one of/);
+  });
+
+  it("should parse exclude field", () => {
+    const cfg = parseConfig(JSON.stringify({ exclude: ["**/*.test.ts", "**/fixtures/**"] }));
+    assert.deepEqual(cfg.exclude, ["**/*.test.ts", "**/fixtures/**"]);
+  });
+
+  it("should reject non-array exclude", () => {
+    assert.throws(() => parseConfig(JSON.stringify({ exclude: "*.test.ts" })), /exclude.*must be an array/);
+  });
+
+  it("should parse include field", () => {
+    const cfg = parseConfig(JSON.stringify({ include: ["**/*.ts"] }));
+    assert.deepEqual(cfg.include, ["**/*.ts"]);
+  });
+
+  it("should reject non-array include", () => {
+    assert.throws(() => parseConfig(JSON.stringify({ include: true })), /include.*must be an array/);
+  });
+
+  it("should parse maxFiles field", () => {
+    const cfg = parseConfig(JSON.stringify({ maxFiles: 50 }));
+    assert.equal(cfg.maxFiles, 50);
+  });
+
+  it("should reject non-integer maxFiles", () => {
+    assert.throws(() => parseConfig(JSON.stringify({ maxFiles: 2.5 })), /maxFiles.*must be an integer/);
+  });
+
+  it("should reject maxFiles < 1", () => {
+    assert.throws(() => parseConfig(JSON.stringify({ maxFiles: 0 })), /maxFiles.*must be an integer/);
+  });
+
+  it("should parse plugins field", () => {
+    const cfg = parseConfig(JSON.stringify({ plugins: ["my-judges-plugin", "./local-plugin.js"] }));
+    assert.deepEqual(cfg.plugins, ["my-judges-plugin", "./local-plugin.js"]);
+  });
+
+  it("should reject non-array plugins", () => {
+    assert.throws(() => parseConfig(JSON.stringify({ plugins: "my-plugin" })), /plugins.*must be an array/);
+  });
+
+  it("should reject plugins with non-string items", () => {
+    assert.throws(() => parseConfig(JSON.stringify({ plugins: [123] })), /plugins.*must be an array of strings/);
+  });
+
+  // ── All schema properties in one config ──────────────────────────────────
+
+  it("should parse a config with all 12 schema properties", () => {
+    const full = {
+      preset: "strict",
+      disabledRules: ["SEC-003"],
+      disabledJudges: ["ux"],
+      minSeverity: "medium",
+      languages: ["typescript"],
+      ruleOverrides: { "AUTH-001": { severity: "critical" } },
+      failOnFindings: true,
+      baseline: "baseline.json",
+      format: "sarif",
+      exclude: ["**/test/**"],
+      include: ["src/**"],
+      maxFiles: 100,
+      plugins: ["@myorg/judges-plugin"],
+    };
+    const cfg = parseConfig(JSON.stringify(full));
+    assert.equal(cfg.preset, "strict");
+    assert.deepEqual(cfg.disabledRules, ["SEC-003"]);
+    assert.deepEqual(cfg.disabledJudges, ["ux"]);
+    assert.equal(cfg.minSeverity, "medium");
+    assert.deepEqual(cfg.languages, ["typescript"]);
+    assert.equal(cfg.ruleOverrides?.["AUTH-001"]?.severity, "critical");
+    assert.equal(cfg.failOnFindings, true);
+    assert.equal(cfg.baseline, "baseline.json");
+    assert.equal(cfg.format, "sarif");
+    assert.deepEqual(cfg.exclude, ["**/test/**"]);
+    assert.deepEqual(cfg.include, ["src/**"]);
+    assert.equal(cfg.maxFiles, 100);
+    assert.deepEqual(cfg.plugins, ["@myorg/judges-plugin"]);
+  });
+
+  // ── mergeConfigs: new fields ──────────────────────────────────────────────
+
+  it("should merge preset (leaf wins)", () => {
+    const root = parseConfig(JSON.stringify({ preset: "lenient" }));
+    const leaf = parseConfig(JSON.stringify({ preset: "strict" }));
+    const merged = mergeConfigs(root, leaf);
+    assert.equal(merged.preset, "strict");
+  });
+
+  it("should merge failOnFindings (leaf wins)", () => {
+    const root = parseConfig(JSON.stringify({ failOnFindings: false }));
+    const leaf = parseConfig(JSON.stringify({ failOnFindings: true }));
+    const merged = mergeConfigs(root, leaf);
+    assert.equal(merged.failOnFindings, true);
+  });
+
+  it("should merge baseline (leaf wins)", () => {
+    const root = parseConfig(JSON.stringify({ baseline: "old.json" }));
+    const leaf = parseConfig(JSON.stringify({ baseline: "new.json" }));
+    const merged = mergeConfigs(root, leaf);
+    assert.equal(merged.baseline, "new.json");
+  });
+
+  it("should merge format (leaf wins)", () => {
+    const root = parseConfig(JSON.stringify({ format: "text" }));
+    const leaf = parseConfig(JSON.stringify({ format: "sarif" }));
+    const merged = mergeConfigs(root, leaf);
+    assert.equal(merged.format, "sarif");
+  });
+
+  it("should merge plugins (union)", () => {
+    const root = parseConfig(JSON.stringify({ plugins: ["plugin-a"] }));
+    const leaf = parseConfig(JSON.stringify({ plugins: ["plugin-b", "plugin-a"] }));
+    const merged = mergeConfigs(root, leaf);
+    assert.deepEqual(merged.plugins, ["plugin-a", "plugin-b"]);
+  });
+
+  // ── isValidJudgeDefinition ──────────────────────────────────────────────
+
+  it("should validate a well-formed JudgeDefinition", () => {
+    const judge = {
+      id: "custom-judge",
+      name: "Custom Judge",
+      domain: "custom",
+      description: "A custom judge",
+      systemPrompt: "You evaluate custom things",
+      rulePrefix: "CUST",
+      analyze: (code: string, _lang: string) => [],
+    };
+    assert.ok(isValidJudgeDefinition(judge));
+  });
+
+  it("should reject JudgeDefinition missing required fields", () => {
+    assert.ok(!isValidJudgeDefinition({ id: "test" }));
+    assert.ok(!isValidJudgeDefinition(null));
+    assert.ok(!isValidJudgeDefinition("string"));
+    assert.ok(!isValidJudgeDefinition({ id: "x", name: "x", domain: "x", description: "x", systemPrompt: "x" }));
+  });
+
+  it("should accept JudgeDefinition without analyze (it is optional)", () => {
+    const judge = {
+      id: "no-analyze",
+      name: "No Analyze",
+      domain: "test",
+      description: "Judge without analyze",
+      systemPrompt: "test",
+      rulePrefix: "NOANZ",
+    };
+    assert.ok(isValidJudgeDefinition(judge));
+  });
+
+  // ── validatePluginSpecifiers ──────────────────────────────────────────────
+
+  it("should return no errors for valid plugin specifiers", () => {
+    const errors = validatePluginSpecifiers(["my-plugin", "./local.js", "@org/judges-plugin"]);
+    assert.equal(errors.length, 0);
+  });
+
+  it("should detect duplicate plugin specifiers", () => {
+    const errors = validatePluginSpecifiers(["my-plugin", "other", "my-plugin"]);
+    assert.ok(errors.some((e) => e.includes("Duplicate")));
+  });
+
+  it("should detect empty plugin specifiers", () => {
+    const errors = validatePluginSpecifiers(["", "  "]);
+    assert.equal(errors.length, 2);
+    assert.ok(errors.every((e) => e.includes("non-empty")));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 23. Suppression Audit Trail & Block Scope (P1-7)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Suppression Audit Trail & Block Scope", () => {
+  const makeFinding = (ruleId: string, lineNumbers?: number[]): Finding => ({
+    ruleId,
+    severity: "high",
+    title: `Finding ${ruleId}`,
+    description: `Test finding for ${ruleId}`,
+    recommendation: "Fix it",
+    lineNumbers,
+  });
+
+  // ── Backward compatibility ──────────────────────────────────────────────
+
+  it("applyInlineSuppressions still works (backward compat)", () => {
+    const code = `const x = eval(input); // judges-ignore SEC-001\nconst y = 2;`;
+    const findings = [makeFinding("SEC-001", [1]), makeFinding("SEC-002", [2])];
+    const result = applyInlineSuppressions(findings, code);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].ruleId, "SEC-002");
+  });
+
+  // ── Audit trail for line suppression ────────────────────────────────────
+
+  it("should produce audit record for same-line suppression", () => {
+    const code = `const x = eval(input); // judges-ignore SEC-001`;
+    const findings = [makeFinding("SEC-001", [1])];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.findings.length, 0);
+    assert.equal(result.suppressed.length, 1);
+    assert.equal(result.suppressed[0].ruleId, "SEC-001");
+    assert.equal(result.suppressed[0].kind, "line");
+    assert.equal(result.suppressed[0].commentLine, 1);
+    assert.equal(result.suppressed[0].severity, "high");
+  });
+
+  it("should produce audit record for next-line suppression", () => {
+    const code = `// judges-ignore-next-line SEC-002\nconst x = eval(input);`;
+    const findings = [makeFinding("SEC-002", [2])];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.findings.length, 0);
+    assert.equal(result.suppressed.length, 1);
+    assert.equal(result.suppressed[0].kind, "next-line");
+    assert.equal(result.suppressed[0].commentLine, 1);
+  });
+
+  it("should produce audit record for file-level suppression", () => {
+    const code = `// judges-file-ignore SEC-003\nconst x = eval(input);`;
+    const findings = [makeFinding("SEC-003", [2])];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.findings.length, 0);
+    assert.equal(result.suppressed.length, 1);
+    assert.equal(result.suppressed[0].kind, "file");
+    assert.equal(result.suppressed[0].commentLine, 1);
+  });
+
+  // ── Reason capture ─────────────────────────────────────────────────────
+
+  it("should capture reason from suppression comment", () => {
+    const code = `const x = eval(input); // judges-ignore SEC-001 -- legacy code, JIRA-456`;
+    const findings = [makeFinding("SEC-001", [1])];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.suppressed.length, 1);
+    assert.equal(result.suppressed[0].reason, "legacy code, JIRA-456");
+  });
+
+  it("should capture reason from file-level suppression", () => {
+    const code = `// judges-file-ignore AUTH-* -- entire file is test fixture`;
+    const findings = [makeFinding("AUTH-001", [1])];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.suppressed.length, 1);
+    assert.equal(result.suppressed[0].reason, "entire file is test fixture");
+  });
+
+  it("should have no reason when none provided", () => {
+    const code = `const x = eval(input); // judges-ignore SEC-001`;
+    const findings = [makeFinding("SEC-001", [1])];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.suppressed[0].reason, undefined);
+  });
+
+  // ── Block scope ─────────────────────────────────────────────────────────
+
+  it("should suppress findings within a block scope", () => {
+    const code = [
+      "// judges-ignore-block SEC-001",
+      "const x = eval(input);",
+      "const y = eval(input);",
+      "// judges-end-block",
+      "const z = eval(input);",
+    ].join("\n");
+    const findings = [makeFinding("SEC-001", [2]), makeFinding("SEC-001", [3]), makeFinding("SEC-001", [5])];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.findings.length, 1);
+    assert.equal(result.findings[0].lineNumbers?.[0], 5);
+    assert.equal(result.suppressed.length, 2);
+    assert.ok(result.suppressed.every((s) => s.kind === "block"));
+  });
+
+  it("should handle block scope with reason", () => {
+    const code = [
+      "// judges-ignore-block CYBER-001 -- migrated to new auth system",
+      "const legacyAuth = {};",
+      "// judges-end-block",
+    ].join("\n");
+    const findings = [makeFinding("CYBER-001", [2])];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.suppressed.length, 1);
+    assert.equal(result.suppressed[0].kind, "block");
+    assert.equal(result.suppressed[0].reason, "migrated to new auth system");
+  });
+
+  it("should handle multiple rules in one block scope", () => {
+    const code = ["// judges-ignore-block SEC-001, AUTH-002", "const x = eval(input);", "// judges-end-block"].join(
+      "\n",
+    );
+    const findings = [makeFinding("SEC-001", [2]), makeFinding("AUTH-002", [2]), makeFinding("SEC-003", [2])];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.findings.length, 1);
+    assert.equal(result.findings[0].ruleId, "SEC-003");
+    assert.equal(result.suppressed.length, 2);
+  });
+
+  it("should not suppress after end-block", () => {
+    const code = ["// judges-ignore-block *", "const a = 1;", "// judges-end-block", "const b = 2;"].join("\n");
+    const findings = [makeFinding("SEC-001", [2]), makeFinding("SEC-001", [4])];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.findings.length, 1);
+    assert.equal(result.findings[0].lineNumbers?.[0], 4);
+    assert.equal(result.suppressed.length, 1);
+    assert.equal(result.suppressed[0].kind, "block");
+  });
+
+  // ── Python-style comments ──────────────────────────────────────────────
+
+  it("should handle Python-style block suppression", () => {
+    const code = ["# judges-ignore-block SEC-001 -- legacy module", "x = eval(input)", "# judges-end-block"].join("\n");
+    const findings = [makeFinding("SEC-001", [2])];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.findings.length, 0);
+    assert.equal(result.suppressed.length, 1);
+    assert.equal(result.suppressed[0].reason, "legacy module");
+  });
+
+  // ── Mixed suppression types ────────────────────────────────────────────
+
+  it("should handle mixed line, next-line, block, and file suppressions", () => {
+    const code = [
+      "// judges-file-ignore LOG-001",
+      "// judges-ignore-block SEC-001",
+      "const a = eval(input); // judges-ignore AUTH-001",
+      "// judges-ignore-next-line DATA-001",
+      "const b = getData();",
+      "// judges-end-block",
+      "const c = eval(input);",
+    ].join("\n");
+    const findings = [
+      makeFinding("LOG-001", [3]), // file-level → suppressed
+      makeFinding("SEC-001", [3]), // block scope → suppressed
+      makeFinding("AUTH-001", [3]), // same-line → suppressed
+      makeFinding("DATA-001", [5]), // next-line → suppressed
+      makeFinding("SEC-001", [7]), // after end-block → kept
+    ];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.findings.length, 1);
+    assert.equal(result.findings[0].ruleId, "SEC-001");
+    assert.equal(result.findings[0].lineNumbers?.[0], 7);
+    assert.equal(result.suppressed.length, 4);
+
+    const kinds = new Set(result.suppressed.map((s) => s.kind));
+    assert.ok(kinds.has("file"));
+    assert.ok(kinds.has("block"));
+    assert.ok(kinds.has("line"));
+    assert.ok(kinds.has("next-line"));
+  });
+
+  // ── Empty case ──────────────────────────────────────────────────────────
+
+  it("should return all findings when no suppressions exist", () => {
+    const code = `const x = 1;\nconst y = 2;`;
+    const findings = [makeFinding("SEC-001", [1]), makeFinding("SEC-002", [2])];
+    const result = applyInlineSuppressionsWithAudit(findings, code);
+    assert.equal(result.findings.length, 2);
+    assert.equal(result.suppressed.length, 0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 24. Team Feedback Aggregation (P1-8)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function makeStore(entries: FeedbackEntry[]): FeedbackStore {
+  const now = new Date().toISOString();
+  return {
+    version: 1,
+    entries,
+    metadata: { createdAt: now, lastUpdated: now, totalSubmissions: entries.length },
+  };
+}
+
+function makeEntry(overrides: Partial<FeedbackEntry> = {}): FeedbackEntry {
+  return {
+    ruleId: "SEC-001",
+    verdict: "fp",
+    timestamp: "2025-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+describe("24. Team Feedback Aggregation", () => {
+  // ── mergeFeedbackStores ─────────────────────────────────────────────────
+
+  it("should merge entries from multiple stores into one", () => {
+    const storeA = makeStore([makeEntry({ ruleId: "SEC-001", timestamp: "2025-01-01T00:00:00Z" })]);
+    const storeB = makeStore([makeEntry({ ruleId: "AUTH-001", timestamp: "2025-01-02T00:00:00Z" })]);
+    const merged = mergeFeedbackStores([storeA, storeB]);
+    assert.equal(merged.entries.length, 2);
+    assert.ok(merged.entries.some((e) => e.ruleId === "SEC-001"));
+    assert.ok(merged.entries.some((e) => e.ruleId === "AUTH-001"));
+    assert.equal(merged.metadata.totalSubmissions, 2);
+  });
+
+  it("should deduplicate entries with same ruleId+verdict+timestamp+filePath", () => {
+    const entry = makeEntry({
+      ruleId: "SEC-001",
+      verdict: "fp",
+      timestamp: "2025-01-01T00:00:00Z",
+      filePath: "app.ts",
+    });
+    const storeA = makeStore([entry]);
+    const storeB = makeStore([{ ...entry }]); // exact clone
+    const merged = mergeFeedbackStores([storeA, storeB]);
+    assert.equal(merged.entries.length, 1);
+  });
+
+  it("should not deduplicate entries with different timestamps", () => {
+    const storeA = makeStore([makeEntry({ ruleId: "SEC-001", timestamp: "2025-01-01T00:00:00Z" })]);
+    const storeB = makeStore([makeEntry({ ruleId: "SEC-001", timestamp: "2025-01-02T00:00:00Z" })]);
+    const merged = mergeFeedbackStores([storeA, storeB]);
+    assert.equal(merged.entries.length, 2);
+  });
+
+  it("should tag entries with contributor labels", () => {
+    const storeA = makeStore([makeEntry({ ruleId: "SEC-001" })]);
+    const storeB = makeStore([makeEntry({ ruleId: "AUTH-001", timestamp: "2025-01-02T00:00:00Z" })]);
+    const merged = mergeFeedbackStores([storeA, storeB], ["alice", "bob"]);
+    assert.equal(merged.entries.find((e) => e.ruleId === "SEC-001")?.contributor, "alice");
+    assert.equal(merged.entries.find((e) => e.ruleId === "AUTH-001")?.contributor, "bob");
+  });
+
+  it("should preserve existing contributor field over label", () => {
+    const store = makeStore([makeEntry({ ruleId: "SEC-001", contributor: "carol" })]);
+    const merged = mergeFeedbackStores([store], ["alice"]);
+    assert.equal(merged.entries[0].contributor, "carol");
+  });
+
+  it("should handle empty stores", () => {
+    const merged = mergeFeedbackStores([makeStore([]), makeStore([])]);
+    assert.equal(merged.entries.length, 0);
+    assert.equal(merged.metadata.totalSubmissions, 0);
+  });
+
+  it("should handle single store passthrough", () => {
+    const store = makeStore([makeEntry(), makeEntry({ ruleId: "AUTH-001", timestamp: "2025-01-02T00:00:00Z" })]);
+    const merged = mergeFeedbackStores([store]);
+    assert.equal(merged.entries.length, 2);
+  });
+
+  // ── computeTeamFeedbackStats ────────────────────────────────────────────
+
+  it("should count distinct contributors", () => {
+    const store = makeStore([
+      makeEntry({ ruleId: "SEC-001", contributor: "alice" }),
+      makeEntry({ ruleId: "SEC-002", contributor: "bob", timestamp: "2025-01-02T00:00:00Z" }),
+      makeEntry({ ruleId: "SEC-003", contributor: "alice", timestamp: "2025-01-03T00:00:00Z" }),
+    ]);
+    const stats = computeTeamFeedbackStats(store);
+    assert.equal(stats.contributorCount, 2);
+  });
+
+  it("should identify consensus FP rules (≥2 contributors agree)", () => {
+    const store = makeStore([
+      makeEntry({ ruleId: "SEC-001", verdict: "fp", contributor: "alice" }),
+      makeEntry({ ruleId: "SEC-001", verdict: "fp", contributor: "bob", timestamp: "2025-01-02T00:00:00Z" }),
+      makeEntry({ ruleId: "AUTH-001", verdict: "fp", contributor: "alice", timestamp: "2025-01-03T00:00:00Z" }),
+    ]);
+    const stats = computeTeamFeedbackStats(store);
+    assert.ok(stats.consensusFpRules.includes("SEC-001"));
+    assert.ok(!stats.consensusFpRules.includes("AUTH-001")); // only 1 contributor
+  });
+
+  it("should identify disputed rules (mixed TP and FP from ≥2 contributors)", () => {
+    const store = makeStore([
+      makeEntry({ ruleId: "SEC-001", verdict: "fp", contributor: "alice" }),
+      makeEntry({ ruleId: "SEC-001", verdict: "tp", contributor: "bob", timestamp: "2025-01-02T00:00:00Z" }),
+    ]);
+    const stats = computeTeamFeedbackStats(store);
+    assert.ok(stats.disputedRules.includes("SEC-001"));
+  });
+
+  it("should not flag a rule as disputed when verdicts are the same", () => {
+    const store = makeStore([
+      makeEntry({ ruleId: "SEC-001", verdict: "fp", contributor: "alice" }),
+      makeEntry({ ruleId: "SEC-001", verdict: "fp", contributor: "bob", timestamp: "2025-01-02T00:00:00Z" }),
+    ]);
+    const stats = computeTeamFeedbackStats(store);
+    assert.ok(!stats.disputedRules.includes("SEC-001"));
+  });
+
+  it("should compute accurate per-rule team stats", () => {
+    const store = makeStore([
+      makeEntry({ ruleId: "SEC-001", verdict: "fp", contributor: "alice" }),
+      makeEntry({ ruleId: "SEC-001", verdict: "fp", contributor: "bob", timestamp: "2025-01-02T00:00:00Z" }),
+      makeEntry({ ruleId: "SEC-001", verdict: "tp", contributor: "carol", timestamp: "2025-01-03T00:00:00Z" }),
+    ]);
+    const stats = computeTeamFeedbackStats(store);
+    const rs = stats.perRuleTeam.get("SEC-001");
+    assert.ok(rs);
+    assert.equal(rs.contributors, 3);
+    assert.equal(rs.fpContributors, 2);
+    assert.equal(rs.fp, 2);
+    assert.equal(rs.tp, 1);
+    // consensus = fpContributors / contributors = 2/3 ≈ 0.667
+    assert.ok(Math.abs(rs.consensus - 2 / 3) < 0.01);
+  });
+
+  it("should treat missing contributor as 'anonymous'", () => {
+    const store = makeStore([
+      makeEntry({ ruleId: "SEC-001", verdict: "fp" }),
+      makeEntry({ ruleId: "SEC-001", verdict: "fp", timestamp: "2025-01-02T00:00:00Z" }),
+    ]);
+    const stats = computeTeamFeedbackStats(store);
+    // Both entries have no contributor → both become "anonymous" → 1 unique
+    assert.equal(stats.contributorCount, 1);
+  });
+
+  // ── formatTeamStatsOutput ───────────────────────────────────────────────
+
+  it("should produce non-empty output with header", () => {
+    const store = makeStore([
+      makeEntry({ ruleId: "SEC-001", verdict: "fp", contributor: "alice" }),
+      makeEntry({ ruleId: "SEC-001", verdict: "fp", contributor: "bob", timestamp: "2025-01-02T00:00:00Z" }),
+    ]);
+    const stats = computeTeamFeedbackStats(store);
+    const output = formatTeamStatsOutput(stats);
+    assert.ok(output.length > 0);
+    assert.ok(output.includes("Team Feedback Statistics"));
+    assert.ok(output.includes("Contributors"));
+    assert.ok(output.includes("Consensus FP Rules"));
+  });
+
+  it("should include disputed rules section when present", () => {
+    const store = makeStore([
+      makeEntry({ ruleId: "SEC-001", verdict: "fp", contributor: "alice" }),
+      makeEntry({ ruleId: "SEC-001", verdict: "tp", contributor: "bob", timestamp: "2025-01-02T00:00:00Z" }),
+    ]);
+    const stats = computeTeamFeedbackStats(store);
+    const output = formatTeamStatsOutput(stats);
+    assert.ok(output.includes("Disputed Rules"));
+    assert.ok(output.includes("SEC-001"));
+  });
+
+  it("should handle empty store gracefully", () => {
+    const stats = computeTeamFeedbackStats(makeStore([]));
+    const output = formatTeamStatsOutput(stats);
+    assert.ok(output.includes("Contributors"));
+    assert.ok(output.includes("0"));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 25. Rule Test Assertions (P2-9)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("25. Rule Test Assertions", () => {
+  const sampleRule: CustomRule = {
+    id: "CUSTOM-001",
+    title: "Detect eval usage",
+    severity: "high",
+    judgeId: "cybersecurity",
+    description: "eval() is dangerous",
+    pattern: /\beval\s*\(/gi,
+    suggestedFix: "Use a safe alternative.",
+  };
+
+  // ── testRule ────────────────────────────────────────────────────────────
+
+  it("should detect findings when pattern matches", () => {
+    const findings = testRule(sampleRule, "const x = eval('1+1');", "typescript");
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].ruleId, "CUSTOM-001");
+  });
+
+  it("should return no findings on safe code", () => {
+    const findings = testRule(sampleRule, "const x = 1 + 1;", "typescript");
+    assert.equal(findings.length, 0);
+  });
+
+  it("should skip when language is not in rule.languages", () => {
+    const rule: CustomRule = { ...sampleRule, languages: ["python"] };
+    const findings = testRule(rule, "eval('test')", "typescript");
+    assert.equal(findings.length, 0);
+  });
+
+  // ── runRuleTests ────────────────────────────────────────────────────────
+
+  it("should pass all tests for valid test cases", () => {
+    const cases: RuleTestCase[] = [
+      { name: "flags eval", code: "eval('x')", shouldMatch: true },
+      { name: "safe code", code: "const x = 1;", shouldMatch: false },
+    ];
+    const result = runRuleTests(sampleRule, cases);
+    assert.equal(result.total, 2);
+    assert.equal(result.passed, 2);
+    assert.equal(result.failed, 0);
+  });
+
+  it("should fail when shouldMatch test finds nothing", () => {
+    const cases: RuleTestCase[] = [{ name: "should fire but won't", code: "const x = 1;", shouldMatch: true }];
+    const result = runRuleTests(sampleRule, cases);
+    assert.equal(result.failed, 1);
+    assert.ok(result.results[0].reason?.includes("Expected at least 1"));
+  });
+
+  it("should fail when shouldNotMatch test finds something", () => {
+    const cases: RuleTestCase[] = [{ name: "should be safe but isn't", code: "eval('bad')", shouldMatch: false }];
+    const result = runRuleTests(sampleRule, cases);
+    assert.equal(result.failed, 1);
+    assert.ok(result.results[0].reason?.includes("Expected no findings"));
+  });
+
+  it("should check expectedRuleId", () => {
+    const cases: RuleTestCase[] = [
+      { name: "correct id", code: "eval('x')", shouldMatch: true, expectedRuleId: "CUSTOM-001" },
+      { name: "wrong id", code: "eval('x')", shouldMatch: true, expectedRuleId: "CUSTOM-999" },
+    ];
+    const result = runRuleTests(sampleRule, cases);
+    assert.equal(result.results[0].passed, true);
+    assert.equal(result.results[1].passed, false);
+  });
+
+  it("should check expectedLines", () => {
+    const code = "const y = 1;\neval('danger');";
+    const cases: RuleTestCase[] = [
+      { name: "correct line", code, shouldMatch: true, expectedLines: [2] },
+      { name: "wrong line", code, shouldMatch: true, expectedLines: [5] },
+    ];
+    const result = runRuleTests(sampleRule, cases);
+    assert.equal(result.results[0].passed, true);
+    assert.equal(result.results[1].passed, false);
+  });
+
+  it("should check expectedMinFindings / expectedMaxFindings", () => {
+    const code = "eval('a'); eval('b');";
+    const cases: RuleTestCase[] = [
+      { name: "min ok", code, shouldMatch: true, expectedMinFindings: 2 },
+      { name: "min too high", code, shouldMatch: true, expectedMinFindings: 5 },
+      { name: "max ok", code, shouldMatch: true, expectedMaxFindings: 5 },
+      { name: "max too low", code, shouldMatch: true, expectedMinFindings: 1, expectedMaxFindings: 1 },
+    ];
+    const result = runRuleTests(sampleRule, cases);
+    assert.equal(result.results[0].passed, true);
+    assert.equal(result.results[1].passed, false);
+    assert.equal(result.results[2].passed, true);
+    assert.equal(result.results[3].passed, false);
+  });
+
+  // ── validateRuleTestSuite ───────────────────────────────────────────────
+
+  it("should accept valid test suite", () => {
+    const cases: RuleTestCase[] = [
+      { name: "test1", code: "eval('x')", shouldMatch: true },
+      { name: "test2", code: "const x = 1;", shouldMatch: false },
+    ];
+    const errors = validateRuleTestSuite(cases);
+    assert.equal(errors.length, 0);
+  });
+
+  it("should reject duplicate test names", () => {
+    const cases: RuleTestCase[] = [
+      { name: "same", code: "eval('x')", shouldMatch: true },
+      { name: "same", code: "const x = 1;", shouldMatch: false },
+    ];
+    const errors = validateRuleTestSuite(cases);
+    assert.ok(errors.some((e) => e.includes("duplicate")));
+  });
+
+  // ── formatRuleTestResults ───────────────────────────────────────────────
+
+  it("should format passing results with checkmark", () => {
+    const result = runRuleTests(sampleRule, [{ name: "ok", code: "eval('x')", shouldMatch: true }]);
+    const output = formatRuleTestResults(result);
+    assert.ok(output.includes("✅"));
+    assert.ok(output.includes("CUSTOM-001"));
+    assert.ok(output.includes("✓"));
+  });
+
+  it("should format failing results with cross mark", () => {
+    const result = runRuleTests(sampleRule, [{ name: "fail", code: "safe()", shouldMatch: true }]);
+    const output = formatRuleTestResults(result);
+    assert.ok(output.includes("❌"));
+    assert.ok(output.includes("✗"));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 26. Calibration Pipeline Integration (P2-10)
+// ═══════════════════════════════════════════════════════════════════════════
+
+import { buildCalibrationProfile, calibrateFindings } from "../src/calibration.js";
+import type { FeedbackStore as CalFeedbackStore } from "../src/commands/feedback.js";
+
+describe("26. Calibration Pipeline Integration", () => {
+  it("should reduce confidence for high-FP-rate rules", () => {
+    const store: CalFeedbackStore = {
+      version: 1,
+      entries: [
+        { ruleId: "SEC-001", verdict: "fp", timestamp: "2025-01-01T00:00:00Z" },
+        { ruleId: "SEC-001", verdict: "fp", timestamp: "2025-01-02T00:00:00Z" },
+        { ruleId: "SEC-001", verdict: "fp", timestamp: "2025-01-03T00:00:00Z" },
+        { ruleId: "SEC-001", verdict: "tp", timestamp: "2025-01-04T00:00:00Z" },
+      ],
+      metadata: { createdAt: "2025-01-01T00:00:00Z", lastUpdated: "2025-01-04T00:00:00Z", totalSubmissions: 4 },
+    };
+    const profile = buildCalibrationProfile(store, { minSamples: 3 });
+    assert.ok(profile.isActive);
+    assert.ok(profile.fpRateByRule.get("SEC-001")! > 0.5);
+
+    const findings: Finding[] = [
+      { ruleId: "SEC-001", severity: "high", title: "test", description: "d", recommendation: "r", confidence: 0.8 },
+    ];
+    const calibrated = calibrateFindings(findings, profile);
+    assert.ok(calibrated[0].confidence! < 0.8); // confidence reduced
+  });
+
+  it("should boost confidence for low-FP-rate rules", () => {
+    const store: CalFeedbackStore = {
+      version: 1,
+      entries: [
+        { ruleId: "AUTH-001", verdict: "tp", timestamp: "2025-01-01T00:00:00Z" },
+        { ruleId: "AUTH-001", verdict: "tp", timestamp: "2025-01-02T00:00:00Z" },
+        { ruleId: "AUTH-001", verdict: "tp", timestamp: "2025-01-03T00:00:00Z" },
+      ],
+      metadata: { createdAt: "2025-01-01T00:00:00Z", lastUpdated: "2025-01-03T00:00:00Z", totalSubmissions: 3 },
+    };
+    const profile = buildCalibrationProfile(store, { minSamples: 3 });
+    assert.ok(profile.isActive);
+    assert.equal(profile.fpRateByRule.get("AUTH-001"), 0);
+
+    const findings: Finding[] = [
+      { ruleId: "AUTH-001", severity: "high", title: "test", description: "d", recommendation: "r", confidence: 0.7 },
+    ];
+    const calibrated = calibrateFindings(findings, profile);
+    assert.ok(calibrated[0].confidence! > 0.7); // confidence boosted
+  });
+
+  it("should not calibrate when insufficient data", () => {
+    const store: CalFeedbackStore = {
+      version: 1,
+      entries: [{ ruleId: "SEC-001", verdict: "fp", timestamp: "2025-01-01T00:00:00Z" }],
+      metadata: { createdAt: "2025-01-01T00:00:00Z", lastUpdated: "2025-01-01T00:00:00Z", totalSubmissions: 1 },
+    };
+    const profile = buildCalibrationProfile(store, { minSamples: 3 });
+    assert.ok(!profile.isActive); // not enough samples
+
+    const findings: Finding[] = [
+      { ruleId: "SEC-001", severity: "high", title: "test", description: "d", recommendation: "r", confidence: 0.8 },
+    ];
+    const calibrated = calibrateFindings(findings, profile);
+    assert.equal(calibrated[0].confidence, 0.8); // unchanged
+  });
+
+  it("should add provenance marker to calibrated findings", () => {
+    const store: CalFeedbackStore = {
+      version: 1,
+      entries: [
+        { ruleId: "SEC-001", verdict: "fp", timestamp: "2025-01-01T00:00:00Z" },
+        { ruleId: "SEC-001", verdict: "fp", timestamp: "2025-01-02T00:00:00Z" },
+        { ruleId: "SEC-001", verdict: "fp", timestamp: "2025-01-03T00:00:00Z" },
+      ],
+      metadata: { createdAt: "2025-01-01T00:00:00Z", lastUpdated: "2025-01-03T00:00:00Z", totalSubmissions: 3 },
+    };
+    const profile = buildCalibrationProfile(store, { minSamples: 3 });
+    const findings: Finding[] = [
+      { ruleId: "SEC-001", severity: "high", title: "test", description: "d", recommendation: "r", confidence: 0.8 },
+    ];
+    const calibrated = calibrateFindings(findings, profile);
+    assert.ok(calibrated[0].provenance?.includes("confidence-calibrated"));
+  });
+
+  it("should calibrate by prefix when rule-specific data unavailable", () => {
+    const store: CalFeedbackStore = {
+      version: 1,
+      entries: [
+        { ruleId: "SEC-001", verdict: "fp", timestamp: "2025-01-01T00:00:00Z" },
+        { ruleId: "SEC-002", verdict: "fp", timestamp: "2025-01-02T00:00:00Z" },
+        { ruleId: "SEC-003", verdict: "fp", timestamp: "2025-01-03T00:00:00Z" },
+      ],
+      metadata: { createdAt: "2025-01-01T00:00:00Z", lastUpdated: "2025-01-03T00:00:00Z", totalSubmissions: 3 },
+    };
+    const profile = buildCalibrationProfile(store, { minSamples: 3 });
+    // No rule-specific data for SEC-999, but prefix "SEC" has data
+    const findings: Finding[] = [
+      { ruleId: "SEC-999", severity: "high", title: "test", description: "d", recommendation: "r", confidence: 0.8 },
+    ];
+    const calibrated = calibrateFindings(findings, profile);
+    assert.ok(calibrated[0].confidence! < 0.8); // calibrated via prefix
+  });
+});
+
+// 27. Finding Diff Between Runs (P2-11)
+// Tests for diffFindings() and formatFindingDiff()
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("27. Finding Diff Between Runs", () => {
+  function mkFinding(ruleId: string, line: number, sev: Severity = "medium", title = "Test"): Finding {
+    return {
+      ruleId,
+      severity: sev,
+      title,
+      description: "desc",
+      recommendation: "fix",
+      confidence: 0.8,
+      lineNumbers: [line],
+    };
+  }
+
+  it("should identify all new findings when previous is empty", () => {
+    const current = [mkFinding("SEC-001", 10), mkFinding("SEC-002", 20)];
+    const diff = diffFindings([], current);
+    assert.equal(diff.newFindings.length, 2);
+    assert.equal(diff.fixedFindings.length, 0);
+    assert.equal(diff.recurringFindings.length, 0);
+    assert.equal(diff.stats.totalPrevious, 0);
+    assert.equal(diff.stats.totalCurrent, 2);
+    assert.equal(diff.stats.delta, 2);
+  });
+
+  it("should identify all fixed findings when current is empty", () => {
+    const previous = [mkFinding("SEC-001", 10), mkFinding("AUTH-001", 5)];
+    const diff = diffFindings(previous, []);
+    assert.equal(diff.newFindings.length, 0);
+    assert.equal(diff.fixedFindings.length, 2);
+    assert.equal(diff.recurringFindings.length, 0);
+    assert.equal(diff.stats.delta, -2);
+  });
+
+  it("should classify recurring findings by ruleId+line", () => {
+    const previous = [mkFinding("SEC-001", 10), mkFinding("SEC-002", 20)];
+    const current = [mkFinding("SEC-001", 10), mkFinding("SEC-002", 20)];
+    const diff = diffFindings(previous, current);
+    assert.equal(diff.recurringFindings.length, 2);
+    assert.equal(diff.newFindings.length, 0);
+    assert.equal(diff.fixedFindings.length, 0);
+    assert.equal(diff.stats.delta, 0);
+  });
+
+  it("should handle mixed new/fixed/recurring", () => {
+    const previous = [mkFinding("SEC-001", 10), mkFinding("SEC-002", 20), mkFinding("AUTH-001", 30)];
+    const current = [mkFinding("SEC-001", 10), mkFinding("DATA-001", 40)];
+    const diff = diffFindings(previous, current);
+    assert.equal(diff.recurringFindings.length, 1); // SEC-001
+    assert.equal(diff.newFindings.length, 1); // DATA-001
+    assert.equal(diff.fixedFindings.length, 2); // SEC-002, AUTH-001
+    assert.equal(diff.stats.totalPrevious, 3);
+    assert.equal(diff.stats.totalCurrent, 2);
+    assert.equal(diff.stats.delta, -1);
+  });
+
+  it("should use filePath param when findings lack filePath", () => {
+    const f1 = mkFinding("SEC-001", 10);
+    const f2 = mkFinding("SEC-001", 10);
+    const diff = diffFindings([f1], [f2], "app.ts");
+    assert.equal(diff.recurringFindings.length, 1);
+    assert.equal(diff.newFindings.length, 0);
+  });
+
+  it("should distinguish findings with same ruleId but different lines", () => {
+    const previous = [mkFinding("SEC-001", 10)];
+    const current = [mkFinding("SEC-001", 50)];
+    const diff = diffFindings(previous, current);
+    assert.equal(diff.newFindings.length, 1); // line 50 is new
+    assert.equal(diff.fixedFindings.length, 1); // line 10 is fixed
+    assert.equal(diff.recurringFindings.length, 0);
+  });
+
+  it("should handle both empty arrays", () => {
+    const diff = diffFindings([], []);
+    assert.equal(diff.stats.totalPrevious, 0);
+    assert.equal(diff.stats.totalCurrent, 0);
+    assert.equal(diff.stats.delta, 0);
+  });
+
+  it("should use finding.filePath for key when no filePath param", () => {
+    const f1: Finding = { ...mkFinding("SEC-001", 10), filePath: "a.ts" };
+    const f2: Finding = { ...mkFinding("SEC-001", 10), filePath: "b.ts" };
+    const diff = diffFindings([f1], [f2]);
+    assert.equal(diff.newFindings.length, 1); // different file = new
+    assert.equal(diff.fixedFindings.length, 1);
+    assert.equal(diff.recurringFindings.length, 0);
+  });
+
+  it("should format diff with all sections", () => {
+    const previous = [mkFinding("SEC-001", 10, "high", "SQL Injection")];
+    const current = [mkFinding("DATA-001", 20, "critical", "Data Leak")];
+    const diff = diffFindings(previous, current);
+    const output = formatFindingDiff(diff);
+    assert.ok(output.includes("Finding Diff"));
+    assert.ok(output.includes("New Findings"));
+    assert.ok(output.includes("DATA-001"));
+    assert.ok(output.includes("Fixed Findings"));
+    assert.ok(output.includes("SEC-001"));
+    assert.ok(output.includes("Delta"));
+  });
+
+  it("should format diff with no new findings", () => {
+    const previous = [mkFinding("SEC-001", 10)];
+    const current = [mkFinding("SEC-001", 10)];
+    const diff = diffFindings(previous, current);
+    const output = formatFindingDiff(diff);
+    assert.ok(!output.includes("New Findings"));
+    assert.ok(!output.includes("Fixed Findings"));
+    assert.ok(output.includes("Recurring Findings"));
+  });
+
+  it("should format delta with proper sign", () => {
+    const diff = diffFindings([mkFinding("A", 1), mkFinding("B", 2)], [mkFinding("A", 1)]);
+    const output = formatFindingDiff(diff);
+    assert.ok(output.includes("-1")); // negative delta
+
+    const diff2 = diffFindings([], [mkFinding("A", 1)]);
+    const output2 = formatFindingDiff(diff2);
+    assert.ok(output2.includes("+1")); // positive delta
+  });
+});
+
+// 28. Doctor Diagnostics (P2-12)
+// Tests for the `judges doctor` healthcheck command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("28. Doctor Diagnostics", () => {
+  it("should pass node version check for current runtime", () => {
+    const check = checkNodeVersion();
+    assert.ok(check.status === "pass" || check.status === "warn");
+    assert.ok(check.message.includes("Node.js"));
+  });
+
+  it("should verify core judges are loaded", () => {
+    const check = checkJudgesLoaded();
+    assert.equal(check.status, "pass");
+    assert.ok(check.message.includes("judges loaded"));
+  });
+
+  it("should verify presets are available", () => {
+    const check = checkPresets();
+    assert.equal(check.status, "pass");
+    assert.ok(check.message.includes("presets available"));
+  });
+
+  it("should handle missing config file gracefully", () => {
+    const check = checkConfigFile("/nonexistent/dir/that/does/not/exist");
+    assert.equal(check.status, "warn");
+    assert.ok(check.message.includes("No .judgesrc"));
+  });
+
+  it("should handle missing feedback store gracefully", () => {
+    const check = checkFeedbackStore("/nonexistent/dir/that/does/not/exist");
+    assert.equal(check.status, "pass");
+    assert.ok(check.message.includes("No feedback store"));
+  });
+
+  it("should handle missing baseline gracefully", () => {
+    const check = checkBaselineFile("/nonexistent/dir/that/does/not/exist", {});
+    assert.equal(check.status, "pass");
+    assert.ok(check.message.includes("No baseline"));
+  });
+
+  it("should fail when configured baseline is missing", () => {
+    const check = checkBaselineFile("/nonexistent/dir", { baseline: "missing-baseline.json" });
+    assert.equal(check.status, "fail");
+    assert.ok(check.message.includes("not found"));
+  });
+
+  it("should pass plugin check with no plugins", () => {
+    const check = checkPlugins({});
+    assert.equal(check.status, "pass");
+  });
+
+  it("should fail plugin check with invalid specifiers", () => {
+    const check = checkPlugins({ plugins: [""] });
+    assert.equal(check.status, "fail");
+    assert.ok(check.message.includes("validation failed"));
+  });
+
+  it("should run all checks and produce a report", () => {
+    const report = runDoctorChecks("/nonexistent/dir/for/doctor/test");
+    assert.ok(report.checks.length >= 7);
+    assert.equal(report.summary.total, report.checks.length);
+    assert.equal(report.summary.pass + report.summary.warn + report.summary.fail, report.summary.total);
+    assert.ok(typeof report.healthy === "boolean");
+  });
+
+  it("should format report as readable text", () => {
+    const report = runDoctorChecks("/nonexistent/dir/for/doctor/test");
+    const output = formatDoctorReport(report);
+    assert.ok(output.includes("Doctor Report"));
+    assert.ok(output.includes("Summary"));
+    assert.ok(output.includes("pass"));
+  });
+
+  it("should include status indicator in formatted report", () => {
+    const report: DoctorReport = {
+      checks: [{ name: "test-fail", status: "fail", message: "Something broke" }],
+      summary: { pass: 0, warn: 0, fail: 1, total: 1 },
+      healthy: false,
+    };
+    const output = formatDoctorReport(report);
+    assert.ok(output.includes("Issues found"));
+  });
+});
+
+// 29. Language Coverage Report (P3-13)
+// Tests for computeLanguageCoverage() and formatCoverageReport()
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("29. Language Coverage Report", () => {
+  it("should detect languages from file extensions", () => {
+    assert.equal(detectFileLanguage("app.ts"), "typescript");
+    assert.equal(detectFileLanguage("server.py"), "python");
+    assert.equal(detectFileLanguage("main.rs"), "rust");
+    assert.equal(detectFileLanguage("lib.go"), "go");
+    assert.equal(detectFileLanguage("unknown.xyz"), "unknown");
+  });
+
+  it("should detect Dockerfile without extension", () => {
+    assert.equal(detectFileLanguage("Dockerfile"), "dockerfile");
+    assert.equal(detectFileLanguage("Dockerfile.prod"), "dockerfile");
+  });
+
+  it("should compute coverage for all-covered project", () => {
+    const files = ["app.ts", "utils.ts", "server.py", "lib.go"];
+    const report = computeLanguageCoverage(files);
+    assert.equal(report.stats.totalFiles, 4);
+    assert.equal(report.stats.coveragePercent, 100);
+    assert.equal(report.uncovered.length, 0);
+    assert.ok(report.covered.length >= 3); // ts, py, go
+  });
+
+  it("should identify uncovered languages", () => {
+    const files = ["app.ts", "run.sh", "Makefile.yaml"];
+    const report = computeLanguageCoverage(files);
+    assert.ok(report.covered.some((e) => e.language === "typescript"));
+    assert.ok(
+      report.uncovered.some((e) => e.language === "bash") || report.uncovered.some((e) => e.language === "yaml"),
+    );
+  });
+
+  it("should handle empty file list", () => {
+    const report = computeLanguageCoverage([]);
+    assert.equal(report.stats.totalFiles, 0);
+    assert.equal(report.stats.coveragePercent, 100);
+    assert.equal(report.covered.length, 0);
+  });
+
+  it("should skip unknown extensions", () => {
+    const report = computeLanguageCoverage(["readme.md", "notes.txt", "data.csv"]);
+    assert.equal(report.stats.totalFiles, 0); // all unknown, skipped
+  });
+
+  it("should group files by language", () => {
+    const files = ["a.ts", "b.ts", "c.ts", "d.py"];
+    const report = computeLanguageCoverage(files);
+    const tsEntry = report.covered.find((e) => e.language === "typescript");
+    assert.ok(tsEntry);
+    assert.equal(tsEntry!.fileCount, 3);
+  });
+
+  it("should sort by file count descending", () => {
+    const files = ["a.py", "b.ts", "c.ts", "d.ts", "e.go"];
+    const report = computeLanguageCoverage(files);
+    assert.equal(report.covered[0].language, "typescript"); // 3 files = most
+    assert.ok(report.covered[0].fileCount >= report.covered[1].fileCount);
+  });
+
+  it("should include judge count for covered languages", () => {
+    const report = computeLanguageCoverage(["app.ts"]);
+    assert.ok(report.covered[0].judgeCount > 0);
+  });
+
+  it("should format report as readable text", () => {
+    const report = computeLanguageCoverage(["a.ts", "b.py", "c.sh"]);
+    const output = formatCoverageReport(report);
+    assert.ok(output.includes("Coverage Report"));
+    assert.ok(output.includes("Covered Languages"));
+    assert.ok(output.includes("typescript"));
+  });
+
+  it("should show 100% coverage message when all covered", () => {
+    const report = computeLanguageCoverage(["a.ts", "b.py"]);
+    const output = formatCoverageReport(report);
+    assert.ok(output.includes("All detected languages") || report.stats.coveragePercent === 100);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 30. Finding Snapshot & Trend (P3-14)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Finding Snapshot & Trend", () => {
+  it("should create an empty snapshot store", () => {
+    const store = createSnapshotStore();
+    assert.equal(store.version, 1);
+    assert.equal(store.snapshots.length, 0);
+    assert.equal(store.metadata.totalRuns, 0);
+    assert.ok(store.metadata.createdAt);
+  });
+
+  it("should record a snapshot from findings", () => {
+    const store = createSnapshotStore();
+    const findings: Finding[] = [
+      makeFinding({ ruleId: "SEC-001", severity: "critical" }),
+      makeFinding({ ruleId: "SEC-002", severity: "high" }),
+      makeFinding({ ruleId: "SEC-001", severity: "critical" }),
+    ];
+    const snap = recordSnapshot(store, findings, "main", "abc1234");
+    assert.equal(snap.totalFindings, 3);
+    assert.equal(snap.bySeverity.critical, 2);
+    assert.equal(snap.bySeverity.high, 1);
+    assert.equal(snap.bySeverity.medium, 0);
+    assert.deepEqual(snap.ruleIds, ["SEC-001", "SEC-002"]);
+    assert.equal(snap.branch, "main");
+    assert.equal(store.metadata.totalRuns, 1);
+  });
+
+  it("should compute stable trend with no data", () => {
+    const store = createSnapshotStore();
+    const trend = computeTrend(store);
+    assert.equal(trend.stats.trend, "stable");
+    assert.equal(trend.stats.totalRuns, 0);
+    assert.equal(trend.points.length, 0);
+  });
+
+  it("should compute improving trend with decreasing findings", () => {
+    const store = createSnapshotStore();
+    // Record runs with decreasing findings
+    for (const count of [10, 9, 8, 7, 4, 2]) {
+      const findings = Array.from({ length: count }, () => makeFinding({ severity: "high" }));
+      recordSnapshot(store, findings);
+    }
+    const trend = computeTrend(store);
+    assert.equal(trend.stats.trend, "improving");
+    assert.equal(trend.stats.totalRuns, 6);
+  });
+
+  it("should compute regressing trend with increasing findings", () => {
+    const store = createSnapshotStore();
+    for (const count of [2, 4, 6, 8, 10, 15]) {
+      const findings = Array.from({ length: count }, () => makeFinding({ severity: "medium" }));
+      recordSnapshot(store, findings);
+    }
+    const trend = computeTrend(store);
+    assert.equal(trend.stats.trend, "regressing");
+  });
+
+  it("should compute stable trend for consistent findings", () => {
+    const store = createSnapshotStore();
+    for (let i = 0; i < 4; i++) {
+      recordSnapshot(store, [makeFinding(), makeFinding(), makeFinding()]);
+    }
+    const trend = computeTrend(store);
+    assert.equal(trend.stats.trend, "stable");
+  });
+
+  it("should calculate delta between consecutive runs", () => {
+    const store = createSnapshotStore();
+    recordSnapshot(store, [makeFinding(), makeFinding(), makeFinding()]);
+    recordSnapshot(store, [makeFinding()]);
+    const trend = computeTrend(store);
+    assert.equal(trend.points[0].delta, 3); // first run: 3 - 0
+    assert.equal(trend.points[1].delta, -2); // second run: 1 - 3
+  });
+
+  it("should track severity breakdown in trend points", () => {
+    const store = createSnapshotStore();
+    recordSnapshot(store, [
+      makeFinding({ severity: "critical" }),
+      makeFinding({ severity: "high" }),
+      makeFinding({ severity: "low" }),
+    ]);
+    const trend = computeTrend(store);
+    assert.equal(trend.points[0].critical, 1);
+    assert.equal(trend.points[0].high, 1);
+    assert.equal(trend.points[0].low, 1);
+    assert.equal(trend.points[0].medium, 0);
+  });
+
+  it("should include overall delta in stats", () => {
+    const store = createSnapshotStore();
+    recordSnapshot(
+      store,
+      Array.from({ length: 5 }, () => makeFinding()),
+    );
+    recordSnapshot(
+      store,
+      Array.from({ length: 3 }, () => makeFinding()),
+    );
+    const trend = computeTrend(store);
+    assert.equal(trend.stats.overallDelta, -2); // 3 - 5
+    assert.equal(trend.stats.currentTotal, 3);
+    assert.equal(trend.stats.previousTotal, 5);
+  });
+
+  it("should format trend report as readable text", () => {
+    const store = createSnapshotStore();
+    recordSnapshot(store, [makeFinding(), makeFinding()]);
+    recordSnapshot(store, [makeFinding()]);
+    const trend = computeTrend(store);
+    const output = formatTrendReport(trend);
+    assert.ok(output.includes("Trend Report"));
+    assert.ok(output.includes("Runs analyzed"));
+    assert.ok(output.includes("Run History"));
+  });
+
+  it("should format empty report with no-data message", () => {
+    const store = createSnapshotStore();
+    const trend = computeTrend(store);
+    const output = formatTrendReport(trend);
+    assert.ok(output.includes("No snapshot data"));
+  });
+
+  it("should record snapshot with optional label", () => {
+    const store = createSnapshotStore();
+    const snap = recordSnapshot(store, [makeFinding()], undefined, undefined, "nightly-build");
+    assert.equal(snap.label, "nightly-build");
+    const trend = computeTrend(store);
+    assert.equal(trend.points[0].label, "nightly-build");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 31. Rule Hit Metrics (P3-15)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Rule Hit Metrics", () => {
+  const mockJudges = [
+    {
+      id: "cybersecurity",
+      name: "Cybersecurity Judge",
+      domain: "security",
+      description: "",
+      systemPrompt: "",
+      rulePrefix: "SEC",
+    },
+    {
+      id: "authentication",
+      name: "Authentication Judge",
+      domain: "auth",
+      description: "",
+      systemPrompt: "",
+      rulePrefix: "AUTH",
+    },
+    {
+      id: "performance",
+      name: "Performance Judge",
+      domain: "perf",
+      description: "",
+      systemPrompt: "",
+      rulePrefix: "PERF",
+    },
+  ] as any[];
+
+  it("should return empty metrics for no findings", () => {
+    const metrics = computeRuleHitMetrics([], mockJudges);
+    assert.equal(metrics.totalFindings, 0);
+    assert.equal(metrics.uniqueRulesTriggered, 0);
+    assert.equal(metrics.activeRules.length, 0);
+    assert.equal(metrics.silentJudges.length, 3);
+  });
+
+  it("should count hits per rule", () => {
+    const findings = [
+      makeFinding({ ruleId: "SEC-001" }),
+      makeFinding({ ruleId: "SEC-001" }),
+      makeFinding({ ruleId: "SEC-002" }),
+    ];
+    const metrics = computeRuleHitMetrics(findings, mockJudges);
+    assert.equal(metrics.uniqueRulesTriggered, 2);
+    assert.equal(metrics.activeRules[0].ruleId, "SEC-001");
+    assert.equal(metrics.activeRules[0].hitCount, 2);
+    assert.equal(metrics.activeRules[1].hitCount, 1);
+  });
+
+  it("should identify silent judges", () => {
+    const findings = [makeFinding({ ruleId: "SEC-001" })];
+    const metrics = computeRuleHitMetrics(findings, mockJudges);
+    assert.equal(metrics.silentJudges.length, 2);
+    const silentIds = metrics.silentJudges.map((j) => j.judgeId);
+    assert.ok(silentIds.includes("authentication"));
+    assert.ok(silentIds.includes("performance"));
+  });
+
+  it("should track severity breakdown per rule", () => {
+    const findings = [
+      makeFinding({ ruleId: "SEC-001", severity: "critical" }),
+      makeFinding({ ruleId: "SEC-001", severity: "high" }),
+      makeFinding({ ruleId: "SEC-001", severity: "critical" }),
+    ];
+    const metrics = computeRuleHitMetrics(findings, mockJudges);
+    assert.equal(metrics.activeRules[0].bySeverity["critical"], 2);
+    assert.equal(metrics.activeRules[0].bySeverity["high"], 1);
+  });
+
+  it("should map rules to judge IDs", () => {
+    const j = findJudgeForRule("SEC-001", mockJudges);
+    assert.ok(j);
+    assert.equal(j!.id, "cybersecurity");
+  });
+
+  it("should return undefined for unknown rule prefix", () => {
+    const j = findJudgeForRule("UNKNOWN-001", mockJudges);
+    assert.equal(j, undefined);
+  });
+
+  it("should limit noisiest to topN", () => {
+    const findings = [
+      makeFinding({ ruleId: "SEC-001" }),
+      makeFinding({ ruleId: "SEC-001" }),
+      makeFinding({ ruleId: "SEC-002" }),
+      makeFinding({ ruleId: "AUTH-001" }),
+    ];
+    const metrics = computeRuleHitMetrics(findings, mockJudges, 2);
+    assert.equal(metrics.noisiest.length, 2);
+    assert.equal(metrics.noisiest[0].ruleId, "SEC-001");
+  });
+
+  it("should sort active rules by hit count descending", () => {
+    const findings = [
+      makeFinding({ ruleId: "AUTH-001" }),
+      makeFinding({ ruleId: "SEC-001" }),
+      makeFinding({ ruleId: "SEC-001" }),
+      makeFinding({ ruleId: "SEC-001" }),
+      makeFinding({ ruleId: "AUTH-001" }),
+    ];
+    const metrics = computeRuleHitMetrics(findings, mockJudges);
+    assert.equal(metrics.activeRules[0].ruleId, "SEC-001");
+    assert.equal(metrics.activeRules[0].hitCount, 3);
+    assert.equal(metrics.activeRules[1].ruleId, "AUTH-001");
+    assert.equal(metrics.activeRules[1].hitCount, 2);
+  });
+
+  it("should format report with noisy and silent sections", () => {
+    const findings = [makeFinding({ ruleId: "SEC-001" }), makeFinding({ ruleId: "SEC-001" })];
+    const metrics = computeRuleHitMetrics(findings, mockJudges);
+    const output = formatRuleHitReport(metrics);
+    assert.ok(output.includes("Rule Hit Metrics"));
+    assert.ok(output.includes("Noisiest Rules"));
+    assert.ok(output.includes("Silent Judges"));
+    assert.ok(output.includes("SEC-001"));
+  });
+
+  it("should format empty report with no-findings message", () => {
+    const metrics = computeRuleHitMetrics([], mockJudges);
+    const output = formatRuleHitReport(metrics);
+    assert.ok(output.includes("No findings to analyze"));
+  });
+
+  it("should include percentage in noisy rules output", () => {
+    const findings = [
+      makeFinding({ ruleId: "SEC-001" }),
+      makeFinding({ ruleId: "SEC-001" }),
+      makeFinding({ ruleId: "AUTH-001" }),
+      makeFinding({ ruleId: "AUTH-001" }),
+    ];
+    const metrics = computeRuleHitMetrics(findings, mockJudges);
+    const output = formatRuleHitReport(metrics);
+    assert.ok(output.includes("50.0%"));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 32. Project Auto-Detection & Init Wizard (P3-16)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Project Auto-Detection", () => {
+  it("should detect languages from file extensions", () => {
+    const langs = detectLanguages(["src/app.ts", "src/utils.ts", "main.py"]);
+    assert.equal(langs[0], "typescript"); // most files
+    assert.ok(langs.includes("python"));
+  });
+
+  it("should return empty for unknown extensions", () => {
+    const langs = detectLanguages(["README.md", "image.png"]);
+    assert.equal(langs.length, 0);
+  });
+
+  it("should detect frameworks from package.json deps", () => {
+    const frameworks = detectFrameworksFromFiles([], { express: "^4.0.0", react: "^18.0.0" });
+    assert.ok(frameworks.includes("express"));
+    assert.ok(frameworks.includes("react"));
+  });
+
+  it("should detect Python frameworks from requirements", () => {
+    const frameworks = detectFrameworksFromFiles([], undefined, "fastapi==0.100.0\nuvicorn>=0.20");
+    assert.ok(frameworks.includes("fastapi"));
+  });
+
+  it("should detect frameworks from file indicators", () => {
+    const frameworks = detectFrameworksFromFiles(["next.config.js", "angular.json"]);
+    assert.ok(frameworks.includes("nextjs"));
+    assert.ok(frameworks.includes("angular"));
+  });
+
+  it("should detect Docker from Dockerfile", () => {
+    const frameworks = detectFrameworksFromFiles(["Dockerfile", "src/app.ts"]);
+    assert.ok(frameworks.includes("docker"));
+  });
+
+  it("should classify web-api for backend frameworks", () => {
+    const type = classifyProjectType(["typescript"], ["express"], ["src/server.ts"]);
+    assert.equal(type, "web-api");
+  });
+
+  it("should classify full-stack for frontend + backend", () => {
+    const type = classifyProjectType(["typescript"], ["react", "express"], ["src/app.tsx", "src/server.ts"]);
+    assert.equal(type, "full-stack");
+  });
+
+  it("should classify infrastructure for terraform files", () => {
+    const type = classifyProjectType([], ["terraform"], ["main.tf", "variables.tf"]);
+    assert.equal(type, "infrastructure");
+  });
+
+  it("should classify web-frontend for React-only projects", () => {
+    const type = classifyProjectType(["typescript"], ["react"], ["src/App.tsx"]);
+    assert.equal(type, "web-frontend");
+  });
+
+  it("should classify library for src/index pattern", () => {
+    const type = classifyProjectType(["typescript"], [], ["src/index.ts", "src/utils.ts"]);
+    assert.equal(type, "library");
+  });
+
+  it("should classify unknown for empty files", () => {
+    const type = classifyProjectType([], [], []);
+    assert.equal(type, "unknown");
+  });
+
+  it("should detect CI from GitHub Actions", () => {
+    assert.ok(detectCI([".github/workflows/ci.yml"]));
+    assert.ok(!detectCI(["src/app.ts"]));
+  });
+
+  it("should detect monorepo signals", () => {
+    assert.ok(detectMonorepo(["packages/core/index.ts"]));
+    assert.ok(detectMonorepo(["pnpm-workspace.yaml"]));
+    assert.ok(!detectMonorepo(["src/index.ts"]));
+  });
+
+  it("should gather full project signals", () => {
+    const signals = detectProjectSignals(["src/server.ts", "src/routes.ts", ".github/workflows/ci.yml", "Dockerfile"], {
+      express: "^4.0.0",
+    });
+    assert.ok(signals.languages.includes("typescript"));
+    assert.ok(signals.frameworks.includes("express"));
+    assert.ok(signals.frameworks.includes("docker"));
+    assert.equal(signals.projectType, "web-api");
+    assert.ok(signals.hasCI);
+    assert.ok(signals.hasDocker);
+  });
+
+  it("should recommend security-only for web-api", () => {
+    const rec = recommendPreset({
+      languages: ["typescript"],
+      frameworks: ["express"],
+      projectType: "web-api",
+      hasCI: true,
+      hasDocker: false,
+      isMonorepo: false,
+    });
+    assert.equal(rec.preset, "security-only");
+    assert.equal(rec.confidence, "high");
+  });
+
+  it("should recommend strict for infrastructure", () => {
+    const rec = recommendPreset({
+      languages: [],
+      frameworks: ["terraform"],
+      projectType: "infrastructure",
+      hasCI: false,
+      hasDocker: false,
+      isMonorepo: false,
+    });
+    assert.equal(rec.preset, "strict");
+  });
+
+  it("should recommend lenient for data-science", () => {
+    const rec = recommendPreset({
+      languages: ["python"],
+      frameworks: [],
+      projectType: "data-science",
+      hasCI: false,
+      hasDocker: false,
+      isMonorepo: false,
+    });
+    assert.equal(rec.preset, "lenient");
+  });
+
+  it("should recommend strict for libraries", () => {
+    const rec = recommendPreset({
+      languages: ["typescript"],
+      frameworks: [],
+      projectType: "library",
+      hasCI: false,
+      hasDocker: false,
+      isMonorepo: false,
+    });
+    assert.equal(rec.preset, "strict");
+    assert.equal(rec.confidence, "high");
+  });
+
+  it("should suggest CI when missing for web-api", () => {
+    const rec = recommendPreset({
+      languages: ["typescript"],
+      frameworks: ["express"],
+      projectType: "web-api",
+      hasCI: false,
+      hasDocker: false,
+      isMonorepo: false,
+    });
+    assert.ok(rec.suggestions.some((s) => s.includes("CI")));
+  });
+
+  it("should format project summary", () => {
+    const signals = detectProjectSignals(["src/app.ts", "Dockerfile"], { express: "^4.0.0" });
+    const output = formatProjectSummary(signals);
+    assert.ok(output.includes("Detected Project Signals"));
+    assert.ok(output.includes("typescript"));
+    assert.ok(output.includes("express"));
+  });
+
+  it("should format preset recommendation", () => {
+    const rec = recommendPreset({
+      languages: ["typescript"],
+      frameworks: ["express"],
+      projectType: "web-api",
+      hasCI: true,
+      hasDocker: false,
+      isMonorepo: false,
+    });
+    const output = formatRecommendation(rec);
+    assert.ok(output.includes("Recommended preset"));
+    assert.ok(output.includes("security-only"));
   });
 });

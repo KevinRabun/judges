@@ -83,6 +83,11 @@
       "minimum": 1,
       "description": "Maximum number of files to analyze when scanning a directory.",
       "default": 300
+    },
+    "plugins": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Plugin module specifiers (npm packages or relative file paths) that export custom JudgeDefinition arrays. Each module must export { judges: JudgeDefinition[] } or a default export."
     }
   },
   "additionalProperties": false

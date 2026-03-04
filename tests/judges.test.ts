@@ -7092,11 +7092,12 @@ describe("Baseline Command", () => {
     try {
       assert.ok(existsSync(baselineOut), "Baseline file should be created");
       const baseline = JSON.parse(readFileSync(baselineOut, "utf-8"));
-      assert.ok(baseline.version);
+      assert.equal(baseline.version, 2);
       assert.ok(baseline.createdAt);
-      assert.ok(Array.isArray(baseline.findings));
+      assert.ok(baseline.updatedAt);
+      assert.ok(typeof baseline.files === "object");
       assert.ok(typeof baseline.totalFindings === "number");
-      assert.ok(typeof baseline.score === "number");
+      assert.equal(typeof baseline.resolvedFindings, "number");
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });
     }

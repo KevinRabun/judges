@@ -1,0 +1,3934 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "judges",
+          "version": "2.3.0",
+          "informationUri": "https://github.com/KevinRabun/judges",
+          "rules": [
+            {
+              "id": "DATA-001",
+              "name": "Hardcoded password detected",
+              "shortDescription": {
+                "text": "Move the password to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DATA-002",
+              "name": "Hardcoded API key detected",
+              "shortDescription": {
+                "text": "Move the API key to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DATA-003",
+              "name": "Hardcoded secret/token detected",
+              "shortDescription": {
+                "text": "Move the secret/token to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DATA-004",
+              "name": "Hardcoded database connection URL detected",
+              "shortDescription": {
+                "text": "Move the database connection URL to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DATA-005",
+              "name": "Sensitive data may be logged",
+              "shortDescription": {
+                "text": "Remove sensitive data from log statements. Use structured logging with redaction filters to automatically mask sensitive fields."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DATA-006",
+              "name": "Weak hashing algorithm used",
+              "shortDescription": {
+                "text": "Use SHA-256/SHA-512 for integrity checks, or bcrypt/scrypt/argon2 for password hashing."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DATA-007",
+              "name": "Potential SQL injection via string concatenation",
+              "shortDescription": {
+                "text": "Use parameterized queries or prepared statements. Never concatenate user input into SQL strings directly."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DATA-008",
+              "name": "Cookie may lack security flags",
+              "shortDescription": {
+                "text": "Set Secure, HttpOnly, and SameSite=Strict (or Lax) flags on all cookies. Use __Host- prefix for sensitive cookies."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DATA-009",
+              "name": "File upload without type/size validation",
+              "shortDescription": {
+                "text": "Validate file type (MIME + extension + magic bytes), enforce size limits, scan for malware, and store uploads outside the webroot."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DATA-010",
+              "name": "No CSRF protection detected",
+              "shortDescription": {
+                "text": "Implement CSRF protection using tokens (csurf, django.middleware.csrf, @csrf_exempt annotations) or SameSite cookies."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "CYBER-001",
+              "name": "Dangerous eval()/exec() usage",
+              "shortDescription": {
+                "text": "Remove eval() entirely. Use JSON.parse() for data parsing (JS/TS), ast.literal_eval (Python), or a proper expression parser."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "CYBER-002",
+              "name": "Potential XSS via innerHTML",
+              "shortDescription": {
+                "text": "Use textContent for plain text, or use a sanitization library (DOMPurify) before inserting HTML. In React, avoid dangerouslySetInnerHTML unless content is sanitized."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "CYBER-003",
+              "name": "TLS certificate validation disabled",
+              "shortDescription": {
+                "text": "Never disable TLS certificate validation in production. Use proper CA certificates. If using self-signed certs in development, use a CA bundle instead."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "CYBER-004",
+              "name": "Linter/type-checker suppression directives found",
+              "shortDescription": {
+                "text": "Review each suppression directive to ensure it's justified. Add a comment explaining why the suppression is necessary. Remove any that were added simply to silence warnings."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "CYBER-006",
+              "name": "No password complexity validation",
+              "shortDescription": {
+                "text": "Enforce minimum 8-character passwords with complexity requirements. Use NIST SP 800-63B guidelines. Check against breached password databases (Have I Been Pwned)."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "CYBER-007",
+              "name": "Authentication endpoints without rate limiting",
+              "shortDescription": {
+                "text": "Implement rate limiting on login/auth endpoints. Use progressive delays, account lockouts, or CAPTCHA after failed attempts."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "COST-001",
+              "name": "Nested loops detected — potential O(n²) complexity",
+              "shortDescription": {
+                "text": "Consider using hash maps for lookups (O(1)), sorting + binary search, or restructuring the algorithm. If the nested loop is necessary, ensure the inner dataset is bounded."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "COST-002",
+              "name": "Potential N+1 query pattern (await in loop)",
+              "shortDescription": {
+                "text": "Use Promise.all() to parallelize independent operations, or batch database queries (e.g., WHERE id IN (...) instead of per-ID queries)."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "COST-003",
+              "name": "Unbounded data query",
+              "shortDescription": {
+                "text": "Add pagination (LIMIT/OFFSET or cursor-based), filtering (WHERE clauses), and projection (select only needed fields). Default to a reasonable page size."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "COST-004",
+              "name": "Synchronous/blocking file I/O detected",
+              "shortDescription": {
+                "text": "Use asynchronous file operations (fs.promises.readFile, aiofiles, async File.ReadAllTextAsync) or streaming for large files."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "SCALE-001",
+              "name": "Global mutable state detected",
+              "shortDescription": {
+                "text": "Externalize state to a database, cache (Redis), or message queue. Use const/final/immutable for configuration. Each instance should be stateless."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "SCALE-002",
+              "name": "Synchronous blocking operation",
+              "shortDescription": {
+                "text": "Use asynchronous alternatives (async/await, promises, non-blocking I/O). Move long-running work to background queues."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "SCALE-003",
+              "name": "External calls without timeout",
+              "shortDescription": {
+                "text": "Set explicit timeouts on all external calls (e.g., 5-30 seconds). Implement circuit breakers (e.g., using libraries like cockatiel or opossum) for critical dependencies."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "SCALE-004",
+              "name": "CPU-intensive computation may block scaling",
+              "shortDescription": {
+                "text": "Offload CPU-intensive work to worker threads, a job queue (Bull, Celery), or a dedicated compute service. Use async variants of crypto operations (pbkdf2, scrypt). Consider WebAssembly for hot-path computation."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "CLOUD-001",
+              "name": "Local filesystem path dependency",
+              "shortDescription": {
+                "text": "Use cloud storage (S3, Azure Blob, GCS) for persistent files. Use /tmp only for truly temporary data. Accept paths from environment configuration."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "CLOUD-003",
+              "name": "Console.log instead of structured logging",
+              "shortDescription": {
+                "text": "Use a structured logging library (pino/winston for JS, logging with dictConfig for Python, slog for Go, serilog for C#, log4j/slf4j for Java, tracing for Rust) that outputs JSON. Include correlation IDs, timestamps, and log levels."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "CLOUD-004",
+              "name": "Hardcoded connection string / service URL",
+              "shortDescription": {
+                "text": "Use environment variables or a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) for all connection strings."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "SWDEV-001",
+              "name": "'any' type usage",
+              "shortDescription": {
+                "text": "Replace with specific types, generics, or constrained types. In TS enable 'noImplicitAny'. In Go use concrete types or type constraints."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "SWDEV-002",
+              "name": "Type-checker / linter error suppression",
+              "shortDescription": {
+                "text": "Fix the underlying issue instead of suppressing it. If suppression is truly necessary, add a comment explaining why."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "SWDEV-003",
+              "name": "TODO/FIXME/HACK comments found",
+              "shortDescription": {
+                "text": "Track TODOs as work items in your issue tracker. Resolve FIXMEs and HACKs before merging to main. Set a code quality gate that flags unresolved TODOs."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "SWDEV-005",
+              "name": "Bare except / untyped catch block",
+              "shortDescription": {
+                "text": "Catch specific exception types. In Python, use 'except ValueError' (not bare 'except:'). In Java/C#, catch specific exception classes."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "A11Y-001",
+              "name": "Image missing alt attribute",
+              "shortDescription": {
+                "text": "Add meaningful alt text describing the image content. Use alt=\"\" only for purely decorative images."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "A11Y-002",
+              "name": "Click handler without keyboard equivalent",
+              "shortDescription": {
+                "text": "Add onKeyDown or onKeyPress handlers alongside onClick. Ensure all interactive elements are keyboard accessible."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "A11Y-003",
+              "name": "Non-semantic element used with ARIA role",
+              "shortDescription": {
+                "text": "Use semantic HTML elements (button, a, h1-h6, nav, main) instead of divs with ARIA roles."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "A11Y-004",
+              "name": "Form input missing label association",
+              "shortDescription": {
+                "text": "Associate each input with a <label> element using for/id, or use aria-label / aria-labelledby."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "A11Y-005",
+              "name": "Missing lang attribute on <html>",
+              "shortDescription": {
+                "text": "Add lang attribute: <html lang=\"en\">. Use the appropriate BCP 47 language tag."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "A11Y-007",
+              "name": "Focus indicator removed (outline: none)",
+              "shortDescription": {
+                "text": "If removing outline, provide a visible alternative focus indicator (box-shadow, border, custom :focus-visible styles)."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "A11Y-008",
+              "name": "Form error not associated with input via ARIA",
+              "shortDescription": {
+                "text": "Use aria-describedby to link error messages to inputs, and aria-invalid='true' on invalid inputs."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "API-001",
+              "name": "Verb in REST endpoint URL",
+              "shortDescription": {
+                "text": "Use noun-based URLs (e.g., POST /users instead of POST /createUser). Let HTTP methods convey the action."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "API-002",
+              "name": "SELECT * in API handler",
+              "shortDescription": {
+                "text": "Explicitly select only the fields needed for the API response. Use DTOs or view models to shape the output."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "API-003",
+              "name": "List endpoint without pagination",
+              "shortDescription": {
+                "text": "Implement pagination using limit/offset, cursor-based, or page-based approaches. Include total count and navigation links."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "API-004",
+              "name": "No API versioning detected",
+              "shortDescription": {
+                "text": "Add API versioning via URL path (/v1/resource), header (X-API-Version), or query parameter."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "API-005",
+              "name": "Inconsistent API response structure",
+              "shortDescription": {
+                "text": "Adopt a consistent response envelope (e.g., { data, meta, errors }) across all endpoints."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "API-006",
+              "name": "Request body used without content-type validation",
+              "shortDescription": {
+                "text": "Use body-parsing middleware (express.json()) and validate Content-Type headers. Reject requests with unexpected content types."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "API-007",
+              "name": "Sensitive data in URL/query parameters",
+              "shortDescription": {
+                "text": "Pass sensitive data in request headers (Authorization) or request body, never in URLs or query parameters."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "REL-001",
+              "name": "Network call without timeout",
+              "shortDescription": {
+                "text": "Set explicit timeouts on all network calls. Use AbortController with setTimeout for fetch, or timeout options for HTTP clients."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "REL-003",
+              "name": "Abrupt process termination detected",
+              "shortDescription": {
+                "text": "Throw errors or use graceful shutdown patterns instead. Let the process exit naturally after cleanup. Reserve panics for truly unrecoverable situations."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "REL-005",
+              "name": "No fallback for failed external call",
+              "shortDescription": {
+                "text": "Provide fallback behavior: cached responses, default values, or gracefully degraded features when dependencies fail."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "REL-006",
+              "name": "Write endpoints without idempotency support",
+              "shortDescription": {
+                "text": "Accept an idempotency key header (Idempotency-Key) and use it to deduplicate write operations."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "OBS-001",
+              "name": "Console logging instead of structured logger",
+              "shortDescription": {
+                "text": "Use a structured logging library (winston/pino for JS, logging for Python, slog for Go, serilog for C#, log4j for Java, tracing for Rust) with log levels, timestamps, and correlation IDs."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "OBS-003",
+              "name": "String concatenation in log statements",
+              "shortDescription": {
+                "text": "Use structured log parameters: logger.info('User action', { userId, action }) instead of string concatenation."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "OBS-005",
+              "name": "Sensitive data potentially logged",
+              "shortDescription": {
+                "text": "Never log sensitive data. Use redaction middleware or mask sensitive fields before logging. Audit all log statements for PII/secrets."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "PERF-001",
+              "name": "Potential N+1 query pattern",
+              "shortDescription": {
+                "text": "Batch queries outside the loop using WHERE IN clauses, JOINs, or DataLoader patterns. Fetch all needed data in a single query."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "PERF-002",
+              "name": "Synchronous / blocking I/O detected",
+              "shortDescription": {
+                "text": "Use async/await versions, non-blocking APIs, or spawn blocking work on a separate thread/runtime. Sync I/O is only acceptable at startup."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "PERF-003",
+              "name": "Duplicate fetch calls to same URL",
+              "shortDescription": {
+                "text": "Cache responses or deduplicate requests. Use memoization, request coalescing, or an in-memory/distributed cache."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "PERF-004",
+              "name": "Heavy library imported eagerly",
+              "shortDescription": {
+                "text": "Use dynamic imports (import()) for heavy libraries. Import specific sub-modules (lodash/get instead of lodash). Consider tree-shakeable alternatives."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "PERF-005",
+              "name": "DOM manipulation inside loop",
+              "shortDescription": {
+                "text": "Build DOM content in a DocumentFragment or string, then insert once. Use virtual DOM frameworks or batch updates."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "PERF-006",
+              "name": "Unbounded data fetch without pagination",
+              "shortDescription": {
+                "text": "Always use pagination (limit/offset or cursor-based) when querying collections. Set reasonable default page sizes."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "PERF-007",
+              "name": "Nested loops detected — O(n²) or worse complexity",
+              "shortDescription": {
+                "text": "Replace nested loops with hash maps (O(n)) for lookups, pre-sorted data with binary search, or purpose-built data structures. Consider if the algorithm can be flattened."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "PERF-008",
+              "name": "setInterval without clearInterval — timer leak",
+              "shortDescription": {
+                "text": "Store the interval ID and call clearInterval in cleanup/teardown logic (e.g., useEffect cleanup, componentWillUnmount, or process exit handler)."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "COMP-001",
+              "name": "PII field handled without protection",
+              "shortDescription": {
+                "text": "Encrypt PII fields, mask them in logs and UI displays, and ensure they are stored with column-level encryption."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "COMP-002",
+              "name": "Sensitive data in log statements",
+              "shortDescription": {
+                "text": "Never log sensitive data. Use redaction/masking utilities to sanitize log output. Audit all log statements."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "COMP-003",
+              "name": "Credit card data handling detected",
+              "shortDescription": {
+                "text": "Use a PCI-compliant payment processor (Stripe, Braintree). Never store, log, or transmit raw card numbers. Tokenize immediately."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "COMP-004",
+              "name": "Cookies set without security flags",
+              "shortDescription": {
+                "text": "Set Secure, HttpOnly, and SameSite=Strict on sensitive cookies. Review cookie consent requirements per jurisdiction."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "SOV-001",
+              "name": "Potential cross-border data egress without jurisdiction checks",
+              "shortDescription": {
+                "text": "Add egress controls that validate destination jurisdiction, data classification, and lawful transfer conditions before sending data."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "SOV-002",
+              "name": "Replication/backup configuration may violate localization requirements",
+              "shortDescription": {
+                "text": "Pin replication and backup targets to approved jurisdictions and document DR geography constraints."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "SOV-003",
+              "name": "PII stored without geographic partitioning indicator",
+              "shortDescription": {
+                "text": "Tag PII records with a region/jurisdiction identifier. Use tenant-scoped region routing for multi-tenant systems. Implement database-level partitioning by geography for regulated data."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "SOV-004",
+              "name": "Administrative operations without audit trail",
+              "shortDescription": {
+                "text": "Log all administrative and destructive operations to a tamper-evident audit trail. Include actor identity, timestamp, operation type, affected resource, and outcome. Store audit logs in a separate, append-only store with retention policies."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DOC-001",
+              "name": "TODO/FIXME without issue tracking reference",
+              "shortDescription": {
+                "text": "Link TODOs to issue tracker tickets (e.g., TODO(#123): ...). Create tracking issues for existing unlinked TODOs."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "DOC-003",
+              "name": "API endpoints without documentation",
+              "shortDescription": {
+                "text": "Add OpenAPI/Swagger annotations or JSDoc comments documenting request body, query params, response schema, and error codes."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "I18N-001",
+              "name": "Hardcoded user-facing strings",
+              "shortDescription": {
+                "text": "Use an i18n library (react-intl, i18next, vue-i18n) and extract strings to translation files."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "I18N-002",
+              "name": "String concatenation for user messages",
+              "shortDescription": {
+                "text": "Use parameterized translation strings with named placeholders: t('greeting', { name }) instead of 'Hello ' + name."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "I18N-003",
+              "name": "Hardcoded date or number format",
+              "shortDescription": {
+                "text": "Use Intl.DateTimeFormat and Intl.NumberFormat for locale-aware formatting. Never hardcode date patterns."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "I18N-004",
+              "name": "Numeric values formatted without locale awareness",
+              "shortDescription": {
+                "text": "Use Intl.NumberFormat for all user-facing numbers: new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount)."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "DEPS-001",
+              "name": "Deprecated or unmaintained package import",
+              "shortDescription": {
+                "text": "Replace deprecated packages: moment->date-fns/luxon, request->node-fetch/axios, underscore->lodash-es or native methods."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "CONC-001",
+              "name": "Shared mutable state in async context",
+              "shortDescription": {
+                "text": "Use request-scoped/context-scoped state, atomic operations, or proper synchronization mechanisms instead of shared mutable variables."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "CONC-002",
+              "name": "Potentially missing await on async operation",
+              "shortDescription": {
+                "text": "Add await to async operations, or explicitly handle the returned promise with .catch(). Use ESLint's no-floating-promises rule."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "CONC-003",
+              "name": "Sequential await in loop",
+              "shortDescription": {
+                "text": "For independent operations, collect promises and use Promise.all() (with concurrency limits). Keep sequential only if order matters."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "CONC-004",
+              "name": "setInterval without clearInterval",
+              "shortDescription": {
+                "text": "Store the interval ID and call clearInterval in cleanup/unmount/dispose handlers."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "ETHICS-001",
+              "name": "Demographic-based conditional logic",
+              "shortDescription": {
+                "text": "Review whether demographic-based logic is legally compliant and ethically justified. Document the business justification. Consider bias testing."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "ETHICS-002",
+              "name": "Non-inclusive language in code",
+              "shortDescription": {
+                "text": "Use inclusive alternatives: allowlist/denylist, primary/replica, placeholder, confidence check."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "MAINT-001",
+              "name": "Weak or unsafe type usage detected",
+              "shortDescription": {
+                "text": "Replace weak types with specific types: use 'unknown' with type guards (TS), generics (Java/C#), concrete types (Go), safe wrappers (Rust)."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "MAINT-002",
+              "name": "Magic numbers detected",
+              "shortDescription": {
+                "text": "Extract magic numbers into named constants (e.g., const HEARTBEAT_INTERVAL_MS = 5000). Use enums for related sets of values."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "MAINT-003",
+              "name": "Technical debt markers (TODO/FIXME/HACK) found",
+              "shortDescription": {
+                "text": "Convert TODO/FIXME comments into tracked issues in your project management tool. Resolve HACK comments with proper implementations."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "MAINT-004",
+              "name": "Functions with too many parameters",
+              "shortDescription": {
+                "text": "Use an options object parameter: func({ name, age, ...opts }). This is self-documenting, order-independent, and extensible."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "MAINT-005",
+              "name": "Duplicate string literals — extract to constants",
+              "shortDescription": {
+                "text": "Extract repeated strings into named constants. This makes updates a single-point change and prevents typos."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "ERR-001",
+              "name": "Abrupt process termination instead of proper error handling",
+              "shortDescription": {
+                "text": "Use proper error propagation instead of abrupt termination. Return error responses in HTTP servers. Let the process shutdown gracefully."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "ERR-002",
+              "name": "Error responses without error codes",
+              "shortDescription": {
+                "text": "Include a machine-readable error code in responses: { code: 'VALIDATION_ERROR', message: '...' }. Use RFC 7807 Problem Details format."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "AUTH-001",
+              "name": "Hardcoded credentials in source code",
+              "shortDescription": {
+                "text": "Use environment variables or a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault). Never commit credentials to version control."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "AUTH-002",
+              "name": "Sensitive tokens passed in query parameters",
+              "shortDescription": {
+                "text": "Pass tokens in the Authorization header (Bearer scheme) or in httpOnly cookies. Never use query parameters for sensitive credentials."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "AUTH-003",
+              "name": "Weak hashing algorithm for credentials",
+              "shortDescription": {
+                "text": "Use bcrypt, scrypt, or Argon2 for password hashing. These algorithms are intentionally slow and include salt by default."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "AUTH-004",
+              "name": "TLS certificate validation disabled",
+              "shortDescription": {
+                "text": "Never disable TLS verification in production. Fix certificate issues properly. Use CA bundles for self-signed certs in development only."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "AUTH-008",
+              "name": "Cookies set without Secure/HttpOnly flags",
+              "shortDescription": {
+                "text": "Set cookies with { secure: true, httpOnly: true, sameSite: 'strict' }. Use Secure for all auth cookies. HttpOnly prevents JavaScript access."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DB-001",
+              "name": "SQL injection via string concatenation",
+              "shortDescription": {
+                "text": "Use parameterized queries (placeholders) or prepared statements. ORMs handle this automatically. Never concatenate user input into SQL strings."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DB-002",
+              "name": "SELECT * retrieves unnecessary columns",
+              "shortDescription": {
+                "text": "Select only the columns you need: SELECT id, name, email FROM users. This reduces network transfer, memory usage, and improves query plan optimization."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "DB-003",
+              "name": "N+1 query pattern detected",
+              "shortDescription": {
+                "text": "Use batch queries (WHERE id IN (...)), JOINs, or ORM eager loading (include/populate) to fetch related data in a single query."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DB-004",
+              "name": "Data mutations without transaction handling",
+              "shortDescription": {
+                "text": "Wrap multi-step data mutations in transactions. Use BEGIN/COMMIT/ROLLBACK or ORM transaction APIs to ensure atomicity."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "DB-005",
+              "name": "Hardcoded database connection string",
+              "shortDescription": {
+                "text": "Use environment variables for connection strings. Store credentials in a secrets manager. Use different connection strings per environment."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DB-006",
+              "name": "Destructive DDL statements in application code",
+              "shortDescription": {
+                "text": "Never run destructive DDL from application code. Use migration tools (Prisma, Flyway, Alembic) with review and rollback support. Require elevated permissions for DDL."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DB-007",
+              "name": "Database credentials embedded in connection string",
+              "shortDescription": {
+                "text": "Use separate credential parameters or environment variables. Consider IAM/managed identity for passwordless database connections in cloud environments."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "CFG-001",
+              "name": "Secrets hardcoded in source code",
+              "shortDescription": {
+                "text": "Store secrets in a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault). Inject via environment variables at runtime. Never commit secrets."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "CFG-002",
+              "name": "Configuration values hardcoded instead of externalized",
+              "shortDescription": {
+                "text": "Read configuration from environment variables (process.env.PORT). Use a config library (convict, dotenv, django-environ) to validate and provide defaults."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "CFG-004",
+              "name": ".env usage detected — ensure it is not committed",
+              "shortDescription": {
+                "text": "Add .env to .gitignore. Create a .env.example with placeholder values documenting required environment variables. Use CI/CD variables for deployment."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "COMPAT-002",
+              "name": "Multiple response formats — verify contract consistency",
+              "shortDescription": {
+                "text": "Use a consistent response envelope across all endpoints. Define response schemas (OpenAPI/Swagger) to enforce contracts."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "COMPAT-003",
+              "name": "HTTP method mismatch — destructive action via POST",
+              "shortDescription": {
+                "text": "Use appropriate HTTP methods: DELETE for removal, PUT/PATCH for updates. If migrating methods, keep the old method working during a deprecation period."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "PORTA-001",
+              "name": "OS-specific file paths detected",
+              "shortDescription": {
+                "text": "Use platform-independent path construction (path.join, os.path.join, Path.Combine). Use environment variables or config for base directories."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "PORTA-002",
+              "name": "File I/O without explicit line-ending handling",
+              "shortDescription": {
+                "text": "Use 'utf-8' encoding explicitly. Consider normalizing line endings when reading files. Configure .gitattributes for consistent line endings in version control."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "PORTA-003",
+              "name": "OS-specific environment variables used directly",
+              "shortDescription": {
+                "text": "Use cross-platform helpers like os.homedir(), os.tmpdir(), or libraries like 'env-paths' to resolve platform-appropriate directories."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "PORTA-004",
+              "name": "Browser-specific APIs used in server-side code",
+              "shortDescription": {
+                "text": "Guard browser API usage with typeof checks (e.g., typeof window !== 'undefined'). Use isomorphic libraries for code shared between client and server."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "UX-001",
+              "name": "Inline event handlers in HTML",
+              "shortDescription": {
+                "text": "Use addEventListener() or framework event bindings (React onClick, Vue @click). Separate behavior from markup for maintainability and CSP compliance."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "UX-002",
+              "name": "Form submission without loading/disabled state",
+              "shortDescription": {
+                "text": "Disable the submit button during submission. Show a loading indicator. Prevent double-submission at the application layer."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "UX-003",
+              "name": "Destructive actions without confirmation",
+              "shortDescription": {
+                "text": "Add confirmation dialogs for destructive actions. Show what will be affected. Consider soft-delete with undo capability."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "UX-004",
+              "name": "List endpoints without pagination",
+              "shortDescription": {
+                "text": "Implement pagination (offset-based or cursor-based). Return total count and page info. Enforce maximum page sizes."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "UX-005",
+              "name": "Mutations without success feedback",
+              "shortDescription": {
+                "text": "Show success notifications (toasts, alerts) after mutations. Provide clear visual feedback. Consider optimistic UI updates with rollback on failure."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "UX-006",
+              "name": "Form submission without client-side validation",
+              "shortDescription": {
+                "text": "Add client-side validation before submission. Use schema validation libraries (Zod, Yup, Joi). Show inline validation feedback. Keep server-side validation as well."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "LOGPRIV-001",
+              "name": "Authentication tokens logged",
+              "shortDescription": {
+                "text": "Never log authentication tokens, Authorization headers, or session IDs. If request logging is needed, redact sensitive headers before logging."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "LOGPRIV-002",
+              "name": "Passwords/secrets logged",
+              "shortDescription": {
+                "text": "Never log passwords, credentials, or secrets. Implement a log sanitizer that redacts sensitive fields automatically."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "LOGPRIV-003",
+              "name": "Unstructured logging lacks redaction capabilities",
+              "shortDescription": {
+                "text": "Use a structured logging library (pino, winston) that supports field-level redaction, log level filtering, and structured output for automated sensitivity scanning."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "LOGPRIV-004",
+              "name": "String concatenation in log statements",
+              "shortDescription": {
+                "text": "Use structured logging with named fields: logger.info({ userId, action }, 'User action performed'). This allows automated redaction of specific fields."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "LOGPRIV-005",
+              "name": "IP addresses logged without anonymization",
+              "shortDescription": {
+                "text": "Anonymize IP addresses in logs (truncate last octet for IPv4, mask prefix for IPv6). If full IP is needed for security, ensure log retention complies with privacy policy."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "LOGPRIV-006",
+              "name": "Database queries logged — may contain sensitive parameters",
+              "shortDescription": {
+                "text": "Log query templates without parameter values. Use parameterized query logging that replaces bind values with placeholders. Redact sensitive column values."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "RATE-001",
+              "name": "Unbounded query results without limit",
+              "shortDescription": {
+                "text": "Always enforce a maximum result limit: db.find({}).limit(100). Implement pagination and enforce maximum page sizes."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "RATE-002",
+              "name": "setInterval without rate control",
+              "shortDescription": {
+                "text": "Use setTimeout with re-scheduling instead of setInterval to prevent overlap. Add guards to skip execution if the previous run hasn't completed."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "RATE-003",
+              "name": "Authentication endpoints without rate limiting",
+              "shortDescription": {
+                "text": "Apply strict rate limits to auth endpoints (e.g., 5-10 requests/minute per IP). Use progressive delays or CAPTCHA after failed attempts. Consider using 'express-rate-limit' or 'rate-limiter-flexible'."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "RATE-004",
+              "name": "File upload without size or count limits",
+              "shortDescription": {
+                "text": "Set explicit file size limits (e.g., multer({ limits: { fileSize: 5 * 1024 * 1024 } })). Limit the number of files per request. Validate file types."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "CICD-001",
+              "name": "Hard process termination hinders graceful CI/CD lifecycle",
+              "shortDescription": {
+                "text": "Use proper error propagation instead of hard exits. In production, handle SIGTERM gracefully. Let the runtime manage process lifecycle."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "CICD-002",
+              "name": "Static analysis suppression comments detected",
+              "shortDescription": {
+                "text": "Fix the underlying issues instead of suppressing them. If suppression is necessary, add a comment explaining why and create a tracking issue to resolve it."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "AICS-003",
+              "name": "Placeholder security comment — missing implementation",
+              "shortDescription": {
+                "text": "Implement the security controls indicated by each comment before merging. If the control is not needed, remove the comment and document why. Do not ship TODO security comments to production."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "AICS-007",
+              "name": "Type safety bypassed in security-critical code",
+              "shortDescription": {
+                "text": "Define proper interfaces for security-related data structures (tokens, sessions, credentials). Replace 'as any' with explicit types or runtime validation (zod, io-ts)."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "AICS-008",
+              "name": "Hardcoded URLs or IP addresses",
+              "shortDescription": {
+                "text": "Move all endpoint URLs and IP addresses to environment variables or a configuration file. Use service discovery or DNS for internal services."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "AICS-010",
+              "name": "Request handlers without input validation",
+              "shortDescription": {
+                "text": "Add schema validation for all request inputs (body, query, params). Use zod, joi, or yup (Node.js), pydantic (Python), class-validator (NestJS), or equivalent for your framework. Validate at the boundary before any business logic."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "AICS-017",
+              "name": "Weak cryptographic hash (MD5/SHA-1)",
+              "shortDescription": {
+                "text": "Replace MD5/SHA-1 with SHA-256+ for integrity checks, or bcrypt/scrypt/argon2 for password hashing. Use crypto.subtle.digest('SHA-256', data) in web contexts."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "AICS-020",
+              "name": "TLS certificate verification disabled",
+              "shortDescription": {
+                "text": "Never disable TLS verification in production. Use properly signed certificates (Let's Encrypt is free). If self-signed certificates are required for internal services, configure the specific CA certificate rather than disabling all verification."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "FW-001",
+              "name": "Express error middleware registered before routes",
+              "shortDescription": {
+                "text": "Move error-handling middleware to after all route registrations: first register all routes, then app.use(errorHandler)."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "FW-002",
+              "name": "Express app without helmet() — missing security headers",
+              "shortDescription": {
+                "text": "Install and use helmet: npm install helmet, then app.use(helmet()). This sets 11 security headers with sensible defaults."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "DATA-001",
+          "level": "error",
+          "message": {
+            "text": "Hardcoded password detected: Move the password to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 15
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DATA-002",
+          "level": "error",
+          "message": {
+            "text": "Hardcoded API key detected: Move the API key to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 16
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DATA-003",
+          "level": "error",
+          "message": {
+            "text": "Hardcoded secret/token detected: Move the secret/token to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 17
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DATA-004",
+          "level": "error",
+          "message": {
+            "text": "Hardcoded database connection URL detected: Move the database connection URL to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 18
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DATA-005",
+          "level": "error",
+          "message": {
+            "text": "Sensitive data may be logged: Remove sensitive data from log statements. Use structured logging with redaction filters to automatically mask sensitive fields."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 51
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DATA-006",
+          "level": "error",
+          "message": {
+            "text": "Weak hashing algorithm used: Use SHA-256/SHA-512 for integrity checks, or bcrypt/scrypt/argon2 for password hashing."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 67
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DATA-007",
+          "level": "error",
+          "message": {
+            "text": "Potential SQL injection via string concatenation: Use parameterized queries or prepared statements. Never concatenate user input into SQL strings directly."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 77
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DATA-008",
+          "level": "error",
+          "message": {
+            "text": "Cookie may lack security flags: Set Secure, HttpOnly, and SameSite=Strict (or Lax) flags on all cookies. Use __Host- prefix for sensitive cookies."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 208
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DATA-009",
+          "level": "error",
+          "message": {
+            "text": "File upload without type/size validation: Validate file type (MIME + extension + magic bytes), enforce size limits, scan for malware, and store uploads outside the webroot."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 254
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DATA-010",
+          "level": "error",
+          "message": {
+            "text": "No CSRF protection detected: Implement CSRF protection using tokens (csurf, django.middleware.csrf, @csrf_exempt annotations) or SameSite cookies."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 62
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CYBER-001",
+          "level": "error",
+          "message": {
+            "text": "Dangerous eval()/exec() usage: Remove eval() entirely. Use JSON.parse() for data parsing (JS/TS), ast.literal_eval (Python), or a proper expression parser."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 115
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CYBER-002",
+          "level": "error",
+          "message": {
+            "text": "Potential XSS via innerHTML: Use textContent for plain text, or use a sanitization library (DOMPurify) before inserting HTML. In React, avoid dangerouslySetInnerHTML unless content is sanitized."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 108
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CYBER-003",
+          "level": "error",
+          "message": {
+            "text": "TLS certificate validation disabled: Never disable TLS certificate validation in production. Use proper CA certificates. If using self-signed certs in development, use a CA bundle instead."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 31
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CYBER-004",
+          "level": "note",
+          "message": {
+            "text": "Linter/type-checker suppression directives found: Review each suppression directive to ensure it's justified. Add a comment explaining why the suppression is necessary. Remove any that were added simply to silence warnings."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CYBER-006",
+          "level": "warning",
+          "message": {
+            "text": "No password complexity validation: Enforce minimum 8-character passwords with complexity requirements. Use NIST SP 800-63B guidelines. Check against breached password databases (Have I Been Pwned)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CYBER-007",
+          "level": "error",
+          "message": {
+            "text": "Authentication endpoints without rate limiting: Implement rate limiting on login/auth endpoints. Use progressive delays, account lockouts, or CAPTCHA after failed attempts."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 51
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "COST-001",
+          "level": "warning",
+          "message": {
+            "text": "Nested loops detected — potential O(n²) complexity: Consider using hash maps for lookups (O(1)), sorting + binary search, or restructuring the algorithm. If the nested loop is necessary, ensure the inner dataset is bounded."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 101
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "COST-002",
+          "level": "error",
+          "message": {
+            "text": "Potential N+1 query pattern (await in loop): Use Promise.all() to parallelize independent operations, or batch database queries (e.g., WHERE id IN (...) instead of per-ID queries)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 94
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "COST-003",
+          "level": "warning",
+          "message": {
+            "text": "Unbounded data query: Add pagination (LIMIT/OFFSET or cursor-based), filtering (WHERE clauses), and projection (select only needed fields). Default to a reasonable page size."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 47
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "COST-004",
+          "level": "note",
+          "message": {
+            "text": "Synchronous/blocking file I/O detected: Use asynchronous file operations (fs.promises.readFile, aiofiles, async File.ReadAllTextAsync) or streaming for large files."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 44
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SCALE-001",
+          "level": "warning",
+          "message": {
+            "text": "Global mutable state detected: Externalize state to a database, cache (Redis), or message queue. Use const/final/immutable for configuration. Each instance should be stateless."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 21
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SCALE-002",
+          "level": "error",
+          "message": {
+            "text": "Synchronous blocking operation: Use asynchronous alternatives (async/await, promises, non-blocking I/O). Move long-running work to background queues."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 44
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SCALE-003",
+          "level": "warning",
+          "message": {
+            "text": "External calls without timeout: Set explicit timeouts on all external calls (e.g., 5-30 seconds). Implement circuit breakers (e.g., using libraries like cockatiel or opossum) for critical dependencies."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 57
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SCALE-004",
+          "level": "note",
+          "message": {
+            "text": "CPU-intensive computation may block scaling: Offload CPU-intensive work to worker threads, a job queue (Bull, Celery), or a dedicated compute service. Use async variants of crypto operations (pbkdf2, scrypt). Consider WebAssembly for hot-path computation."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CLOUD-001",
+          "level": "warning",
+          "message": {
+            "text": "Local filesystem path dependency: Use cloud storage (S3, Azure Blob, GCS) for persistent files. Use /tmp only for truly temporary data. Accept paths from environment configuration."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 177
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CLOUD-003",
+          "level": "note",
+          "message": {
+            "text": "Console.log instead of structured logging: Use a structured logging library (pino/winston for JS, logging with dictConfig for Python, slog for Go, serilog for C#, log4j/slf4j for Java, tracing for Rust) that outputs JSON. Include correlation IDs, timestamps, and log levels."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CLOUD-004",
+          "level": "error",
+          "message": {
+            "text": "Hardcoded connection string / service URL: Use environment variables or a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) for all connection strings."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 18
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SWDEV-001",
+          "level": "warning",
+          "message": {
+            "text": "'any' type usage: Replace with specific types, generics, or constrained types. In TS enable 'noImplicitAny'. In Go use concrete types or type constraints."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 22
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SWDEV-002",
+          "level": "warning",
+          "message": {
+            "text": "Type-checker / linter error suppression: Fix the underlying issue instead of suppressing it. If suppression is truly necessary, add a comment explaining why."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SWDEV-003",
+          "level": "note",
+          "message": {
+            "text": "TODO/FIXME/HACK comments found: Track TODOs as work items in your issue tracker. Resolve FIXMEs and HACKs before merging to main. Set a code quality gate that flags unresolved TODOs."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 282
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SWDEV-005",
+          "level": "warning",
+          "message": {
+            "text": "Bare except / untyped catch block: Catch specific exception types. In Python, use 'except ValueError' (not bare 'except:'). In Java/C#, catch specific exception classes."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 120
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A11Y-001",
+          "level": "error",
+          "message": {
+            "text": "Image missing alt attribute: Add meaningful alt text describing the image content. Use alt=\"\" only for purely decorative images."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 156
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A11Y-002",
+          "level": "warning",
+          "message": {
+            "text": "Click handler without keyboard equivalent: Add onKeyDown or onKeyPress handlers alongside onClick. Ensure all interactive elements are keyboard accessible."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 158
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A11Y-003",
+          "level": "warning",
+          "message": {
+            "text": "Non-semantic element used with ARIA role: Use semantic HTML elements (button, a, h1-h6, nav, main) instead of divs with ARIA roles."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 158
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A11Y-004",
+          "level": "error",
+          "message": {
+            "text": "Form input missing label association: Associate each input with a <label> element using for/id, or use aria-label / aria-labelledby."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 157
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A11Y-005",
+          "level": "error",
+          "message": {
+            "text": "Missing lang attribute on <html>: Add lang attribute: <html lang=\"en\">. Use the appropriate BCP 47 language tag."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 154
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A11Y-007",
+          "level": "error",
+          "message": {
+            "text": "Focus indicator removed (outline: none): If removing outline, provide a visible alternative focus indicator (box-shadow, border, custom :focus-visible styles)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 159
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A11Y-008",
+          "level": "warning",
+          "message": {
+            "text": "Form error not associated with input via ARIA: Use aria-describedby to link error messages to inputs, and aria-invalid='true' on invalid inputs."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 234
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "API-001",
+          "level": "warning",
+          "message": {
+            "text": "Verb in REST endpoint URL: Use noun-based URLs (e.g., POST /users instead of POST /createUser). Let HTTP methods convey the action."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 42
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "API-002",
+          "level": "warning",
+          "message": {
+            "text": "SELECT * in API handler: Explicitly select only the fields needed for the API response. Use DTOs or view models to shape the output."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 48
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "API-003",
+          "level": "error",
+          "message": {
+            "text": "List endpoint without pagination: Implement pagination using limit/offset, cursor-based, or page-based approaches. Include total count and navigation links."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 42
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "API-004",
+          "level": "note",
+          "message": {
+            "text": "No API versioning detected: Add API versioning via URL path (/v1/resource), header (X-API-Version), or query parameter."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 34
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "API-005",
+          "level": "note",
+          "message": {
+            "text": "Inconsistent API response structure: Adopt a consistent response envelope (e.g., { data, meta, errors }) across all endpoints."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 85
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "API-006",
+          "level": "warning",
+          "message": {
+            "text": "Request body used without content-type validation: Use body-parsing middleware (express.json()) and validate Content-Type headers. Reject requests with unexpected content types."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 64
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "API-007",
+          "level": "error",
+          "message": {
+            "text": "Sensitive data in URL/query parameters: Pass sensitive data in request headers (Authorization) or request body, never in URLs or query parameters."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 90
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "REL-001",
+          "level": "error",
+          "message": {
+            "text": "Network call without timeout: Set explicit timeouts on all network calls. Use AbortController with setTimeout for fetch, or timeout options for HTTP clients."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 215
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "REL-003",
+          "level": "warning",
+          "message": {
+            "text": "Abrupt process termination detected: Throw errors or use graceful shutdown patterns instead. Let the process exit naturally after cleanup. Reserve panics for truly unrecoverable situations."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 126
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "REL-005",
+          "level": "note",
+          "message": {
+            "text": "No fallback for failed external call: Provide fallback behavior: cached responses, default values, or gracefully degraded features when dependencies fail."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 215
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "REL-006",
+          "level": "note",
+          "message": {
+            "text": "Write endpoints without idempotency support: Accept an idempotency key header (Idempotency-Key) and use it to deduplicate write operations."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 62
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "OBS-001",
+          "level": "warning",
+          "message": {
+            "text": "Console logging instead of structured logger: Use a structured logging library (winston/pino for JS, logging for Python, slog for Go, serilog for C#, log4j for Java, tracing for Rust) with log levels, timestamps, and correlation IDs."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 51
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "OBS-003",
+          "level": "note",
+          "message": {
+            "text": "String concatenation in log statements: Use structured log parameters: logger.info('User action', { userId, action }) instead of string concatenation."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 51
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "OBS-005",
+          "level": "error",
+          "message": {
+            "text": "Sensitive data potentially logged: Never log sensitive data. Use redaction middleware or mask sensitive fields before logging. Audit all log statements for PII/secrets."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 51
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "PERF-001",
+          "level": "error",
+          "message": {
+            "text": "Potential N+1 query pattern: Batch queries outside the loop using WHERE IN clauses, JOINs, or DataLoader patterns. Fetch all needed data in a single query."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 94
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "PERF-002",
+          "level": "warning",
+          "message": {
+            "text": "Synchronous / blocking I/O detected: Use async/await versions, non-blocking APIs, or spawn blocking work on a separate thread/runtime. Sync I/O is only acceptable at startup."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 44
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "PERF-003",
+          "level": "warning",
+          "message": {
+            "text": "Duplicate fetch calls to same URL: Cache responses or deduplicate requests. Use memoization, request coalescing, or an in-memory/distributed cache."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 215
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "PERF-004",
+          "level": "note",
+          "message": {
+            "text": "Heavy library imported eagerly: Use dynamic imports (import()) for heavy libraries. Import specific sub-modules (lodash/get instead of lodash). Consider tree-shakeable alternatives."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 11
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "PERF-005",
+          "level": "warning",
+          "message": {
+            "text": "DOM manipulation inside loop: Build DOM content in a DocumentFragment or string, then insert once. Use virtual DOM frameworks or batch updates."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 101
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "PERF-006",
+          "level": "error",
+          "message": {
+            "text": "Unbounded data fetch without pagination: Always use pagination (limit/offset or cursor-based) when querying collections. Set reasonable default page sizes."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 47
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "PERF-007",
+          "level": "error",
+          "message": {
+            "text": "Nested loops detected — O(n²) or worse complexity: Replace nested loops with hash maps (O(n)) for lookups, pre-sorted data with binary search, or purpose-built data structures. Consider if the algorithm can be flattened."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 101
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "PERF-008",
+          "level": "error",
+          "message": {
+            "text": "setInterval without clearInterval — timer leak: Store the interval ID and call clearInterval in cleanup/teardown logic (e.g., useEffect cleanup, componentWillUnmount, or process exit handler)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 168
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "COMP-001",
+          "level": "error",
+          "message": {
+            "text": "PII field handled without protection: Encrypt PII fields, mask them in logs and UI displays, and ensure they are stored with column-level encryption."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 70
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "COMP-002",
+          "level": "error",
+          "message": {
+            "text": "Sensitive data in log statements: Never log sensitive data. Use redaction/masking utilities to sanitize log output. Audit all log statements."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 51
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "COMP-003",
+          "level": "error",
+          "message": {
+            "text": "Credit card data handling detected: Use a PCI-compliant payment processor (Stripe, Braintree). Never store, log, or transmit raw card numbers. Tokenize immediately."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 71
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "COMP-004",
+          "level": "warning",
+          "message": {
+            "text": "Cookies set without security flags: Set Secure, HttpOnly, and SameSite=Strict on sensitive cookies. Review cookie consent requirements per jurisdiction."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 208
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SOV-001",
+          "level": "error",
+          "message": {
+            "text": "Potential cross-border data egress without jurisdiction checks: Add egress controls that validate destination jurisdiction, data classification, and lawful transfer conditions before sending data."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 57
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SOV-002",
+          "level": "warning",
+          "message": {
+            "text": "Replication/backup configuration may violate localization requirements: Pin replication and backup targets to approved jurisdictions and document DR geography constraints."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 177
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SOV-003",
+          "level": "warning",
+          "message": {
+            "text": "PII stored without geographic partitioning indicator: Tag PII records with a region/jurisdiction identifier. Use tenant-scoped region routing for multi-tenant systems. Implement database-level partitioning by geography for regulated data."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 77
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SOV-004",
+          "level": "error",
+          "message": {
+            "text": "Administrative operations without audit trail: Log all administrative and destructive operations to a tamper-evident audit trail. Include actor identity, timestamp, operation type, affected resource, and outcome. Store audit logs in a separate, append-only store with retention policies."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 119
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DOC-001",
+          "level": "note",
+          "message": {
+            "text": "TODO/FIXME without issue tracking reference: Link TODOs to issue tracker tickets (e.g., TODO(#123): ...). Create tracking issues for existing unlinked TODOs."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 188
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DOC-003",
+          "level": "warning",
+          "message": {
+            "text": "API endpoints without documentation: Add OpenAPI/Swagger annotations or JSDoc comments documenting request body, query params, response schema, and error codes."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 88
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "I18N-001",
+          "level": "warning",
+          "message": {
+            "text": "Hardcoded user-facing strings: Use an i18n library (react-intl, i18next, vue-i18n) and extract strings to translation files."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 157
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "I18N-002",
+          "level": "warning",
+          "message": {
+            "text": "String concatenation for user messages: Use parameterized translation strings with named placeholders: t('greeting', { name }) instead of 'Hello ' + name."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 148
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "I18N-003",
+          "level": "note",
+          "message": {
+            "text": "Hardcoded date or number format: Use Intl.DateTimeFormat and Intl.NumberFormat for locale-aware formatting. Never hardcode date patterns."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 146
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "I18N-004",
+          "level": "warning",
+          "message": {
+            "text": "Numeric values formatted without locale awareness: Use Intl.NumberFormat for all user-facing numbers: new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 146
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DEPS-001",
+          "level": "warning",
+          "message": {
+            "text": "Deprecated or unmaintained package import: Replace deprecated packages: moment->date-fns/luxon, request->node-fetch/axios, underscore->lodash-es or native methods."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 11
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CONC-001",
+          "level": "error",
+          "message": {
+            "text": "Shared mutable state in async context: Use request-scoped/context-scoped state, atomic operations, or proper synchronization mechanisms instead of shared mutable variables."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 21
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CONC-002",
+          "level": "error",
+          "message": {
+            "text": "Potentially missing await on async operation: Add await to async operations, or explicitly handle the returned promise with .catch(). Use ESLint's no-floating-promises rule."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 62
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CONC-003",
+          "level": "warning",
+          "message": {
+            "text": "Sequential await in loop: For independent operations, collect promises and use Promise.all() (with concurrency limits). Keep sequential only if order matters."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 94
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CONC-004",
+          "level": "warning",
+          "message": {
+            "text": "setInterval without clearInterval: Store the interval ID and call clearInterval in cleanup/unmount/dispose handlers."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 168
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "ETHICS-001",
+          "level": "error",
+          "message": {
+            "text": "Demographic-based conditional logic: Review whether demographic-based logic is legally compliant and ethically justified. Document the business justification. Consider bias testing."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 134
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "ETHICS-002",
+          "level": "note",
+          "message": {
+            "text": "Non-inclusive language in code: Use inclusive alternatives: allowlist/denylist, primary/replica, placeholder, confidence check."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 138
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "MAINT-001",
+          "level": "warning",
+          "message": {
+            "text": "Weak or unsafe type usage detected: Replace weak types with specific types: use 'unknown' with type guards (TS), generics (Java/C#), concrete types (Go), safe wrappers (Rust)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 22
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "MAINT-002",
+          "level": "note",
+          "message": {
+            "text": "Magic numbers detected: Extract magic numbers into named constants (e.g., const HEARTBEAT_INTERVAL_MS = 5000). Use enums for related sets of values."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 171
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "MAINT-003",
+          "level": "note",
+          "message": {
+            "text": "Technical debt markers (TODO/FIXME/HACK) found: Convert TODO/FIXME comments into tracked issues in your project management tool. Resolve HACK comments with proper implementations."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 282
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "MAINT-004",
+          "level": "note",
+          "message": {
+            "text": "Functions with too many parameters: Use an options object parameter: func({ name, age, ...opts }). This is self-documenting, order-independent, and extensible."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 275
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "MAINT-005",
+          "level": "note",
+          "message": {
+            "text": "Duplicate string literals — extract to constants: Extract repeated strings into named constants. This makes updates a single-point change and prevents typos."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "ERR-001",
+          "level": "error",
+          "message": {
+            "text": "Abrupt process termination instead of proper error handling: Use proper error propagation instead of abrupt termination. Return error responses in HTTP servers. Let the process shutdown gracefully."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 126
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "ERR-002",
+          "level": "note",
+          "message": {
+            "text": "Error responses without error codes: Include a machine-readable error code in responses: { code: 'VALIDATION_ERROR', message: '...' }. Use RFC 7807 Problem Details format."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 234
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "AUTH-001",
+          "level": "error",
+          "message": {
+            "text": "Hardcoded credentials in source code: Use environment variables or a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault). Never commit credentials to version control."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 15
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "AUTH-002",
+          "level": "error",
+          "message": {
+            "text": "Sensitive tokens passed in query parameters: Pass tokens in the Authorization header (Bearer scheme) or in httpOnly cookies. Never use query parameters for sensitive credentials."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 90
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "AUTH-003",
+          "level": "error",
+          "message": {
+            "text": "Weak hashing algorithm for credentials: Use bcrypt, scrypt, or Argon2 for password hashing. These algorithms are intentionally slow and include salt by default."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 67
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "AUTH-004",
+          "level": "error",
+          "message": {
+            "text": "TLS certificate validation disabled: Never disable TLS verification in production. Fix certificate issues properly. Use CA bundles for self-signed certs in development only."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 31
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "AUTH-008",
+          "level": "error",
+          "message": {
+            "text": "Cookies set without Secure/HttpOnly flags: Set cookies with { secure: true, httpOnly: true, sameSite: 'strict' }. Use Secure for all auth cookies. HttpOnly prevents JavaScript access."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 208
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DB-001",
+          "level": "error",
+          "message": {
+            "text": "SQL injection via string concatenation: Use parameterized queries (placeholders) or prepared statements. ORMs handle this automatically. Never concatenate user input into SQL strings."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 77
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DB-002",
+          "level": "warning",
+          "message": {
+            "text": "SELECT * retrieves unnecessary columns: Select only the columns you need: SELECT id, name, email FROM users. This reduces network transfer, memory usage, and improves query plan optimization."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 48
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DB-003",
+          "level": "error",
+          "message": {
+            "text": "N+1 query pattern detected: Use batch queries (WHERE id IN (...)), JOINs, or ORM eager loading (include/populate) to fetch related data in a single query."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 47
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DB-004",
+          "level": "warning",
+          "message": {
+            "text": "Data mutations without transaction handling: Wrap multi-step data mutations in transactions. Use BEGIN/COMMIT/ROLLBACK or ORM transaction APIs to ensure atomicity."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DB-005",
+          "level": "error",
+          "message": {
+            "text": "Hardcoded database connection string: Use environment variables for connection strings. Store credentials in a secrets manager. Use different connection strings per environment."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 18
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DB-006",
+          "level": "error",
+          "message": {
+            "text": "Destructive DDL statements in application code: Never run destructive DDL from application code. Use migration tools (Prisma, Flyway, Alembic) with review and rollback support. Require elevated permissions for DDL."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 224
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DB-007",
+          "level": "error",
+          "message": {
+            "text": "Database credentials embedded in connection string: Use separate credential parameters or environment variables. Consider IAM/managed identity for passwordless database connections in cloud environments."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 18
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CFG-001",
+          "level": "error",
+          "message": {
+            "text": "Secrets hardcoded in source code: Store secrets in a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault). Inject via environment variables at runtime. Never commit secrets."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 15
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CFG-002",
+          "level": "warning",
+          "message": {
+            "text": "Configuration values hardcoded instead of externalized: Read configuration from environment variables (process.env.PORT). Use a config library (convict, dotenv, django-environ) to validate and provide defaults."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 174
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CFG-004",
+          "level": "note",
+          "message": {
+            "text": ".env usage detected — ensure it is not committed: Add .env to .gitignore. Create a .env.example with placeholder values documenting required environment variables. Use CI/CD variables for deployment."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "COMPAT-002",
+          "level": "note",
+          "message": {
+            "text": "Multiple response formats — verify contract consistency: Use a consistent response envelope across all endpoints. Define response schemas (OpenAPI/Swagger) to enforce contracts."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 59
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "COMPAT-003",
+          "level": "note",
+          "message": {
+            "text": "HTTP method mismatch — destructive action via POST: Use appropriate HTTP methods: DELETE for removal, PUT/PATCH for updates. If migrating methods, keep the old method working during a deprecation period."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 113
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "PORTA-001",
+          "level": "warning",
+          "message": {
+            "text": "OS-specific file paths detected: Use platform-independent path construction (path.join, os.path.join, Path.Combine). Use environment variables or config for base directories."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 177
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "PORTA-002",
+          "level": "note",
+          "message": {
+            "text": "File I/O without explicit line-ending handling: Use 'utf-8' encoding explicitly. Consider normalizing line endings when reading files. Configure .gitattributes for consistent line endings in version control."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "PORTA-003",
+          "level": "warning",
+          "message": {
+            "text": "OS-specific environment variables used directly: Use cross-platform helpers like os.homedir(), os.tmpdir(), or libraries like 'env-paths' to resolve platform-appropriate directories."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 261
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "PORTA-004",
+          "level": "error",
+          "message": {
+            "text": "Browser-specific APIs used in server-side code: Guard browser API usage with typeof checks (e.g., typeof window !== 'undefined'). Use isomorphic libraries for code shared between client and server."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 108
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "UX-001",
+          "level": "note",
+          "message": {
+            "text": "Inline event handlers in HTML: Use addEventListener() or framework event bindings (React onClick, Vue @click). Separate behavior from markup for maintainability and CSP compliance."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 158
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "UX-002",
+          "level": "warning",
+          "message": {
+            "text": "Form submission without loading/disabled state: Disable the submit button during submission. Show a loading indicator. Prevent double-submission at the application layer."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "UX-003",
+          "level": "note",
+          "message": {
+            "text": "Destructive actions without confirmation: Add confirmation dialogs for destructive actions. Show what will be affected. Consider soft-delete with undo capability."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "UX-004",
+          "level": "warning",
+          "message": {
+            "text": "List endpoints without pagination: Implement pagination (offset-based or cursor-based). Return total count and page info. Enforce maximum page sizes."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "UX-005",
+          "level": "note",
+          "message": {
+            "text": "Mutations without success feedback: Show success notifications (toasts, alerts) after mutations. Provide clear visual feedback. Consider optimistic UI updates with rollback on failure."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "UX-006",
+          "level": "warning",
+          "message": {
+            "text": "Form submission without client-side validation: Add client-side validation before submission. Use schema validation libraries (Zod, Yup, Joi). Show inline validation feedback. Keep server-side validation as well."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 265
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "LOGPRIV-001",
+          "level": "error",
+          "message": {
+            "text": "Authentication tokens logged: Never log authentication tokens, Authorization headers, or session IDs. If request logging is needed, redact sensitive headers before logging."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 51
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "LOGPRIV-002",
+          "level": "error",
+          "message": {
+            "text": "Passwords/secrets logged: Never log passwords, credentials, or secrets. Implement a log sanitizer that redacts sensitive fields automatically."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 74
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "LOGPRIV-003",
+          "level": "warning",
+          "message": {
+            "text": "Unstructured logging lacks redaction capabilities: Use a structured logging library (pino, winston) that supports field-level redaction, log level filtering, and structured output for automated sensitivity scanning."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "LOGPRIV-004",
+          "level": "note",
+          "message": {
+            "text": "String concatenation in log statements: Use structured logging with named fields: logger.info({ userId, action }, 'User action performed'). This allows automated redaction of specific fields."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 51
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "LOGPRIV-005",
+          "level": "warning",
+          "message": {
+            "text": "IP addresses logged without anonymization: Anonymize IP addresses in logs (truncate last octet for IPv4, mask prefix for IPv6). If full IP is needed for security, ensure log retention complies with privacy policy."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 230
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "LOGPRIV-006",
+          "level": "warning",
+          "message": {
+            "text": "Database queries logged — may contain sensitive parameters: Log query templates without parameter values. Use parameterized query logging that replaces bind values with placeholders. Redact sensitive column values."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 53
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "RATE-001",
+          "level": "warning",
+          "message": {
+            "text": "Unbounded query results without limit: Always enforce a maximum result limit: db.find({}).limit(100). Implement pagination and enforce maximum page sizes."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 47
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "RATE-002",
+          "level": "note",
+          "message": {
+            "text": "setInterval without rate control: Use setTimeout with re-scheduling instead of setInterval to prevent overlap. Add guards to skip execution if the previous run hasn't completed."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 168
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "RATE-003",
+          "level": "error",
+          "message": {
+            "text": "Authentication endpoints without rate limiting: Apply strict rate limits to auth endpoints (e.g., 5-10 requests/minute per IP). Use progressive delays or CAPTCHA after failed attempts. Consider using 'express-rate-limit' or 'rate-limiter-flexible'."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 206
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "RATE-004",
+          "level": "error",
+          "message": {
+            "text": "File upload without size or count limits: Set explicit file size limits (e.g., multer({ limits: { fileSize: 5 * 1024 * 1024 } })). Limit the number of files per request. Validate file types."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 255
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CICD-001",
+          "level": "warning",
+          "message": {
+            "text": "Hard process termination hinders graceful CI/CD lifecycle: Use proper error propagation instead of hard exits. In production, handle SIGTERM gracefully. Let the runtime manage process lifecycle."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 126
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CICD-002",
+          "level": "warning",
+          "message": {
+            "text": "Static analysis suppression comments detected: Fix the underlying issues instead of suppressing them. If suppression is necessary, add a comment explaining why and create a tracking issue to resolve it."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "AICS-003",
+          "level": "error",
+          "message": {
+            "text": "Placeholder security comment — missing implementation: Implement the security controls indicated by each comment before merging. If the control is not needed, remove the comment and document why. Do not ship TODO security comments to production."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 282
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "AICS-007",
+          "level": "warning",
+          "message": {
+            "text": "Type safety bypassed in security-critical code: Define proper interfaces for security-related data structures (tokens, sessions, credentials). Replace 'as any' with explicit types or runtime validation (zod, io-ts)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 238
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "AICS-008",
+          "level": "warning",
+          "message": {
+            "text": "Hardcoded URLs or IP addresses: Move all endpoint URLs and IP addresses to environment variables or a configuration file. Use service discovery or DNS for internal services."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 57
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "AICS-010",
+          "level": "error",
+          "message": {
+            "text": "Request handlers without input validation: Add schema validation for all request inputs (body, query, params). Use zod, joi, or yup (Node.js), pydantic (Python), class-validator (NestJS), or equivalent for your framework. Validate at the boundary before any business logic."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 42
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "AICS-017",
+          "level": "error",
+          "message": {
+            "text": "Weak cryptographic hash (MD5/SHA-1): Replace MD5/SHA-1 with SHA-256+ for integrity checks, or bcrypt/scrypt/argon2 for password hashing. Use crypto.subtle.digest('SHA-256', data) in web contexts."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 67
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "AICS-020",
+          "level": "error",
+          "message": {
+            "text": "TLS certificate verification disabled: Never disable TLS verification in production. Use properly signed certificates (Let's Encrypt is free). If self-signed certificates are required for internal services, configure the specific CA certificate rather than disabling all verification."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 31
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "FW-001",
+          "level": "error",
+          "message": {
+            "text": "Express error middleware registered before routes: Move error-handling middleware to after all route registrations: first register all routes, then app.use(errorHandler)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 233
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "FW-002",
+          "level": "warning",
+          "message": {
+            "text": "Express app without helmet() — missing security headers: Install and use helmet: npm install helmet, then app.use(helmet()). This sets 11 security headers with sensible defaults."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/sample-vulnerable-api.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

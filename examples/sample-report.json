@@ -1,0 +1,2663 @@
+{
+  "overallVerdict": "fail",
+  "overallScore": 60,
+  "summary": "# Judges Panel — Verdict\n\n**Overall Verdict: FAIL** | **Score: 60/100**\nTotal critical findings: 18 | Total high findings: 2\n\n## Individual Judge Results\n\n❌ **Judge Data Security** (FAIL, 0/100) — 10 finding(s)\n❌ **Judge Cybersecurity** (FAIL, 5/100) — 6 finding(s)\n⚠️ **Judge Cost Effectiveness** (WARNING, 67/100) — 4 finding(s)\n⚠️ **Judge Scalability** (WARNING, 66/100) — 4 finding(s)\n❌ **Judge Cloud Readiness** (FAIL, 61/100) — 3 finding(s)\n⚠️ **Judge Software Practices** (WARNING, 73/100) — 4 finding(s)\n❌ **Judge Accessibility** (FAIL, 17/100) — 7 finding(s)\n❌ **Judge API Design** (FAIL, 28/100) — 7 finding(s)\n⚠️ **Judge Reliability** (WARNING, 71/100) — 4 finding(s)\n❌ **Judge Observability** (FAIL, 63/100) — 3 finding(s)\n❌ **Judge Performance** (FAIL, 2/100) — 8 finding(s)\n❌ **Judge Compliance** (FAIL, 16/100) — 4 finding(s)\n❌ **Judge Sovereignty** (FAIL, 57/100) — 4 finding(s)\n✅ **Judge Testing** (PASS, 100/100) — 0 finding(s)\n⚠️ **Judge Documentation** (WARNING, 91/100) — 2 finding(s)\n⚠️ **Judge Internationalization** (WARNING, 75/100) — 4 finding(s)\n⚠️ **Judge Dependency Health** (WARNING, 93/100) — 1 finding(s)\n❌ **Judge Concurrency** (FAIL, 58/100) — 4 finding(s)\n❌ **Judge Ethics & Bias** (FAIL, 74/100) — 2 finding(s)\n⚠️ **Judge Maintainability** (WARNING, 76/100) — 5 finding(s)\n⚠️ **Judge Error Handling** (WARNING, 82/100) — 2 finding(s)\n❌ **Judge Authentication** (FAIL, 0/100) — 5 finding(s)\n❌ **Judge Database** (FAIL, 0/100) — 7 finding(s)\n✅ **Judge Caching** (PASS, 100/100) — 0 finding(s)\n❌ **Judge Configuration Management** (FAIL, 63/100) — 3 finding(s)\n✅ **Judge Backwards Compatibility** (PASS, 97/100) — 2 finding(s)\n⚠️ **Judge Portability** (WARNING, 67/100) — 4 finding(s)\n⚠️ **Judge UX** (WARNING, 69/100) — 6 finding(s)\n❌ **Judge Logging Privacy** (FAIL, 20/100) — 6 finding(s)\n⚠️ **Judge Rate Limiting** (WARNING, 61/100) — 4 finding(s)\n⚠️ **Judge CI/CD** (WARNING, 85/100) — 2 finding(s)\n✅ **Judge Code Structure** (PASS, 100/100) — 0 finding(s)\n✅ **Judge Agent Instructions** (PASS, 100/100) — 0 finding(s)\n❌ **Judge AI Code Safety** (FAIL, 15/100) — 6 finding(s)\n⚠️ **Judge Framework Safety** (WARNING, 78/100) — 2 finding(s)\n✅ **Judge IaC Security** (PASS, 100/100) — 0 finding(s)\n✅ **Judge False-Positive Review** (PASS, 100/100) — 0 finding(s)\n\n---\n\n**Judge Data Security** — Data Security & Privacy\nVerdict: **FAIL** | Score: **0/100**\nFindings: 5 critical, 5 high, 0 medium, 0 low\n\nKey issues:\n- [DATA-001] (critical) Hardcoded password detected: A password appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.\n- [DATA-002] (critical) Hardcoded API key detected: A API key appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.\n- [DATA-003] (critical) Hardcoded secret/token detected: A secret/token appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.\n- [DATA-004] (critical) Hardcoded database connection URL detected: A database connection URL appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.\n- [DATA-005] (high) Sensitive data may be logged: Log output appears to include sensitive data fields such as passwords, tokens, or PII. This can lead to credential exposure in log aggregation systems.\n- [DATA-006] (high) Weak hashing algorithm used: MD5 or SHA1 is used, which are cryptographically broken for security purposes. They should not be used for password hashing, data integrity verification, or any security-sensitive context.\n- [DATA-007] (critical) Potential SQL injection via string concatenation: SQL queries appear to be constructed using string interpolation or concatenation with user input, which can lead to SQL injection attacks and data breaches.\n\n**Confirmed data flow**: `req.body` (line 64) via hashedPw → sink at line 77\n- [DATA-008] (high) Cookie may lack security flags: Cookies are set without explicit Secure, HttpOnly, or SameSite flags, making them vulnerable to interception and XSS-based theft.\n- [DATA-009] (high) File upload without type/size validation: File uploads are accepted without visible MIME type, extension, or size validation, allowing malicious file uploads.\n- [DATA-010] (high) No CSRF protection detected: POST endpoints exist but no CSRF tokens or protection middleware is visible, making the application vulnerable to cross-site request forgery.\n\n\n**Judge Cybersecurity** — Cybersecurity & Threat Defense\nVerdict: **FAIL** | Score: **5/100**\nFindings: 2 critical, 2 high, 1 medium, 1 low\n\nKey issues:\n- [CYBER-001] (critical) Dangerous eval()/exec() usage: eval(), exec(), or dynamic code compilation executes arbitrary code and is a primary vector for code injection attacks.\n\n**Confirmed data flow**: `req.body` (line 115) → sink at line 115\n- [CYBER-002] (high) Potential XSS via innerHTML: Setting innerHTML, dangerouslySetInnerHTML, v-html, or [innerHTML] can lead to Cross-Site Scripting (XSS) if the content includes unsanitized user input.\n- [CYBER-003] (critical) TLS certificate validation disabled: TLS certificate verification is explicitly disabled, making the application vulnerable to man-in-the-middle (MITM) attacks.\n- [CYBER-007] (high) Authentication endpoints without rate limiting: Authentication-related code exists without visible rate limiting, making it vulnerable to brute-force and credential stuffing attacks.\n\n\n**Judge Cost Effectiveness** — Cost Optimization & Resource Efficiency\nVerdict: **WARNING** | Score: **67/100**\nFindings: 0 critical, 1 high, 2 medium, 1 low\n\nKey issues:\n- [COST-002] (high) Potential N+1 query pattern (await in loop): An await call inside a loop suggests sequential asynchronous operations that could be batched. This causes N+1 performance problems and increased latency/cost.\n\n\n**Judge Scalability** — Scalability & Performance\nVerdict: **WARNING** | Score: **66/100**\nFindings: 0 critical, 1 high, 2 medium, 1 low\n\nKey issues:\n- [SCALE-002] (high) Synchronous blocking operation: Blocking/synchronous operations in the request path limit concurrency and throughput. Under load, this creates a bottleneck that prevents scaling.\n\n\n**Judge Cloud Readiness** — Cloud-Native Architecture & DevOps\nVerdict: **FAIL** | Score: **61/100**\nFindings: 1 critical, 0 high, 1 medium, 1 low\n\nKey issues:\n- [CLOUD-004] (critical) Hardcoded connection string / service URL: Connection strings hardcoded in source code will break across environments and expose credentials in version control.\n\n\n**Judge Software Practices** — Software Engineering Best Practices & Secure SDLC\nVerdict: **WARNING** | Score: **73/100**\nFindings: 0 critical, 0 high, 3 medium, 0 low\n\nKey issues:\n\n\n**Judge Accessibility** — Accessibility (a11y)\nVerdict: **FAIL** | Score: **17/100**\nFindings: 0 critical, 4 high, 3 medium, 0 low\n\nKey issues:\n- [A11Y-001] (high) Image missing alt attribute: Images must have descriptive alt text for screen readers and assistive technologies.\n- [A11Y-004] (high) Form input missing label association: Form inputs without associated labels are inaccessible to screen reader users.\n- [A11Y-005] (high) Missing lang attribute on <html>: The html element must have a lang attribute so screen readers pronounce content in the correct language.\n- [A11Y-007] (high) Focus indicator removed (outline: none): Removing the focus outline without providing an alternative focus indicator makes the page unusable for keyboard users.\n\n\n**Judge API Design** — API Design & Contracts\nVerdict: **FAIL** | Score: **28/100**\nFindings: 1 critical, 1 high, 3 medium, 2 low\n\nKey issues:\n- [API-003] (high) List endpoint without pagination: API endpoints that return collections should support pagination to prevent unbounded responses.\n- [API-007] (critical) Sensitive data in URL/query parameters: Passwords, tokens, and secrets in URL paths or query strings are logged in server access logs, browser history, and proxy caches.\n\n\n**Judge Reliability** — Reliability & Resilience\nVerdict: **WARNING** | Score: **71/100**\nFindings: 0 critical, 1 high, 1 medium, 2 low\n\nKey issues:\n- [REL-001] (high) Network call without timeout: Network calls without timeouts can hang indefinitely, causing resource exhaustion and cascading failures.\n\n\n**Judge Observability** — Monitoring & Diagnostics\nVerdict: **FAIL** | Score: **63/100**\nFindings: 1 critical, 0 high, 1 medium, 1 low\n\nKey issues:\n- [OBS-005] (critical) Sensitive data potentially logged: Log statements appear to include sensitive fields (password, token, API key, SSN, credit card). This violates security and compliance requirements.\n\n\n**Judge Performance** — Runtime Performance\nVerdict: **FAIL** | Score: **2/100**\nFindings: 1 critical, 3 high, 3 medium, 1 low\n\nKey issues:\n- [PERF-001] (critical) Potential N+1 query pattern: Database queries inside loops cause N+1 performance problems, generating excessive database load that grows linearly with data size.\n- [PERF-006] (high) Unbounded data fetch without pagination: Fetching all records without limit/pagination can exhaust memory and crash the application as data grows.\n- [PERF-007] (high) Nested loops detected — O(n²) or worse complexity: 1 nested loop(s) detected. Nested loops scale quadratically or worse with input size and can cause severe performance degradation on large datasets.\n- [PERF-008] (high) setInterval without clearInterval — timer leak: setInterval is called without a corresponding clearInterval, which creates a timer that runs indefinitely and prevents garbage collection of captured closures.\n\n\n**Judge Compliance** — Regulatory & License Compliance\nVerdict: **FAIL** | Score: **16/100**\nFindings: 3 critical, 0 high, 1 medium, 0 low\n\nKey issues:\n- [COMP-001] (critical) PII field handled without protection: Personally Identifiable Information (SSN, passport, tax ID) must be encrypted at rest and in transit, and masked in logs.\n- [COMP-002] (critical) Sensitive data in log statements: Logging sensitive information (passwords, tokens, SSNs, credit cards) creates compliance violations and security risks.\n- [COMP-003] (critical) Credit card data handling detected: Credit card numbers must never be stored in plain text. PCI DSS requires tokenization, encryption, or use of a payment processor.\n\n\n**Judge Sovereignty** — Data, Technological & Operational Sovereignty\nVerdict: **FAIL** | Score: **57/100**\nFindings: 0 critical, 2 high, 2 medium, 0 low\n\nKey issues:\n- [SOV-001] (high) Potential cross-border data egress without jurisdiction checks: External API/network calls are present without visible jurisdictional or transfer controls, increasing cross-border data transfer risk.\n- [SOV-004] (high) Administrative operations without audit trail: Destructive or privileged operations (delete, destroy, drop, revoke, role changes, password resets) are performed without visible audit logging. Without audit trails, the organization loses operational sovereignty — the ability to independently verify who did what, when, and why.\n\n\n**Judge Testing** — Test Quality & Coverage\nVerdict: **PASS** | Score: **100/100**\nFindings: 0 critical, 0 high, 0 medium, 0 low\n\nNo pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.\n\n**Judge Documentation** — Documentation & Developer Experience\nVerdict: **WARNING** | Score: **91/100**\nFindings: 0 critical, 0 high, 1 medium, 1 low\n\nKey issues:\n\n\n**Judge Internationalization** — i18n & Localization\nVerdict: **WARNING** | Score: **75/100**\nFindings: 0 critical, 0 high, 3 medium, 1 low\n\nKey issues:\n\n\n**Judge Dependency Health** — Supply Chain & Dependencies\nVerdict: **WARNING** | Score: **93/100**\nFindings: 0 critical, 0 high, 1 medium, 0 low\n\nKey issues:\n\n\n**Judge Concurrency** — Concurrency & Thread Safety\nVerdict: **FAIL** | Score: **58/100**\nFindings: 0 critical, 2 high, 2 medium, 0 low\n\nKey issues:\n- [CONC-001] (high) Shared mutable state in async context: Module-level mutable variables accessed from async functions can cause race conditions and data corruption.\n- [CONC-002] (high) Potentially missing await on async operation: Async operations without await fire-and-forget, meaning errors are silently lost and operations may not complete before the response is sent.\n\n\n**Judge Ethics & Bias** — AI/ML Fairness & Ethics\nVerdict: **FAIL** | Score: **74/100**\nFindings: 1 critical, 0 high, 0 medium, 1 low\n\nKey issues:\n- [ETHICS-001] (critical) Demographic-based conditional logic: Code contains conditional logic based on protected demographic characteristics, which may constitute discriminatory behavior.\n\n\n**Judge Maintainability** — Code Maintainability & Technical Debt\nVerdict: **WARNING** | Score: **76/100**\nFindings: 0 critical, 0 high, 1 medium, 4 low\n\nKey issues:\n\n\n**Judge Error Handling** — Error Handling & Fault Tolerance\nVerdict: **WARNING** | Score: **82/100**\nFindings: 0 critical, 1 high, 0 medium, 1 low\n\nKey issues:\n- [ERR-001] (high) Abrupt process termination instead of proper error handling: Found 1 abrupt termination call(s) (process.exit, sys.exit, panic, .unwrap). These skip cleanup handlers, drop in-flight requests, and can corrupt data.\n\n\n**Judge Authentication** — Authentication & Authorization\nVerdict: **FAIL** | Score: **0/100**\nFindings: 3 critical, 2 high, 0 medium, 0 low\n\nKey issues:\n- [AUTH-001] (critical) Hardcoded credentials in source code: Found 4 instance(s) of what appears to be hardcoded credentials. Credentials in source code are exposed in version control and cannot be rotated without redeployment.\n- [AUTH-002] (high) Sensitive tokens passed in query parameters: Authentication tokens or API keys are read from query parameters. Query params appear in server logs, browser history, referrer headers, and proxy logs.\n- [AUTH-003] (critical) Weak hashing algorithm for credentials: MD5, SHA1, or SHA256 are fast hash algorithms unsuitable for password storage. They can be brute-forced at billions of hashes per second.\n- [AUTH-004] (critical) TLS certificate validation disabled: TLS certificate verification is disabled, allowing man-in-the-middle attacks. Authentication credentials sent over this connection can be intercepted.\n- [AUTH-008] (high) Cookies set without Secure/HttpOnly flags: Cookies are set without Secure (HTTPS-only) or HttpOnly (no JS access) flags. This exposes cookies to interception and XSS-based theft.\n\n\n**Judge Database** — Database Design & Query Efficiency\nVerdict: **FAIL** | Score: **0/100**\nFindings: 3 critical, 2 high, 2 medium, 0 low\n\nKey issues:\n- [DB-001] (critical) SQL injection via string concatenation: Found 1 instance(s) of SQL queries built with string concatenation or interpolation containing user input. This is the most common and dangerous database vulnerability.\n\n**Confirmed data flow**: `req.body` (line 64) via hashedPw → sink at line 77\n- [DB-003] (high) N+1 query pattern detected: Found 9 database query/queries inside loops. This creates N+1 queries: 1 for the list + N for each item. Performance degrades linearly with data volume.\n- [DB-005] (critical) Hardcoded database connection string: Database connection string is hardcoded in source code, exposing credentials and making it impossible to use different databases per environment.\n- [DB-006] (critical) Destructive DDL statements in application code: Found 1 DROP/TRUNCATE statement(s). These permanently delete data or schema. If executed accidentally (e.g., via injection), data loss is irreversible.\n- [DB-007] (high) Database credentials embedded in connection string: Connection string contains inline username and password. These credentials are visible in source code, logs, and process listings.\n\n\n**Judge Caching** — Caching Strategy & Data Freshness\nVerdict: **PASS** | Score: **100/100**\nFindings: 0 critical, 0 high, 0 medium, 0 low\n\nNo pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.\n\n**Judge Configuration Management** — Configuration & Secrets Management\nVerdict: **FAIL** | Score: **63/100**\nFindings: 1 critical, 0 high, 1 medium, 0 low\n\nKey issues:\n- [CFG-001] (critical) Secrets hardcoded in source code: Found 6 instance(s) of hardcoded secrets. Secrets in code are exposed in version control, CI logs, and error traces. They cannot be rotated without redeployment.\n\n\n**Judge Backwards Compatibility** — Backwards Compatibility & Versioning\nVerdict: **PASS** | Score: **97/100**\nFindings: 0 critical, 0 high, 0 medium, 1 low\n\nKey issues:\n\n\n**Judge Portability** — Platform Portability & Vendor Independence\nVerdict: **WARNING** | Score: **67/100**\nFindings: 0 critical, 1 high, 2 medium, 0 low\n\nKey issues:\n- [PORTA-004] (high) Browser-specific APIs used in server-side code: Found 2 browser-only API call(s) (document, window, localStorage, etc.) in what appears to be server-side code. These will throw ReferenceError at runtime.\n\n\n**Judge UX** — User Experience & Interface Quality\nVerdict: **WARNING** | Score: **69/100**\nFindings: 0 critical, 0 high, 3 medium, 3 low\n\nKey issues:\n\n\n**Judge Logging Privacy** — Logging Privacy & Data Redaction\nVerdict: **FAIL** | Score: **20/100**\nFindings: 2 critical, 0 high, 3 medium, 1 low\n\nKey issues:\n- [LOGPRIV-001] (critical) Authentication tokens logged: Found 1 instance(s) where authentication tokens or authorization headers are logged. Tokens in logs can be used for session hijacking.\n- [LOGPRIV-002] (critical) Passwords/secrets logged: Found 1 instance(s) where passwords or secrets appear in log statements. This exposes credentials in log files, monitoring systems, and SIEM tools.\n\n\n**Judge Rate Limiting** — Rate Limiting & Throttling\nVerdict: **WARNING** | Score: **61/100**\nFindings: 0 critical, 2 high, 1 medium, 1 low\n\nKey issues:\n- [RATE-003] (high) Authentication endpoints without rate limiting: Found 1 authentication endpoint(s) without visible rate limiting. Auth endpoints are prime targets for brute-force and credential-stuffing attacks.\n- [RATE-004] (high) File upload without size or count limits: Found 2 file upload handler(s) without visible size limits. Unbounded uploads can exhaust disk space and memory, causing denial of service.\n\n\n**Judge CI/CD** — CI/CD Pipeline & Deployment Safety\nVerdict: **WARNING** | Score: **85/100**\nFindings: 0 critical, 0 high, 2 medium, 0 low\n\nKey issues:\n\n\n**Judge Code Structure** — Structural Analysis\nVerdict: **PASS** | Score: **100/100**\nFindings: 0 critical, 0 high, 0 medium, 0 low\n\nNo pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.\n\n**Judge Agent Instructions** — Agent Instruction Markdown Quality & Safety\nVerdict: **PASS** | Score: **100/100**\nFindings: 0 critical, 0 high, 0 medium, 0 low\n\nNo pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.\n\n**Judge AI Code Safety** — AI-Generated Code Quality & Security\nVerdict: **FAIL** | Score: **15/100**\nFindings: 1 critical, 3 high, 2 medium, 0 low\n\nKey issues:\n- [AICS-003] (high) Placeholder security comment — missing implementation: Found 1 TODO/FIXME comment(s) indicating that security-critical functionality (authentication, validation, encryption, etc.) has not been implemented yet. AI-generated code often leaves these placeholders which are easy to overlook during review.\n- [AICS-010] (high) Request handlers without input validation: Found 6 API endpoint handler(s) but no input validation library or schema validation is detected. AI-generated API code frequently omits input validation, leaving endpoints vulnerable to injection, type confusion, and data integrity issues.\n- [AICS-017] (high) Weak cryptographic hash (MD5/SHA-1): AI-generated code frequently uses MD5 or SHA-1 for hashing. Both algorithms have known collision vulnerabilities and are unsuitable for password hashing, integrity verification, or digital signatures.\n- [AICS-020] (critical) TLS certificate verification disabled: SSL/TLS certificate verification has been disabled (e.g. rejectUnauthorized: false, verify=False, InsecureSkipVerify: true). AI-generated code often disables certificate checks to bypass development SSL errors, leaving the code vulnerable to man-in-the-middle attacks in production.\n\n\n**Judge Framework Safety** — Framework-Specific Security & Best Practices\nVerdict: **WARNING** | Score: **78/100**\nFindings: 0 critical, 1 high, 1 medium, 0 low\n\nKey issues:\n- [FW-001] (high) Express error middleware registered before routes: Express error-handling middleware (4-parameter function) is registered before route handlers. Routes added after it won't have their errors caught, leading to unhandled rejections.\n\n\n**Judge IaC Security** — Infrastructure as Code\nVerdict: **PASS** | Score: **100/100**\nFindings: 0 critical, 0 high, 0 medium, 0 low\n\nNo pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.\n\n**Judge False-Positive Review** — False Positive Detection & Finding Accuracy\nVerdict: **PASS** | Score: **100/100**\nFindings: 0 critical, 0 high, 0 medium, 0 low\n\nNo pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.\n\n",
+  "evaluations": [
+    {
+      "judgeId": "data-security",
+      "judgeName": "Judge Data Security",
+      "verdict": "fail",
+      "score": 0,
+      "summary": "**Judge Data Security** — Data Security & Privacy\nVerdict: **FAIL** | Score: **0/100**\nFindings: 5 critical, 5 high, 0 medium, 0 low\n\nKey issues:\n- [DATA-001] (critical) Hardcoded password detected: A password appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.\n- [DATA-002] (critical) Hardcoded API key detected: A API key appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.\n- [DATA-003] (critical) Hardcoded secret/token detected: A secret/token appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.\n- [DATA-004] (critical) Hardcoded database connection URL detected: A database connection URL appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.\n- [DATA-005] (high) Sensitive data may be logged: Log output appears to include sensitive data fields such as passwords, tokens, or PII. This can lead to credential exposure in log aggregation systems.\n- [DATA-006] (high) Weak hashing algorithm used: MD5 or SHA1 is used, which are cryptographically broken for security purposes. They should not be used for password hashing, data integrity verification, or any security-sensitive context.\n- [DATA-007] (critical) Potential SQL injection via string concatenation: SQL queries appear to be constructed using string interpolation or concatenation with user input, which can lead to SQL injection attacks and data breaches.\n\n**Confirmed data flow**: `req.body` (line 64) via hashedPw → sink at line 77\n- [DATA-008] (high) Cookie may lack security flags: Cookies are set without explicit Secure, HttpOnly, or SameSite flags, making them vulnerable to interception and XSS-based theft.\n- [DATA-009] (high) File upload without type/size validation: File uploads are accepted without visible MIME type, extension, or size validation, allowing malicious file uploads.\n- [DATA-010] (high) No CSRF protection detected: POST endpoints exist but no CSRF tokens or protection middleware is visible, making the application vulnerable to cross-site request forgery.\n",
+      "findings": [
+        {
+          "ruleId": "DATA-001",
+          "severity": "critical",
+          "title": "Hardcoded password detected",
+          "description": "A password appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.",
+          "lineNumbers": [
+            15
+          ],
+          "recommendation": "Move the password to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control.",
+          "reference": "OWASP: Hardcoded Credentials — CWE-798",
+          "suggestedFix": "Replace hardcoded password with an environment variable: process.env.SECRET_NAME or inject from a secrets manager at runtime.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "\"SuperSecret123!\"",
+            "newText": "process.env.PASSWORD || \"\"",
+            "startLine": 15,
+            "endLine": 15
+          }
+        },
+        {
+          "ruleId": "DATA-002",
+          "severity": "critical",
+          "title": "Hardcoded API key detected",
+          "description": "A API key appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.",
+          "lineNumbers": [
+            16
+          ],
+          "recommendation": "Move the API key to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control.",
+          "reference": "OWASP: Hardcoded Credentials — CWE-798",
+          "suggestedFix": "Replace hardcoded API key with an environment variable: process.env.SECRET_NAME or inject from a secrets manager at runtime.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "\"sk-proj-ABCDEF1234567890abcdef\"",
+            "newText": "process.env.API_KEY || \"\"",
+            "startLine": 16,
+            "endLine": 16
+          }
+        },
+        {
+          "ruleId": "DATA-003",
+          "severity": "critical",
+          "title": "Hardcoded secret/token detected",
+          "description": "A secret/token appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.",
+          "lineNumbers": [
+            17,
+            209
+          ],
+          "recommendation": "Move the secret/token to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control.",
+          "reference": "OWASP: Hardcoded Credentials — CWE-798",
+          "suggestedFix": "Replace hardcoded secret/token with an environment variable: process.env.SECRET_NAME or inject from a secrets manager at runtime.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "\"my-jwt-signing-secret-value\"",
+            "newText": "process.env.SECRET || \"\"",
+            "startLine": 17,
+            "endLine": 17
+          }
+        },
+        {
+          "ruleId": "DATA-004",
+          "severity": "critical",
+          "title": "Hardcoded database connection URL detected",
+          "description": "A database connection URL appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.",
+          "lineNumbers": [
+            18
+          ],
+          "recommendation": "Move the database connection URL to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control.",
+          "reference": "OWASP: Hardcoded Credentials — CWE-798",
+          "suggestedFix": "Replace hardcoded database connection URL with an environment variable: process.env.SECRET_NAME or inject from a secrets manager at runtime.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "\"postgres://admin:hunter2@prod-db.example.com:5432/myapp\"",
+            "newText": "process.env.DATABASE_URL || \"postgres://admin:hunter2@prod-db.example.com:5432/myapp\"",
+            "startLine": 18,
+            "endLine": 18
+          }
+        },
+        {
+          "ruleId": "DATA-005",
+          "severity": "high",
+          "title": "Sensitive data may be logged",
+          "description": "Log output appears to include sensitive data fields such as passwords, tokens, or PII. This can lead to credential exposure in log aggregation systems.",
+          "lineNumbers": [
+            51,
+            74
+          ],
+          "recommendation": "Remove sensitive data from log statements. Use structured logging with redaction filters to automatically mask sensitive fields.",
+          "reference": "OWASP Logging Cheat Sheet — CWE-532",
+          "suggestedFix": "Remove sensitive fields from log calls or redact them: logger.info('User login', { userId: user.id }) instead of logging passwords/tokens.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "DATA-006",
+          "severity": "high",
+          "title": "Weak hashing algorithm used",
+          "description": "MD5 or SHA1 is used, which are cryptographically broken for security purposes. They should not be used for password hashing, data integrity verification, or any security-sensitive context.",
+          "lineNumbers": [
+            67
+          ],
+          "recommendation": "Use SHA-256/SHA-512 for integrity checks, or bcrypt/scrypt/argon2 for password hashing.",
+          "reference": "NIST SP 800-131A — CWE-328",
+          "suggestedFix": "Replace MD5/SHA1 with SHA-256 for integrity, or bcrypt/argon2 for passwords: crypto.createHash('sha256') or await bcrypt.hash(password, 12).",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "createHash(\"md5\")",
+            "newText": "createHash(\"sha256\")",
+            "startLine": 67,
+            "endLine": 67
+          }
+        },
+        {
+          "ruleId": "DATA-007",
+          "severity": "critical",
+          "title": "Potential SQL injection via string concatenation",
+          "description": "SQL queries appear to be constructed using string interpolation or concatenation with user input, which can lead to SQL injection attacks and data breaches.\n\n**Confirmed data flow**: `req.body` (line 64) via hashedPw → sink at line 77",
+          "lineNumbers": [
+            77
+          ],
+          "recommendation": "Use parameterized queries or prepared statements. Never concatenate user input into SQL strings directly.",
+          "reference": "OWASP SQL Injection — CWE-89",
+          "suggestedFix": "Use parameterized queries: db.query('SELECT * FROM users WHERE id = $1', [userId]) instead of string concatenation.",
+          "confidence": 1
+        },
+        {
+          "ruleId": "DATA-008",
+          "severity": "high",
+          "title": "Cookie may lack security flags",
+          "description": "Cookies are set without explicit Secure, HttpOnly, or SameSite flags, making them vulnerable to interception and XSS-based theft.",
+          "lineNumbers": [
+            208
+          ],
+          "recommendation": "Set Secure, HttpOnly, and SameSite=Strict (or Lax) flags on all cookies. Use __Host- prefix for sensitive cookies.",
+          "reference": "OWASP Session Management — CWE-614",
+          "suggestedFix": "Add security flags: res.cookie('name', value, { secure: true, httpOnly: true, sameSite: 'strict' });",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "DATA-009",
+          "severity": "high",
+          "title": "File upload without type/size validation",
+          "description": "File uploads are accepted without visible MIME type, extension, or size validation, allowing malicious file uploads.",
+          "lineNumbers": [
+            254,
+            255,
+            256
+          ],
+          "recommendation": "Validate file type (MIME + extension + magic bytes), enforce size limits, scan for malware, and store uploads outside the webroot.",
+          "reference": "OWASP Unrestricted File Upload — CWE-434",
+          "suggestedFix": "Add file validation: multer({ fileFilter, limits: { fileSize: 5 * 1024 * 1024 } }) with MIME type and extension checks.",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "DATA-010",
+          "severity": "high",
+          "title": "No CSRF protection detected",
+          "description": "POST endpoints exist but no CSRF tokens or protection middleware is visible, making the application vulnerable to cross-site request forgery.",
+          "lineNumbers": [
+            62,
+            113,
+            206,
+            256
+          ],
+          "recommendation": "Implement CSRF protection using tokens (csurf, django.middleware.csrf, @csrf_exempt annotations) or SameSite cookies.",
+          "reference": "OWASP CSRF — CWE-352",
+          "suggestedFix": "Add CSRF middleware: app.use(csurf({ cookie: { httpOnly: true, sameSite: 'strict' } })); and include token in forms.",
+          "confidence": 0.7
+        }
+      ]
+    },
+    {
+      "judgeId": "cybersecurity",
+      "judgeName": "Judge Cybersecurity",
+      "verdict": "fail",
+      "score": 5,
+      "summary": "**Judge Cybersecurity** — Cybersecurity & Threat Defense\nVerdict: **FAIL** | Score: **5/100**\nFindings: 2 critical, 2 high, 1 medium, 1 low\n\nKey issues:\n- [CYBER-001] (critical) Dangerous eval()/exec() usage: eval(), exec(), or dynamic code compilation executes arbitrary code and is a primary vector for code injection attacks.\n\n**Confirmed data flow**: `req.body` (line 115) → sink at line 115\n- [CYBER-002] (high) Potential XSS via innerHTML: Setting innerHTML, dangerouslySetInnerHTML, v-html, or [innerHTML] can lead to Cross-Site Scripting (XSS) if the content includes unsanitized user input.\n- [CYBER-003] (critical) TLS certificate validation disabled: TLS certificate verification is explicitly disabled, making the application vulnerable to man-in-the-middle (MITM) attacks.\n- [CYBER-007] (high) Authentication endpoints without rate limiting: Authentication-related code exists without visible rate limiting, making it vulnerable to brute-force and credential stuffing attacks.\n",
+      "findings": [
+        {
+          "ruleId": "CYBER-001",
+          "severity": "critical",
+          "title": "Dangerous eval()/exec() usage",
+          "description": "eval(), exec(), or dynamic code compilation executes arbitrary code and is a primary vector for code injection attacks.\n\n**Confirmed data flow**: `req.body` (line 115) → sink at line 115",
+          "lineNumbers": [
+            115
+          ],
+          "recommendation": "Remove eval() entirely. Use JSON.parse() for data parsing (JS/TS), ast.literal_eval (Python), or a proper expression parser.",
+          "reference": "OWASP Code Injection — CWE-94",
+          "suggestedFix": "Replace eval(expr) with JSON.parse(expr) or a safe parser.",
+          "confidence": 1,
+          "patch": {
+            "oldText": "eval(req.body.filterExpression)",
+            "newText": "new Function(req.body.filterExpression)() /* TODO: eliminate dynamic code execution */",
+            "startLine": 115,
+            "endLine": 115
+          }
+        },
+        {
+          "ruleId": "CYBER-002",
+          "severity": "high",
+          "title": "Potential XSS via innerHTML",
+          "description": "Setting innerHTML, dangerouslySetInnerHTML, v-html, or [innerHTML] can lead to Cross-Site Scripting (XSS) if the content includes unsanitized user input.",
+          "lineNumbers": [
+            108,
+            262
+          ],
+          "recommendation": "Use textContent for plain text, or use a sanitization library (DOMPurify) before inserting HTML. In React, avoid dangerouslySetInnerHTML unless content is sanitized.",
+          "reference": "OWASP XSS Prevention — CWE-79",
+          "suggestedFix": "Sanitize with DOMPurify: el.innerHTML = DOMPurify.sanitize(untrustedHtml); or use textContent for plain text.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": ".innerHTML",
+            "newText": ".textContent",
+            "startLine": 108,
+            "endLine": 108
+          }
+        },
+        {
+          "ruleId": "CYBER-003",
+          "severity": "critical",
+          "title": "TLS certificate validation disabled",
+          "description": "TLS certificate verification is explicitly disabled, making the application vulnerable to man-in-the-middle (MITM) attacks.",
+          "lineNumbers": [
+            31
+          ],
+          "recommendation": "Never disable TLS certificate validation in production. Use proper CA certificates. If using self-signed certs in development, use a CA bundle instead.",
+          "reference": "CWE-295: Improper Certificate Validation",
+          "suggestedFix": "Remove rejectUnauthorized: false and NODE_TLS_REJECT_UNAUTHORIZED='0'. Use valid CA certificates instead.",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "CYBER-004",
+          "severity": "low",
+          "title": "Linter/type-checker suppression directives found",
+          "description": "Code contains directives to suppress linter or type-checker warnings. While sometimes necessary, these can mask real security or quality issues.",
+          "lineNumbers": [
+            1,
+            11,
+            199
+          ],
+          "recommendation": "Review each suppression directive to ensure it's justified. Add a comment explaining why the suppression is necessary. Remove any that were added simply to silence warnings.",
+          "reference": "Secure Coding Best Practices",
+          "suggestedFix": "Add justification comments: // eslint-disable-next-line no-explicit-any -- legacy API returns untyped response, tracked in JIRA-1234.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "CYBER-006",
+          "severity": "medium",
+          "title": "No password complexity validation",
+          "description": "Authentication endpoints handle passwords but no password complexity rules (minimum length, character requirements) are visible.",
+          "recommendation": "Enforce minimum 8-character passwords with complexity requirements. Use NIST SP 800-63B guidelines. Check against breached password databases (Have I Been Pwned).",
+          "reference": "NIST SP 800-63B — CWE-521",
+          "suggestedFix": "Add password validation: if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) throw new Error('Password too weak'); check HaveIBeenPwned API.",
+          "confidence": 0.7
+        },
+        {
+          "ruleId": "CYBER-007",
+          "severity": "high",
+          "title": "Authentication endpoints without rate limiting",
+          "description": "Authentication-related code exists without visible rate limiting, making it vulnerable to brute-force and credential stuffing attacks.",
+          "lineNumbers": [
+            51,
+            74,
+            206,
+            209
+          ],
+          "recommendation": "Implement rate limiting on login/auth endpoints. Use progressive delays, account lockouts, or CAPTCHA after failed attempts.",
+          "reference": "OWASP Brute Force — CWE-307",
+          "suggestedFix": "Add auth rate limiting: app.use('/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 5 })); lock account after 10 failures.",
+          "confidence": 0.7
+        }
+      ]
+    },
+    {
+      "judgeId": "cost-effectiveness",
+      "judgeName": "Judge Cost Effectiveness",
+      "verdict": "warning",
+      "score": 67,
+      "summary": "**Judge Cost Effectiveness** — Cost Optimization & Resource Efficiency\nVerdict: **WARNING** | Score: **67/100**\nFindings: 0 critical, 1 high, 2 medium, 1 low\n\nKey issues:\n- [COST-002] (high) Potential N+1 query pattern (await in loop): An await call inside a loop suggests sequential asynchronous operations that could be batched. This causes N+1 performance problems and increased latency/cost.\n",
+      "findings": [
+        {
+          "ruleId": "COST-001",
+          "severity": "medium",
+          "title": "Nested loops detected — potential O(n²) complexity",
+          "description": "Nested loops can lead to quadratic or worse time complexity. At scale, this causes dramatically increased compute costs and response times.",
+          "lineNumbers": [
+            101,
+            277,
+            278
+          ],
+          "recommendation": "Consider using hash maps for lookups (O(1)), sorting + binary search, or restructuring the algorithm. If the nested loop is necessary, ensure the inner dataset is bounded.",
+          "reference": "Algorithm Efficiency Best Practices",
+          "suggestedFix": "Replace the inner loop with a Map/Set lookup, e.g. `const lookup = new Map(items.map(i => [i.id, i]));` then use `lookup.get(id)` instead of iterating.",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "COST-002",
+          "severity": "high",
+          "title": "Potential N+1 query pattern (await in loop)",
+          "description": "An await call inside a loop suggests sequential asynchronous operations that could be batched. This causes N+1 performance problems and increased latency/cost.",
+          "lineNumbers": [
+            94
+          ],
+          "recommendation": "Use Promise.all() to parallelize independent operations, or batch database queries (e.g., WHERE id IN (...) instead of per-ID queries).",
+          "reference": "Database Performance Anti-Patterns",
+          "suggestedFix": "Collect IDs first, then batch-fetch: `const results = await db.query('SELECT * FROM items WHERE id IN (?)', [ids]);` or use `await Promise.all(ids.map(fetchItem))`.",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "COST-003",
+          "severity": "medium",
+          "title": "Unbounded data query",
+          "description": "A query fetches all records without filtering or pagination. With growing data, this will consume excessive memory, bandwidth, and compute.",
+          "lineNumbers": [
+            47,
+            48
+          ],
+          "recommendation": "Add pagination (LIMIT/OFFSET or cursor-based), filtering (WHERE clauses), and projection (select only needed fields). Default to a reasonable page size.",
+          "reference": "Database Query Optimization",
+          "suggestedFix": "Add LIMIT and WHERE clauses, e.g. `db.find({ status: 'active' }).limit(100)` or `SELECT id, name FROM users WHERE active = true LIMIT 100`.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "COST-004",
+          "severity": "low",
+          "title": "Synchronous/blocking file I/O detected",
+          "description": "Synchronous file operations block the event loop or thread, reducing throughput and wasting compute resources — especially costly in serverless environments billed per-ms.",
+          "lineNumbers": [
+            44
+          ],
+          "recommendation": "Use asynchronous file operations (fs.promises.readFile, aiofiles, async File.ReadAllTextAsync) or streaming for large files.",
+          "reference": "I/O Performance Best Practices",
+          "suggestedFix": "Replace `fs.readFileSync(path)` with `await fs.promises.readFile(path)` or use streaming: `const stream = fs.createReadStream(path);`.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "readFileSync",
+            "newText": "await readFile",
+            "startLine": 44,
+            "endLine": 44
+          }
+        }
+      ]
+    },
+    {
+      "judgeId": "scalability",
+      "judgeName": "Judge Scalability",
+      "verdict": "warning",
+      "score": 66,
+      "summary": "**Judge Scalability** — Scalability & Performance\nVerdict: **WARNING** | Score: **66/100**\nFindings: 0 critical, 1 high, 2 medium, 1 low\n\nKey issues:\n- [SCALE-002] (high) Synchronous blocking operation: Blocking/synchronous operations in the request path limit concurrency and throughput. Under load, this creates a bottleneck that prevents scaling.\n",
+      "findings": [
+        {
+          "ruleId": "SCALE-001",
+          "severity": "medium",
+          "title": "Global mutable state detected",
+          "description": "Top-level mutable variables (let/var with object/array initialization) create shared state that prevents safe horizontal scaling across multiple instances.",
+          "lineNumbers": [
+            21
+          ],
+          "recommendation": "Externalize state to a database, cache (Redis), or message queue. Use const/final/immutable for configuration. Each instance should be stateless.",
+          "reference": "12-Factor App: Processes (Factor VI)",
+          "suggestedFix": "Replace the top-level mutable variable with a call to an external store (e.g., `await redis.get(key)`) so each instance remains stateless.",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "SCALE-002",
+          "severity": "high",
+          "title": "Synchronous blocking operation",
+          "description": "Blocking/synchronous operations in the request path limit concurrency and throughput. Under load, this creates a bottleneck that prevents scaling.",
+          "lineNumbers": [
+            44
+          ],
+          "recommendation": "Use asynchronous alternatives (async/await, promises, non-blocking I/O). Move long-running work to background queues.",
+          "reference": "Reactive & Non-Blocking Architecture Patterns",
+          "suggestedFix": "Replace the synchronous call with its async counterpart (e.g., `fs.readFileSync` → `await fs.promises.readFile`) to avoid blocking the event loop.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "readFileSync",
+            "newText": "await readFile",
+            "startLine": 44,
+            "endLine": 44
+          }
+        },
+        {
+          "ruleId": "SCALE-003",
+          "severity": "medium",
+          "title": "External calls without timeout",
+          "description": "HTTP/API calls without timeouts can hang indefinitely, consuming resources and cascading failures through the system when downstream services are slow.",
+          "lineNumbers": [
+            57,
+            215,
+            266
+          ],
+          "recommendation": "Set explicit timeouts on all external calls (e.g., 5-30 seconds). Implement circuit breakers (e.g., using libraries like cockatiel or opossum) for critical dependencies.",
+          "reference": "Release It! — Stability Patterns",
+          "suggestedFix": "Add a timeout option to the HTTP call (e.g., `fetch(url, { signal: AbortSignal.timeout(5000) })`) to prevent indefinite hangs.",
+          "confidence": 0.7
+        },
+        {
+          "ruleId": "SCALE-004",
+          "severity": "low",
+          "title": "CPU-intensive computation may block scaling",
+          "description": "Detected nested loops. Heavy computation on the main thread blocks the event loop (Node.js) or consumes thread pool capacity.",
+          "recommendation": "Offload CPU-intensive work to worker threads, a job queue (Bull, Celery), or a dedicated compute service. Use async variants of crypto operations (pbkdf2, scrypt). Consider WebAssembly for hot-path computation.",
+          "reference": "Node.js Worker Threads / Job Queue Patterns",
+          "suggestedFix": "Move the heavy computation into a worker thread or use the async variant (e.g., `crypto.pbkdf2` instead of `crypto.pbkdf2Sync`) to keep the main thread free.",
+          "confidence": 0.8
+        }
+      ]
+    },
+    {
+      "judgeId": "cloud-readiness",
+      "judgeName": "Judge Cloud Readiness",
+      "verdict": "fail",
+      "score": 61,
+      "summary": "**Judge Cloud Readiness** — Cloud-Native Architecture & DevOps\nVerdict: **FAIL** | Score: **61/100**\nFindings: 1 critical, 0 high, 1 medium, 1 low\n\nKey issues:\n- [CLOUD-004] (critical) Hardcoded connection string / service URL: Connection strings hardcoded in source code will break across environments and expose credentials in version control.\n",
+      "findings": [
+        {
+          "ruleId": "CLOUD-001",
+          "severity": "medium",
+          "title": "Local filesystem path dependency",
+          "description": "Hardcoded filesystem paths assume a specific OS or directory structure. In cloud/container environments, local storage is ephemeral and non-shared.",
+          "lineNumbers": [
+            177
+          ],
+          "recommendation": "Use cloud storage (S3, Azure Blob, GCS) for persistent files. Use /tmp only for truly temporary data. Accept paths from environment configuration.",
+          "reference": "12-Factor App: Disposability (Factor IX)",
+          "suggestedFix": "Replace the hardcoded path with a cloud storage SDK call or read the path from an environment variable (e.g. `process.env.STORAGE_PATH`).",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "CLOUD-003",
+          "severity": "low",
+          "title": "Console.log instead of structured logging",
+          "description": "Console.log output is unstructured and difficult to parse in cloud log aggregation systems (CloudWatch, Azure Monitor, GCP Logging, ELK).",
+          "recommendation": "Use a structured logging library (pino/winston for JS, logging with dictConfig for Python, slog for Go, serilog for C#, log4j/slf4j for Java, tracing for Rust) that outputs JSON. Include correlation IDs, timestamps, and log levels.",
+          "reference": "Cloud-Native Logging Best Practices",
+          "suggestedFix": "Replace `console.log()` calls with a structured logger (e.g. `import pino from 'pino'; const logger = pino(); logger.info({ event }, 'message');`).",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "CLOUD-004",
+          "severity": "critical",
+          "title": "Hardcoded connection string / service URL",
+          "description": "Connection strings hardcoded in source code will break across environments and expose credentials in version control.",
+          "lineNumbers": [
+            18
+          ],
+          "recommendation": "Use environment variables or a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) for all connection strings.",
+          "reference": "12-Factor App: Config (Factor III) / Secret Management",
+          "suggestedFix": "Move the connection string to an environment variable or secret store and reference it via `process.env.DATABASE_URL`.",
+          "confidence": 0.95,
+          "patch": {
+            "oldText": "\"postgres://admin:hunter2@prod-db.example.com:5432/myapp\"",
+            "newText": "process.env.DATABASE_URL || \"postgres://admin:hunter2@prod-db.example.com:5432/myapp\"",
+            "startLine": 18,
+            "endLine": 18
+          }
+        }
+      ]
+    },
+    {
+      "judgeId": "software-practices",
+      "judgeName": "Judge Software Practices",
+      "verdict": "warning",
+      "score": 73,
+      "summary": "**Judge Software Practices** — Software Engineering Best Practices & Secure SDLC\nVerdict: **WARNING** | Score: **73/100**\nFindings: 0 critical, 0 high, 3 medium, 0 low\n\nKey issues:\n",
+      "findings": [
+        {
+          "ruleId": "SWDEV-001",
+          "severity": "medium",
+          "title": "'any' type usage",
+          "description": "Using weak or dynamic types defeats the type system, hiding potential runtime errors and making refactoring unsafe.",
+          "lineNumbers": [
+            22,
+            28,
+            133,
+            238,
+            265,
+            275
+          ],
+          "recommendation": "Replace with specific types, generics, or constrained types. In TS enable 'noImplicitAny'. In Go use concrete types or type constraints.",
+          "reference": "Type Safety Best Practices / Clean Code",
+          "suggestedFix": "Replace 'any' with a specific type or 'unknown'.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": ": any",
+            "newText": ": unknown",
+            "startLine": 22,
+            "endLine": 22
+          }
+        },
+        {
+          "ruleId": "SWDEV-002",
+          "severity": "medium",
+          "title": "Type-checker / linter error suppression",
+          "description": "Directives that suppress compiler or linter errors may mask real bugs and weaken safety guarantees.",
+          "lineNumbers": [
+            1,
+            11,
+            199
+          ],
+          "recommendation": "Fix the underlying issue instead of suppressing it. If suppression is truly necessary, add a comment explaining why.",
+          "reference": "Strict Mode Best Practices",
+          "suggestedFix": "Remove the suppression directive and fix the underlying type or lint error.",
+          "confidence": 0.95
+        },
+        {
+          "ruleId": "SWDEV-003",
+          "severity": "info",
+          "title": "TODO/FIXME/HACK comments found",
+          "description": "There are outstanding TODO, FIXME, or HACK comments indicating incomplete or suboptimal code that should be addressed before production.",
+          "lineNumbers": [
+            282,
+            283
+          ],
+          "recommendation": "Track TODOs as work items in your issue tracker. Resolve FIXMEs and HACKs before merging to main. Set a code quality gate that flags unresolved TODOs.",
+          "reference": "Software Engineering Best Practices",
+          "suggestedFix": "Convert each TODO/FIXME/HACK into a tracked issue and resolve or remove the comment.",
+          "confidence": 0.95
+        },
+        {
+          "ruleId": "SWDEV-005",
+          "severity": "medium",
+          "title": "Bare except / untyped catch block",
+          "description": "Catching all exceptions without specifying the type can mask unexpected errors (OutOfMemoryError, StackOverflow, KeyboardInterrupt).",
+          "lineNumbers": [
+            120,
+            217
+          ],
+          "recommendation": "Catch specific exception types. In Python, use 'except ValueError' (not bare 'except:'). In Java/C#, catch specific exception classes.",
+          "reference": "Exception Handling Best Practices",
+          "suggestedFix": "Replace the bare except/catch-all with a specific exception type (e.g., `except ValueError` or `catch (IOException e)`).",
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "judgeId": "accessibility",
+      "judgeName": "Judge Accessibility",
+      "verdict": "fail",
+      "score": 17,
+      "summary": "**Judge Accessibility** — Accessibility (a11y)\nVerdict: **FAIL** | Score: **17/100**\nFindings: 0 critical, 4 high, 3 medium, 0 low\n\nKey issues:\n- [A11Y-001] (high) Image missing alt attribute: Images must have descriptive alt text for screen readers and assistive technologies.\n- [A11Y-004] (high) Form input missing label association: Form inputs without associated labels are inaccessible to screen reader users.\n- [A11Y-005] (high) Missing lang attribute on <html>: The html element must have a lang attribute so screen readers pronounce content in the correct language.\n- [A11Y-007] (high) Focus indicator removed (outline: none): Removing the focus outline without providing an alternative focus indicator makes the page unusable for keyboard users.\n",
+      "findings": [
+        {
+          "ruleId": "A11Y-001",
+          "severity": "high",
+          "title": "Image missing alt attribute",
+          "description": "Images must have descriptive alt text for screen readers and assistive technologies.",
+          "lineNumbers": [
+            156
+          ],
+          "recommendation": "Add meaningful alt text describing the image content. Use alt=\"\" only for purely decorative images.",
+          "reference": "WCAG 2.1 SC 1.1.1 Non-text Content",
+          "suggestedFix": "Add descriptive alt text: <img src=\"photo.jpg\" alt=\"Team photo at annual conference\"> or alt=\"\" for decorative images.",
+          "confidence": 0.85,
+          "patch": {
+            "oldText": "<img ",
+            "newText": "<img alt=\"\" ",
+            "startLine": 156,
+            "endLine": 156
+          }
+        },
+        {
+          "ruleId": "A11Y-002",
+          "severity": "medium",
+          "title": "Click handler without keyboard equivalent",
+          "description": "Interactive elements with onClick must also support keyboard interaction for users who cannot use a mouse.",
+          "lineNumbers": [
+            158
+          ],
+          "recommendation": "Add onKeyDown or onKeyPress handlers alongside onClick. Ensure all interactive elements are keyboard accessible.",
+          "reference": "WCAG 2.1 SC 2.1.1 Keyboard",
+          "suggestedFix": "Add keyboard support: <button onClick={handler} onKeyDown={(e) => e.key === 'Enter' && handler()}> or use native <button> elements which handle this automatically.",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "A11Y-003",
+          "severity": "medium",
+          "title": "Non-semantic element used with ARIA role",
+          "description": "Using div with an ARIA role instead of the appropriate semantic HTML element reduces accessibility and adds unnecessary complexity.",
+          "lineNumbers": [
+            158
+          ],
+          "recommendation": "Use semantic HTML elements (button, a, h1-h6, nav, main) instead of divs with ARIA roles.",
+          "reference": "WCAG 2.1 SC 4.1.2 Name, Role, Value",
+          "suggestedFix": "Replace <div role=\"button\"> with <button>, <div role=\"link\"> with <a href>, <div role=\"navigation\"> with <nav>, etc.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "A11Y-004",
+          "severity": "high",
+          "title": "Form input missing label association",
+          "description": "Form inputs without associated labels are inaccessible to screen reader users.",
+          "lineNumbers": [
+            157
+          ],
+          "recommendation": "Associate each input with a <label> element using for/id, or use aria-label / aria-labelledby.",
+          "reference": "WCAG 2.1 SC 1.3.1 Info and Relationships",
+          "suggestedFix": "Associate labels: <label htmlFor=\"email\">Email</label><input id=\"email\"> or use aria-label={\"Email address\"} directly on the input.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "A11Y-005",
+          "severity": "high",
+          "title": "Missing lang attribute on <html>",
+          "description": "The html element must have a lang attribute so screen readers pronounce content in the correct language.",
+          "lineNumbers": [
+            154
+          ],
+          "recommendation": "Add lang attribute: <html lang=\"en\">. Use the appropriate BCP 47 language tag.",
+          "reference": "WCAG 2.1 SC 3.1.1 Language of Page",
+          "suggestedFix": "Add language attribute: <html lang=\"en\"> using the appropriate BCP 47 language tag for your content.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "A11Y-007",
+          "severity": "high",
+          "title": "Focus indicator removed (outline: none)",
+          "description": "Removing the focus outline without providing an alternative focus indicator makes the page unusable for keyboard users.",
+          "lineNumbers": [
+            159
+          ],
+          "recommendation": "If removing outline, provide a visible alternative focus indicator (box-shadow, border, custom :focus-visible styles).",
+          "reference": "WCAG 2.1 SC 2.4.7 Focus Visible",
+          "suggestedFix": "Provide alternative focus styles: :focus-visible { outline: 2px solid #4A90D9; outline-offset: 2px; } instead of outline: none.",
+          "confidence": 0.85,
+          "patch": {
+            "oldText": "outline: none",
+            "newText": "outline: 2px solid currentColor",
+            "startLine": 159,
+            "endLine": 159
+          }
+        },
+        {
+          "ruleId": "A11Y-008",
+          "severity": "medium",
+          "title": "Form error not associated with input via ARIA",
+          "description": "Error messages near form inputs should be programmatically associated so screen readers announce them.",
+          "lineNumbers": [
+            234
+          ],
+          "recommendation": "Use aria-describedby to link error messages to inputs, and aria-invalid='true' on invalid inputs.",
+          "reference": "WCAG 2.1 SC 3.3.1 Error Identification",
+          "suggestedFix": "Associate errors with inputs: <input id=\"email\" aria-describedby=\"email-error\" aria-invalid=\"true\"><span id=\"email-error\">Invalid email</span>.",
+          "confidence": 0.75
+        }
+      ]
+    },
+    {
+      "judgeId": "api-design",
+      "judgeName": "Judge API Design",
+      "verdict": "fail",
+      "score": 28,
+      "summary": "**Judge API Design** — API Design & Contracts\nVerdict: **FAIL** | Score: **28/100**\nFindings: 1 critical, 1 high, 3 medium, 2 low\n\nKey issues:\n- [API-003] (high) List endpoint without pagination: API endpoints that return collections should support pagination to prevent unbounded responses.\n- [API-007] (critical) Sensitive data in URL/query parameters: Passwords, tokens, and secrets in URL paths or query strings are logged in server access logs, browser history, and proxy caches.\n",
+      "findings": [
+        {
+          "ruleId": "API-001",
+          "severity": "medium",
+          "title": "Verb in REST endpoint URL",
+          "description": "REST endpoint URLs should use nouns, not verbs. The HTTP method should convey the action.",
+          "lineNumbers": [
+            42,
+            62,
+            88,
+            113,
+            266
+          ],
+          "recommendation": "Use noun-based URLs (e.g., POST /users instead of POST /createUser). Let HTTP methods convey the action.",
+          "reference": "REST API Design Best Practices",
+          "suggestedFix": "Rename the endpoint to a noun-based path (e.g., change '/createUser' to '/users') and use the appropriate HTTP method (POST) to express the action.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "API-002",
+          "severity": "medium",
+          "title": "SELECT * in API handler",
+          "description": "Returning all columns from a database query in an API response may expose sensitive data and waste bandwidth.",
+          "lineNumbers": [
+            48
+          ],
+          "recommendation": "Explicitly select only the fields needed for the API response. Use DTOs or view models to shape the output.",
+          "reference": "API Security Best Practices",
+          "suggestedFix": "Replace `SELECT *` with an explicit column list (e.g., `SELECT id, name, email`) and map the result through a DTO before returning it.",
+          "confidence": 0.85,
+          "patch": {
+            "oldText": "SELECT *",
+            "newText": "SELECT /* TODO: specify columns */",
+            "startLine": 48,
+            "endLine": 48
+          }
+        },
+        {
+          "ruleId": "API-003",
+          "severity": "high",
+          "title": "List endpoint without pagination",
+          "description": "API endpoints that return collections should support pagination to prevent unbounded responses.",
+          "lineNumbers": [
+            42
+          ],
+          "recommendation": "Implement pagination using limit/offset, cursor-based, or page-based approaches. Include total count and navigation links.",
+          "reference": "REST API Design: Pagination",
+          "suggestedFix": "Accept `page` and `limit` query parameters, apply them to the database query (e.g., `.skip().limit()`), and return `{ data, total, page }` in the response.",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "API-004",
+          "severity": "low",
+          "title": "No API versioning detected",
+          "description": "APIs should be versioned to allow backward-compatible evolution.",
+          "lineNumbers": [
+            34,
+            42,
+            62
+          ],
+          "recommendation": "Add API versioning via URL path (/v1/resource), header (X-API-Version), or query parameter.",
+          "reference": "API Versioning Best Practices",
+          "suggestedFix": "Prefix all route paths with a version segment (e.g., `/v1/users`) or mount the router under a `/v1` base path.",
+          "confidence": 0.7
+        },
+        {
+          "ruleId": "API-005",
+          "severity": "low",
+          "title": "Inconsistent API response structure",
+          "description": "Some responses use a wrapper (e.g., { data: ... }) while others return raw data. This inconsistency complicates client consumption.",
+          "lineNumbers": [
+            85,
+            129,
+            209,
+            257
+          ],
+          "recommendation": "Adopt a consistent response envelope (e.g., { data, meta, errors }) across all endpoints.",
+          "reference": "JSON:API Specification / API Response Standards",
+          "suggestedFix": "Wrap all successful responses in a standard envelope (e.g., `res.json({ data: result })`) and error responses in `{ error: { message, code } }`.",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "API-006",
+          "severity": "medium",
+          "title": "Request body used without content-type validation",
+          "description": "Consuming request bodies without verifying Content-Type can lead to parsing errors or security issues.",
+          "lineNumbers": [
+            64,
+            77,
+            115,
+            125,
+            207
+          ],
+          "recommendation": "Use body-parsing middleware (express.json()) and validate Content-Type headers. Reject requests with unexpected content types.",
+          "reference": "API Security: Content-Type Validation",
+          "suggestedFix": "Add `app.use(express.json())` and a middleware that returns 415 Unsupported Media Type when the Content-Type header is not `application/json`.",
+          "confidence": 0.7
+        },
+        {
+          "ruleId": "API-007",
+          "severity": "critical",
+          "title": "Sensitive data in URL/query parameters",
+          "description": "Passwords, tokens, and secrets in URL paths or query strings are logged in server access logs, browser history, and proxy caches.",
+          "lineNumbers": [
+            90
+          ],
+          "recommendation": "Pass sensitive data in request headers (Authorization) or request body, never in URLs or query parameters.",
+          "reference": "OWASP API Security Top 10 / CWE-598",
+          "suggestedFix": "Move the sensitive value from the URL/query string into the `Authorization` header or the request body and update the route accordingly.",
+          "confidence": 0.95
+        }
+      ]
+    },
+    {
+      "judgeId": "reliability",
+      "judgeName": "Judge Reliability",
+      "verdict": "warning",
+      "score": 71,
+      "summary": "**Judge Reliability** — Reliability & Resilience\nVerdict: **WARNING** | Score: **71/100**\nFindings: 0 critical, 1 high, 1 medium, 2 low\n\nKey issues:\n- [REL-001] (high) Network call without timeout: Network calls without timeouts can hang indefinitely, causing resource exhaustion and cascading failures.\n",
+      "findings": [
+        {
+          "ruleId": "REL-001",
+          "severity": "high",
+          "title": "Network call without timeout",
+          "description": "Network calls without timeouts can hang indefinitely, causing resource exhaustion and cascading failures.",
+          "lineNumbers": [
+            215,
+            266
+          ],
+          "recommendation": "Set explicit timeouts on all network calls. Use AbortController with setTimeout for fetch, or timeout options for HTTP clients.",
+          "reference": "Resilience Patterns: Timeout",
+          "suggestedFix": "Add timeout: const controller = new AbortController(); setTimeout(() => controller.abort(), 5000); fetch(url, { signal: controller.signal });",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "REL-003",
+          "severity": "medium",
+          "title": "Abrupt process termination detected",
+          "description": "Calling process.exit(), panic!(), System.exit(), or os.Exit() prevents graceful shutdown, skips cleanup handlers, and can cause data loss.",
+          "lineNumbers": [
+            126
+          ],
+          "recommendation": "Throw errors or use graceful shutdown patterns instead. Let the process exit naturally after cleanup. Reserve panics for truly unrecoverable situations.",
+          "reference": "Graceful Shutdown Patterns",
+          "suggestedFix": "Replace process.exit() with graceful shutdown: process.on('SIGTERM', async () => { await server.close(); await db.disconnect(); });",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "process.exit(1)",
+            "newText": "process.exitCode = 1; /* allow graceful cleanup */",
+            "startLine": 126,
+            "endLine": 126
+          }
+        },
+        {
+          "ruleId": "REL-005",
+          "severity": "low",
+          "title": "No fallback for failed external call",
+          "description": "External calls catch errors but don't provide fallback values or degraded functionality.",
+          "lineNumbers": [
+            215
+          ],
+          "recommendation": "Provide fallback behavior: cached responses, default values, or gracefully degraded features when dependencies fail.",
+          "reference": "Resilience Patterns: Fallback / Graceful Degradation",
+          "suggestedFix": "Add fallback: try { data = await fetchFromApi(); } catch { data = await cache.get(key) ?? DEFAULT_VALUE; logger.warn('Using fallback data'); }",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "REL-006",
+          "severity": "low",
+          "title": "Write endpoints without idempotency support",
+          "description": "POST/PUT endpoints without idempotency keys can cause duplicate operations when clients retry after network failures.",
+          "lineNumbers": [
+            62,
+            113,
+            206
+          ],
+          "recommendation": "Accept an idempotency key header (Idempotency-Key) and use it to deduplicate write operations.",
+          "reference": "API Idempotency / Stripe Idempotency Pattern",
+          "suggestedFix": "Add idempotency: const key = req.headers['idempotency-key']; if (key && await cache.has(key)) return res.json(await cache.get(key)); // process then cache result.",
+          "confidence": 0.7
+        }
+      ]
+    },
+    {
+      "judgeId": "observability",
+      "judgeName": "Judge Observability",
+      "verdict": "fail",
+      "score": 63,
+      "summary": "**Judge Observability** — Monitoring & Diagnostics\nVerdict: **FAIL** | Score: **63/100**\nFindings: 1 critical, 0 high, 1 medium, 1 low\n\nKey issues:\n- [OBS-005] (critical) Sensitive data potentially logged: Log statements appear to include sensitive fields (password, token, API key, SSN, credit card). This violates security and compliance requirements.\n",
+      "findings": [
+        {
+          "ruleId": "OBS-001",
+          "severity": "medium",
+          "title": "Console logging instead of structured logger",
+          "description": "Using console.log for application logging produces unstructured output that is difficult to search, filter, and alert on in production.",
+          "lineNumbers": [
+            51,
+            52,
+            53,
+            54,
+            74
+          ],
+          "recommendation": "Use a structured logging library (winston/pino for JS, logging for Python, slog for Go, serilog for C#, log4j for Java, tracing for Rust) with log levels, timestamps, and correlation IDs.",
+          "reference": "Observability Best Practices: Structured Logging",
+          "suggestedFix": "Replace console.log calls with a structured logger: e.g., import pino from 'pino'; const logger = pino(); logger.info({ userId, action }, 'message');.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "console.log(\"Fetching users with token: \" + req.headers.authorization)",
+            "newText": "logger.info(\"Fetching users with token: \" + req.headers.authorization)",
+            "startLine": 51,
+            "endLine": 51
+          }
+        },
+        {
+          "ruleId": "OBS-003",
+          "severity": "low",
+          "title": "String concatenation in log statements",
+          "description": "Using string concatenation in log statements prevents structured parsing and may cause unnecessary string allocation when log level is filtered.",
+          "lineNumbers": [
+            51,
+            74,
+            170,
+            180,
+            230
+          ],
+          "recommendation": "Use structured log parameters: logger.info('User action', { userId, action }) instead of string concatenation.",
+          "reference": "Structured Logging Best Practices",
+          "suggestedFix": "Replace logger.info('User ' + userId) with logger.info({ userId }, 'User action') to enable structured log parsing.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "OBS-005",
+          "severity": "critical",
+          "title": "Sensitive data potentially logged",
+          "description": "Log statements appear to include sensitive fields (password, token, API key, SSN, credit card). This violates security and compliance requirements.",
+          "lineNumbers": [
+            51,
+            74
+          ],
+          "recommendation": "Never log sensitive data. Use redaction middleware or mask sensitive fields before logging. Audit all log statements for PII/secrets.",
+          "reference": "OWASP Logging Cheat Sheet / PCI DSS Requirement 3",
+          "suggestedFix": "Remove sensitive fields from log calls and configure redaction paths in your logger: e.g., pino({ redact: ['req.headers.authorization', 'password'] }).",
+          "confidence": 0.85
+        }
+      ]
+    },
+    {
+      "judgeId": "performance",
+      "judgeName": "Judge Performance",
+      "verdict": "fail",
+      "score": 2,
+      "summary": "**Judge Performance** — Runtime Performance\nVerdict: **FAIL** | Score: **2/100**\nFindings: 1 critical, 3 high, 3 medium, 1 low\n\nKey issues:\n- [PERF-001] (critical) Potential N+1 query pattern: Database queries inside loops cause N+1 performance problems, generating excessive database load that grows linearly with data size.\n- [PERF-006] (high) Unbounded data fetch without pagination: Fetching all records without limit/pagination can exhaust memory and crash the application as data grows.\n- [PERF-007] (high) Nested loops detected — O(n²) or worse complexity: 1 nested loop(s) detected. Nested loops scale quadratically or worse with input size and can cause severe performance degradation on large datasets.\n- [PERF-008] (high) setInterval without clearInterval — timer leak: setInterval is called without a corresponding clearInterval, which creates a timer that runs indefinitely and prevents garbage collection of captured closures.\n",
+      "findings": [
+        {
+          "ruleId": "PERF-001",
+          "severity": "critical",
+          "title": "Potential N+1 query pattern",
+          "description": "Database queries inside loops cause N+1 performance problems, generating excessive database load that grows linearly with data size.",
+          "lineNumbers": [
+            94
+          ],
+          "recommendation": "Batch queries outside the loop using WHERE IN clauses, JOINs, or DataLoader patterns. Fetch all needed data in a single query.",
+          "reference": "N+1 Query Problem",
+          "suggestedFix": "Batch queries outside the loop: const items = await db.findMany({ where: { id: { in: ids } } }); then iterate over the result.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "PERF-002",
+          "severity": "medium",
+          "title": "Synchronous / blocking I/O detected",
+          "description": "Synchronous file or blocking operations can block the event loop (Node.js), thread, or async runtime, degrading throughput under concurrent load.",
+          "lineNumbers": [
+            44
+          ],
+          "recommendation": "Use async/await versions, non-blocking APIs, or spawn blocking work on a separate thread/runtime. Sync I/O is only acceptable at startup.",
+          "reference": "Performance Best Practices",
+          "suggestedFix": "Use async variants: await fs.promises.readFile() instead of fs.readFileSync(), or asyncio.open() in Python.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "readFileSync",
+            "newText": "await readFile",
+            "startLine": 44,
+            "endLine": 44
+          }
+        },
+        {
+          "ruleId": "PERF-003",
+          "severity": "medium",
+          "title": "Duplicate fetch calls to same URL",
+          "description": "Multiple requests to the same URL within the same module suggest missing caching or request deduplication.",
+          "lineNumbers": [
+            215
+          ],
+          "recommendation": "Cache responses or deduplicate requests. Use memoization, request coalescing, or an in-memory/distributed cache.",
+          "reference": "Caching Strategies",
+          "suggestedFix": "Cache or deduplicate: const cached = cache.get(url) ?? await fetch(url); cache.set(url, cached); or use a request deduplication layer.",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "PERF-004",
+          "severity": "low",
+          "title": "Heavy library imported eagerly",
+          "description": "Large libraries are imported at the top level, which increases initial bundle size and load time.",
+          "lineNumbers": [
+            11
+          ],
+          "recommendation": "Use dynamic imports (import()) for heavy libraries. Import specific sub-modules (lodash/get instead of lodash). Consider tree-shakeable alternatives.",
+          "reference": "Code Splitting / Bundle Optimization",
+          "suggestedFix": "Use dynamic imports: const lodash = await import('lodash/get'); or import specific sub-modules: import get from 'lodash/get'.",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "PERF-005",
+          "severity": "medium",
+          "title": "DOM manipulation inside loop",
+          "description": "Modifying the DOM inside a loop causes repeated layout recalculations (reflows), severely degrading rendering performance.",
+          "lineNumbers": [
+            101
+          ],
+          "recommendation": "Build DOM content in a DocumentFragment or string, then insert once. Use virtual DOM frameworks or batch updates.",
+          "reference": "DOM Performance / Layout Thrashing",
+          "suggestedFix": "Batch DOM updates: const fragment = document.createDocumentFragment(); items.forEach(item => fragment.appendChild(el)); container.appendChild(fragment);",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "PERF-006",
+          "severity": "high",
+          "title": "Unbounded data fetch without pagination",
+          "description": "Fetching all records without limit/pagination can exhaust memory and crash the application as data grows.",
+          "lineNumbers": [
+            47,
+            48
+          ],
+          "recommendation": "Always use pagination (limit/offset or cursor-based) when querying collections. Set reasonable default page sizes.",
+          "reference": "Database Query Performance / API Pagination",
+          "suggestedFix": "Add pagination: db.find({}).limit(50).skip(page * 50) or use cursor-based pagination for large datasets.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "PERF-007",
+          "severity": "high",
+          "title": "Nested loops detected — O(n²) or worse complexity",
+          "description": "1 nested loop(s) detected. Nested loops scale quadratically or worse with input size and can cause severe performance degradation on large datasets.",
+          "lineNumbers": [
+            101
+          ],
+          "recommendation": "Replace nested loops with hash maps (O(n)) for lookups, pre-sorted data with binary search, or purpose-built data structures. Consider if the algorithm can be flattened.",
+          "reference": "Algorithm Complexity / Big-O Analysis",
+          "suggestedFix": "Replace nested loop with Map lookup: const map = new Map(items.map(x => [x.id, x])); for (const item of others) { const match = map.get(item.id); }",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "PERF-008",
+          "severity": "high",
+          "title": "setInterval without clearInterval — timer leak",
+          "description": "setInterval is called without a corresponding clearInterval, which creates a timer that runs indefinitely and prevents garbage collection of captured closures.",
+          "lineNumbers": [
+            168
+          ],
+          "recommendation": "Store the interval ID and call clearInterval in cleanup/teardown logic (e.g., useEffect cleanup, componentWillUnmount, or process exit handler).",
+          "reference": "Timer Management / Memory Leak Prevention",
+          "suggestedFix": "Store and clear: const id = setInterval(fn, delay); // in cleanup: clearInterval(id); or use useEffect: useEffect(() => { const id = setInterval(...); return () => clearInterval(id); }, []);",
+          "confidence": 0.85
+        }
+      ]
+    },
+    {
+      "judgeId": "compliance",
+      "judgeName": "Judge Compliance",
+      "verdict": "fail",
+      "score": 16,
+      "summary": "**Judge Compliance** — Regulatory & License Compliance\nVerdict: **FAIL** | Score: **16/100**\nFindings: 3 critical, 0 high, 1 medium, 0 low\n\nKey issues:\n- [COMP-001] (critical) PII field handled without protection: Personally Identifiable Information (SSN, passport, tax ID) must be encrypted at rest and in transit, and masked in logs.\n- [COMP-002] (critical) Sensitive data in log statements: Logging sensitive information (passwords, tokens, SSNs, credit cards) creates compliance violations and security risks.\n- [COMP-003] (critical) Credit card data handling detected: Credit card numbers must never be stored in plain text. PCI DSS requires tokenization, encryption, or use of a payment processor.\n",
+      "findings": [
+        {
+          "ruleId": "COMP-001",
+          "severity": "critical",
+          "title": "PII field handled without protection",
+          "description": "Personally Identifiable Information (SSN, passport, tax ID) must be encrypted at rest and in transit, and masked in logs.",
+          "lineNumbers": [
+            70
+          ],
+          "recommendation": "Encrypt PII fields, mask them in logs and UI displays, and ensure they are stored with column-level encryption.",
+          "reference": "GDPR Article 32 / CCPA / HIPAA",
+          "suggestedFix": "Encrypt PII at rest: const encrypted = crypto.createCipheriv('aes-256-gcm', key, iv).update(piiValue, 'utf8', 'hex'); store only the ciphertext.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "COMP-002",
+          "severity": "critical",
+          "title": "Sensitive data in log statements",
+          "description": "Logging sensitive information (passwords, tokens, SSNs, credit cards) creates compliance violations and security risks.",
+          "lineNumbers": [
+            51,
+            74
+          ],
+          "recommendation": "Never log sensitive data. Use redaction/masking utilities to sanitize log output. Audit all log statements.",
+          "reference": "OWASP Logging Cheat Sheet / PCI DSS Requirement 3",
+          "suggestedFix": "Redact sensitive fields before logging: logger.info({ ...data, password: undefined, ssn: '***' }); use a log-redaction middleware.",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "COMP-003",
+          "severity": "critical",
+          "title": "Credit card data handling detected",
+          "description": "Credit card numbers must never be stored in plain text. PCI DSS requires tokenization, encryption, or use of a payment processor.",
+          "lineNumbers": [
+            71
+          ],
+          "recommendation": "Use a PCI-compliant payment processor (Stripe, Braintree). Never store, log, or transmit raw card numbers. Tokenize immediately.",
+          "reference": "PCI DSS Requirement 3: Protect Stored Cardholder Data",
+          "suggestedFix": "Replace raw card handling with tokenization: const { id } = await stripe.tokens.create({ card }); store only the token, never the card number.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "COMP-004",
+          "severity": "medium",
+          "title": "Cookies set without security flags",
+          "description": "Cookies are set without SameSite, Secure, or HttpOnly flags, which may violate security compliance standards.",
+          "lineNumbers": [
+            208
+          ],
+          "recommendation": "Set Secure, HttpOnly, and SameSite=Strict on sensitive cookies. Review cookie consent requirements per jurisdiction.",
+          "reference": "OWASP Cookie Security / ePrivacy Directive",
+          "suggestedFix": "Set secure cookie flags: res.cookie('session', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600000 });",
+          "confidence": 0.8
+        }
+      ]
+    },
+    {
+      "judgeId": "data-sovereignty",
+      "judgeName": "Judge Sovereignty",
+      "verdict": "fail",
+      "score": 57,
+      "summary": "**Judge Sovereignty** — Data, Technological & Operational Sovereignty\nVerdict: **FAIL** | Score: **57/100**\nFindings: 0 critical, 2 high, 2 medium, 0 low\n\nKey issues:\n- [SOV-001] (high) Potential cross-border data egress without jurisdiction checks: External API/network calls are present without visible jurisdictional or transfer controls, increasing cross-border data transfer risk.\n- [SOV-004] (high) Administrative operations without audit trail: Destructive or privileged operations (delete, destroy, drop, revoke, role changes, password resets) are performed without visible audit logging. Without audit trails, the organization loses operational sovereignty — the ability to independently verify who did what, when, and why.\n",
+      "findings": [
+        {
+          "ruleId": "SOV-001",
+          "severity": "high",
+          "title": "Potential cross-border data egress without jurisdiction checks",
+          "description": "External API/network calls are present without visible jurisdictional or transfer controls, increasing cross-border data transfer risk.",
+          "lineNumbers": [
+            57,
+            215,
+            266
+          ],
+          "recommendation": "Add egress controls that validate destination jurisdiction, data classification, and lawful transfer conditions before sending data.",
+          "reference": "GDPR Articles 44-49 / Cross-Border Transfer Controls",
+          "suggestedFix": "Add egress validation: if (!approvedJurisdictions.includes(getDestinationRegion(url))) throw new SovereigntyError('Cross-border transfer blocked');",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "SOV-002",
+          "severity": "medium",
+          "title": "Replication/backup configuration may violate localization requirements",
+          "description": "Replication or backup behavior is referenced without explicit geography constraints, which can replicate regulated data to unauthorized regions.",
+          "lineNumbers": [
+            177
+          ],
+          "recommendation": "Pin replication and backup targets to approved jurisdictions and document DR geography constraints.",
+          "reference": "Data Localization Controls / Operational Resilience",
+          "suggestedFix": "Pin replicas to approved regions: replication: { regions: ALLOWED_REGIONS } and add sovereignty tags to backup configurations.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "SOV-003",
+          "severity": "medium",
+          "title": "PII stored without geographic partitioning indicator",
+          "description": "Code stores PII fields (email, phone, national ID, etc.) with database operations but has no visible geographic partitioning, tenant-region routing, or data boundary tagging. Without explicit geo-aware storage, PII may be co-mingled across jurisdictions.",
+          "recommendation": "Tag PII records with a region/jurisdiction identifier. Use tenant-scoped region routing for multi-tenant systems. Implement database-level partitioning by geography for regulated data.",
+          "reference": "Data Residency Partitioning / Multi-Tenant Sovereignty",
+          "suggestedFix": "Add region tagging to PII records: { ...userData, _region: tenantRegion } and partition storage by jurisdiction.",
+          "confidence": 0.8,
+          "lineNumbers": [
+            77,
+            119
+          ]
+        },
+        {
+          "ruleId": "SOV-004",
+          "severity": "high",
+          "title": "Administrative operations without audit trail",
+          "description": "Destructive or privileged operations (delete, destroy, drop, revoke, role changes, password resets) are performed without visible audit logging. Without audit trails, the organization loses operational sovereignty — the ability to independently verify who did what, when, and why.",
+          "lineNumbers": [
+            119
+          ],
+          "recommendation": "Log all administrative and destructive operations to a tamper-evident audit trail. Include actor identity, timestamp, operation type, affected resource, and outcome. Store audit logs in a separate, append-only store with retention policies.",
+          "reference": "Operational Sovereignty / Audit Trail Requirements",
+          "suggestedFix": "Add audit logging before each destructive operation: auditLogger.log({ actor: ctx.userId, action: 'DELETE', resource: resourceId, timestamp: new Date().toISOString(), outcome: 'success' });",
+          "confidence": 0.8
+        }
+      ]
+    },
+    {
+      "judgeId": "testing",
+      "judgeName": "Judge Testing",
+      "verdict": "pass",
+      "score": 100,
+      "summary": "**Judge Testing** — Test Quality & Coverage\nVerdict: **PASS** | Score: **100/100**\nFindings: 0 critical, 0 high, 0 medium, 0 low\n\nNo pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.",
+      "findings": []
+    },
+    {
+      "judgeId": "documentation",
+      "judgeName": "Judge Documentation",
+      "verdict": "warning",
+      "score": 91,
+      "summary": "**Judge Documentation** — Documentation & Developer Experience\nVerdict: **WARNING** | Score: **91/100**\nFindings: 0 critical, 0 high, 1 medium, 1 low\n\nKey issues:\n",
+      "findings": [
+        {
+          "ruleId": "DOC-001",
+          "severity": "low",
+          "title": "TODO/FIXME without issue tracking reference",
+          "description": "TODO and FIXME comments without issue tracker references tend to be forgotten and accumulate as technical debt.",
+          "lineNumbers": [
+            188,
+            283
+          ],
+          "recommendation": "Link TODOs to issue tracker tickets (e.g., TODO(#123): ...). Create tracking issues for existing unlinked TODOs.",
+          "reference": "Technical Debt Management",
+          "suggestedFix": "Append an issue reference to each TODO comment (e.g., `// TODO(#1234): refactor auth flow`) and create a tracking issue if one does not exist.",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "DOC-003",
+          "severity": "medium",
+          "title": "API endpoints without documentation",
+          "description": "HTTP route handlers lack documentation comments. API consumers need to know request/response schemas, status codes, and auth requirements.",
+          "lineNumbers": [
+            88,
+            113,
+            229,
+            233,
+            256
+          ],
+          "recommendation": "Add OpenAPI/Swagger annotations or JSDoc comments documenting request body, query params, response schema, and error codes.",
+          "reference": "OpenAPI Specification / Swagger",
+          "suggestedFix": "Add a JSDoc or OpenAPI decorator above each route handler documenting the HTTP method, path, request/response schema, and possible status codes.",
+          "confidence": 0.7
+        }
+      ]
+    },
+    {
+      "judgeId": "internationalization",
+      "judgeName": "Judge Internationalization",
+      "verdict": "warning",
+      "score": 75,
+      "summary": "**Judge Internationalization** — i18n & Localization\nVerdict: **WARNING** | Score: **75/100**\nFindings: 0 critical, 0 high, 3 medium, 1 low\n\nKey issues:\n",
+      "findings": [
+        {
+          "ruleId": "I18N-001",
+          "severity": "medium",
+          "title": "Hardcoded user-facing strings",
+          "description": "User-facing text is hardcoded instead of using an internationalization framework, making translation impossible.",
+          "lineNumbers": [
+            157,
+            158,
+            159,
+            262
+          ],
+          "recommendation": "Use an i18n library (react-intl, i18next, vue-i18n) and extract strings to translation files.",
+          "reference": "Internationalization Best Practices",
+          "suggestedFix": "Replace hardcoded text with translation keys: use t('greeting_message') or <FormattedMessage id='greeting_message' /> instead of inline strings.",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "I18N-002",
+          "severity": "medium",
+          "title": "String concatenation for user messages",
+          "description": "Building user-facing messages with string concatenation doesn't work with i18n because word order varies by language.",
+          "lineNumbers": [
+            148
+          ],
+          "recommendation": "Use parameterized translation strings with named placeholders: t('greeting', { name }) instead of 'Hello ' + name.",
+          "reference": "ICU MessageFormat / i18n Parameterization",
+          "suggestedFix": "Replace string concatenation with parameterized translations: t('greeting', { name }) instead of 'Hello ' + name + '!'.",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "I18N-003",
+          "severity": "low",
+          "title": "Hardcoded date or number format",
+          "description": "Date formats (MM/DD vs DD/MM) and number formats (decimal separators) differ across locales.",
+          "lineNumbers": [
+            146
+          ],
+          "recommendation": "Use Intl.DateTimeFormat and Intl.NumberFormat for locale-aware formatting. Never hardcode date patterns.",
+          "reference": "JavaScript Intl API / CLDR",
+          "suggestedFix": "Replace hardcoded format patterns with Intl APIs: new Intl.DateTimeFormat(locale, { dateStyle: 'short' }).format(date) instead of MM/DD/YYYY strings.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "I18N-004",
+          "severity": "medium",
+          "title": "Numeric values formatted without locale awareness",
+          "description": "Monetary or numeric values are formatted without using locale-aware APIs. Thousand separators (1,000 vs 1.000) and decimal marks vary by locale.",
+          "lineNumbers": [
+            146
+          ],
+          "recommendation": "Use Intl.NumberFormat for all user-facing numbers: new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount).",
+          "reference": "JavaScript Intl.NumberFormat / CLDR Number Patterns",
+          "suggestedFix": "Format numbers with Intl: new Intl.NumberFormat(userLocale, { style: 'currency', currency: 'USD' }).format(amount); instead of manual formatting.",
+          "confidence": 0.8
+        }
+      ]
+    },
+    {
+      "judgeId": "dependency-health",
+      "judgeName": "Judge Dependency Health",
+      "verdict": "warning",
+      "score": 93,
+      "summary": "**Judge Dependency Health** — Supply Chain & Dependencies\nVerdict: **WARNING** | Score: **93/100**\nFindings: 0 critical, 0 high, 1 medium, 0 low\n\nKey issues:\n",
+      "findings": [
+        {
+          "ruleId": "DEPS-001",
+          "severity": "medium",
+          "title": "Deprecated or unmaintained package import",
+          "description": "Importing from packages that are deprecated, unmaintained, or have known supply chain issues.",
+          "lineNumbers": [
+            11
+          ],
+          "recommendation": "Replace deprecated packages: moment->date-fns/luxon, request->node-fetch/axios, underscore->lodash-es or native methods.",
+          "reference": "npm deprecation notices / package health scores",
+          "suggestedFix": "Replace the deprecated import with its modern alternative, e.g. change `require('request')` to `require('node-fetch')` or `require('axios')`.",
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "judgeId": "concurrency",
+      "judgeName": "Judge Concurrency",
+      "verdict": "fail",
+      "score": 58,
+      "summary": "**Judge Concurrency** — Concurrency & Thread Safety\nVerdict: **FAIL** | Score: **58/100**\nFindings: 0 critical, 2 high, 2 medium, 0 low\n\nKey issues:\n- [CONC-001] (high) Shared mutable state in async context: Module-level mutable variables accessed from async functions can cause race conditions and data corruption.\n- [CONC-002] (high) Potentially missing await on async operation: Async operations without await fire-and-forget, meaning errors are silently lost and operations may not complete before the response is sent.\n",
+      "findings": [
+        {
+          "ruleId": "CONC-001",
+          "severity": "high",
+          "title": "Shared mutable state in async context",
+          "description": "Module-level mutable variables accessed from async functions can cause race conditions and data corruption.",
+          "lineNumbers": [
+            21,
+            100,
+            101
+          ],
+          "recommendation": "Use request-scoped/context-scoped state, atomic operations, or proper synchronization mechanisms instead of shared mutable variables.",
+          "reference": "Concurrency: Shared State Hazards",
+          "suggestedFix": "Move the mutable variable into a request-scoped context (e.g., pass it as a function parameter or store it in `AsyncLocalStorage`) instead of using a module-level `let`.",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "CONC-002",
+          "severity": "high",
+          "title": "Potentially missing await on async operation",
+          "description": "Async operations without await fire-and-forget, meaning errors are silently lost and operations may not complete before the response is sent.",
+          "lineNumbers": [
+            62,
+            81
+          ],
+          "recommendation": "Add await to async operations, or explicitly handle the returned promise with .catch(). Use ESLint's no-floating-promises rule.",
+          "reference": "Async/Await Error Handling",
+          "suggestedFix": "Prepend `await` to the async call (e.g., `await db.save(entity)`) and enable the `@typescript-eslint/no-floating-promises` lint rule to catch future occurrences.",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "CONC-003",
+          "severity": "medium",
+          "title": "Sequential await in loop",
+          "description": "Using await inside a loop processes items sequentially. If operations are independent, this unnecessarily serializes them.",
+          "lineNumbers": [
+            94
+          ],
+          "recommendation": "For independent operations, collect promises and use Promise.all() (with concurrency limits). Keep sequential only if order matters.",
+          "reference": "Async Patterns: Parallel vs Sequential",
+          "suggestedFix": "Refactor the loop body to build an array of promises and resolve them with `await Promise.all(promises)` (or `pMap` for bounded concurrency) outside the loop.",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "CONC-004",
+          "severity": "medium",
+          "title": "setInterval without clearInterval",
+          "description": "Intervals without cleanup continue running after the component/module is no longer needed, causing memory leaks and unexpected behavior.",
+          "lineNumbers": [
+            168
+          ],
+          "recommendation": "Store the interval ID and call clearInterval in cleanup/unmount/dispose handlers.",
+          "reference": "Resource Cleanup Patterns",
+          "suggestedFix": "Assign the return value to a variable (`const intervalId = setInterval(...)`) and call `clearInterval(intervalId)` in the component's cleanup or `process.on('SIGTERM')` handler.",
+          "confidence": 0.7
+        }
+      ]
+    },
+    {
+      "judgeId": "ethics-bias",
+      "judgeName": "Judge Ethics & Bias",
+      "verdict": "fail",
+      "score": 74,
+      "summary": "**Judge Ethics & Bias** — AI/ML Fairness & Ethics\nVerdict: **FAIL** | Score: **74/100**\nFindings: 1 critical, 0 high, 0 medium, 1 low\n\nKey issues:\n- [ETHICS-001] (critical) Demographic-based conditional logic: Code contains conditional logic based on protected demographic characteristics, which may constitute discriminatory behavior.\n",
+      "findings": [
+        {
+          "ruleId": "ETHICS-001",
+          "severity": "critical",
+          "title": "Demographic-based conditional logic",
+          "description": "Code contains conditional logic based on protected demographic characteristics, which may constitute discriminatory behavior.",
+          "lineNumbers": [
+            134
+          ],
+          "recommendation": "Review whether demographic-based logic is legally compliant and ethically justified. Document the business justification. Consider bias testing.",
+          "reference": "EU AI Act / Anti-Discrimination Laws / Algorithmic Fairness",
+          "suggestedFix": "Replace demographic conditionals with policy-driven rules or feature flags, and add bias-impact documentation for any remaining demographic logic.",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "ETHICS-002",
+          "severity": "low",
+          "title": "Non-inclusive language in code",
+          "description": "Terms like 'whitelist/blacklist' and 'master/slave' are being replaced across the industry with inclusive alternatives.",
+          "lineNumbers": [
+            138,
+            139
+          ],
+          "recommendation": "Use inclusive alternatives: allowlist/denylist, primary/replica, placeholder, confidence check.",
+          "reference": "Inclusive Naming Initiative / Google Developer Style Guide",
+          "suggestedFix": "Rename `whitelist`→`allowlist`, `blacklist`→`denylist`, `master/slave`→`primary/replica`, and `sanity check`→`confidence check`.",
+          "confidence": 0.85
+        }
+      ]
+    },
+    {
+      "judgeId": "maintainability",
+      "judgeName": "Judge Maintainability",
+      "verdict": "warning",
+      "score": 76,
+      "summary": "**Judge Maintainability** — Code Maintainability & Technical Debt\nVerdict: **WARNING** | Score: **76/100**\nFindings: 0 critical, 0 high, 1 medium, 4 low\n\nKey issues:\n",
+      "findings": [
+        {
+          "ruleId": "MAINT-001",
+          "severity": "medium",
+          "title": "Weak or unsafe type usage detected",
+          "description": "Found 6 occurrence(s) of weak type usage (e.g., 'any' in TypeScript, 'dynamic'/'object' in C#, 'interface{}' in Go, unsafe blocks in Rust). Weak types bypass the type system.",
+          "lineNumbers": [
+            22,
+            28,
+            133,
+            238,
+            265,
+            275
+          ],
+          "recommendation": "Replace weak types with specific types: use 'unknown' with type guards (TS), generics (Java/C#), concrete types (Go), safe wrappers (Rust).",
+          "reference": "Type Safety Best Practices / Clean Code",
+          "suggestedFix": "Replace 'any' with 'unknown' and add a type guard, or define a specific interface/type that describes the expected shape.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": ": any",
+            "newText": ": unknown",
+            "startLine": 22,
+            "endLine": 22
+          }
+        },
+        {
+          "ruleId": "MAINT-002",
+          "severity": "low",
+          "title": "Magic numbers detected",
+          "description": "Found 1 magic number(s) — numeric literals without named constants. Future maintainers won't know what these values represent.",
+          "lineNumbers": [
+            171
+          ],
+          "recommendation": "Extract magic numbers into named constants (e.g., const HEARTBEAT_INTERVAL_MS = 5000). Use enums for related sets of values.",
+          "reference": "Clean Code: Chapter 17 — Smells and Heuristics (G25)",
+          "suggestedFix": "Extract each numeric literal into a descriptive const (e.g., `const TIMEOUT_MS = 5000;`) and reference the constant instead.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "MAINT-003",
+          "severity": "low",
+          "title": "Technical debt markers (TODO/FIXME/HACK) found",
+          "description": "Found 2 technical debt marker(s). These indicate known problems or shortcuts that haven't been addressed.",
+          "lineNumbers": [
+            282,
+            283
+          ],
+          "recommendation": "Convert TODO/FIXME comments into tracked issues in your project management tool. Resolve HACK comments with proper implementations.",
+          "reference": "Clean Code: Technical Debt Management",
+          "suggestedFix": "Create a tracked issue for each TODO/FIXME, then either resolve the underlying problem or replace the comment with a link to the issue.",
+          "confidence": 0.95
+        },
+        {
+          "ruleId": "MAINT-004",
+          "severity": "low",
+          "title": "Functions with too many parameters",
+          "description": "Found 1 function(s) with more than 5 parameters. Long parameter lists are hard to remember, easy to misorder, and indicate the function does too much.",
+          "lineNumbers": [
+            275
+          ],
+          "recommendation": "Use an options object parameter: func({ name, age, ...opts }). This is self-documenting, order-independent, and extensible.",
+          "reference": "Clean Code: Functions (Chapter 3) / Code Complete",
+          "suggestedFix": "Group related parameters into an options/config object (e.g., `function create(opts: CreateOptions)`) and destructure inside the function.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "MAINT-005",
+          "severity": "low",
+          "title": "Duplicate string literals — extract to constants",
+          "description": "Found 1 string value(s) repeated 3+ times. Duplicate strings are easy to typo and hard to update consistently.",
+          "recommendation": "Extract repeated strings into named constants. This makes updates a single-point change and prevents typos.",
+          "reference": "DRY Principle / Clean Code",
+          "suggestedFix": "Create a shared constants file and export each repeated string as a named const, then import and use the constant everywhere.",
+          "confidence": 0.8
+        }
+      ]
+    },
+    {
+      "judgeId": "error-handling",
+      "judgeName": "Judge Error Handling",
+      "verdict": "warning",
+      "score": 82,
+      "summary": "**Judge Error Handling** — Error Handling & Fault Tolerance\nVerdict: **WARNING** | Score: **82/100**\nFindings: 0 critical, 1 high, 0 medium, 1 low\n\nKey issues:\n- [ERR-001] (high) Abrupt process termination instead of proper error handling: Found 1 abrupt termination call(s) (process.exit, sys.exit, panic, .unwrap). These skip cleanup handlers, drop in-flight requests, and can corrupt data.\n",
+      "findings": [
+        {
+          "ruleId": "ERR-001",
+          "severity": "high",
+          "title": "Abrupt process termination instead of proper error handling",
+          "description": "Found 1 abrupt termination call(s) (process.exit, sys.exit, panic, .unwrap). These skip cleanup handlers, drop in-flight requests, and can corrupt data.",
+          "lineNumbers": [
+            126
+          ],
+          "recommendation": "Use proper error propagation instead of abrupt termination. Return error responses in HTTP servers. Let the process shutdown gracefully.",
+          "reference": "Graceful Shutdown Best Practices / CWE-705",
+          "suggestedFix": "Replace abrupt exits with graceful shutdown: server.close(() => cleanup()) (JS), raise SystemExit (Python), return Err(...) instead of .unwrap() (Rust), os.Exit only in main() (Go).",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "process.exit(1)",
+            "newText": "process.exitCode = 1; /* allow graceful cleanup */",
+            "startLine": 126,
+            "endLine": 126
+          }
+        },
+        {
+          "ruleId": "ERR-002",
+          "severity": "low",
+          "title": "Error responses without error codes",
+          "description": "HTTP error responses don't include machine-readable error codes. Clients must parse human-readable messages to determine the error type.",
+          "lineNumbers": [
+            234
+          ],
+          "recommendation": "Include a machine-readable error code in responses: { code: 'VALIDATION_ERROR', message: '...' }. Use RFC 7807 Problem Details format.",
+          "reference": "RFC 7807: Problem Details for HTTP APIs",
+          "suggestedFix": "Add machine-readable error codes: res.status(422).json({ code: 'VALIDATION_FAILED', message: '...', details: [...] }).",
+          "confidence": 0.7
+        }
+      ]
+    },
+    {
+      "judgeId": "authentication",
+      "judgeName": "Judge Authentication",
+      "verdict": "fail",
+      "score": 0,
+      "summary": "**Judge Authentication** — Authentication & Authorization\nVerdict: **FAIL** | Score: **0/100**\nFindings: 3 critical, 2 high, 0 medium, 0 low\n\nKey issues:\n- [AUTH-001] (critical) Hardcoded credentials in source code: Found 4 instance(s) of what appears to be hardcoded credentials. Credentials in source code are exposed in version control and cannot be rotated without redeployment.\n- [AUTH-002] (high) Sensitive tokens passed in query parameters: Authentication tokens or API keys are read from query parameters. Query params appear in server logs, browser history, referrer headers, and proxy logs.\n- [AUTH-003] (critical) Weak hashing algorithm for credentials: MD5, SHA1, or SHA256 are fast hash algorithms unsuitable for password storage. They can be brute-forced at billions of hashes per second.\n- [AUTH-004] (critical) TLS certificate validation disabled: TLS certificate verification is disabled, allowing man-in-the-middle attacks. Authentication credentials sent over this connection can be intercepted.\n- [AUTH-008] (high) Cookies set without Secure/HttpOnly flags: Cookies are set without Secure (HTTPS-only) or HttpOnly (no JS access) flags. This exposes cookies to interception and XSS-based theft.\n",
+      "findings": [
+        {
+          "ruleId": "AUTH-001",
+          "severity": "critical",
+          "title": "Hardcoded credentials in source code",
+          "description": "Found 4 instance(s) of what appears to be hardcoded credentials. Credentials in source code are exposed in version control and cannot be rotated without redeployment.",
+          "lineNumbers": [
+            15,
+            16,
+            17,
+            209
+          ],
+          "recommendation": "Use environment variables or a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault). Never commit credentials to version control.",
+          "reference": "OWASP: Credential Management / CWE-798",
+          "suggestedFix": "Replace hardcoded credentials with environment variables: process.env.SECRET_NAME (Node.js), os.environ['SECRET_NAME'] (Python), or inject from a secrets manager.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "\"SuperSecret123!\"",
+            "newText": "process.env.PASSWORD || \"\"",
+            "startLine": 15,
+            "endLine": 15
+          }
+        },
+        {
+          "ruleId": "AUTH-002",
+          "severity": "high",
+          "title": "Sensitive tokens passed in query parameters",
+          "description": "Authentication tokens or API keys are read from query parameters. Query params appear in server logs, browser history, referrer headers, and proxy logs.",
+          "lineNumbers": [
+            90
+          ],
+          "recommendation": "Pass tokens in the Authorization header (Bearer scheme) or in httpOnly cookies. Never use query parameters for sensitive credentials.",
+          "reference": "OWASP: Transport Layer Security / RFC 6750",
+          "suggestedFix": "Read tokens from the Authorization header instead: const token = req.headers.authorization?.replace('Bearer ', '');",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "AUTH-003",
+          "severity": "critical",
+          "title": "Weak hashing algorithm for credentials",
+          "description": "MD5, SHA1, or SHA256 are fast hash algorithms unsuitable for password storage. They can be brute-forced at billions of hashes per second.",
+          "lineNumbers": [
+            67
+          ],
+          "recommendation": "Use bcrypt, scrypt, or Argon2 for password hashing. These algorithms are intentionally slow and include salt by default.",
+          "reference": "OWASP Password Storage Cheat Sheet / NIST 800-63b",
+          "suggestedFix": "Replace with bcrypt/argon2: bcrypt.hash(password, 12) (JS), bcrypt.hashpw(password, bcrypt.gensalt()) (Python), Argon2::default().hash_password() (Rust), BCrypt.HashPassword() (C#).",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "createHash(\"md5\")",
+            "newText": "createHash(\"sha256\")",
+            "startLine": 67,
+            "endLine": 67
+          }
+        },
+        {
+          "ruleId": "AUTH-004",
+          "severity": "critical",
+          "title": "TLS certificate validation disabled",
+          "description": "TLS certificate verification is disabled, allowing man-in-the-middle attacks. Authentication credentials sent over this connection can be intercepted.",
+          "lineNumbers": [
+            31
+          ],
+          "recommendation": "Never disable TLS verification in production. Fix certificate issues properly. Use CA bundles for self-signed certs in development only.",
+          "reference": "CWE-295: Improper Certificate Validation",
+          "suggestedFix": "Remove TLS bypass: delete rejectUnauthorized:false (JS), verify=False (Python), InsecureSkipVerify:true (Go), danger_accept_invalid_certs(true) (Rust), TrustAllCerts (Java).",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "AUTH-008",
+          "severity": "high",
+          "title": "Cookies set without Secure/HttpOnly flags",
+          "description": "Cookies are set without Secure (HTTPS-only) or HttpOnly (no JS access) flags. This exposes cookies to interception and XSS-based theft.",
+          "lineNumbers": [
+            208
+          ],
+          "recommendation": "Set cookies with { secure: true, httpOnly: true, sameSite: 'strict' }. Use Secure for all auth cookies. HttpOnly prevents JavaScript access.",
+          "reference": "OWASP Secure Cookie Best Practices / CWE-614",
+          "suggestedFix": "Add security flags: res.cookie('session', token, { httpOnly: true, secure: true, sameSite: 'strict' });",
+          "confidence": 0.8
+        }
+      ]
+    },
+    {
+      "judgeId": "database",
+      "judgeName": "Judge Database",
+      "verdict": "fail",
+      "score": 0,
+      "summary": "**Judge Database** — Database Design & Query Efficiency\nVerdict: **FAIL** | Score: **0/100**\nFindings: 3 critical, 2 high, 2 medium, 0 low\n\nKey issues:\n- [DB-001] (critical) SQL injection via string concatenation: Found 1 instance(s) of SQL queries built with string concatenation or interpolation containing user input. This is the most common and dangerous database vulnerability.\n\n**Confirmed data flow**: `req.body` (line 64) via hashedPw → sink at line 77\n- [DB-003] (high) N+1 query pattern detected: Found 9 database query/queries inside loops. This creates N+1 queries: 1 for the list + N for each item. Performance degrades linearly with data volume.\n- [DB-005] (critical) Hardcoded database connection string: Database connection string is hardcoded in source code, exposing credentials and making it impossible to use different databases per environment.\n- [DB-006] (critical) Destructive DDL statements in application code: Found 1 DROP/TRUNCATE statement(s). These permanently delete data or schema. If executed accidentally (e.g., via injection), data loss is irreversible.\n- [DB-007] (high) Database credentials embedded in connection string: Connection string contains inline username and password. These credentials are visible in source code, logs, and process listings.\n",
+      "findings": [
+        {
+          "ruleId": "DB-001",
+          "severity": "critical",
+          "title": "SQL injection via string concatenation",
+          "description": "Found 1 instance(s) of SQL queries built with string concatenation or interpolation containing user input. This is the most common and dangerous database vulnerability.\n\n**Confirmed data flow**: `req.body` (line 64) via hashedPw → sink at line 77",
+          "lineNumbers": [
+            77
+          ],
+          "recommendation": "Use parameterized queries (placeholders) or prepared statements. ORMs handle this automatically. Never concatenate user input into SQL strings.",
+          "reference": "OWASP SQL Injection Prevention Cheat Sheet / CWE-89",
+          "suggestedFix": "Use parameterized queries: db.query('SELECT * FROM users WHERE id = $1', [userId]) (JS), cursor.execute('...WHERE id = %s', (uid,)) (Python), db.Query('...WHERE id = $1', id) (Go).",
+          "confidence": 1
+        },
+        {
+          "ruleId": "DB-002",
+          "severity": "medium",
+          "title": "SELECT * retrieves unnecessary columns",
+          "description": "Found 1 SELECT * query/queries. Selecting all columns transfers unnecessary data, breaks when schema changes, and prevents index-only scans.",
+          "lineNumbers": [
+            48
+          ],
+          "recommendation": "Select only the columns you need: SELECT id, name, email FROM users. This reduces network transfer, memory usage, and improves query plan optimization.",
+          "reference": "SQL Performance Best Practices",
+          "suggestedFix": "Replace SELECT * with explicit columns: SELECT id, name, email FROM users WHERE active = true; — reduces data transfer and enables index-only scans.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "SELECT *",
+            "newText": "SELECT /* TODO: specify columns */",
+            "startLine": 48,
+            "endLine": 48
+          }
+        },
+        {
+          "ruleId": "DB-003",
+          "severity": "high",
+          "title": "N+1 query pattern detected",
+          "description": "Found 9 database query/queries inside loops. This creates N+1 queries: 1 for the list + N for each item. Performance degrades linearly with data volume.",
+          "lineNumbers": [
+            47,
+            57,
+            77,
+            93,
+            95,
+            215,
+            224,
+            241,
+            266
+          ],
+          "recommendation": "Use batch queries (WHERE id IN (...)), JOINs, or ORM eager loading (include/populate) to fetch related data in a single query.",
+          "reference": "N+1 Query Problem / ORM Performance Patterns",
+          "suggestedFix": "Batch queries: const items = await db.query('SELECT * FROM items WHERE parent_id = ANY($1)', [parentIds]); instead of querying in a loop.",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "DB-004",
+          "severity": "medium",
+          "title": "Data mutations without transaction handling",
+          "description": "Data is modified (INSERT/UPDATE/DELETE) without transaction wrappers. If an error occurs mid-operation, data could be left in an inconsistent state.",
+          "recommendation": "Wrap multi-step data mutations in transactions. Use BEGIN/COMMIT/ROLLBACK or ORM transaction APIs to ensure atomicity.",
+          "reference": "ACID Properties / Database Transaction Best Practices",
+          "suggestedFix": "Wrap mutations in transaction: await db.transaction(async (trx) => { await trx('orders').insert(order); await trx('inventory').decrement('qty', 1); });",
+          "confidence": 0.7
+        },
+        {
+          "ruleId": "DB-005",
+          "severity": "critical",
+          "title": "Hardcoded database connection string",
+          "description": "Database connection string is hardcoded in source code, exposing credentials and making it impossible to use different databases per environment.",
+          "lineNumbers": [
+            18,
+            225
+          ],
+          "recommendation": "Use environment variables for connection strings. Store credentials in a secrets manager. Use different connection strings per environment.",
+          "reference": "12-Factor App: Config / OWASP Secrets Management",
+          "suggestedFix": "Use env vars: const connectionString = process.env.DATABASE_URL; never hardcode credentials in source code.",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "\"postgres://admin:hunter2@prod-db.example.com:5432/myapp\"",
+            "newText": "process.env.DATABASE_URL || \"postgres://admin:hunter2@prod-db.example.com:5432/myapp\"",
+            "startLine": 18,
+            "endLine": 18
+          }
+        },
+        {
+          "ruleId": "DB-006",
+          "severity": "critical",
+          "title": "Destructive DDL statements in application code",
+          "description": "Found 1 DROP/TRUNCATE statement(s). These permanently delete data or schema. If executed accidentally (e.g., via injection), data loss is irreversible.",
+          "lineNumbers": [
+            224
+          ],
+          "recommendation": "Never run destructive DDL from application code. Use migration tools (Prisma, Flyway, Alembic) with review and rollback support. Require elevated permissions for DDL.",
+          "reference": "Database Migration Best Practices / Least Privilege",
+          "suggestedFix": "Move DDL to migration files: npx prisma migrate dev --name drop_legacy_table; never embed DROP TABLE in application code.",
+          "confidence": 0.95
+        },
+        {
+          "ruleId": "DB-007",
+          "severity": "high",
+          "title": "Database credentials embedded in connection string",
+          "description": "Connection string contains inline username and password. These credentials are visible in source code, logs, and process listings.",
+          "lineNumbers": [
+            18,
+            225
+          ],
+          "recommendation": "Use separate credential parameters or environment variables. Consider IAM/managed identity for passwordless database connections in cloud environments.",
+          "reference": "OWASP: Credential Management / Azure Managed Identity",
+          "suggestedFix": "Use env vars: const client = new Client({ host: process.env.DB_HOST, user: process.env.DB_USER, password: process.env.DB_PASSWORD });",
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "judgeId": "caching",
+      "judgeName": "Judge Caching",
+      "verdict": "pass",
+      "score": 100,
+      "summary": "**Judge Caching** — Caching Strategy & Data Freshness\nVerdict: **PASS** | Score: **100/100**\nFindings: 0 critical, 0 high, 0 medium, 0 low\n\nNo pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.",
+      "findings": []
+    },
+    {
+      "judgeId": "configuration-management",
+      "judgeName": "Judge Configuration Management",
+      "verdict": "fail",
+      "score": 63,
+      "summary": "**Judge Configuration Management** — Configuration & Secrets Management\nVerdict: **FAIL** | Score: **63/100**\nFindings: 1 critical, 0 high, 1 medium, 0 low\n\nKey issues:\n- [CFG-001] (critical) Secrets hardcoded in source code: Found 6 instance(s) of hardcoded secrets. Secrets in code are exposed in version control, CI logs, and error traces. They cannot be rotated without redeployment.\n",
+      "findings": [
+        {
+          "ruleId": "CFG-001",
+          "severity": "critical",
+          "title": "Secrets hardcoded in source code",
+          "description": "Found 6 instance(s) of hardcoded secrets. Secrets in code are exposed in version control, CI logs, and error traces. They cannot be rotated without redeployment.",
+          "lineNumbers": [
+            15,
+            16,
+            17,
+            51,
+            74,
+            209
+          ],
+          "recommendation": "Store secrets in a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault). Inject via environment variables at runtime. Never commit secrets.",
+          "reference": "OWASP: Secrets Management / 12-Factor App: Config",
+          "suggestedFix": "Replace with environment variable: process.env.SECRET_NAME || throw new Error('Missing SECRET_NAME');",
+          "confidence": 0.95
+        },
+        {
+          "ruleId": "CFG-002",
+          "severity": "medium",
+          "title": "Configuration values hardcoded instead of externalized",
+          "description": "Found 1 hardcoded configuration value(s). These values need to change between environments (dev, staging, prod) and should be externalized.",
+          "lineNumbers": [
+            174
+          ],
+          "recommendation": "Read configuration from environment variables (process.env.PORT). Use a config library (convict, dotenv, django-environ) to validate and provide defaults.",
+          "reference": "12-Factor App: Config (Factor III)",
+          "suggestedFix": "Replace hardcoded values with process.env reads: const PORT = parseInt(process.env.PORT || '3000', 10);",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "CFG-004",
+          "severity": "info",
+          "title": ".env usage detected — ensure it is not committed",
+          "description": ".env files are useful for development but must not be committed to version control. Ensure .env is listed in .gitignore and provide a .env.example template instead.",
+          "recommendation": "Add .env to .gitignore. Create a .env.example with placeholder values documenting required environment variables. Use CI/CD variables for deployment.",
+          "reference": "12-Factor App: Config / dotenv Best Practices",
+          "suggestedFix": "Add '.env' to .gitignore and create a .env.example with placeholder values for each required variable.",
+          "confidence": 0.85
+        }
+      ]
+    },
+    {
+      "judgeId": "backwards-compatibility",
+      "judgeName": "Judge Backwards Compatibility",
+      "verdict": "pass",
+      "score": 97,
+      "summary": "**Judge Backwards Compatibility** — Backwards Compatibility & Versioning\nVerdict: **PASS** | Score: **97/100**\nFindings: 0 critical, 0 high, 0 medium, 1 low\n\nKey issues:\n",
+      "findings": [
+        {
+          "ruleId": "COMPAT-002",
+          "severity": "info",
+          "title": "Multiple response formats — verify contract consistency",
+          "description": "Found 6 response points. Verify that all endpoints follow a consistent response envelope (e.g., { data, error, meta }). Inconsistent response shapes are a compatibility hazard.",
+          "lineNumbers": [
+            59,
+            85,
+            110,
+            129,
+            209
+          ],
+          "recommendation": "Use a consistent response envelope across all endpoints. Define response schemas (OpenAPI/Swagger) to enforce contracts.",
+          "reference": "API Contract Design / JSON:API Specification",
+          "suggestedFix": "Wrap all `res.json()` calls in a shared helper like `sendResponse(res, { data, meta })` to enforce a uniform envelope.",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "COMPAT-003",
+          "severity": "low",
+          "title": "HTTP method mismatch — destructive action via POST",
+          "description": "Destructive operations (delete, remove) are exposed via POST instead of DELETE. If these were originally DELETE endpoints, the method change breaks REST clients.",
+          "lineNumbers": [
+            113
+          ],
+          "recommendation": "Use appropriate HTTP methods: DELETE for removal, PUT/PATCH for updates. If migrating methods, keep the old method working during a deprecation period.",
+          "reference": "RESTful API Design / HTTP Method Semantics",
+          "suggestedFix": "Change `app.post('/resource', deleteHandler)` to `app.delete('/resource', deleteHandler)` and keep the old POST route temporarily for backwards compatibility.",
+          "confidence": 0.8
+        }
+      ]
+    },
+    {
+      "judgeId": "portability",
+      "judgeName": "Judge Portability",
+      "verdict": "warning",
+      "score": 67,
+      "summary": "**Judge Portability** — Platform Portability & Vendor Independence\nVerdict: **WARNING** | Score: **67/100**\nFindings: 0 critical, 1 high, 2 medium, 0 low\n\nKey issues:\n- [PORTA-004] (high) Browser-specific APIs used in server-side code: Found 2 browser-only API call(s) (document, window, localStorage, etc.) in what appears to be server-side code. These will throw ReferenceError at runtime.\n",
+      "findings": [
+        {
+          "ruleId": "PORTA-001",
+          "severity": "medium",
+          "title": "OS-specific file paths detected",
+          "description": "Found 1 hardcoded OS-specific path(s). These will fail on other operating systems.",
+          "lineNumbers": [
+            177
+          ],
+          "recommendation": "Use platform-independent path construction (path.join, os.path.join, Path.Combine). Use environment variables or config for base directories.",
+          "reference": "Cross-Platform File Path Best Practices",
+          "suggestedFix": "Replace hardcoded paths like `'C:\\Users\\...'` with `path.join(os.homedir(), 'relative', 'path')` or read the base directory from an environment variable.",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "PORTA-002",
+          "severity": "info",
+          "title": "File I/O without explicit line-ending handling",
+          "description": "File operations detected without explicit line-ending handling. Windows uses CRLF (\\r\\n) while Unix uses LF (\\n), which can cause issues in cross-platform environments.",
+          "recommendation": "Use 'utf-8' encoding explicitly. Consider normalizing line endings when reading files. Configure .gitattributes for consistent line endings in version control.",
+          "reference": "Git Line Endings / Cross-Platform File I/O",
+          "suggestedFix": "Normalize line endings after reading with `.replace(/\\r\\n/g, '\\n')` and add a `.gitattributes` file with `* text=auto eol=lf`.",
+          "confidence": 0.7
+        },
+        {
+          "ruleId": "PORTA-003",
+          "severity": "medium",
+          "title": "OS-specific environment variables used directly",
+          "description": "Found 1 reference(s) to platform-specific environment variables (e.g., APPDATA, USERPROFILE, XDG_*). These variables only exist on specific operating systems.",
+          "lineNumbers": [
+            261
+          ],
+          "recommendation": "Use cross-platform helpers like os.homedir(), os.tmpdir(), or libraries like 'env-paths' to resolve platform-appropriate directories.",
+          "reference": "Node.js os Module / Cross-Platform File Paths",
+          "suggestedFix": "Replace `process.env.APPDATA` with `os.homedir()` or use the `env-paths` package to get platform-appropriate config/data directories.",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "PORTA-004",
+          "severity": "high",
+          "title": "Browser-specific APIs used in server-side code",
+          "description": "Found 2 browser-only API call(s) (document, window, localStorage, etc.) in what appears to be server-side code. These will throw ReferenceError at runtime.",
+          "lineNumbers": [
+            108,
+            262
+          ],
+          "recommendation": "Guard browser API usage with typeof checks (e.g., typeof window !== 'undefined'). Use isomorphic libraries for code shared between client and server.",
+          "reference": "Universal JavaScript / SSR Best Practices",
+          "suggestedFix": "Wrap browser API calls in a guard: `if (typeof window !== 'undefined') { window.localStorage.setItem(...) }` or move them to a client-only module.",
+          "confidence": 0.85
+        }
+      ]
+    },
+    {
+      "judgeId": "ux",
+      "judgeName": "Judge UX",
+      "verdict": "warning",
+      "score": 69,
+      "summary": "**Judge UX** — User Experience & Interface Quality\nVerdict: **WARNING** | Score: **69/100**\nFindings: 0 critical, 0 high, 3 medium, 3 low\n\nKey issues:\n",
+      "findings": [
+        {
+          "ruleId": "UX-001",
+          "severity": "low",
+          "title": "Inline event handlers in HTML",
+          "description": "Found 1 inline event handler(s). Inline handlers mix behavior with markup, break CSP policies, and are harder to maintain.",
+          "lineNumbers": [
+            158
+          ],
+          "recommendation": "Use addEventListener() or framework event bindings (React onClick, Vue @click). Separate behavior from markup for maintainability and CSP compliance.",
+          "reference": "MDN: Inline Event Handlers / Content Security Policy",
+          "suggestedFix": "Remove the inline `on*=` attribute and attach the handler in JavaScript via `element.addEventListener('click', handler)` or the framework equivalent.",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "UX-002",
+          "severity": "medium",
+          "title": "Form submission without loading/disabled state",
+          "description": "Forms are submitted without visible loading state or button disabling. Users may click multiple times causing duplicate submissions.",
+          "recommendation": "Disable the submit button during submission. Show a loading indicator. Prevent double-submission at the application layer.",
+          "reference": "Nielsen's Heuristic #1: Visibility of System Status",
+          "suggestedFix": "Add an `isSubmitting` state flag that disables the submit button and shows a spinner while the form request is in flight.",
+          "confidence": 0.7
+        },
+        {
+          "ruleId": "UX-003",
+          "severity": "low",
+          "title": "Destructive actions without confirmation",
+          "description": "Destructive operations (delete, remove) are handled without confirmation prompts. Users could accidentally destroy data.",
+          "recommendation": "Add confirmation dialogs for destructive actions. Show what will be affected. Consider soft-delete with undo capability.",
+          "reference": "Nielsen's Heuristic #5: Error Prevention",
+          "suggestedFix": "Guard the delete handler with a confirmation prompt, e.g., `if (!confirm('Are you sure you want to delete this item?')) return;`.",
+          "confidence": 0.7
+        },
+        {
+          "ruleId": "UX-004",
+          "severity": "medium",
+          "title": "List endpoints without pagination",
+          "description": "Data retrieval endpoints return all results without pagination. This causes slow responses, high memory usage, and poor UX with large datasets.",
+          "recommendation": "Implement pagination (offset-based or cursor-based). Return total count and page info. Enforce maximum page sizes.",
+          "reference": "REST API Pagination Best Practices",
+          "suggestedFix": "Accept `page` and `limit` query parameters (e.g., `const { page = 1, limit = 20 } = req.query`) and apply `.skip((page-1)*limit).limit(limit)` to the query.",
+          "confidence": 0.7
+        },
+        {
+          "ruleId": "UX-005",
+          "severity": "low",
+          "title": "Mutations without success feedback",
+          "description": "POST/PUT/DELETE operations found without visible success feedback. Users don't know if their action worked, leading to repeated submissions.",
+          "recommendation": "Show success notifications (toasts, alerts) after mutations. Provide clear visual feedback. Consider optimistic UI updates with rollback on failure.",
+          "reference": "Nielsen's Heuristic #1: Visibility of System Status",
+          "suggestedFix": "Add a `toast.success('Changes saved successfully')` call (or equivalent notification) in the `.then()` or after the `await` of the mutation request.",
+          "confidence": 0.7
+        },
+        {
+          "ruleId": "UX-006",
+          "severity": "medium",
+          "title": "Form submission without client-side validation",
+          "description": "Found 1 form submission handler(s) without visible validation. Submitting invalid data wastes round trips and frustrates users with server-side error messages.",
+          "lineNumbers": [
+            265
+          ],
+          "recommendation": "Add client-side validation before submission. Use schema validation libraries (Zod, Yup, Joi). Show inline validation feedback. Keep server-side validation as well.",
+          "reference": "UX: Form Validation Patterns / Nielsen's Heuristic #9: Error Recovery",
+          "suggestedFix": "Add a validation check at the top of the submit handler (e.g., `const result = schema.safeParse(formData); if (!result.success) return showErrors(result.error)`) before sending the request.",
+          "confidence": 0.75
+        }
+      ]
+    },
+    {
+      "judgeId": "logging-privacy",
+      "judgeName": "Judge Logging Privacy",
+      "verdict": "fail",
+      "score": 20,
+      "summary": "**Judge Logging Privacy** — Logging Privacy & Data Redaction\nVerdict: **FAIL** | Score: **20/100**\nFindings: 2 critical, 0 high, 3 medium, 1 low\n\nKey issues:\n- [LOGPRIV-001] (critical) Authentication tokens logged: Found 1 instance(s) where authentication tokens or authorization headers are logged. Tokens in logs can be used for session hijacking.\n- [LOGPRIV-002] (critical) Passwords/secrets logged: Found 1 instance(s) where passwords or secrets appear in log statements. This exposes credentials in log files, monitoring systems, and SIEM tools.\n",
+      "findings": [
+        {
+          "ruleId": "LOGPRIV-001",
+          "severity": "critical",
+          "title": "Authentication tokens logged",
+          "description": "Found 1 instance(s) where authentication tokens or authorization headers are logged. Tokens in logs can be used for session hijacking.",
+          "lineNumbers": [
+            51
+          ],
+          "recommendation": "Never log authentication tokens, Authorization headers, or session IDs. If request logging is needed, redact sensitive headers before logging.",
+          "reference": "OWASP Logging Cheat Sheet / CWE-532",
+          "suggestedFix": "Redact auth headers: const safeHeaders = { ...req.headers, authorization: '[REDACTED]' }; logger.info({ headers: safeHeaders });",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "LOGPRIV-002",
+          "severity": "critical",
+          "title": "Passwords/secrets logged",
+          "description": "Found 1 instance(s) where passwords or secrets appear in log statements. This exposes credentials in log files, monitoring systems, and SIEM tools.",
+          "lineNumbers": [
+            74
+          ],
+          "recommendation": "Never log passwords, credentials, or secrets. Implement a log sanitizer that redacts sensitive fields automatically.",
+          "reference": "OWASP Logging Cheat Sheet / GDPR Art. 5(1)(f)",
+          "suggestedFix": "Remove password from log output: const { password, ...safeData } = userData; logger.info({ user: safeData });",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "LOGPRIV-003",
+          "severity": "medium",
+          "title": "Unstructured logging lacks redaction capabilities",
+          "description": "Found 12 unstructured log statement(s). Console/print logging has no built-in redaction, log level filtering, or structured output — making it impossible to automatically strip sensitive data.",
+          "recommendation": "Use a structured logging library (pino, winston) that supports field-level redaction, log level filtering, and structured output for automated sensitivity scanning.",
+          "reference": "Structured Logging / Log Redaction Patterns",
+          "suggestedFix": "Use pino with redaction: import pino from 'pino'; const logger = pino({ redact: ['req.headers.authorization', '*.password', '*.ssn'] });",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "LOGPRIV-004",
+          "severity": "low",
+          "title": "String concatenation in log statements",
+          "description": "Found 5 log statement(s) using string concatenation. Concatenated logs are unstructured and make it impossible to apply field-level redaction.",
+          "lineNumbers": [
+            51,
+            74,
+            170,
+            180,
+            230
+          ],
+          "recommendation": "Use structured logging with named fields: logger.info({ userId, action }, 'User action performed'). This allows automated redaction of specific fields.",
+          "reference": "Structured Logging Best Practices",
+          "suggestedFix": "Replace concatenation with structured fields: instead of console.log('User ' + id + ' did ' + action), use logger.info({ userId: id, action }, 'User action performed');",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "LOGPRIV-005",
+          "severity": "medium",
+          "title": "IP addresses logged without anonymization",
+          "description": "Found 1 instance(s) where IP addresses are logged. Under GDPR, IP addresses are personal data and must be handled accordingly.",
+          "lineNumbers": [
+            230
+          ],
+          "recommendation": "Anonymize IP addresses in logs (truncate last octet for IPv4, mask prefix for IPv6). If full IP is needed for security, ensure log retention complies with privacy policy.",
+          "reference": "GDPR Recital 30: IP Addresses as Personal Data",
+          "suggestedFix": "Anonymize IPs: function anonymizeIp(ip) { return ip.replace(/\\d+$/, '0'); } logger.info({ ip: anonymizeIp(req.ip) });",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "LOGPRIV-006",
+          "severity": "medium",
+          "title": "Database queries logged — may contain sensitive parameters",
+          "description": "Found 1 instance(s) where SQL queries are logged. Query parameters often contain user data (emails, names, IDs) that shouldn't appear in logs.",
+          "lineNumbers": [
+            53
+          ],
+          "recommendation": "Log query templates without parameter values. Use parameterized query logging that replaces bind values with placeholders. Redact sensitive column values.",
+          "reference": "Database Logging Privacy / OWASP Logging Cheat Sheet",
+          "suggestedFix": "Log queries safely: logger.info({ query: 'SELECT * FROM users WHERE id = $1', paramCount: params.length }); // never log actual parameter values.",
+          "confidence": 0.8
+        }
+      ]
+    },
+    {
+      "judgeId": "rate-limiting",
+      "judgeName": "Judge Rate Limiting",
+      "verdict": "warning",
+      "score": 61,
+      "summary": "**Judge Rate Limiting** — Rate Limiting & Throttling\nVerdict: **WARNING** | Score: **61/100**\nFindings: 0 critical, 2 high, 1 medium, 1 low\n\nKey issues:\n- [RATE-003] (high) Authentication endpoints without rate limiting: Found 1 authentication endpoint(s) without visible rate limiting. Auth endpoints are prime targets for brute-force and credential-stuffing attacks.\n- [RATE-004] (high) File upload without size or count limits: Found 2 file upload handler(s) without visible size limits. Unbounded uploads can exhaust disk space and memory, causing denial of service.\n",
+      "findings": [
+        {
+          "ruleId": "RATE-001",
+          "severity": "medium",
+          "title": "Unbounded query results without limit",
+          "description": "Found 1 database query/queries without a limit. A single request could return millions of rows, crashing the server.",
+          "lineNumbers": [
+            47
+          ],
+          "recommendation": "Always enforce a maximum result limit: db.find({}).limit(100). Implement pagination and enforce maximum page sizes.",
+          "reference": "API Rate Limiting / Database Query Safety",
+          "suggestedFix": "Add query limits: db.find({}).limit(100).skip(page * 100); enforce max page size: const limit = Math.min(req.query.limit || 20, 100);",
+          "confidence": 0.85
+        },
+        {
+          "ruleId": "RATE-002",
+          "severity": "low",
+          "title": "setInterval without rate control",
+          "description": "setInterval runs indefinitely and could generate excessive load. If the interval function is slow, executions can overlap and compound.",
+          "lineNumbers": [
+            168
+          ],
+          "recommendation": "Use setTimeout with re-scheduling instead of setInterval to prevent overlap. Add guards to skip execution if the previous run hasn't completed.",
+          "reference": "JavaScript Timer Best Practices",
+          "suggestedFix": "Replace setInterval with controlled scheduling: async function poll() { await doWork(); setTimeout(poll, interval); } poll(); — prevents overlapping executions.",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "RATE-003",
+          "severity": "high",
+          "title": "Authentication endpoints without rate limiting",
+          "description": "Found 1 authentication endpoint(s) without visible rate limiting. Auth endpoints are prime targets for brute-force and credential-stuffing attacks.",
+          "lineNumbers": [
+            206
+          ],
+          "recommendation": "Apply strict rate limits to auth endpoints (e.g., 5-10 requests/minute per IP). Use progressive delays or CAPTCHA after failed attempts. Consider using 'express-rate-limit' or 'rate-limiter-flexible'.",
+          "reference": "OWASP: Brute Force Protection / NIST 800-63B",
+          "suggestedFix": "Add auth rate limit: app.use('/auth', rateLimit({ windowMs: 60000, max: 5 })); from 'express-rate-limit'.",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "RATE-004",
+          "severity": "high",
+          "title": "File upload without size or count limits",
+          "description": "Found 2 file upload handler(s) without visible size limits. Unbounded uploads can exhaust disk space and memory, causing denial of service.",
+          "lineNumbers": [
+            255,
+            256
+          ],
+          "recommendation": "Set explicit file size limits (e.g., multer({ limits: { fileSize: 5 * 1024 * 1024 } })). Limit the number of files per request. Validate file types.",
+          "reference": "OWASP: Unrestricted File Upload / Multer Limits",
+          "suggestedFix": "Set upload limits: const upload = multer({ limits: { fileSize: 5 * 1024 * 1024, files: 5 }, fileFilter: allowedTypes });",
+          "confidence": 0.8
+        }
+      ]
+    },
+    {
+      "judgeId": "ci-cd",
+      "judgeName": "Judge CI/CD",
+      "verdict": "warning",
+      "score": 85,
+      "summary": "**Judge CI/CD** — CI/CD Pipeline & Deployment Safety\nVerdict: **WARNING** | Score: **85/100**\nFindings: 0 critical, 0 high, 2 medium, 0 low\n\nKey issues:\n",
+      "findings": [
+        {
+          "ruleId": "CICD-001",
+          "severity": "medium",
+          "title": "Hard process termination hinders graceful CI/CD lifecycle",
+          "description": "Found 1 hard exit call(s) (e.g., process.exit, sys.exit, panic!, System.exit, os.Exit). Hard exits prevent proper shutdown, skip cleanup hooks, and can cause deployment health checks to fail.",
+          "lineNumbers": [
+            126
+          ],
+          "recommendation": "Use proper error propagation instead of hard exits. In production, handle SIGTERM gracefully. Let the runtime manage process lifecycle.",
+          "reference": "12-Factor App: Disposability / Kubernetes Pod Lifecycle",
+          "suggestedFix": "Replace `process.exit(1)` with `throw new Error('reason')` and register a `process.on('SIGTERM', …)` handler for graceful shutdown.",
+          "confidence": 0.85,
+          "patch": {
+            "oldText": "process.exit(1)",
+            "newText": "process.exitCode = 1; /* allow graceful cleanup */",
+            "startLine": 126,
+            "endLine": 126
+          }
+        },
+        {
+          "ruleId": "CICD-002",
+          "severity": "medium",
+          "title": "Static analysis suppression comments detected",
+          "description": "Found 3 instance(s) of disabled type checking or linting. Suppression comments defeat the purpose of static analysis in CI.",
+          "lineNumbers": [
+            1,
+            11,
+            199
+          ],
+          "recommendation": "Fix the underlying issues instead of suppressing them. If suppression is necessary, add a comment explaining why and create a tracking issue to resolve it.",
+          "reference": "TypeScript / ESLint Best Practices",
+          "suggestedFix": "Remove the `// @ts-ignore` or `// eslint-disable` comment and fix the underlying type error or lint violation directly.",
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "judgeId": "code-structure",
+      "judgeName": "Judge Code Structure",
+      "verdict": "pass",
+      "score": 100,
+      "summary": "**Judge Code Structure** — Structural Analysis\nVerdict: **PASS** | Score: **100/100**\nFindings: 0 critical, 0 high, 0 medium, 0 low\n\nNo pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.",
+      "findings": []
+    },
+    {
+      "judgeId": "agent-instructions",
+      "judgeName": "Judge Agent Instructions",
+      "verdict": "pass",
+      "score": 100,
+      "summary": "**Judge Agent Instructions** — Agent Instruction Markdown Quality & Safety\nVerdict: **PASS** | Score: **100/100**\nFindings: 0 critical, 0 high, 0 medium, 0 low\n\nNo pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.",
+      "findings": []
+    },
+    {
+      "judgeId": "ai-code-safety",
+      "judgeName": "Judge AI Code Safety",
+      "verdict": "fail",
+      "score": 15,
+      "summary": "**Judge AI Code Safety** — AI-Generated Code Quality & Security\nVerdict: **FAIL** | Score: **15/100**\nFindings: 1 critical, 3 high, 2 medium, 0 low\n\nKey issues:\n- [AICS-003] (high) Placeholder security comment — missing implementation: Found 1 TODO/FIXME comment(s) indicating that security-critical functionality (authentication, validation, encryption, etc.) has not been implemented yet. AI-generated code often leaves these placeholders which are easy to overlook during review.\n- [AICS-010] (high) Request handlers without input validation: Found 6 API endpoint handler(s) but no input validation library or schema validation is detected. AI-generated API code frequently omits input validation, leaving endpoints vulnerable to injection, type confusion, and data integrity issues.\n- [AICS-017] (high) Weak cryptographic hash (MD5/SHA-1): AI-generated code frequently uses MD5 or SHA-1 for hashing. Both algorithms have known collision vulnerabilities and are unsuitable for password hashing, integrity verification, or digital signatures.\n- [AICS-020] (critical) TLS certificate verification disabled: SSL/TLS certificate verification has been disabled (e.g. rejectUnauthorized: false, verify=False, InsecureSkipVerify: true). AI-generated code often disables certificate checks to bypass development SSL errors, leaving the code vulnerable to man-in-the-middle attacks in production.\n",
+      "findings": [
+        {
+          "ruleId": "AICS-003",
+          "severity": "high",
+          "title": "Placeholder security comment — missing implementation",
+          "description": "Found 1 TODO/FIXME comment(s) indicating that security-critical functionality (authentication, validation, encryption, etc.) has not been implemented yet. AI-generated code often leaves these placeholders which are easy to overlook during review.",
+          "lineNumbers": [
+            282
+          ],
+          "recommendation": "Implement the security controls indicated by each comment before merging. If the control is not needed, remove the comment and document why. Do not ship TODO security comments to production.",
+          "reference": "CWE-1188: Insecure Default Initialization of Resource",
+          "suggestedFix": "Replace each TODO/FIXME security comment with a working implementation or remove the comment and document why the control is unnecessary.",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "AICS-007",
+          "severity": "medium",
+          "title": "Type safety bypassed in security-critical code",
+          "description": "TypeScript 'as any' or untyped 'any' usage found near authentication, cryptographic, or validation code. Bypassing the type system in security-sensitive areas can hide type mismatches that lead to vulnerabilities.",
+          "lineNumbers": [
+            238,
+            265
+          ],
+          "recommendation": "Define proper interfaces for security-related data structures (tokens, sessions, credentials). Replace 'as any' with explicit types or runtime validation (zod, io-ts).",
+          "reference": "CWE-704: Incorrect Type Conversion or Cast",
+          "suggestedFix": "Replace 'as any' with a proper interface: interface TokenPayload { sub: string; exp: number; roles: string[] } and validate at runtime with zod or io-ts.",
+          "confidence": 0.75
+        },
+        {
+          "ruleId": "AICS-008",
+          "severity": "medium",
+          "title": "Hardcoded URLs or IP addresses",
+          "description": "Found 2 hardcoded URL(s) or IP address(es). AI-generated code frequently hardcodes endpoints that should be configurable per environment. Hardcoded production URLs in source code can leak internal infrastructure details.",
+          "lineNumbers": [
+            57,
+            215
+          ],
+          "recommendation": "Move all endpoint URLs and IP addresses to environment variables or a configuration file. Use service discovery or DNS for internal services.",
+          "reference": "12-Factor App: Config (Factor III) — CWE-798",
+          "suggestedFix": "Move URLs to environment variables: const apiUrl = process.env.API_URL ?? 'http://localhost:3000'; and load from .env files per environment.",
+          "confidence": 0.8
+        },
+        {
+          "ruleId": "AICS-010",
+          "severity": "high",
+          "title": "Request handlers without input validation",
+          "description": "Found 6 API endpoint handler(s) but no input validation library or schema validation is detected. AI-generated API code frequently omits input validation, leaving endpoints vulnerable to injection, type confusion, and data integrity issues.",
+          "lineNumbers": [
+            42,
+            62,
+            88,
+            113,
+            206
+          ],
+          "recommendation": "Add schema validation for all request inputs (body, query, params). Use zod, joi, or yup (Node.js), pydantic (Python), class-validator (NestJS), or equivalent for your framework. Validate at the boundary before any business logic.",
+          "reference": "OWASP Input Validation — CWE-20: Improper Input Validation",
+          "suggestedFix": "Add schema validation at the boundary: app.post('/api', validate(schema), handler). Use zod, joi, or express-validator to validate body, query, and params.",
+          "confidence": 0.7
+        },
+        {
+          "ruleId": "AICS-017",
+          "severity": "high",
+          "title": "Weak cryptographic hash (MD5/SHA-1)",
+          "description": "AI-generated code frequently uses MD5 or SHA-1 for hashing. Both algorithms have known collision vulnerabilities and are unsuitable for password hashing, integrity verification, or digital signatures.",
+          "lineNumbers": [
+            67
+          ],
+          "recommendation": "Replace MD5/SHA-1 with SHA-256+ for integrity checks, or bcrypt/scrypt/argon2 for password hashing. Use crypto.subtle.digest('SHA-256', data) in web contexts.",
+          "reference": "CWE-328: Use of Weak Hash — NIST SP 800-131A",
+          "suggestedFix": "Replace weak hashes: crypto.createHash('sha256') instead of md5/sha1. For passwords, use bcrypt: await bcrypt.hash(password, 12).",
+          "confidence": 0.9,
+          "patch": {
+            "oldText": "createHash(\"md5\")",
+            "newText": "createHash(\"sha256\")",
+            "startLine": 67,
+            "endLine": 67
+          }
+        },
+        {
+          "ruleId": "AICS-020",
+          "severity": "critical",
+          "title": "TLS certificate verification disabled",
+          "description": "SSL/TLS certificate verification has been disabled (e.g. rejectUnauthorized: false, verify=False, InsecureSkipVerify: true). AI-generated code often disables certificate checks to bypass development SSL errors, leaving the code vulnerable to man-in-the-middle attacks in production.",
+          "lineNumbers": [
+            31
+          ],
+          "recommendation": "Never disable TLS verification in production. Use properly signed certificates (Let's Encrypt is free). If self-signed certificates are required for internal services, configure the specific CA certificate rather than disabling all verification.",
+          "reference": "CWE-295: Improper Certificate Validation — OWASP A07:2021",
+          "suggestedFix": "Remove rejectUnauthorized: false. Use proper TLS certificates or configure a custom CA: const agent = new https.Agent({ ca: fs.readFileSync('internal-ca.pem') }).",
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "judgeId": "framework-safety",
+      "judgeName": "Judge Framework Safety",
+      "verdict": "warning",
+      "score": 78,
+      "summary": "**Judge Framework Safety** — Framework-Specific Security & Best Practices\nVerdict: **WARNING** | Score: **78/100**\nFindings: 0 critical, 1 high, 1 medium, 0 low\n\nKey issues:\n- [FW-001] (high) Express error middleware registered before routes: Express error-handling middleware (4-parameter function) is registered before route handlers. Routes added after it won't have their errors caught, leading to unhandled rejections.\n",
+      "findings": [
+        {
+          "ruleId": "FW-001",
+          "severity": "high",
+          "title": "Express error middleware registered before routes",
+          "description": "Express error-handling middleware (4-parameter function) is registered before route handlers. Routes added after it won't have their errors caught, leading to unhandled rejections.",
+          "lineNumbers": [
+            233,
+            256
+          ],
+          "recommendation": "Move error-handling middleware to after all route registrations: first register all routes, then app.use(errorHandler).",
+          "reference": "Express Error Handling — https://expressjs.com/en/guide/error-handling.html",
+          "suggestedFix": "Move app.use((err, req, res, next) => { ... }) to the very end, after all app.get/post/put/delete routes.",
+          "confidence": 0.9
+        },
+        {
+          "ruleId": "FW-002",
+          "severity": "medium",
+          "title": "Express app without helmet() — missing security headers",
+          "description": "No security headers middleware (helmet) detected in Express app. Without it, responses lack X-Content-Type-Options, X-Frame-Options, CSP, and other defensive headers.",
+          "lineNumbers": [
+            1
+          ],
+          "recommendation": "Install and use helmet: npm install helmet, then app.use(helmet()). This sets 11 security headers with sensible defaults.",
+          "reference": "Helmet.js — https://helmetjs.github.io/",
+          "suggestedFix": "Add: import helmet from 'helmet'; app.use(helmet());",
+          "confidence": 0.8
+        }
+      ]
+    },
+    {
+      "judgeId": "iac-security",
+      "judgeName": "Judge IaC Security",
+      "verdict": "pass",
+      "score": 100,
+      "summary": "**Judge IaC Security** — Infrastructure as Code\nVerdict: **PASS** | Score: **100/100**\nFindings: 0 critical, 0 high, 0 medium, 0 low\n\nNo pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.",
+      "findings": []
+    },
+    {
+      "judgeId": "false-positive-review",
+      "judgeName": "Judge False-Positive Review",
+      "verdict": "pass",
+      "score": 100,
+      "summary": "**Judge False-Positive Review** — False Positive Detection & Finding Accuracy\nVerdict: **PASS** | Score: **100/100**\nFindings: 0 critical, 0 high, 0 medium, 0 low\n\nNo pattern-based issues detected. Heuristic analysis has inherent limits — absence of findings does not guarantee the code is free of defects. Manual expert review is strongly recommended.",
+      "findings": []
+    }
+  ],
+  "findings": [
+    {
+      "ruleId": "DB-001",
+      "severity": "critical",
+      "title": "SQL injection via string concatenation",
+      "description": "Found 1 instance(s) of SQL queries built with string concatenation or interpolation containing user input. This is the most common and dangerous database vulnerability.\n\n**Confirmed data flow**: `req.body` (line 64) via hashedPw → sink at line 77\n\n_Also identified by: DATA-007_",
+      "lineNumbers": [
+        77
+      ],
+      "recommendation": "Use parameterized queries (placeholders) or prepared statements. ORMs handle this automatically. Never concatenate user input into SQL strings.",
+      "reference": "OWASP SQL Injection Prevention Cheat Sheet / CWE-89",
+      "suggestedFix": "Use parameterized queries: db.query('SELECT * FROM users WHERE id = $1', [userId]) (JS), cursor.execute('...WHERE id = %s', (uid,)) (Python), db.Query('...WHERE id = $1', id) (Go).",
+      "confidence": 1,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "CYBER-001",
+      "severity": "critical",
+      "title": "Dangerous eval()/exec() usage",
+      "description": "eval(), exec(), or dynamic code compilation executes arbitrary code and is a primary vector for code injection attacks.\n\n**Confirmed data flow**: `req.body` (line 115) → sink at line 115",
+      "lineNumbers": [
+        115
+      ],
+      "recommendation": "Remove eval() entirely. Use JSON.parse() for data parsing (JS/TS), ast.literal_eval (Python), or a proper expression parser.",
+      "reference": "OWASP Code Injection — CWE-94",
+      "suggestedFix": "Replace eval(expr) with JSON.parse(expr) or a safe parser.",
+      "confidence": 1,
+      "patch": {
+        "oldText": "eval(req.body.filterExpression)",
+        "newText": "new Function(req.body.filterExpression)() /* TODO: eliminate dynamic code execution */",
+        "startLine": 115,
+        "endLine": 115
+      },
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "CFG-001",
+      "severity": "critical",
+      "title": "Secrets hardcoded in source code",
+      "description": "Found 6 instance(s) of hardcoded secrets. Secrets in code are exposed in version control, CI logs, and error traces. They cannot be rotated without redeployment.\n\n_Also identified by: DATA-003, DATA-001, DATA-002, AUTH-001, DB-007_",
+      "lineNumbers": [
+        15,
+        16,
+        17,
+        18,
+        51,
+        74,
+        209,
+        225
+      ],
+      "recommendation": "Store secrets in a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault). Inject via environment variables at runtime. Never commit secrets.",
+      "reference": "OWASP: Secrets Management / 12-Factor App: Config",
+      "suggestedFix": "Replace with environment variable: process.env.SECRET_NAME || throw new Error('Missing SECRET_NAME');",
+      "confidence": 0.95,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "DB-006",
+      "severity": "critical",
+      "title": "Destructive DDL statements in application code",
+      "description": "Found 1 DROP/TRUNCATE statement(s). These permanently delete data or schema. If executed accidentally (e.g., via injection), data loss is irreversible.",
+      "lineNumbers": [
+        224
+      ],
+      "recommendation": "Never run destructive DDL from application code. Use migration tools (Prisma, Flyway, Alembic) with review and rollback support. Require elevated permissions for DDL.",
+      "reference": "Database Migration Best Practices / Least Privilege",
+      "suggestedFix": "Move DDL to migration files: npx prisma migrate dev --name drop_legacy_table; never embed DROP TABLE in application code.",
+      "confidence": 0.95,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "API-007",
+      "severity": "critical",
+      "title": "Sensitive data in URL/query parameters",
+      "description": "Passwords, tokens, and secrets in URL paths or query strings are logged in server access logs, browser history, and proxy caches.",
+      "lineNumbers": [
+        90
+      ],
+      "recommendation": "Pass sensitive data in request headers (Authorization) or request body, never in URLs or query parameters.",
+      "reference": "OWASP API Security Top 10 / CWE-598",
+      "suggestedFix": "Move the sensitive value from the URL/query string into the `Authorization` header or the request body and update the route accordingly.",
+      "confidence": 0.95,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "CLOUD-004",
+      "severity": "critical",
+      "title": "Hardcoded connection string / service URL",
+      "description": "Connection strings hardcoded in source code will break across environments and expose credentials in version control.",
+      "lineNumbers": [
+        18
+      ],
+      "recommendation": "Use environment variables or a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) for all connection strings.",
+      "reference": "12-Factor App: Config (Factor III) / Secret Management",
+      "suggestedFix": "Move the connection string to an environment variable or secret store and reference it via `process.env.DATABASE_URL`.",
+      "confidence": 0.95,
+      "patch": {
+        "oldText": "\"postgres://admin:hunter2@prod-db.example.com:5432/myapp\"",
+        "newText": "process.env.DATABASE_URL || \"postgres://admin:hunter2@prod-db.example.com:5432/myapp\"",
+        "startLine": 18,
+        "endLine": 18
+      },
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "AICS-020",
+      "severity": "critical",
+      "title": "TLS certificate verification disabled",
+      "description": "SSL/TLS certificate verification has been disabled (e.g. rejectUnauthorized: false, verify=False, InsecureSkipVerify: true). AI-generated code often disables certificate checks to bypass development SSL errors, leaving the code vulnerable to man-in-the-middle attacks in production.\n\n_Also identified by: AUTH-004, CYBER-003_",
+      "lineNumbers": [
+        31
+      ],
+      "recommendation": "Never disable TLS verification in production. Use properly signed certificates (Let's Encrypt is free). If self-signed certificates are required for internal services, configure the specific CA certificate rather than disabling all verification.",
+      "reference": "CWE-295: Improper Certificate Validation — OWASP A07:2021",
+      "suggestedFix": "Remove rejectUnauthorized: false. Use proper TLS certificates or configure a custom CA: const agent = new https.Agent({ ca: fs.readFileSync('internal-ca.pem') }).",
+      "confidence": 0.9,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "DATA-004",
+      "severity": "critical",
+      "title": "Hardcoded database connection URL detected",
+      "description": "A database connection URL appears to be hardcoded in the source code. This is a severe data security risk as it can be extracted from version control, build artifacts, or decompiled binaries.",
+      "lineNumbers": [
+        18
+      ],
+      "recommendation": "Move the database connection URL to a secrets manager (e.g., Azure Key Vault, AWS Secrets Manager, HashiCorp Vault) or at minimum to environment variables. Never commit secrets to source control.",
+      "reference": "OWASP: Hardcoded Credentials — CWE-798",
+      "suggestedFix": "Replace hardcoded database connection URL with an environment variable: process.env.SECRET_NAME or inject from a secrets manager at runtime.",
+      "confidence": 0.9,
+      "patch": {
+        "oldText": "\"postgres://admin:hunter2@prod-db.example.com:5432/myapp\"",
+        "newText": "process.env.DATABASE_URL || \"postgres://admin:hunter2@prod-db.example.com:5432/myapp\"",
+        "startLine": 18,
+        "endLine": 18
+      },
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "AUTH-003",
+      "severity": "critical",
+      "title": "Weak hashing algorithm for credentials",
+      "description": "MD5, SHA1, or SHA256 are fast hash algorithms unsuitable for password storage. They can be brute-forced at billions of hashes per second.\n\n_Also identified by: AICS-017, DATA-006_",
+      "lineNumbers": [
+        67
+      ],
+      "recommendation": "Use bcrypt, scrypt, or Argon2 for password hashing. These algorithms are intentionally slow and include salt by default.",
+      "reference": "OWASP Password Storage Cheat Sheet / NIST 800-63b",
+      "suggestedFix": "Replace with bcrypt/argon2: bcrypt.hash(password, 12) (JS), bcrypt.hashpw(password, bcrypt.gensalt()) (Python), Argon2::default().hash_password() (Rust), BCrypt.HashPassword() (C#).",
+      "confidence": 0.9,
+      "patch": {
+        "oldText": "createHash(\"md5\")",
+        "newText": "createHash(\"sha256\")",
+        "startLine": 67,
+        "endLine": 67
+      },
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "LOGPRIV-002",
+      "severity": "critical",
+      "title": "Passwords/secrets logged",
+      "description": "Found 1 instance(s) where passwords or secrets appear in log statements. This exposes credentials in log files, monitoring systems, and SIEM tools.",
+      "lineNumbers": [
+        74
+      ],
+      "recommendation": "Never log passwords, credentials, or secrets. Implement a log sanitizer that redacts sensitive fields automatically.",
+      "reference": "OWASP Logging Cheat Sheet / GDPR Art. 5(1)(f)",
+      "suggestedFix": "Remove password from log output: const { password, ...safeData } = userData; logger.info({ user: safeData });",
+      "confidence": 0.9,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "DB-005",
+      "severity": "critical",
+      "title": "Hardcoded database connection string",
+      "description": "Database connection string is hardcoded in source code, exposing credentials and making it impossible to use different databases per environment.",
+      "lineNumbers": [
+        18,
+        225
+      ],
+      "recommendation": "Use environment variables for connection strings. Store credentials in a secrets manager. Use different connection strings per environment.",
+      "reference": "12-Factor App: Config / OWASP Secrets Management",
+      "suggestedFix": "Use env vars: const connectionString = process.env.DATABASE_URL; never hardcode credentials in source code.",
+      "confidence": 0.9,
+      "patch": {
+        "oldText": "\"postgres://admin:hunter2@prod-db.example.com:5432/myapp\"",
+        "newText": "process.env.DATABASE_URL || \"postgres://admin:hunter2@prod-db.example.com:5432/myapp\"",
+        "startLine": 18,
+        "endLine": 18
+      },
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "LOGPRIV-001",
+      "severity": "critical",
+      "title": "Authentication tokens logged",
+      "description": "Found 1 instance(s) where authentication tokens or authorization headers are logged. Tokens in logs can be used for session hijacking.",
+      "lineNumbers": [
+        51
+      ],
+      "recommendation": "Never log authentication tokens, Authorization headers, or session IDs. If request logging is needed, redact sensitive headers before logging.",
+      "reference": "OWASP Logging Cheat Sheet / CWE-532",
+      "suggestedFix": "Redact auth headers: const safeHeaders = { ...req.headers, authorization: '[REDACTED]' }; logger.info({ headers: safeHeaders });",
+      "confidence": 0.9,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "COMP-002",
+      "severity": "critical",
+      "title": "Sensitive data in log statements",
+      "description": "Logging sensitive information (passwords, tokens, SSNs, credit cards) creates compliance violations and security risks.",
+      "lineNumbers": [
+        51,
+        74
+      ],
+      "recommendation": "Never log sensitive data. Use redaction/masking utilities to sanitize log output. Audit all log statements.",
+      "reference": "OWASP Logging Cheat Sheet / PCI DSS Requirement 3",
+      "suggestedFix": "Redact sensitive fields before logging: logger.info({ ...data, password: undefined, ssn: '***' }); use a log-redaction middleware.",
+      "confidence": 0.9,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "PERF-001",
+      "severity": "critical",
+      "title": "Potential N+1 query pattern",
+      "description": "Database queries inside loops cause N+1 performance problems, generating excessive database load that grows linearly with data size.\n\n_Also identified by: COST-002, DB-003_",
+      "lineNumbers": [
+        47,
+        57,
+        77,
+        93,
+        94,
+        95,
+        215,
+        224,
+        241,
+        266
+      ],
+      "recommendation": "Batch queries outside the loop using WHERE IN clauses, JOINs, or DataLoader patterns. Fetch all needed data in a single query.",
+      "reference": "N+1 Query Problem",
+      "suggestedFix": "Batch queries outside the loop: const items = await db.findMany({ where: { id: { in: ids } } }); then iterate over the result.",
+      "confidence": 0.85,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "COMP-001",
+      "severity": "critical",
+      "title": "PII field handled without protection",
+      "description": "Personally Identifiable Information (SSN, passport, tax ID) must be encrypted at rest and in transit, and masked in logs.\n\n_Also identified by: SOV-003_",
+      "lineNumbers": [
+        70,
+        77,
+        119
+      ],
+      "recommendation": "Encrypt PII fields, mask them in logs and UI displays, and ensure they are stored with column-level encryption.",
+      "reference": "GDPR Article 32 / CCPA / HIPAA",
+      "suggestedFix": "Encrypt PII at rest: const encrypted = crypto.createCipheriv('aes-256-gcm', key, iv).update(piiValue, 'utf8', 'hex'); store only the ciphertext.",
+      "confidence": 0.85,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "OBS-005",
+      "severity": "critical",
+      "title": "Sensitive data potentially logged",
+      "description": "Log statements appear to include sensitive fields (password, token, API key, SSN, credit card). This violates security and compliance requirements.",
+      "lineNumbers": [
+        51,
+        74
+      ],
+      "recommendation": "Never log sensitive data. Use redaction middleware or mask sensitive fields before logging. Audit all log statements for PII/secrets.",
+      "reference": "OWASP Logging Cheat Sheet / PCI DSS Requirement 3",
+      "suggestedFix": "Remove sensitive fields from log calls and configure redaction paths in your logger: e.g., pino({ redact: ['req.headers.authorization', 'password'] }).",
+      "confidence": 0.85,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "COMP-003",
+      "severity": "critical",
+      "title": "Credit card data handling detected",
+      "description": "Credit card numbers must never be stored in plain text. PCI DSS requires tokenization, encryption, or use of a payment processor.",
+      "lineNumbers": [
+        71
+      ],
+      "recommendation": "Use a PCI-compliant payment processor (Stripe, Braintree). Never store, log, or transmit raw card numbers. Tokenize immediately.",
+      "reference": "PCI DSS Requirement 3: Protect Stored Cardholder Data",
+      "suggestedFix": "Replace raw card handling with tokenization: const { id } = await stripe.tokens.create({ card }); store only the token, never the card number.",
+      "confidence": 0.85,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "ETHICS-001",
+      "severity": "critical",
+      "title": "Demographic-based conditional logic",
+      "description": "Code contains conditional logic based on protected demographic characteristics, which may constitute discriminatory behavior.",
+      "lineNumbers": [
+        134
+      ],
+      "recommendation": "Review whether demographic-based logic is legally compliant and ethically justified. Document the business justification. Consider bias testing.",
+      "reference": "EU AI Act / Anti-Discrimination Laws / Algorithmic Fairness",
+      "suggestedFix": "Replace demographic conditionals with policy-driven rules or feature flags, and add bias-impact documentation for any remaining demographic logic.",
+      "confidence": 0.8,
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "ERR-001",
+      "severity": "high",
+      "title": "Abrupt process termination instead of proper error handling",
+      "description": "Found 1 abrupt termination call(s) (process.exit, sys.exit, panic, .unwrap). These skip cleanup handlers, drop in-flight requests, and can corrupt data.\n\n_Also identified by: REL-003, CICD-001_",
+      "lineNumbers": [
+        126
+      ],
+      "recommendation": "Use proper error propagation instead of abrupt termination. Return error responses in HTTP servers. Let the process shutdown gracefully.",
+      "reference": "Graceful Shutdown Best Practices / CWE-705",
+      "suggestedFix": "Replace abrupt exits with graceful shutdown: server.close(() => cleanup()) (JS), raise SystemExit (Python), return Err(...) instead of .unwrap() (Rust), os.Exit only in main() (Go).",
+      "confidence": 0.9,
+      "patch": {
+        "oldText": "process.exit(1)",
+        "newText": "process.exitCode = 1; /* allow graceful cleanup */",
+        "startLine": 126,
+        "endLine": 126
+      },
+      "confidenceTier": "essential"
+    },
+    {
+      "ruleId": "SCALE-002",
+      "severity": "high",
+      "title": "Synchronous blocking operation",
+      "description": "Blocking/synchronous operations in the request path limit concurrency and throughput. Under load, this creates a bottleneck that prevents scaling.\n\n_Also identified by: PERF-002, COST-004_",
+      "lineNumbers": [
+        44
+      ],
+      "recommendation": "Use asynchronous alternatives (async/await, promises, non-blocking I/O). Move long-running work to background queues.",
+      "reference": "Reactive & Non-Blocking Architecture Patterns",
+      "suggestedFix": "Replace the synchronous call with its async counterpart (e.g., `fs.readFileSync` → `await fs.promises.readFile`) to avoid blocking the event loop.",
+      "confidence": 0.9,
+      "patch": {
+        "oldText": "readFileSync",
+        "newText": "await readFile",
+        "startLine": 44,
+        "endLine": 44
+      },
+      "confidenceTier": "essential"
+    }
+  ],
+  "criticalCount": 18,
+  "highCount": 2,
+  "timestamp": "2026-03-04T18:53:53.788Z"
+}
