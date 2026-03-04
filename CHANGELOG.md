@@ -2,6 +2,14 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.22.1] — 2026-03-04
+
+### Fixed
+- **JSON Schema test for preset composability** — Updated `judgesrc.schema.json` test to reflect intentional removal of preset `enum` constraint (now free-form string for comma-separated preset composition); fixes CI failure on Node 20 + 22 matrix
+
+### Tests
+- 1006 tests passing (0 failures)
+
 ## [3.22.0] — 2026-03-04
 
 ### Added — P0: Trust & Accuracy Foundation

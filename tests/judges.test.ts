@@ -7326,13 +7326,12 @@ describe("JSON Schema", () => {
   it("should define correct preset enum values", () => {
     const schemaPath = resolve(__dirname, "..", "judgesrc.schema.json");
     const schema = JSON.parse(readFileSync(schemaPath, "utf-8"));
-    const presetEnum: string[] = schema.properties.preset.enum;
-    assert.ok(presetEnum.includes("strict"));
-    assert.ok(presetEnum.includes("lenient"));
-    assert.ok(presetEnum.includes("security-only"));
-    assert.ok(presetEnum.includes("startup"));
-    assert.ok(presetEnum.includes("compliance"));
-    assert.ok(presetEnum.includes("performance"));
+    // preset is now a free-form string to support comma-separated composition
+    assert.equal(schema.properties.preset.type, "string");
+    assert.ok(
+      schema.properties.preset.description.includes("security-only"),
+      "preset description should reference known presets",
+    );
   });
 
   it("should define correct format enum values", () => {

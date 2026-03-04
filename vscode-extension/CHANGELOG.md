@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.22.1] — 2026-03-04
+
+### Fixed
+- **CI fix** — Corrected JSON Schema test for preset composability; see [core CHANGELOG](../CHANGELOG.md) for details
+
 ## [3.22.0] — 2026-03-04
 
 ### Added
