@@ -2,6 +2,25 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.14] — 2026-03-04
+
+### Added
+- **Three new FP heuristics (H33–H35)** — Expanded the false-positive filter from 32 to 35 deterministic heuristics:
+  - **H33: Destructuring variable extraction** — Suppresses hardcoded-credential findings when the security keyword is a destructured variable name (`const { password } = req.body`), recognizing the code extracts a named field from runtime data
+  - **H34: Dictionary/map key access** — Suppresses hardcoded-credential findings when the keyword is a dictionary key being accessed (`data["password"]`, `request.form.get("token")`), not a hardcoded value; excludes LOGPRIV and exposure-related findings
+  - **H35: CLI argument/option definitions** — Suppresses findings when the keyword defines a CLI parameter in argparse, click, commander.js, or yargs (`parser.add_argument("--password")`, `.option("--token")`)
+- **Expanded H6 keyword-in-identifier patterns** — Significantly broadened compound-identifier recognition for all five security keywords:
+  - `password`: ~25 new suffixes (manager, service, handler, helper, criteria, complexity, expiry, generator, mask, etc.) and ~16 new prefixes (set, get, save, store, update, change, manage, generate, etc.)
+  - `secret`: ~14 new suffixes (holder, service, handler, helper, resolver, loader, fetcher, etc.) and ~20 new prefixes (get, set, read, fetch, load, resolve, lookup, rotate, etc.)
+  - `token`: ~18 new suffixes (manager, service, handler, provider, factory, builder, cache, parser, etc.) and ~26 new prefixes (get, set, create, generate, fetch, store, validate, revoke, etc.)
+  - `delete`: Refined to add safe lifecycle prefixes (soft, hard, mark, pre, post, async, schedule) and safe naming suffixes (scheduled, pending, mark) while deliberately excluding operation-target suffixes (many, all, records) that represent actual data operations
+  - `exec`: ~13 new suffixes (command, args, timeout, callback, handler, etc.) and ~12 new prefixes (pre, post, async, remote, batch, parallel, etc.)
+- **Three new safe idiom patterns (H7)** — Added vault/secrets-manager SDK calls, hash/digest function calls, and UI label/placeholder strings as recognized safe contexts
+
+### Tests
+- Added 29 new FP heuristic tests covering all new and expanded heuristics with both FP-suppression and TP-retention validation
+- 1666 tests, 0 failures
+
 ## [3.20.13] — 2026-03-04
 
 ### Fixed

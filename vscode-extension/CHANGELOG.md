@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.14] — 2026-03-04
+
+### Added
+- **False-positive reduction** — Three new heuristics (H33 destructuring, H34 dict-key access, H35 CLI arg definitions), expanded H6 identifier patterns for all security keywords, and three new safe idiom patterns; see [core CHANGELOG](../CHANGELOG.md) for full details
+
+### Tests
+- 1666 tests, 0 failures
+
 ## [3.20.13] — 2026-03-04
 
 ### Fixed

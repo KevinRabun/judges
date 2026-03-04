@@ -124,33 +124,34 @@ const KEYWORD_IDENTIFIER_PATTERNS: Array<{
       /(?:cache|max|ttl|min|avg|token|cookie|session|expir|stale|fresh)\s*[-_]?\s*age|age\s*[-_]?\s*(?:out|limit|check|seconds|minutes|hours|days|ms|header)|\bcache[_-]age\b|\bmax[_-]age\b/i,
   },
   {
-    // "delete" in deleteButton, on_delete, handleDelete, isDeleted
+    // "delete" in deleteButton, on_delete, handleDelete, isDeleted, softDelete, batchDelete, etc.
     trigger: /\bdelete\b/i,
     identifierContext:
-      /(?:on|handle|is|can|should|will|did|set|get|btn|button|icon|modal|dialog|confirm)[-_]?delete|delete[-_]?(?:button|handler|modal|confirm|dialog|flag|status|action|event|click|icon|request|response|result)/i,
+      /(?:on|handle|is|can|should|will|did|set|get|btn|button|icon|modal|dialog|confirm|soft|hard|mark|pre|post|async|schedule)[-_]?delete|delete[-_]?(?:button|handler|modal|confirm|dialog|flag|status|action|event|click|icon|request|response|result|scheduled|pending|mark)/i,
   },
   {
-    // "exec" in execMode, exec_path, execOptions, child_exec
+    // "exec" in execMode, exec_path, execOptions, child_exec, asyncExec, remoteExec, etc.
     trigger: /\bexec\b/i,
-    identifierContext: /exec[-_]?(?:mode|path|option|config|result|status|type|name|id)|(?:child|fork|spawn)[-_]?exec/i,
+    identifierContext:
+      /exec[-_]?(?:mode|path|option|config|result|status|type|name|id|command|args|timeout|callback|handler|sync|async|promise|queue|batch|parallel|plan|strategy|context|env)|(?:child|fork|spawn|pre|post|async|remote|batch|parallel|deferred|safe|sandbox|shell|docker|container)[-_]?exec/i,
   },
   {
-    // "password" in passwordField, password_input, showPassword, confirm_password
+    // "password" in passwordField, password_input, showPassword, confirm_password, setPassword, etc.
     trigger: /\bpassword\b/i,
     identifierContext:
-      /password[-_]?(?:field|input|label|placeholder|strength|policy|rule|validator|visible|show|hide|toggle|confirm|match|min|max|length|reset|change|update|hash|column|prop|param|check|verify|form|dialog|modal|error|expired|required|schema|type|view|prompt|attempts)|(?:confirm|verify|validate|check|reset|new|old|current|previous|hashed|encrypted|forgot|enter|missing|invalid|has|is|no|require)[-_]?password/i,
+      /password[-_]?(?:field|input|label|placeholder|strength|policy|rule|validator|visible|show|hide|toggle|confirm|match|min|max|length|reset|change|update|hash|column|prop|param|check|verify|form|dialog|modal|error|expired|required|schema|type|view|prompt|attempts|manager|service|handler|helper|criteria|complexity|requirements|expiry|expiration|generator|display|store|clear|protect|encode|decode|constraint|icon|text|mask|regex|pattern|hint|enabled|disabled|protected)|(?:confirm|verify|validate|check|reset|new|old|current|previous|hashed|encrypted|forgot|enter|missing|invalid|has|is|no|require|set|get|save|store|update|change|manage|generate|submit|show|hide|reveal|create|remove|clear|compare|match|parse|decode|encode)[-_]?password/i,
   },
   {
-    // "secret" in secretName, secret_arn, secretRef, client_secret
+    // "secret" in secretName, secret_arn, secretRef, client_secret, getSecret, etc.
     trigger: /\bsecret\b/i,
     identifierContext:
-      /secret[-_]?(?:name|arn|ref|version|id|key|path|manager|store|engine|backend|rotation|value|error|invalid|missing|config|schema|type|provider)|(?:aws|azure|gcp|vault|k8s|kube|client|app|has|is|no|missing|invalid|create|generate|list)[-_]?secret/i,
+      /secret[-_]?(?:name|arn|ref|version|id|key|path|manager|store|engine|backend|rotation|value|error|invalid|missing|config|schema|type|provider|holder|service|handler|helper|resolver|loader|fetcher|reader|creator|generator|deleter|updater|sync|cache)|(?:aws|azure|gcp|vault|k8s|kube|client|app|has|is|no|missing|invalid|create|generate|list|get|set|read|fetch|load|resolve|lookup|delete|remove|update|clear|store|save|manage|rotate|renew|refresh|put|find|retrieve)[-_]?secret/i,
   },
   {
-    // "token" in tokenExpiry, token_type, refreshToken, reset_token
+    // "token" in tokenExpiry, token_type, refreshToken, reset_token, getToken, etc.
     trigger: /\btoken\b/i,
     identifierContext:
-      /token[-_]?(?:type|name|expir|ttl|refresh|revoke|validate|verify|field|input|header|prefix|format|length|bucket|count|limit|usage|error|invalid|missing|source|response|config|schema)|(?:access|refresh|bearer|csrf|api|auth|jwt|session|reset|verification|missing|invalid|expired|has|is|no|decode|parse)[-_]?token/i,
+      /token[-_]?(?:type|name|expir|ttl|refresh|revoke|validate|verify|field|input|header|prefix|format|length|bucket|count|limit|usage|error|invalid|missing|source|response|config|schema|manager|service|handler|provider|factory|builder|helper|store|cache|parser|encoder|decoder|generator|creator|issuer|resolver|refresher|interceptor)|(?:access|refresh|bearer|csrf|api|auth|jwt|session|reset|verification|missing|invalid|expired|has|is|no|decode|parse|get|set|create|generate|fetch|store|save|delete|clear|invalidate|blacklist|whitelist|validate|verify|revoke|renew|rotate|read|load|find|retrieve|extract|inspect|encode)[-_]?token/i,
   },
   {
     // "global" in Python's `global` keyword used for variable declarations
@@ -237,6 +238,25 @@ const SAFE_IDIOM_PATTERNS: Array<{
     findingPattern: /hardcoded.*(?:password|secret|token|credential|key|api)|DATA-00|AUTH-00/i,
     safeContext:
       /(?:process\.env\b|os\.environ|os\.getenv\s*\(|System\.getenv\s*\(|Environment\.GetEnvironmentVariable\s*\(|env::var\s*\()/i,
+  },
+  {
+    // Vault / secrets-manager SDK calls — credentials are fetched at runtime, not hardcoded
+    findingPattern: /hardcoded.*(?:password|secret|token|credential|key)|DATA-00|AUTH-00|DSEC-/i,
+    safeContext:
+      /(?:vault|secretsmanager|SecretClient|KeyVaultSecret|ssm|parameterStore|keyring|credentialManager)\s*[\.(]/i,
+  },
+  {
+    // Hash/digest function calls — "password" or "secret" is being hashed, not stored in plaintext
+    findingPattern: /plaintext|plain.?text|unencrypted|unhashed/i,
+    safeContext:
+      /(?:bcrypt|argon2|scrypt|pbkdf2|sha256|sha512|hashlib|crypto\.hash|passwordEncoder|hash_password|hashpw|createHash)\s*[\.(]/i,
+  },
+  {
+    // String concatenation / template literal for error or user-facing messages
+    // Finding flags "password" keyword but it's in a UI label or validation message
+    findingPattern: /hardcoded.*(?:password|secret|token|credential)|DSEC-/i,
+    safeContext:
+      /(?:placeholder|label|hint|title|message|msg|text|caption|tooltip|aria[_-]label)\s*[:=]\s*["'`].*\b(?:password|secret|token|credential)\b/i,
   },
 ];
 
@@ -888,6 +908,91 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
       const hasCompensatingControl = /compensat|conditional\s*access|AAD|Entra|MFA|multi.?factor|audit/i.test(fullCode);
       if (hasBastionSubnet && hasCompensatingControl) {
         return "Azure Bastion requires inbound HTTPS from Internet per Microsoft documentation — compensating controls are documented.";
+      }
+    }
+  }
+
+  // ── 33. Destructuring variable extraction suppresses credential findings ──
+  // When a security keyword appears in a destructuring pattern, the code is
+  // extracting a named field from a runtime object (request body, config, etc.),
+  // not declaring a hardcoded credential.
+  // e.g., `const { password, email } = req.body;`
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const titleAndDesc33 = `${finding.title} ${finding.description}`;
+    const hasCredentialKw33 = /\bpassword\b|\bsecret\b|\btoken\b|\bcredential\b/i.test(titleAndDesc33);
+    const isHardcodedFinding33 = /hardcoded|hard.?coded/i.test(titleAndDesc33);
+    if (hasCredentialKw33 && isHardcodedFinding33) {
+      const allDestructuring = finding.lineNumbers.every((ln) => {
+        const line = lines[ln - 1];
+        if (!line) return false;
+        // JS/TS object destructuring: const { password, ... } = expr
+        // Python tuple unpacking: password, email = get_credentials()
+        return (
+          /(?:const|let|var|final)\s*\{[^}]*\b(?:password|secret|token|credential)\b[^}]*\}\s*=/.test(line) ||
+          /\(\s*\{[^}]*\b(?:password|secret|token|credential)\b[^}]*\}\s*[):,]/.test(line) ||
+          /^\s*\b(?:password|secret|token|credential)\b\s*,\s*\w+\s*=\s*\w+/.test(line)
+        );
+      });
+      if (allDestructuring) {
+        return "Security keyword is a destructured variable name — extracted from runtime data, not hardcoded.";
+      }
+    }
+  }
+
+  // ── 34. Dictionary/map key access suppresses credential findings ──
+  // When a security keyword appears as a dictionary/map key being accessed,
+  // the code is reading a field by name from a runtime data structure.
+  // e.g., `data["password"]`, `request.form.get("token")`, `params[:secret]`
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const titleAndDesc34 = `${finding.title} ${finding.description}`;
+    const hasCredentialKw34 = /\bpassword\b|\bsecret\b|\btoken\b|\bcredential\b/i.test(titleAndDesc34);
+    const isHardcodedFinding34 = /hardcoded|hard.?coded/i.test(titleAndDesc34);
+    if (hasCredentialKw34 && isHardcodedFinding34) {
+      // Don't suppress findings about credential logging/leakage
+      const isAboutExposure34 =
+        /\b(?:leak|expos|log(?:ged|ging)?|print|display|transmit|send)\b/i.test(titleAndDesc34) ||
+        /^LOG|LOGPRIV/i.test(finding.ruleId);
+      if (!isAboutExposure34) {
+        const allDictAccess = finding.lineNumbers.every((ln) => {
+          const line = lines[ln - 1];
+          if (!line) return false;
+          // obj["password"], obj['token'], data.get("secret"), request.form["credential"]
+          return (
+            /\w\s*\[\s*["'](?:password|secret|token|credential)["']\s*\]/.test(line) ||
+            /\w\s*\.\s*(?:get|pop|setdefault|fetch|read)\s*\(\s*["'](?:password|secret|token|credential)["']/.test(line)
+          );
+        });
+        if (allDictAccess) {
+          return "Security keyword is a dictionary/map key — reading a named field from runtime data, not a hardcoded credential.";
+        }
+      }
+    }
+  }
+
+  // ── 35. CLI argument/option definitions suppress credential findings ──
+  // When a security keyword appears in a CLI argument parser definition,
+  // it names a CLI option, not a hardcoded credential.
+  // e.g., `parser.add_argument("--password")`, `.option("--token")`
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const titleAndDesc35 = `${finding.title} ${finding.description}`;
+    const hasCredentialKw35 = /\bpassword\b|\bsecret\b|\btoken\b|\bcredential\b/i.test(titleAndDesc35);
+    if (hasCredentialKw35) {
+      const allCliDefs = finding.lineNumbers.every((ln) => {
+        const line = lines[ln - 1];
+        if (!line) return false;
+        // Python argparse: add_argument("--password", ...)
+        // Python click: @click.option("--token", ...)
+        // Node commander: .option("--secret <value>", ...)
+        // Node yargs: .option("password", { ... })
+        return (
+          /add_argument\s*\(\s*["']--?(?:password|secret|token|credential)["']/.test(line) ||
+          /@click\.(?:option|argument)\s*\(\s*["']--?(?:password|secret|token|credential)["']/.test(line) ||
+          /\.option\s*\(\s*["'][^"']*-{1,2}(?:password|secret|token|credential)\b/.test(line) ||
+          /\.(?:option|positional)\s*\(\s*["'](?:password|secret|token|credential)["']\s*,/.test(line)
+        );
+      });
+      if (allCliDefs) {
+        return "Security keyword is a CLI argument/option name — defines a command-line parameter, not a hardcoded credential.";
       }
     }
   }

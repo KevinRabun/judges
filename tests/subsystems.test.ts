@@ -3976,6 +3976,810 @@ describe("False-Positive Heuristic Filter", () => {
     });
   });
 
+  // ── Expanded identifier patterns (H6 additions) ──
+  describe("Expanded identifier patterns — new prefix/suffix combinations", () => {
+    it("should suppress when 'password' has prefix 'set' (setPassword)", () => {
+      const code = [
+        `import { hashPassword } from "./auth";`,
+        ``,
+        `class UserService {`,
+        `  async setPassword(userId: string, newPw: string) {`,
+        `    const hashed = await hashPassword(newPw);`,
+        `    return this.repo.update(userId, { passwordHash: hashed });`,
+        `  }`,
+        ``,
+        `  async getUser(id: string) {`,
+        `    return this.repo.findById(id);`,
+        `  }`,
+        `}`,
+        ``,
+        `export { UserService };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Hardcoded password detected",
+          description: "Found password reference in source code",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "'setPassword' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when 'password' has prefix 'get' (getPassword)", () => {
+      const code = [
+        `import vault from "./vault";`,
+        ``,
+        `function getPassword(key: string): string {`,
+        `  return vault.read(key);`,
+        `}`,
+        ``,
+        `function connect(host: string) {`,
+        `  const pw = getPassword("db.password");`,
+        `  return createPool({ host, password: pw });`,
+        `}`,
+        ``,
+        `export { connect };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-001",
+          title: "Hardcoded password detected",
+          description: "Found password in source code",
+          lineNumbers: [3],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "'getPassword' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when 'token' has prefix 'create' (createToken)", () => {
+      const code = [
+        `import jwt from "jsonwebtoken";`,
+        ``,
+        `function createToken(payload: Record<string, unknown>) {`,
+        `  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1h" });`,
+        `}`,
+        ``,
+        `function verifyToken(raw: string) {`,
+        `  return jwt.verify(raw, process.env.JWT_SECRET);`,
+        `}`,
+        ``,
+        `export { createToken, verifyToken };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "AUTH-002",
+          title: "Token handling without encryption",
+          description: "Found token in source code",
+          lineNumbers: [3],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "'createToken' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when 'secret' has prefix 'fetch' (fetchSecret)", () => {
+      const code = [
+        `import { SecretClient } from "@azure/keyvault-secrets";`,
+        ``,
+        `async function fetchSecret(name: string): Promise<string> {`,
+        `  const client = new SecretClient(vaultUrl, credential);`,
+        `  const result = await client.getSecret(name);`,
+        `  return result.value ?? "";`,
+        `}`,
+        ``,
+        `export { fetchSecret };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-003",
+          title: "Hardcoded secret detected",
+          description: "Found secret in source code",
+          lineNumbers: [3],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "'fetchSecret' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when 'delete' has prefix 'soft' (softDelete)", () => {
+      const code = [
+        `import { BaseEntity } from "./entity";`,
+        ``,
+        `class SoftDeleteMixin extends BaseEntity {`,
+        `  softDelete(id: string) {`,
+        `    return this.update(id, { deletedAt: new Date() });`,
+        `  }`,
+        ``,
+        `  restore(id: string) {`,
+        `    return this.update(id, { deletedAt: null });`,
+        `  }`,
+        `}`,
+        ``,
+        `export { SoftDeleteMixin };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Unprotected delete operation",
+          description: "Found delete without authorization",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "'softDelete' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when 'delete' has suffix 'scheduled' (deleteScheduled)", () => {
+      const code = [
+        `import { Repository } from "./repo";`,
+        ``,
+        `class CleanupService {`,
+        `  async deleteScheduled(filter: object) {`,
+        `    return this.repo.removeMany(filter);`,
+        `  }`,
+        ``,
+        `  async count() {`,
+        `    return this.repo.count();`,
+        `  }`,
+        `}`,
+        ``,
+        `export { CleanupService };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Dangerous delete operation without safeguards",
+          description: "Found delete without authorization",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "'deleteScheduled' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when 'exec' has prefix 'async' (asyncExec)", () => {
+      const code = [
+        `import { promisify } from "util";`,
+        `import { exec } from "child_process";`,
+        ``,
+        `const asyncExec = promisify(exec);`,
+        ``,
+        `export async function runCommand(cmd: string) {`,
+        `  const { stdout } = await asyncExec(cmd);`,
+        `  return stdout.trim();`,
+        `}`,
+        ``,
+        `export function getVersion() { return "1.0.0"; }`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "CYBER-010",
+          title: "Unsafe exec usage detected",
+          description: "Found exec reference",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "'asyncExec' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when 'token' has suffix 'manager' (tokenManager)", () => {
+      const code = [
+        `class TokenManager {`,
+        `  private tokenStore: Map<string, string> = new Map();`,
+        ``,
+        `  issue(userId: string): string {`,
+        `    const t = crypto.randomUUID();`,
+        `    this.tokenStore.set(userId, t);`,
+        `    return t;`,
+        `  }`,
+        ``,
+        `  revoke(userId: string) {`,
+        `    this.tokenStore.delete(userId);`,
+        `  }`,
+        `}`,
+        ``,
+        `export { TokenManager };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "AUTH-002",
+          title: "Token handling without encryption",
+          description: "Found token reference",
+          lineNumbers: [1],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "'TokenManager' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when 'secret' has suffix 'resolver' (secretResolver)", () => {
+      const code = [
+        `from typing import Optional`,
+        ``,
+        `class SecretResolver:`,
+        `    def __init__(self, backend: str):`,
+        `        self.backend = backend`,
+        ``,
+        `    def secretResolver(self, key: str) -> Optional[str]:`,
+        `        return self._backends[self.backend].get(key)`,
+        ``,
+        `    def list_keys(self) -> list:`,
+        `        return list(self._backends[self.backend].keys())`,
+        ``,
+        `# Secret resolution utilities`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-003",
+          title: "Hardcoded secret detected",
+          description: "Found secret in source code",
+          lineNumbers: [7],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "'secretResolver' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when 'password' has suffix 'manager' (passwordManager)", () => {
+      const code = [
+        `import { encrypt, decrypt } from "./crypto";`,
+        ``,
+        `class PasswordManager {`,
+        `  constructor(private vault: string) {}`,
+        ``,
+        `  async store(entry: { site: string; pw: string }) {`,
+        `    return encrypt(JSON.stringify(entry), this.vault);`,
+        `  }`,
+        ``,
+        `  async retrieve(site: string) {`,
+        `    const data = await this.load(site);`,
+        `    return decrypt(data, this.vault);`,
+        `  }`,
+        `}`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-001",
+          title: "Hardcoded password detected",
+          description: "Found password in source code",
+          lineNumbers: [3],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "'PasswordManager' identifier should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep finding when bare password is assigned a string (not compound identifier)", () => {
+      const code = [
+        `import express from "express";`,
+        ``,
+        `const password = "letmein";`,
+        ``,
+        `app.post("/login", (req, res) => {`,
+        `  if (req.body.pw === password) res.send("ok");`,
+        `});`,
+        ``,
+        `app.listen(3000);`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-001",
+          title: "Hardcoded password detected",
+          description: "Found password value in source",
+          lineNumbers: [3],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(filtered.length, 1, "Bare 'password = string' should be kept as TP");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  // ── Destructuring patterns (H33) ──
+  describe("Destructuring patterns suppress credential findings", () => {
+    it("should suppress when password extracted via JS destructuring from req.body", () => {
+      const code = [
+        `import { hashSync } from "bcryptjs";`,
+        ``,
+        `export async function register(req, res) {`,
+        `  const { password, email, username } = req.body;`,
+        `  const hashed = hashSync(password, 10);`,
+        `  await db.users.create({ email, username, passwordHash: hashed });`,
+        `  res.status(201).json({ ok: true });`,
+        `}`,
+        ``,
+        `export async function login(req, res) {`,
+        `  const { email } = req.body;`,
+        `  res.json({ token: "..." });`,
+        `}`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-001",
+          title: "Hardcoded password detected",
+          description: "A password appears to be hardcoded in the source code.",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "Destructured password from req.body should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when token extracted via destructuring from cookies", () => {
+      const code = [
+        `import { verify } from "jsonwebtoken";`,
+        ``,
+        `export function authMiddleware(req, res, next) {`,
+        `  const { token } = req.cookies;`,
+        `  if (!token) return res.status(401).send("Unauthorized");`,
+        `  try {`,
+        `    req.user = verify(token, process.env.JWT_SECRET);`,
+        `    next();`,
+        `  } catch {`,
+        `    res.status(401).send("Invalid token");`,
+        `  }`,
+        `}`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "AUTH-002",
+          title: "Hardcoded token detected",
+          description: "A token appears to be hardcoded in the source code.",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "Destructured token from cookies should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when secret extracted in function parameter destructuring", () => {
+      const code = [
+        `import { createHmac } from "crypto";`,
+        ``,
+        `interface SignOptions {`,
+        `  secret: string;`,
+        `  algorithm: string;`,
+        `}`,
+        ``,
+        `export function sign({ secret, algorithm }: SignOptions, data: string) {`,
+        `  return createHmac(algorithm, secret).update(data).digest("hex");`,
+        `}`,
+        ``,
+        `export function verify(sig: string) { return sig.length > 0; }`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-002",
+          title: "Hardcoded secret in plaintext",
+          description: "A secret appears to be hardcoded in the source code.",
+          lineNumbers: [8],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "Destructured secret in function param should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep finding when password is NOT in a destructuring pattern", () => {
+      const code = [
+        `const config = require("./config");`,
+        ``,
+        `const password = "super_secret_pw";`,
+        ``,
+        `module.exports = { password };`,
+        ``,
+        `function test() { return true; }`,
+        `function helper() { return false; }`,
+        `function util() { return null; }`,
+        `function main() { return password; }`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-001",
+          title: "Hardcoded password detected",
+          description: "A password appears to be hard-coded in the source code.",
+          lineNumbers: [3],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(filtered.length, 1, "Non-destructured hardcoded password should be kept as TP");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  // ── Dictionary/map key access (H34) ──
+  describe("Dictionary/map key access suppresses credential findings", () => {
+    it("should suppress when password is a bracket-notation dict key", () => {
+      const code = [
+        `from flask import request`,
+        `from werkzeug.security import check_password_hash`,
+        ``,
+        `def login():`,
+        `    data = request.get_json()`,
+        `    pw = data["password"]`,
+        `    user = find_user(data["email"])`,
+        `    if check_password_hash(user.pw_hash, pw):`,
+        `        return {"status": "ok"}`,
+        `    return {"status": "fail"}, 401`,
+        ``,
+        `def health():`,
+        `    return {"status": "healthy"}`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-001",
+          title: "Hardcoded password detected",
+          description: "A password appears to be hardcoded in the source code.",
+          lineNumbers: [6],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "data['password'] dict key access should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when token is accessed via .get() method", () => {
+      const code = [
+        `from flask import request`,
+        ``,
+        `def extract_token():`,
+        `    headers = dict(request.headers)`,
+        `    token = headers.get("token")`,
+        `    if not token:`,
+        `        return None`,
+        `    return validate(token)`,
+        ``,
+        `def validate(t):`,
+        `    return len(t) > 10`,
+        ``,
+        `def health():`,
+        `    return "ok"`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "AUTH-002",
+          title: "Hardcoded token detected",
+          description: "A token appears to be hardcoded in the source code.",
+          lineNumbers: [5],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "headers.get('token') key access should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when secret is accessed via bracket notation in JS", () => {
+      const code = [
+        `const express = require("express");`,
+        ``,
+        `function validatePayload(body) {`,
+        `  const secret = body["secret"];`,
+        `  if (!secret || secret.length < 32) {`,
+        `    throw new Error("Invalid secret format");`,
+        `  }`,
+        `  return secret;`,
+        `}`,
+        ``,
+        `function process(data) { return data; }`,
+        `function transform(data) { return data; }`,
+        `module.exports = { validatePayload };`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-002",
+          title: "Hardcoded secret detected",
+          description: "A secret appears to be hard-coded in the source code.",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "body['secret'] key access should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep finding when credential is actually hardcoded (not key access)", () => {
+      const code = [
+        `import os`,
+        ``,
+        `password = "Hunter2!"`,
+        ``,
+        `def connect():`,
+        `    return db.connect(password=password)`,
+        ``,
+        `def disconnect():`,
+        `    db.close()`,
+        ``,
+        `def ping():`,
+        `    return db.ping()`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-001",
+          title: "Hardcoded password detected",
+          description: "A password appears to be hardcoded in the source code.",
+          lineNumbers: [3],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(filtered.length, 1, "Hardcoded string password should remain as TP");
+      assert.strictEqual(removed.length, 0);
+    });
+
+    it("should keep LOGPRIV finding even on dict key access line", () => {
+      const code = [
+        `import logging`,
+        ``,
+        `def log_request(data):`,
+        `    pw = data["password"]`,
+        `    logging.info(f"User password received: {pw}")`,
+        ``,
+        `def process(data):`,
+        `    return data`,
+        ``,
+        `def health():`,
+        `    return "ok"`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "LOGPRIV-001",
+          title: "Password exposed in log output",
+          description: "Credential leaked via logging",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(filtered.length, 1, "LOGPRIV finding on dict access should be kept as TP");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  // ── CLI argument/option definitions (H35) ──
+  describe("CLI argument definitions suppress credential findings", () => {
+    it("should suppress when password is a Python argparse argument", () => {
+      const code = [
+        `import argparse`,
+        ``,
+        `parser = argparse.ArgumentParser(description="DB CLI")`,
+        `parser.add_argument("--password", type=str, help="Database password")`,
+        `parser.add_argument("--host", type=str, default="localhost")`,
+        `parser.add_argument("--port", type=int, default=5432)`,
+        ``,
+        `def main():`,
+        `    args = parser.parse_args()`,
+        `    connect(args.host, args.port, args.password)`,
+        ``,
+        `if __name__ == "__main__":`,
+        `    main()`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-001",
+          title: "Hardcoded password detected",
+          description: "Found password reference in source code",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "argparse --password definition should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when token is a click option", () => {
+      const code = [
+        `import click`,
+        ``,
+        `@click.command()`,
+        `@click.option("--token", envvar="API_TOKEN", help="API token")`,
+        `def deploy(token):`,
+        `    headers = {"Authorization": f"Bearer {token}"}`,
+        `    # do deployment...`,
+        `    print("Done")`,
+        ``,
+        `if __name__ == "__main__":`,
+        `    deploy()`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "AUTH-002",
+          title: "Hardcoded token detected",
+          description: "Found token in source code",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "click --token option should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when secret is a commander.js option", () => {
+      const code = [
+        `const { program } = require("commander");`,
+        ``,
+        `program`,
+        `  .option("--secret <value>", "Signing secret for JWT")`,
+        `  .option("--port <number>", "Server port", "3000")`,
+        `  .parse(process.argv);`,
+        ``,
+        `const opts = program.opts();`,
+        `startServer(opts.port, opts.secret);`,
+        ``,
+        `function startServer(port, secret) {`,
+        `  console.log("Starting on port " + port);`,
+        `}`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-003",
+          title: "Hardcoded secret detected",
+          description: "Found secret in source code",
+          lineNumbers: [4],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(removed.length, 1, "commander --secret option should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep finding when credential is hardcoded outside CLI definition", () => {
+      const code = [
+        `import argparse`,
+        ``,
+        `parser = argparse.ArgumentParser()`,
+        `parser.add_argument("--host", default="localhost")`,
+        ``,
+        `password = "my-super-secret-password"`,
+        ``,
+        `def run():`,
+        `    args = parser.parse_args()`,
+        `    connect(args.host, password)`,
+        ``,
+        `if __name__ == "__main__":`,
+        `    run()`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-001",
+          title: "Hardcoded password detected",
+          description: "Found password in source code",
+          lineNumbers: [6],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(filtered.length, 1, "Hardcoded string outside CLI def should be kept as TP");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
+  // ── Expanded safe idiom patterns ──
+  describe("Expanded safe idiom patterns", () => {
+    it("should suppress when credential accessed via vault SDK", () => {
+      const code = [
+        `from azure.keyvault.secrets import SecretClient`,
+        `from azure.identity import DefaultAzureCredential`,
+        ``,
+        `vault_url = "https://myvault.vault.azure.net"`,
+        `credential = DefaultAzureCredential()`,
+        `client = SecretClient(vault_url, credential)`,
+        ``,
+        `def get_db_password():`,
+        `    secret = client.get_secret("db-password")`,
+        `    return secret.value`,
+        ``,
+        `def health():`,
+        `    return "ok"`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-001",
+          title: "Hardcoded password detected",
+          description: "Found password reference in source code",
+          lineNumbers: [9],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "python");
+      assert.strictEqual(removed.length, 1, "SecretClient vault access should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should suppress when password in UI label/placeholder string", () => {
+      const code = [
+        `import React from "react";`,
+        ``,
+        `export function LoginForm() {`,
+        `  return (`,
+        `    <div>`,
+        `      <input placeholder="Enter your password" type="password" />`,
+        `      <button>Login</button>`,
+        `    </div>`,
+        `  );`,
+        `}`,
+        ``,
+        `export default LoginForm;`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DSEC-005",
+          title: "Hardcoded password detected",
+          description: "Found password reference in source code",
+          lineNumbers: [6],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "typescript");
+      assert.strictEqual(removed.length, 1, "placeholder='...password...' UI label should be FP");
+      assert.strictEqual(filtered.length, 0);
+    });
+
+    it("should keep finding when actual credential is hardcoded (not vault or UI)", () => {
+      const code = [
+        `const API_KEY = "sk-live-abc123def456";`,
+        ``,
+        `function callApi(data) {`,
+        `  return fetch("https://api.example.com", {`,
+        `    headers: { Authorization: API_KEY },`,
+        `    body: JSON.stringify(data),`,
+        `  });`,
+        `}`,
+        ``,
+        `function process() { return true; }`,
+        `function health() { return "ok"; }`,
+      ].join("\n");
+      const findings: Finding[] = [
+        {
+          ...baseFinding,
+          ruleId: "DATA-003",
+          title: "Hardcoded secret detected",
+          description: "Found credential in source code",
+          lineNumbers: [1],
+        },
+      ];
+      const { filtered, removed } = filterFalsePositiveHeuristics(findings, code, "javascript");
+      assert.strictEqual(filtered.length, 1, "Hardcoded API key should remain as TP");
+      assert.strictEqual(removed.length, 0);
+    });
+  });
+
   // ── New: Additional edge-case negative tests for TP confidence ──
   describe("TP confidence — edge cases that should NOT be suppressed", () => {
     it("should keep CYBER finding even when code has imports (mixed lines)", () => {
