@@ -88,7 +88,15 @@ jobs:
           jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
 
       - name: Publish server to MCP Registry
-        run: ./mcp-publisher publish
+        run: |
+          OUTPUT=$(./mcp-publisher publish 2>&1) && echo "$OUTPUT" || {
+            if echo "$OUTPUT" | grep -qi "duplicate version"; then
+              echo "Version already published to MCP Registry — skipping"
+            else
+              echo "$OUTPUT"
+              exit 1
+            fi
+          }
 
       # ── Publish VS Code Extension to Marketplace ────────────
 
@@ -111,6 +119,12 @@ jobs:
       - name: Publish extension to VS Code Marketplace
         run: |
           cd vscode-extension
-          npx @vscode/vsce publish --no-git-tag-version --skip-duplicate
+          for i in 1 2 3; do
+            npx @vscode/vsce publish --no-git-tag-version --skip-duplicate && exit 0
+            echo "Attempt $i/3 failed — retrying in 15s…"
+            sleep 15
+          done
+          echo "All 3 attempts failed"
+          exit 1
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
