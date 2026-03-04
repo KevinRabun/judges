@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.20.8] — 2026-03-03
+
+### Fixed
+- **False positive reduction** — 3 new deterministic FP heuristics (config/schema object keys, function call assignment, string comparison/dispatch), broadened env-var safe idiom for all credential findings, and extended identifier patterns further reduce false positives; see [core CHANGELOG](../CHANGELOG.md) for full details
+
+### Tests
+- 19 new tests (1646 total, 0 failures)
+
 ## [3.20.7] — 2026-03-03
 
 ### Fixed

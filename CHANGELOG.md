@@ -2,6 +2,20 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.20.8] — 2026-03-03
+
+### Fixed
+- **False positive reduction — 3 new heuristics (H25–H27) + 1 new safe idiom entry + extended identifier patterns** — Continued proactive FP analysis targeting config/schema definitions, function call assignments, string comparison dispatch, and broadened env-var credential suppression:
+  - **H25**: Config/schema object keys with non-credential values — findings suppressed when security keywords (`password`, `secret`, `token`, `credential`) appear as object/dict keys followed by boolean (`true`/`false`), null (`null`/`undefined`/`None`), config keywords (`required`/`optional`), nested schema objects (`{ type: ... }`), or ORM field definitions (`Column(...)`, `Field(...)`, `models.CharField(...)`)
+  - **H26**: Assignment from function call / config lookup — findings about "hardcoded" or "plaintext" credentials suppressed when the value is assigned from a function call (`getConfig(...)`, `vault.read(...)`) or env-var access (`process.env`, `os.environ`), not from a literal string; excludes request/input object bracket access (`request.form[...]`)
+  - **H27**: String comparison / switch-case dispatch — findings suppressed when security keywords appear as string values in equality comparisons (`=== "password"`, `== "token"`), switch-case labels (`case "secret":`), inclusion checks (`.includes("password")`), or Python `in` operator (`in ["password", "secret"]`)
+  - **Extended SAFE_IDIOM_PATTERNS**: New entry broadening env-var access suppression from DB-001-only to all hardcoded credential findings (DATA-00x, AUTH-00x) when lines contain `process.env`, `os.environ`, `os.getenv()`, `System.getenv()`, `Environment.GetEnvironmentVariable()`, or `env::var()`
+  - **Extended KEYWORD_IDENTIFIER_PATTERNS**: Added password suffixes (`error`, `expired`, `required`, `schema`, `type`, `view`, `prompt`, `attempts`) and prefixes (`forgot`, `enter`, `missing`, `invalid`, `has`, `is`, `no`, `require`); token suffixes (`error`, `invalid`, `missing`, `source`, `response`, `config`, `schema`) and prefixes (`missing`, `invalid`, `expired`, `has`, `is`, `no`, `decode`, `parse`); secret suffixes (`error`, `invalid`, `missing`, `config`, `schema`, `type`, `provider`) and prefixes (`has`, `is`, `no`, `missing`, `invalid`, `create`, `generate`, `list`)
+
+### Tests
+- 19 new tests across 5 describe blocks: env-var safe idiom broadening (4), config/schema object keys (4), assignment from function call (4), string comparison/dispatch (4), extended identifier patterns (3)
+- 1646 tests, 0 failures
+
 ## [3.20.7] — 2026-03-03
 
 ### Fixed

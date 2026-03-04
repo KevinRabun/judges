@@ -138,19 +138,19 @@ const KEYWORD_IDENTIFIER_PATTERNS: Array<{
     // "password" in passwordField, password_input, showPassword, confirm_password
     trigger: /\bpassword\b/i,
     identifierContext:
-      /password[-_]?(?:field|input|label|placeholder|strength|policy|rule|validator|visible|show|hide|toggle|confirm|match|min|max|length|reset|change|update|hash|column|prop|param|check|verify|form|dialog|modal)|(?:confirm|verify|validate|check|reset|new|old|current|previous|hashed|encrypted)[-_]?password/i,
+      /password[-_]?(?:field|input|label|placeholder|strength|policy|rule|validator|visible|show|hide|toggle|confirm|match|min|max|length|reset|change|update|hash|column|prop|param|check|verify|form|dialog|modal|error|expired|required|schema|type|view|prompt|attempts)|(?:confirm|verify|validate|check|reset|new|old|current|previous|hashed|encrypted|forgot|enter|missing|invalid|has|is|no|require)[-_]?password/i,
   },
   {
     // "secret" in secretName, secret_arn, secretRef, client_secret
     trigger: /\bsecret\b/i,
     identifierContext:
-      /secret[-_]?(?:name|arn|ref|version|id|key|path|manager|store|engine|backend|rotation|value)|(?:aws|azure|gcp|vault|k8s|kube|client|app)[-_]?secret/i,
+      /secret[-_]?(?:name|arn|ref|version|id|key|path|manager|store|engine|backend|rotation|value|error|invalid|missing|config|schema|type|provider)|(?:aws|azure|gcp|vault|k8s|kube|client|app|has|is|no|missing|invalid|create|generate|list)[-_]?secret/i,
   },
   {
     // "token" in tokenExpiry, token_type, refreshToken, reset_token
     trigger: /\btoken\b/i,
     identifierContext:
-      /token[-_]?(?:type|name|expir|ttl|refresh|revoke|validate|verify|field|input|header|prefix|format|length|bucket|count|limit|usage)|(?:access|refresh|bearer|csrf|api|auth|jwt|session|reset|verification)[-_]?token/i,
+      /token[-_]?(?:type|name|expir|ttl|refresh|revoke|validate|verify|field|input|header|prefix|format|length|bucket|count|limit|usage|error|invalid|missing|source|response|config|schema)|(?:access|refresh|bearer|csrf|api|auth|jwt|session|reset|verification|missing|invalid|expired|has|is|no|decode|parse)[-_]?token/i,
   },
   {
     // "global" in Python's `global` keyword used for variable declarations
@@ -230,6 +230,13 @@ const SAFE_IDIOM_PATTERNS: Array<{
     findingPattern: /\bdelete\b.*(?:data|destruct|unprotect|unauthori)|dangerous.*delete/i,
     safeContext:
       /(?:app|router|server|express|fastify|hapi|koa)\s*\.\s*delete\s*\(\s*["'`\/]|@(?:app|router)\s*\.\s*delete\s*\(/i,
+  },
+  {
+    // Environment variable / config-lookup access for hardcoded credential findings
+    // Broader than the DB-001 env-var pattern above — covers all credential keyword findings
+    findingPattern: /hardcoded.*(?:password|secret|token|credential|key|api)|DATA-00|AUTH-00/i,
+    safeContext:
+      /(?:process\.env\b|os\.environ|os\.getenv\s*\(|System\.getenv\s*\(|Environment\.GetEnvironmentVariable\s*\(|env::var\s*\()/i,
   },
 ];
 
@@ -733,6 +740,79 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
       });
       if (allRegexLines) {
         return "Security keyword appears inside a regex pattern — used for matching/validation, not credential handling.";
+      }
+    }
+  }
+
+  // ── 25. Config/schema object keys with non-credential values ──
+  // When a security keyword appears as an object/dict key and the assigned
+  // value is a boolean, null, a schema type descriptor, or an ORM field
+  // definition, the line defines field metadata — not a hardcoded credential.
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const titleAndDesc25 = `${finding.title} ${finding.description}`;
+    const hasCredentialKw25 = /\bpassword\b|\bsecret\b|\btoken\b|\bcredential\b/i.test(titleAndDesc25);
+    if (hasCredentialKw25) {
+      const allConfigKeys = finding.lineNumbers.every((ln) => {
+        const line = lines[ln - 1];
+        if (!line) return false;
+        // Object/dict key followed by non-credential value:
+        // password: true, token: false, secret: null, credential: undefined
+        // "password": { type: "string" }, token: Column(...), secret: Field(...)
+        return /["']?(?:password|secret|token|credential)["']?\s*[:=]\s*(?:true\b|false\b|null\b|undefined\b|None\b|required\b|optional\b|{\s*["']?(?:type|required|default|min|max|enum|validate|format|description)\b|(?:Column|Field|models\.)\s*\()/i.test(
+          line,
+        );
+      });
+      if (allConfigKeys) {
+        return "Security keyword is a config/schema object key — describes field structure, not a hardcoded credential.";
+      }
+    }
+  }
+
+  // ── 26. Assignment from function call / config lookup ──
+  // When a security keyword is assigned the return value of a function call
+  // or config/env lookup (e.g., password = getPassword(), token = config.get("token")),
+  // the value comes from runtime, not hardcoded in source.
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const titleAndDesc26 = `${finding.title} ${finding.description}`;
+    const hasCredentialKw26 = /\bpassword\b|\bsecret\b|\btoken\b|\bcredential\b/i.test(titleAndDesc26);
+    const isHardcodedFinding26 = /hardcoded|hard.?coded|plaintext|plain.?text/i.test(titleAndDesc26);
+    if (hasCredentialKw26 && isHardcodedFinding26) {
+      const allFunctionCalls = finding.lineNumbers.every((ln) => {
+        const line = lines[ln - 1];
+        if (!line) return false;
+        // keyword = someFunction(...) or keyword = obj.method(...)
+        // keyword = process.env.KEY or keyword = os.environ[...]
+        return /\b(?:password|secret|token|credential)\b\s*=\s*(?:\w+[\w.]*\s*\(|process\.env\b|os\.environ)/i.test(
+          line,
+        );
+      });
+      if (allFunctionCalls) {
+        return "Value is assigned from a function call or config lookup — not hardcoded in source.";
+      }
+    }
+  }
+
+  // ── 27. String comparison / switch-case dispatch with security keywords ──
+  // When a security keyword appears as a string value in a comparison operator
+  // (=== / ==), switch-case label, or inclusion check (.includes()), the code
+  // is dispatching by field name, not handling a credential.
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const titleAndDesc27 = `${finding.title} ${finding.description}`;
+    const hasCredentialKw27 = /\bpassword\b|\bsecret\b|\btoken\b|\bcredential\b/i.test(titleAndDesc27);
+    if (hasCredentialKw27) {
+      const allComparisonDispatch = finding.lineNumbers.every((ln) => {
+        const line = lines[ln - 1];
+        if (!line) return false;
+        return (
+          /\bcase\s+["'](?:password|secret|token|credential)["']\s*:/i.test(line) ||
+          /(?:===?|!==?)\s*["'](?:password|secret|token|credential)["']/i.test(line) ||
+          /["'](?:password|secret|token|credential)["']\s*(?:===?|!==?)/i.test(line) ||
+          /\.includes\s*\(\s*["'](?:password|secret|token|credential)["']/i.test(line) ||
+          /\bin\s+[\[(].*["'](?:password|secret|token|credential)["']/i.test(line)
+        );
+      });
+      if (allComparisonDispatch) {
+        return "Security keyword is a string value in a comparison/dispatch — routing by field name, not credential handling.";
       }
     }
   }
