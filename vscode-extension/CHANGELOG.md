@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.4] — 2025-07-26
+
+### Fixed
+- **3 self-review false-positive reductions (batch 2)** — DATA-001 compound identifier word boundary for `iv`, DB-002 database context requirement for mutation detection, SOV-001 compound identifier and import continuation filtering; see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.23.3] — 2025-07-26
 
 ### Fixed

@@ -63,6 +63,8 @@ import { analyzeInternationalization } from "../src/evaluators/internationalizat
 import { analyzeDocumentation } from "../src/evaluators/documentation.js";
 import { analyzeEthicsBias } from "../src/evaluators/ethics-bias.js";
 import { analyzeDataSovereignty } from "../src/evaluators/data-sovereignty.js";
+import { analyzeDataSecurity } from "../src/evaluators/data-security.js";
+import { analyzeDatabase } from "../src/evaluators/database.js";
 import { analyzeCostEffectiveness } from "../src/evaluators/cost-effectiveness.js";
 import { buildSingleJudgeDeepReviewSection, buildTribunalDeepReviewSection } from "../src/tools/deep-review.js";
 import { getCondensedCriteria } from "../src/tools/prompts.js";
@@ -10583,5 +10585,239 @@ function handleError2() {
     const findings = analyzeErrorHandling(code, "typescript");
     const err003 = findings.filter((f) => f.title.includes("Throwing string"));
     assert.ok(err003.length > 0, "Actual throw string literals should still be flagged");
+  });
+});
+
+// ─── v3.23.4 FP Fixes ──────────────────────────────────────────────────────
+// DATA-001: Word boundary on `iv` to prevent compound identifier matches
+// DB-002:   Database context requirement for mutation-without-transaction rule
+// SOV-001:  Skip compound identifiers and multi-line import continuations
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("v3.23.4 FP Fixes — DATA-001 compound identifier false positive", () => {
+  it("should NOT flag LOGPRIV: 'Logging Privacy' as hardcoded encryption IV", () => {
+    const code = `
+const SPECIALTY_LABELS: Record<string, string> = {
+  AUTH: "Authentication",
+  CYBER: "Cybersecurity",
+  DATA: "Data Security",
+  LOGPRIV: "Logging Privacy",
+  PERF: "Performance",
+};
+`;
+    const findings = analyzeDataSecurity(code, "typescript");
+    const data001 = findings.filter((f) => f.title.includes("Hardcoded encryption key or IV"));
+    assert.strictEqual(
+      data001.length,
+      0,
+      "LOGPRIV property should not trigger DATA-001 (IV is part of compound identifier)",
+    );
+  });
+
+  it("should NOT flag compound identifiers ending in IV as encryption keys", () => {
+    const code = `
+const config = {
+  PRIVKEY_DERIV: "ed25519",
+  MASSIVE: "large-value",
+  MOTIV: "intrinsic",
+};
+`;
+    const findings = analyzeDataSecurity(code, "typescript");
+    const data001 = findings.filter((f) => f.title.includes("Hardcoded encryption key or IV"));
+    assert.strictEqual(
+      data001.length,
+      0,
+      "Compound identifiers ending in IV-like sequences should not trigger DATA-001",
+    );
+  });
+
+  it("should still flag standalone iv = '<value>' as hardcoded IV", () => {
+    const code = `
+const iv = "a1b2c3d4e5f6a7b8";
+const key = crypto.createCipheriv("aes-256-cbc", secretKey, iv);
+`;
+    const findings = analyzeDataSecurity(code, "typescript");
+    const data001 = findings.filter((f) => f.title.includes("Hardcoded encryption key or IV"));
+    assert.ok(data001.length > 0, "Standalone iv assignment should still be flagged");
+  });
+
+  it("should still flag encryption_key = '<value>'", () => {
+    const code = `
+const encryption_key = "my-super-secret-key-12345";
+const cipher = crypto.createCipheriv("aes-256-cbc", encryption_key, iv);
+`;
+    const findings = analyzeDataSecurity(code, "typescript");
+    const data001 = findings.filter((f) => f.title.includes("Hardcoded encryption key or IV"));
+    assert.ok(data001.length > 0, "encryption_key assignment should still be flagged");
+  });
+});
+
+describe("v3.23.4 FP Fixes — DB-002 in-memory collection false positive", () => {
+  it("should NOT flag Set.delete() in DFS traversal as database mutation", () => {
+    const code = `
+function detectCycles(graph: Map<string, string[]>): string[][] {
+  const visited = new Set<string>();
+  const stack = new Set<string>();
+  const cycles: string[][] = [];
+
+  function dfs(node: string, path: string[]) {
+    if (stack.has(node)) {
+      cycles.push([...path, node]);
+      return;
+    }
+    if (visited.has(node)) return;
+    visited.add(node);
+    stack.add(node);
+    for (const neighbor of graph.get(node) || []) {
+      dfs(neighbor, [...path, node]);
+    }
+    stack.delete(node);
+  }
+
+  for (const [node] of graph) {
+    dfs(node, []);
+  }
+  return cycles;
+}
+`;
+    const findings = analyzeDatabase(code, "typescript");
+    const db002 = findings.filter((f) => f.title.includes("mutations without transaction"));
+    assert.strictEqual(db002.length, 0, "Set.delete() in DFS should not trigger DB-002 (no database context)");
+  });
+
+  it("should NOT flag Map.delete() in cache management as database mutation", () => {
+    const code = `
+const cache = new Map<string, Result>();
+
+function evictStale(maxAge: number) {
+  const now = Date.now();
+  for (const [key, entry] of cache) {
+    if (now - entry.timestamp > maxAge) {
+      cache.delete(key);
+    }
+  }
+}
+
+function clearAll() {
+  cache.clear();
+}
+`;
+    const findings = analyzeDatabase(code, "typescript");
+    const db002 = findings.filter((f) => f.title.includes("mutations without transaction"));
+    assert.strictEqual(db002.length, 0, "Map.delete() in cache should not trigger DB-002 (no database context)");
+  });
+
+  it("should still flag actual DB mutations without transactions", () => {
+    const code = `
+import { Pool } from "pg";
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+interface Account {
+  id: string;
+  balance: number;
+  currency: string;
+  status: string;
+}
+
+interface AuditLog {
+  action: string;
+  userId: string;
+  timestamp: Date;
+}
+
+async function getAccount(id: string): Promise<Account> {
+  const result = await pool.query("SELECT * FROM accounts WHERE id = $1", [id]);
+  return result.rows[0];
+}
+
+async function transferFunds(from: string, to: string, amount: number) {
+  await pool.query("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [amount, from]);
+  await pool.query("UPDATE accounts SET balance = balance + $1 WHERE id = $2", [amount, to]);
+}
+
+async function deleteUser(userId: string) {
+  await pool.query("DELETE FROM sessions WHERE user_id = $1", [userId]);
+  await pool.query("DELETE FROM users WHERE id = $1", [userId]);
+}
+
+async function logAction(action: string, userId: string) {
+  await pool.query("INSERT INTO audit_log (action, user_id) VALUES ($1, $2)", [action, userId]);
+}
+`;
+    const findings = analyzeDatabase(code, "typescript");
+    const db002 = findings.filter((f) => f.title.includes("mutations without transaction"));
+    assert.ok(db002.length > 0, "Actual DB mutations without transactions should still be flagged");
+  });
+});
+
+describe("v3.23.4 FP Fixes — SOV-001 compound identifier and import continuation", () => {
+  it("should NOT flag UncertaintyReportV2 type annotation as data export", () => {
+    const code = `
+interface EvaluationResult {
+  score: number;
+  uncertainty?: UncertaintyReportV2;
+  findings: Finding[];
+}
+
+function buildUncertainty(context?: EvaluationContextV2, evidence?: EvidenceBundleV2): UncertaintyReportV2 {
+  return { level: "low", factors: [] };
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const sov001 = findings.filter((f) => f.title.includes("Data export path"));
+    assert.strictEqual(sov001.length, 0, "Type names containing 'Report' should not trigger SOV-001");
+  });
+
+  it("should NOT flag multi-line import continuation containing Report type", () => {
+    const code = `
+import {
+  Finding,
+  EvaluationContextV2,
+  UncertaintyReportV2,
+  EvidenceBundleV2,
+} from "../types.js";
+
+export function evaluate(code: string): Finding[] {
+  return [];
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const sov001 = findings.filter((f) => f.title.includes("Data export path"));
+    assert.strictEqual(sov001.length, 0, "Import continuation lines should not trigger SOV-001");
+  });
+
+  it("should NOT flag DownloadManager class name as data export", () => {
+    const code = `
+class DownloadManager {
+  private queue: string[] = [];
+
+  addToQueue(url: string) {
+    this.queue.push(url);
+  }
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const sov001 = findings.filter((f) => f.title.includes("Data export path"));
+    assert.strictEqual(sov001.length, 0, "Compound identifier 'DownloadManager' should not trigger SOV-001");
+  });
+
+  it("should still flag actual data export paths without sovereignty controls", () => {
+    const code = `
+async function exportUserData(userId: string) {
+  const data = await db.query("SELECT * FROM users WHERE id = $1", [userId]);
+  const csv = convertToCsv(data);
+  await sendToExternalService(csv);
+  return { status: "exported" };
+}
+
+async function downloadReport(reportId: string) {
+  const report = await fetchReport(reportId);
+  res.download(report.filePath);
+}
+`;
+    const findings = analyzeDataSovereignty(code, "typescript");
+    const sov001 = findings.filter((f) => f.title.includes("Data export path"));
+    assert.ok(sov001.length > 0, "Actual standalone export/download/report paths should still be flagged");
   });
 });

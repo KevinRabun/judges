@@ -174,8 +174,17 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     if (/^\s*export\s*\{/.test(line)) return;
     // Skip env-var / config references that merely name a region or setting
     if (/process\.env\.|import\s|require\s*\(|getenv|os\.environ/i.test(line)) return;
+    // Skip multi-line import continuation lines (identifiers inside import { ... } blocks)
+    if (/^\s*[A-Za-z_$][A-Za-z0-9_$]*,?\s*$/.test(line)) return;
     // Skip lines where 'export' only appears as part of an identifier (e.g., getExportRegion, isExportAllowed)
     if (/export/i.test(line) && !/(?<![a-zA-Z0-9_])export(?![a-zA-Z0-9_])/i.test(line)) return;
+    // Skip lines where trigger words appear only inside compound identifiers
+    // (e.g., "UncertaintyReportV2" or "DownloadManager" — type names, not data exports)
+    if (
+      /(export|download|dump|report|analytics|telemetry|support.?bundle)/i.test(line) &&
+      !/(^|[^a-zA-Z])(export|download|dump|report|analytics|telemetry|support.?bundle)([^a-zA-Z]|$)/i.test(line)
+    )
+      return;
     if (
       /(export|download|dump|report|analytics|telemetry|support.?bundle)/i.test(line) &&
       !/redact|anonym|aggregate|jurisdiction|policy|allowed|blocked|guard|check|validate/i.test(line)

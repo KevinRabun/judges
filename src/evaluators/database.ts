@@ -158,8 +158,15 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
     /(?:(?:query|execute|run|raw)\s*\(\s*["'`](?:INSERT|UPDATE|DELETE))|(?:\.(?:save|create|update|delete|remove|destroy|bulkCreate|insertMany|updateMany|deleteMany|insertOne|updateOne|deleteOne)\s*\()|(?:INSERT\s+INTO\b|UPDATE\s+\w+\s+SET\b|DELETE\s+FROM\b)|db\.(?:create|update|delete|save|remove)\s*\(/gi.test(
       code,
     );
+  // Require at least one database-related signal in the file so that
+  // in-memory collection methods (Map.delete, Set.delete, Array.splice, etc.)
+  // do not trigger this rule in non-database code.
+  const hasDbSignals =
+    /(?:knex|prisma|sequelize|typeorm|mongoose|mongodb(?:Client)?|mysql2?|postgres|pg(?:\b|Pool|Client)|sqlite|drizzle|mikro.?orm|objection|bookshelf|waterline|createConnection|getConnection|getRepository|dataSource|Repository|Entity|Schema\s*\(|Model\s*\(|\.collection\s*\(|\bquery\s*\(\s*["'`](?:SELECT|INSERT|UPDATE|DELETE))/i.test(
+      code,
+    );
   const hasTransactions = testCode(code, /transaction|BEGIN|COMMIT|ROLLBACK|startTransaction|withTransaction/gi);
-  if (hasMutations && !hasTransactions && code.split("\n").length > 30) {
+  if (hasMutations && !hasTransactions && hasDbSignals && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

@@ -370,8 +370,10 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   }
 
   // Hardcoded encryption keys / IVs
+  // Use word boundaries around short tokens like `iv` and `nonce` to avoid
+  // matching compound identifiers (e.g., LOGPRIV: "..." should not fire).
   const encKeyPatterns =
-    /(?:encryption[_-]?key|aes[_-]?key|iv|initialization[_-]?vector|nonce)\s*[:=]\s*["'][^"']+["']|(?:Buffer\.from|new\s+Uint8Array)\s*\(.*(?:key|iv)/gi;
+    /(?:encryption[_-]?key|aes[_-]?key|\biv\b|initialization[_-]?vector|\bnonce\b)\s*[:=]\s*["'][^"']+["']|(?:Buffer\.from|new\s+Uint8Array)\s*\(.*(?:key|\biv\b)/gi;
   const encKeyLines = filterNonProductionLineNumbers(code, getLineNumbers(code, encKeyPatterns));
   if (encKeyLines.length > 0) {
     findings.push({

@@ -2,6 +2,20 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.4] — 2025-07-26
+
+### Fixed — Self-Review False Positive Reductions (3 root causes, batch 2)
+
+Continued self-review of all 43 evaluator files. Groups A–E (27 files) scored 100/100 with only DOC-001. Group F (3 orchestrator files: `index.ts`, `project.ts`, `v2.ts`) scored 97–99/100, revealing 3 new FP root causes:
+
+- **DATA-001: Compound identifiers ending in `iv` no longer flagged as hardcoded encryption IVs** — Added `\b` word boundaries around the short token `iv` (and `nonce`) in the `data-security.ts` encryption-key regex. Property names like `LOGPRIV: "Logging Privacy"` where `IV` appears at the end of a compound identifier previously matched `iv\s*[:=]\s*"..."`. Standalone `iv = "..."` assignments are still correctly flagged.
+- **DB-002: In-memory collection methods no longer trigger "mutations without transaction"** — Added a database-context signal check to `database.ts`. The `hasMutations` regex matches generic method names (`.delete()`, `.save()`, `.create()`) that are common on `Map`, `Set`, and other non-database objects. The rule now requires at least one database-related import or usage pattern (e.g., `pg`, `prisma`, `sequelize`, SQL query strings) before firing, preventing false positives on `stack.delete(node)` in DFS traversal code and `cache.delete(key)` in Map-based caches.
+- **SOV-001: Compound identifiers and multi-line import continuations no longer trigger "data export path"** — Enhanced `data-sovereignty.ts` export-keyword scanner with two new filters: (1) skip lines that are multi-line import continuations (bare identifiers like `UncertaintyReportV2,`), and (2) skip lines where trigger words (`report`, `export`, `download`, etc.) appear only embedded inside compound identifiers (e.g., `UncertaintyReportV2`, `DownloadManager`). Standalone usages like `export(data)` and `download(file)` are still correctly flagged.
+
+### Tests
+- 11 new tests covering all 3 FP root causes (positive and negative cases)
+- 1037 judges tests passing, 689 subsystems tests passing (1726 total)
+
 ## [3.23.3] — 2025-07-26
 
 ### Fixed — Self-Review False Positive Reductions (3 root causes)
