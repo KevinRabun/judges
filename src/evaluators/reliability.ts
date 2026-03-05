@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, isLikelyCLI, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeReliability(code: string, language: string): Finding[] {
@@ -146,7 +146,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
 
   // Detect process.exit / panic / System.exit (multi-language)
   const processExitLines = getLangLineNumbers(code, language, LP.PANIC_UNWRAP);
-  if (processExitLines.length > 0) {
+  if (processExitLines.length > 0 && !isLikelyCLI(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

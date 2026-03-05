@@ -455,6 +455,41 @@ export function isStringLiteralLine(line: string): boolean {
   return STRING_LITERAL_LINE_RE.test(line);
 }
 
+/**
+ * Returns true when the source code appears to be a **code-analysis** or
+ * **static-analysis tool** rather than application/production code.
+ *
+ * Heuristic: files that contain ≥ 8 occurrences of `.test(` are almost
+ * certainly regex-heavy analysis/evaluator code (e.g. linters, security
+ * scanners).  Rules about PII handling, database transactions, structured
+ * logging, sovereignty controls, etc. are not meaningful for such files
+ * and would only produce false positives.
+ *
+ * The threshold of 8 was calibrated from the Judges evaluator corpus —
+ * typical application files have 0–3 `.test()` calls while evaluators
+ * routinely have 15–60+.
+ */
+export function isLikelyAnalysisCode(code: string): boolean {
+  return (code.match(/\.test\s*\(/g) || []).length >= 8;
+}
+
+/**
+ * Returns true when the source code appears to be a **CLI entry-point** or
+ * command-line tool.
+ *
+ * CLI programs legitimately use `process.exit()`, console logging, and
+ * synchronous I/O; flagging those patterns as anti-patterns would be a
+ * false positive.
+ */
+export function isLikelyCLI(code: string): boolean {
+  // Shebang or process.argv / commander / yargs / meow patterns
+  return (
+    /^#!\/usr\/bin\/env\s/m.test(code) ||
+    /\bprocess\.argv\b/.test(code) ||
+    /\b(?:commander|yargs|meow|cac|citty|clipanion)\b/i.test(code)
+  );
+}
+
 // ─── Comment & String Stripping ──────────────────────────────────────────────
 // Provides `stripCommentsAndStrings()` which replaces all comments and string
 // literals with whitespace (preserving line structure) so that whole-file

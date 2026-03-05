@@ -1,5 +1,13 @@
 import type { Finding, AnalyzeContext } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine, isStringLiteralLine, testCode } from "./shared.js";
+import {
+  getLangLineNumbers,
+  getLangFamily,
+  isCommentLine,
+  isStringLiteralLine,
+  isLikelyAnalysisCode,
+  isLikelyCLI,
+  testCode,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzePerformance(code: string, language: string, context?: AnalyzeContext): Finding[] {
@@ -8,6 +16,11 @@ export function analyzePerformance(code: string, language: string, context?: Ana
   const prefix = "PERF";
   let ruleNum = 1;
   const lang = getLangFamily(language);
+
+  // Analysis/evaluator code intentionally uses nested loops and regex-in-loop
+  // patterns for code scanning. CLI tools legitimately use synchronous I/O.
+  const analysisCode = isLikelyAnalysisCode(code);
+  const cliCode = isLikelyCLI(code);
 
   // ── AST context (optional — enables scope-aware detection) ────────────────
   const ast = context?.ast;
@@ -60,7 +73,7 @@ export function analyzePerformance(code: string, language: string, context?: Ana
       syncIOLines.push(i + 1);
     }
   });
-  if (syncIOLines.length > 0) {
+  if (syncIOLines.length > 0 && !cliCode) {
     // AST: elevate severity when synchronous I/O is inside an async function
     // (blocks the event loop / async runtime, far worse than in sync context)
     let syncSeverity: "medium" | "high" = "medium";
@@ -199,7 +212,7 @@ export function analyzePerformance(code: string, language: string, context?: Ana
       regexInLoopLines.push(loopLine);
     }
   }
-  if (regexInLoopLines.length > 0) {
+  if (regexInLoopLines.length > 0 && !analysisCode) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -519,7 +532,7 @@ export function analyzePerformance(code: string, language: string, context?: Ana
       }
     }
   }
-  if (nestedLoopLines.length > 0) {
+  if (nestedLoopLines.length > 0 && !analysisCode) {
     // AST: annotate with function-level complexity via AST metrics
     let nestedDescription = `${nestedLoopLines.length} nested loop(s) detected. Nested loops scale quadratically or worse with input size and can cause severe performance degradation on large datasets.`;
     if (astFunctions.length > 0) {
@@ -664,7 +677,7 @@ export function analyzePerformance(code: string, language: string, context?: Ana
       }
     }
   }
-  if (recursiveLines.length > 0) {
+  if (recursiveLines.length > 0 && !analysisCode) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

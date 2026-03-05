@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
+import { getLangLineNumbers, getLangFamily, isCommentLine, isLikelyCLI, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeObservability(code: string, language: string): Finding[] {
@@ -11,7 +11,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
 
   // Detect console.log used instead of structured logging (multi-language)
   const consoleLogLines = getLangLineNumbers(code, language, LP.CONSOLE_LOG);
-  if (consoleLogLines.length > 3) {
+  if (consoleLogLines.length > 3 && !isLikelyCLI(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

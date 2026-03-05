@@ -1,5 +1,13 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, testCode, classifyFile } from "./shared.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  testCode,
+  classifyFile,
+  isLikelyAnalysisCode,
+  isLikelyCLI,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCiCd(code: string, language: string): Finding[] {
@@ -7,6 +15,10 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
   let ruleNum = 1;
   const prefix = "CICD";
   const _lang = getLangFamily(language);
+
+  // Analysis code references linter-disable/suppression patterns in regex
+  // for detection purposes — these are not actual suppressions.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   // CI/CD absence rules (no tests, no lint, no build script) are project-level
   // concerns — they belong in config/manifest files (package.json, Cargo.toml),
@@ -61,7 +73,7 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
 
   // Hard process exit in application code (multi-language)
   const processExitLines = getLangLineNumbers(code, language, LP.PANIC_UNWRAP);
-  if (processExitLines.length > 0) {
+  if (processExitLines.length > 0 && !isLikelyCLI(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

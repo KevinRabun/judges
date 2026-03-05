@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine, testCode, isLikelyCLI } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeSoftwarePractices(code: string, language: string): Finding[] {
@@ -324,7 +324,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
 
   // God class / file with too many responsibilities (multi-language)
   const functionLines = getLangLineNumbers(code, language, LP.FUNCTION_DEF);
-  if (codeLines.length > 500 && functionLines.length > 20) {
+  if (codeLines.length > 500 && functionLines.length > 20 && !isLikelyCLI(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

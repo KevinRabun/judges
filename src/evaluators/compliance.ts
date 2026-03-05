@@ -1,5 +1,12 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine, isIaCTemplate, testCode } from "./shared.js";
+import {
+  getLangLineNumbers,
+  getLangFamily,
+  isCommentLine,
+  isIaCTemplate,
+  isLikelyAnalysisCode,
+  testCode,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCompliance(code: string, language: string): Finding[] {
@@ -8,6 +15,10 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   const prefix = "COMP";
   let ruleNum = 1;
   const _lang = getLangFamily(language);
+
+  // Analysis code references PII keywords (email, SSN, passport) in detection
+  // patterns — these are not actual PII fields that need encryption.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   const isCommentLikeLine = (line: string): boolean => {
     const trimmed = line.trim();

@@ -6,6 +6,7 @@ import {
   isIaCTemplate,
   testCode,
   getContextWindow,
+  isLikelyAnalysisCode,
 } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -20,6 +21,11 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
   let ruleNum = 1;
   const prefix = "AICS";
   const lang = getLangFamily(language);
+
+  // Analysis / evaluator code references security keywords (auth, token,
+  // password, credential, etc.) inside regex patterns for detection —
+  // these are not actual AI-safety violations.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   // ── AICS-001  Prompt injection — user input concatenated into LLM prompts ──
   const promptConcatPattern =

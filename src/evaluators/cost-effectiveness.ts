@@ -1,5 +1,13 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate, testCode } from "./shared.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  isIaCTemplate,
+  testCode,
+  isLikelyAnalysisCode,
+  isLikelyCLI,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCostEffectiveness(code: string, language: string): Finding[] {
@@ -7,6 +15,8 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
   let ruleNum = 1;
   const prefix = "COST";
   const lang = getLangFamily(language);
+  const analysisCode = isLikelyAnalysisCode(code);
+  const cliCode = isLikelyCLI(code);
 
   // Infrastructure-as-Code templates (Bicep, Terraform, ARM) are declarative —
   // they have no imperative loops. Skip nested-loop detection for IaC files.
@@ -59,7 +69,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
       }
     }
   }
-  if (nestedLoopLines.length > 0 && !iacTemplate) {
+  if (nestedLoopLines.length > 0 && !iacTemplate && !analysisCode) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -150,7 +160,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
   const syncReadPattern =
     /readFileSync|readSync|fs\.readFile\s*\(\s*[^,]+\s*\)|open\s*\(.*\)\.read\(\)|File\.ReadAllText|File\.ReadAllLines|File\.ReadAllBytes|ioutil\.ReadFile/gi;
   const syncReadLines = getLineNumbers(code, syncReadPattern);
-  if (syncReadLines.length > 0) {
+  if (syncReadLines.length > 0 && !cliCode) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

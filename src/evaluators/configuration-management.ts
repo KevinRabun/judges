@@ -1,5 +1,12 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate, testCode } from "./shared.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  isIaCTemplate,
+  testCode,
+  isLikelyAnalysisCode,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeConfigurationManagement(code: string, language: string): Finding[] {
@@ -14,6 +21,10 @@ export function analyzeConfigurationManagement(code: string, language: string): 
   // application code (env-var usage, rotation, schema validation) produce
   // false positives on IaC.
   if (isIaCTemplate(code)) return findings;
+
+  // Analysis / evaluator code is full of credential-keyword regexes for
+  // detection purposes — these are not real secrets or config issues.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   // Hardcoded secrets / credentials
   const secretPattern = /(?:password|passwd|secret|api_?key|token|private_?key)\s*[:=]\s*["'`][^"'`]{3,}/gi;

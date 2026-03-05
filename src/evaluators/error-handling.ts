@@ -5,6 +5,7 @@ import {
   getLangFamily,
   isCommentLine,
   isStringLiteralLine,
+  isLikelyCLI,
   testCode,
 } from "./shared.js";
 import * as LP from "../language-patterns.js";
@@ -184,7 +185,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
 
   // Abrupt process termination (multi-language: process.exit, sys.exit, panic, unwrap, etc.)
   const panicExitLines = getLangLineNumbers(code, language, LP.PANIC_UNWRAP);
-  if (panicExitLines.length > 0) {
+  if (panicExitLines.length > 0 && !isLikelyCLI(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

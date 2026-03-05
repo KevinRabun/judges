@@ -1,5 +1,12 @@
 import type { Finding, AnalyzeContext } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isIaCTemplate, testCode } from "./shared.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  isIaCTemplate,
+  testCode,
+  isLikelyAnalysisCode,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeCybersecurity(code: string, language: string, context?: AnalyzeContext): Finding[] {
@@ -7,6 +14,10 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
   let ruleNum = 1;
   const prefix = "CYBER";
   const lang = getLangFamily(language);
+
+  // Analysis code references XSS, innerHTML, and credential patterns in regex
+  // for detection purposes — these are not actual vulnerabilities.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   // ── AST context (optional — makes detection scope-aware) ──────────────────
   const ast = context?.ast;

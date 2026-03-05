@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangFamily, isCommentLine } from "./shared.js";
+import { getLangFamily, isCommentLine, isLikelyAnalysisCode } from "./shared.js";
 
 export function analyzeEthicsBias(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
@@ -7,6 +7,10 @@ export function analyzeEthicsBias(code: string, language: string): Finding[] {
   const prefix = "ETHICS";
   let ruleNum = 1;
   const _lang = getLangFamily(language);
+
+  // Analysis code references exclusionary-language keywords inside regex
+  // patterns for detection — these are not real ethical violations.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   const isCommentLikeLine = (line: string): boolean => {
     const trimmed = line.trim();

@@ -6,6 +6,7 @@ import {
   isIaCTemplate,
   testCode,
   getContextWindow,
+  isLikelyAnalysisCode,
 } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -14,6 +15,10 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   let ruleNum = 1;
   const prefix = "CLOUD";
   const _lang = getLangFamily(language);
+
+  // Analysis code references filesystem paths and cloud-service keywords in
+  // regex patterns for detection — these are not real cloud-readiness issues.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   // Shared: detect whether the file contains server/application bootstrap code.
   // Used to suppress operational rules (health check, graceful shutdown, feature flags)

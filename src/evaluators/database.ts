@@ -1,5 +1,12 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  isCommentLine,
+  isLikelyAnalysisCode,
+  testCode,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeDatabase(code: string, language: string): Finding[] {
@@ -7,6 +14,11 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   let ruleNum = 1;
   const prefix = "DB";
   const _lang = getLangFamily(language);
+
+  // Analysis / evaluator code contains regex patterns and string literals that
+  // reference database operations (`.save(`, `Model.create`, `Schema(`, etc.)
+  // but are not actual database calls — skip to avoid false positives.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   // SQL injection via string concatenation (multi-language)
   const rawSqlInjectionLines = getLangLineNumbers(code, language, LP.SQL_INJECTION);

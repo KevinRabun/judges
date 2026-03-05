@@ -230,7 +230,7 @@ const SAFE_IDIOM_PATTERNS: Array<{
     // HTTP routing method app.delete() / router.delete() — "delete" is an HTTP verb, not data destruction
     findingPattern: /\bdelete\b.*(?:data|destruct|unprotect|unauthori)|dangerous.*delete/i,
     safeContext:
-      /(?:app|router|server|express|fastify|hapi|koa)\s*\.\s*delete\s*\(\s*["'`\/]|@(?:app|router)\s*\.\s*delete\s*\(/i,
+      /(?:app|router|server|express|fastify|hapi|koa)\s*\.\s*delete\s*\(\s*["'`/]|@(?:app|router)\s*\.\s*delete\s*\(/i,
   },
   {
     // Environment variable / config-lookup access for hardcoded credential findings
@@ -243,13 +243,13 @@ const SAFE_IDIOM_PATTERNS: Array<{
     // Vault / secrets-manager SDK calls — credentials are fetched at runtime, not hardcoded
     findingPattern: /hardcoded.*(?:password|secret|token|credential|key)|DATA-00|AUTH-00|DSEC-/i,
     safeContext:
-      /(?:vault|secretsmanager|SecretClient|KeyVaultSecret|ssm|parameterStore|keyring|credentialManager)\s*[\.(]/i,
+      /(?:vault|secretsmanager|SecretClient|KeyVaultSecret|ssm|parameterStore|keyring|credentialManager)\s*[.(]/i,
   },
   {
     // Hash/digest function calls — "password" or "secret" is being hashed, not stored in plaintext
     findingPattern: /plaintext|plain.?text|unencrypted|unhashed/i,
     safeContext:
-      /(?:bcrypt|argon2|scrypt|pbkdf2|sha256|sha512|hashlib|crypto\.hash|passwordEncoder|hash_password|hashpw|createHash)\s*[\.(]/i,
+      /(?:bcrypt|argon2|scrypt|pbkdf2|sha256|sha512|hashlib|crypto\.hash|passwordEncoder|hash_password|hashpw|createHash)\s*[.(]/i,
   },
   {
     // String concatenation / template literal for error or user-facing messages
@@ -1013,7 +1013,7 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
           /(?:===?|!==?)\s*["'](?:password|secret|token|credential)["']/i.test(line) ||
           /["'](?:password|secret|token|credential)["']\s*(?:===?|!==?)/i.test(line) ||
           /\.includes\s*\(\s*["'](?:password|secret|token|credential)["']/i.test(line) ||
-          /\bin\s+[\[(].*["'](?:password|secret|token|credential)["']/i.test(line)
+          /\bin\s+[[(].*["'](?:password|secret|token|credential)["']/i.test(line)
         );
       });
       if (allComparisonDispatch) {

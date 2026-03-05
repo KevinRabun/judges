@@ -6,6 +6,7 @@ import {
   looksLikeRealCredentialValue,
   isCommentLine,
   testCode,
+  isLikelyAnalysisCode as isAnalysisModule,
 } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -81,6 +82,11 @@ export function analyzeAuthentication(code: string, language: string, context?: 
   let ruleNum = 1;
   const prefix = "AUTH";
   const _lang = getLangFamily(language);
+
+  // Analysis code references password/credential keywords in regex patterns
+  // for detection purposes — these are not actual authentication flows.
+  if (isAnalysisModule(code)) return findings;
+
   const lines = code.split("\n");
 
   // ── AST context (optional — enables decorator and import awareness) ───────

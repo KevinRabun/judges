@@ -1,5 +1,12 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, testCode } from "./shared.js";
+import {
+  getLineNumbers,
+  getLangLineNumbers,
+  getLangFamily,
+  isLikelyAnalysisCode,
+  isLikelyCLI,
+  testCode,
+} from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeLoggingPrivacy(code: string, language: string): Finding[] {
@@ -7,6 +14,10 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
   let ruleNum = 1;
   const prefix = "LOGPRIV";
   const _lang = getLangFamily(language);
+
+  // Analysis code references PII/IP/credential keywords in regex patterns for
+  // detection purposes — these are not actual sensitive data being logged.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   // Helper: find log statement lines that contain sensitive data (multi-language)
   const logLineSet = new Set([
@@ -67,7 +78,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
   const logPiiLines = getLogLinesMatching(
     /(?:\bemail\b|\bssn\b|\bphone(?:Number)?\b|\baddress\b(?!\s*(?:=|:)\s*(?:0x|null|undefined|['"](?:\/|http)))|(?:^|[\s{(,.:])name(?:\s*[=:,})\]]|$)|\bfirstName\b|\blast_?[Nn]ame\b|\bdateOfBirth\b|\bdob\b|\bsocial.?security\b)/i,
   );
-  if (logPiiLines.length > 0) {
+  if (logPiiLines.length > 0 && !isLikelyCLI(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -129,7 +140,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
   const consoleLogLines = getLangLineNumbers(code, language, LP.CONSOLE_LOG);
   const hasProperLogger = testCode(code, /winston|pino|bunyan|log4j|serilog|NLog|structuredLog|logger\./gi);
   const structuredLogLines = getLangLineNumbers(code, language, LP.STRUCTURED_LOG);
-  if (consoleLogLines.length > 3 && !hasProperLogger && structuredLogLines.length === 0) {
+  if (consoleLogLines.length > 3 && !hasProperLogger && structuredLogLines.length === 0 && !isLikelyCLI(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -172,7 +183,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
   const logIpLines = getLogLinesMatching(
     /(?:ip|ipAddress|remoteAddress|x-forwarded-for|req\.ip|req\.connection\.remoteAddress|REMOTE_ADDR)/i,
   );
-  if (logIpLines.length > 0) {
+  if (logIpLines.length > 0 && !isLikelyCLI(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

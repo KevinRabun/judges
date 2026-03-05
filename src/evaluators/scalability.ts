@@ -6,6 +6,8 @@ import {
   isIaCTemplate,
   testCode,
   getContextWindow,
+  isLikelyAnalysisCode,
+  isLikelyCLI,
 } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -14,6 +16,8 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   let ruleNum = 1;
   const prefix = "SCALE";
   const _lang = getLangFamily(language);
+  const analysisCode = isLikelyAnalysisCode(code);
+  const cliCode = isLikelyCLI(code);
 
   // Global mutable state (multi-language)
   // Only flag variables at module/top-level scope — function-local variables
@@ -54,7 +58,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   const inMemPattern =
     /(?:Map|Set|WeakMap|Object\.create)\s*\(\s*\)|session\s*[:=].*\{\}|(?:store|cache|registry)\s*=\s*(?:new\s+Map|\{\}|\[\])|MemoryStore|express-session\s*\(\s*\)/gi;
   const inMemLines = getLineNumbers(code, inMemPattern);
-  if (inMemLines.length > 0) {
+  if (inMemLines.length > 0 && !analysisCode) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -81,7 +85,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
     const ctx = getContextWindow(lines, ln, 1);
     return !/\bawait\b/i.test(ctx);
   });
-  if (blockingLines.length > 0) {
+  if (blockingLines.length > 0 && !cliCode) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

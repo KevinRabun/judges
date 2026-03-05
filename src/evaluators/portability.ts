@@ -214,19 +214,35 @@ export function analyzePortability(code: string, language: string): Finding[] {
   const dirnameLines = getLineNumbers(code, dirnamePattern);
   const isESM = /import\s+.*from\s+['"]|export\s+(?:default|const|function|class)\b/g.test(code);
   if (dirnameLines.length > 0 && isESM) {
-    findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
-      severity: "medium",
-      title: "__dirname/__filename used in ESM module",
-      description: `Found ${dirnameLines.length} use(s) of __dirname or __filename, which are not available in ES modules. This will fail at runtime when using ESM.`,
-      lineNumbers: dirnameLines,
-      recommendation:
-        "Use import.meta.url with fileURLToPath() and path.dirname() for ESM-compatible directory resolution: const __dirname = path.dirname(fileURLToPath(import.meta.url))",
-      reference: "Node.js ESM: import.meta.url",
-      suggestedFix:
-        "Replace `__dirname` with `path.dirname(fileURLToPath(import.meta.url))` after importing `fileURLToPath` from `'node:url'`.",
-      confidence: 0.9,
+    // Filter out files that USE the recommended ESM polyfill pattern:
+    //   const __filename = fileURLToPath(import.meta.url);
+    //   const __dirname  = path.dirname(fileURLToPath(import.meta.url));
+    //   const __dirname  = dirname(__filename);       // also valid
+    // When a polyfill definition exists, all subsequent uses of __dirname /
+    // __filename in the same file reference the polyfilled const, not the
+    // missing CJS global — so the entire finding is suppressed.
+    const codeLines = code.split("\n");
+    const ESM_POLYFILL_RE =
+      /(?:const|let|var)\s+__(?:dirname|filename)\s*=\s*(?:(?:path\.)?dirname\s*\((?:__filename|fileURLToPath)|fileURLToPath\s*\()/;
+    const hasPolyfill = dirnameLines.some((ln) => {
+      const lineText = codeLines[ln - 1] ?? "";
+      return ESM_POLYFILL_RE.test(lineText);
     });
+    if (!hasPolyfill) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "medium",
+        title: "__dirname/__filename used in ESM module",
+        description: `Found ${dirnameLines.length} use(s) of __dirname or __filename, which are not available in ES modules. This will fail at runtime when using ESM.`,
+        lineNumbers: dirnameLines,
+        recommendation:
+          "Use import.meta.url with fileURLToPath() and path.dirname() for ESM-compatible directory resolution: const __dirname = path.dirname(fileURLToPath(import.meta.url))",
+        reference: "Node.js ESM: import.meta.url",
+        suggestedFix:
+          "Replace `__dirname` with `path.dirname(fileURLToPath(import.meta.url))` after importing `fileURLToPath` from `'node:url'`.",
+        confidence: 0.9,
+      });
+    }
   }
 
   // Architecture-specific assumptions (32/64 bit)

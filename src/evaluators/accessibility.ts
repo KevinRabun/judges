@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangFamily, isCommentLine, testCode } from "./shared.js";
+import { getLangFamily, isCommentLine, testCode, isLikelyAnalysisCode } from "./shared.js";
 
 export function analyzeAccessibility(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
@@ -7,6 +7,10 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   const prefix = "A11Y";
   let ruleNum = 1;
   const _lang = getLangFamily(language);
+
+  // Analysis code references ARIA, form, and HTML patterns in regex
+  // for detection purposes — these are not actual accessibility issues.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   // Detect images without alt attributes
   // File-level check: if the file constructs ARIA helpers or accessibility utilities,

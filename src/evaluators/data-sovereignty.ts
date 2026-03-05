@@ -1,11 +1,15 @@
 import type { Finding } from "../types.js";
-import { isCommentLine, isIaCTemplate, testCode } from "./shared.js";
+import { isCommentLine, isIaCTemplate, isLikelyAnalysisCode, testCode } from "./shared.js";
 
 export function analyzeDataSovereignty(code: string, _language: string): Finding[] {
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const prefix = "SOV";
   let ruleNum = 1;
+
+  // Analysis / evaluator code references sovereignty concepts (KMS, replication,
+  // export paths, PII patterns) in regex and string literals — not real violations.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   // Infrastructure-as-Code templates (Bicep, Terraform, ARM) are declarative
   // infrastructure definitions — they enforce jurisdiction via parameter

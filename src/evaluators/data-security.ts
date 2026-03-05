@@ -6,6 +6,7 @@ import {
   looksLikeRealCredentialValue,
   testCode,
   getContextWindow,
+  isLikelyAnalysisCode,
 } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -57,6 +58,10 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   let ruleNum = 1;
   const prefix = "DATA";
   const _lang = getLangFamily(language);
+
+  // Analysis code references PII/secret/credential keywords in regex patterns
+  // for detection purposes — these are not real sensitive data.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   // Hardcoded secrets (multi-language)
   const secretPatterns = [

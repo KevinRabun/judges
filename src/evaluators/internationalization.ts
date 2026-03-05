@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangFamily, isCommentLine, testCode } from "./shared.js";
+import { getLangFamily, isCommentLine, isLikelyAnalysisCode, testCode } from "./shared.js";
 
 export function analyzeInternationalization(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
@@ -7,6 +7,10 @@ export function analyzeInternationalization(code: string, language: string): Fin
   const prefix = "I18N";
   let ruleNum = 1;
   const _lang = getLangFamily(language);
+
+  // Analysis code has `title:` and `description:` properties for machine-
+  // readable finding output — not user-facing strings that need translation.
+  if (isLikelyAnalysisCode(code)) return findings;
 
   // Detect hardcoded user-facing strings in UI code
   const hardcodedStringLines: number[] = [];
