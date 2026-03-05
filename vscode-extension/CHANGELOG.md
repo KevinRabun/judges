@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.6] — 2026-03-05
+
+### Fixed
+- **Analysis-code, CLI, and IaC template false-positive guards** — Added heuristic guards across 21+ evaluators to suppress application-code rules from misfiring on analysis/evaluator code, CLI scaffolding, and Bicep/Terraform IaC templates. Refined IAC-001 hardcoded-secret detection to filter boolean configs and enum identifiers; see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.23.5] — 2026-03-05
 
 ### Security

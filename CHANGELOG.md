@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.6] — 2026-03-05
+
+### Fixed — False Positive Reductions
+
+- **Analysis-code & CLI guards** — Added `isLikelyAnalysisCode()` and `isLikelyCLI()` heuristics to `shared.ts` and applied guards across 21+ evaluators. Files that contain analysis/evaluator logic (≥8 `.test()` calls, rule-definition patterns) or CLI scaffolding (argument-parser imports, `yargs`/`commander` patterns) are now suppressed from application-code rules that would otherwise misfire.
+- **IaC template guards (Bicep/Terraform)** — Added `isIaCTemplate` early returns to 5 evaluators (`cloud-readiness`, `data-security`, `database`, `portability`, `maintainability`) so application-code rules no longer fire on declarative infrastructure files. Raised `maintainability` file-length threshold from 300→600 for IaC templates and suppressed duplicate-string detection for IaC.
+- **IAC-001 hardcoded-secret refinement** — Added `looksLikeIaCSecretValue()` post-filter to `iac-security.ts` so boolean config values (`'true'`/`'false'`), PascalCase enum identifiers, and known IaC configuration constants are no longer flagged as hardcoded secrets.
+
+### Tests
+- 217 new negative tests added
+- All 1943 tests passing (1037 judges + 689 subsystems + 217 negative)
+
 ## [3.23.5] — 2026-03-05
 
 ### Security
