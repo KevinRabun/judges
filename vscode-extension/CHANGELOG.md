@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.5] — 2026-03-05
+
+### Security
+- **4 Dependabot alerts resolved** — Updated transitive deps `hono` (4.12.5) and `@hono/node-server` (1.19.11) to patch CVE-2026-29045, CVE-2026-29085, CVE-2026-29086, CVE-2026-29087
+
+### Fixed
+- **5 CodeQL alerts resolved** — 4 polynomial ReDoS fixes (suppression regex, singleton detection, prompt stripping) and 1 incomplete sanitization fix (glob-to-regex escaping); see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.23.4] — 2025-07-26
 
 ### Fixed

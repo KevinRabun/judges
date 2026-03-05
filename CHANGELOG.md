@@ -2,6 +2,21 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.5] — 2026-03-05
+
+### Security
+- **Dependabot: Update hono 4.12.3 → 4.12.5** — Resolves CVE-2026-29045 (arbitrary file access via serveStatic), CVE-2026-29085 (SSE control field injection via CR/LF), CVE-2026-29086 (cookie attribute injection via unsanitized domain/path). Transitive dependency of `@modelcontextprotocol/sdk`.
+- **Dependabot: Update @hono/node-server 1.19.9 → 1.19.11** — Resolves CVE-2026-29087 (authorization bypass for protected static paths via encoded slashes). Transitive dependency of `@modelcontextprotocol/sdk`.
+
+### Fixed
+- **CodeQL: Polynomial ReDoS in suppression/file-ignore regexes** (`src/evaluators/index.ts`) — Replaced `[\w*,\s-]+?` with `[\w*,-]+(?:\s+(?!--)[\w*,-]+)*` to eliminate whitespace overlap with subsequent `\s+` groups, preventing catastrophic backtracking on crafted input.
+- **CodeQL: Polynomial ReDoS in singletonRe** (`src/evaluators/project.ts`) — Replaced `[^=]*` with `[^=\s]+(?:\s+[^=\s]+)*` to prevent overlap between optional type annotation and `\s*=`.
+- **CodeQL: Polynomial ReDoS in prompt stripping** (`src/tools/prompts.ts`) — Replaced regex-based `.replace()` with `split/filter/join` string-based line removal, eliminating ReDoS risk entirely.
+- **CodeQL: Incomplete string escaping in globToRegex** (`src/cli.ts`) — Added `-` to the regex escape character class so literal hyphens in glob patterns are properly escaped.
+
+### Tests
+- All 1726 tests passing (1037 judges + 689 subsystems)
+
 ## [3.23.4] — 2025-07-26
 
 ### Fixed — Self-Review False Positive Reductions (3 root causes, batch 2)
