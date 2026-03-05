@@ -2,6 +2,21 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.7] — 2026-03-05
+
+### Added
+- **`judges review` command** — Post inline review comments on GitHub PRs directly from the CLI. Supports `--pr`, `--repo`, `--approve`, `--dry-run`, `--min-severity`, `--max-comments`, and `--format` flags. Authenticates via `GITHUB_TOKEN` env var or `gh` CLI.
+- **`judges tune` command** — Analyze a project directory and generate an optimal `.judgesrc.json` configuration. Detects frameworks, languages, and file structure to suggest presets, disabled rules, and severity overrides. Supports `--dir`, `--apply`, `--max-files`, and `--verbose` flags.
+- **Finding lifecycle tracking** (`src/finding-lifecycle.ts`) — Track individual findings across evaluation runs with fingerprinting, trend detection (improving/stable/degrading), and stats. Supports in-memory and file-backed (`.judges-findings.json`) stores.
+- **8 framework-aware presets** — `react`, `express`, `fastapi`, `django`, `spring-boot`, `rails`, `nextjs`, `terraform` — each disables irrelevant evaluators for that framework.
+- **~15 new autofix patches** — Python (`eval→ast.literal_eval`, `verify=False→True`, `shell=True→False`, `open` without encoding), Go (`log.Fatal→http.Error`, defer Close error check), Rust (`panic!→Result match`, `.clone()→borrow`), Java (`System.out.println→Logger`, `Statement→PreparedStatement`), C# (`ExecuteSqlRaw→ExecuteSqlInterpolated`, `Console.WriteLine→ILogger`).
+- **10 new clean-code FP benchmark cases** — FastAPI, Go handler, Rust handler, Java Spring, C# ASP.NET, TS utility lib, hardened Terraform, Python data script, Go CLI tool, React component.
+- **Enhanced diff mode** — `judges diff` now loads full file content from disk when the file path exists, improving patch context accuracy.
+
+### Tests
+- 38 new tests added (framework presets, finding lifecycle, new patches, review/tune CLI parsing)
+- All 2051 tests passing (1037 judges + 727 subsystems + 217 negative + 70 extension-logic)
+
 ## [3.23.6] — 2026-03-05
 
 ### Fixed — False Positive Reductions

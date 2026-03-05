@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.7] — 2026-03-05
+
+### Added
+- **`judges review` command** — Post inline review comments on GitHub PRs from the CLI with `--pr`, `--dry-run`, `--approve`, and severity filtering
+- **`judges tune` command** — Analyze a project and generate optimal `.judgesrc.json` configuration with framework detection
+- **8 framework-aware presets** — `react`, `express`, `fastapi`, `django`, `spring-boot`, `rails`, `nextjs`, `terraform`
+- **Finding lifecycle tracking** — Fingerprint-based finding tracking with trend detection across runs
+- **~15 new autofix patches** — Python, Go, Rust, Java, C# language-specific patches; see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.23.6] — 2026-03-05
 
 ### Fixed
