@@ -9190,3 +9190,413 @@ describe("Project Auto-Detection", () => {
     assert.ok(output.includes("security-only"));
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Framework-Aware Presets
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Framework-Aware Presets", () => {
+  it("should load react preset with correct disabled judges", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const react = getPreset("react");
+    assert.ok(react, "react preset should exist");
+    assert.ok(react!.config.disabledJudges!.includes("database"), "react should disable database judge");
+    assert.ok(react!.config.disabledJudges!.includes("iac-security"), "react should disable iac-security judge");
+  });
+
+  it("should load express preset", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const express = getPreset("express");
+    assert.ok(express, "express preset should exist");
+    assert.ok(express!.config.disabledJudges!.includes("accessibility"), "express should disable accessibility judge");
+  });
+
+  it("should load fastapi preset with Python language restriction", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const fastapi = getPreset("fastapi");
+    assert.ok(fastapi, "fastapi preset should exist");
+    assert.ok(fastapi!.config.languages!.includes("python"), "fastapi should restrict to python");
+  });
+
+  it("should load django preset", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const django = getPreset("django");
+    assert.ok(django, "django preset should exist");
+    assert.ok(django!.config.languages!.includes("python"), "django should restrict to python");
+  });
+
+  it("should load spring-boot preset with Java language restriction", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const spring = getPreset("spring-boot");
+    assert.ok(spring, "spring-boot preset should exist");
+    assert.ok(spring!.config.languages!.includes("java"), "spring-boot should restrict to java");
+  });
+
+  it("should load rails preset", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const rails = getPreset("rails");
+    assert.ok(rails, "rails preset should exist");
+    assert.ok(rails!.config.languages!.includes("ruby"), "rails should restrict to ruby");
+  });
+
+  it("should load nextjs preset", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const nextjs = getPreset("nextjs");
+    assert.ok(nextjs, "nextjs preset should exist");
+    assert.ok(nextjs!.config.disabledJudges!.includes("database"), "nextjs should disable database judge");
+  });
+
+  it("should load terraform preset with IaC-focused judges", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const tf = getPreset("terraform");
+    assert.ok(tf, "terraform preset should exist");
+    assert.ok(tf!.config.disabledJudges!.includes("accessibility"), "terraform should disable accessibility");
+    assert.ok(tf!.config.disabledJudges!.includes("ux"), "terraform should disable ux");
+  });
+
+  it("should load kubernetes preset", async () => {
+    const { getPreset } = await import("../src/presets.js");
+    const k8s = getPreset("kubernetes");
+    assert.ok(k8s, "kubernetes preset should exist");
+    assert.ok(k8s!.config.disabledJudges!.includes("accessibility"), "kubernetes should disable accessibility");
+  });
+
+  it("should compose framework preset with security-only", async () => {
+    const { composePresets } = await import("../src/presets.js");
+    const combined = composePresets(["security-only", "react"]);
+    assert.ok(combined, "Should compose security-only+react");
+    assert.ok(combined!.config.disabledJudges, "Should have disabled judges from intersection");
+  });
+
+  it("listPresets should include all framework presets", async () => {
+    const { listPresets } = await import("../src/presets.js");
+    const presets = listPresets();
+    const names = presets.map((p) => p.name);
+    for (const name of [
+      "react",
+      "express",
+      "fastapi",
+      "django",
+      "spring-boot",
+      "rails",
+      "nextjs",
+      "terraform",
+      "kubernetes",
+    ]) {
+      assert.ok(names.includes(name), `listPresets should include ${name}`);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Finding Lifecycle Tracking
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Finding Lifecycle — generateFindingFingerprint", () => {
+  it("should produce deterministic fingerprints for the same input", async () => {
+    const { generateFindingFingerprint } = await import("../src/finding-lifecycle.js");
+    const f = makeFinding({ ruleId: "SEC-001", title: "SQL Injection", lineNumbers: [42] });
+    const fp1 = generateFindingFingerprint(f, "src/app.ts");
+    const fp2 = generateFindingFingerprint(f, "src/app.ts");
+    assert.strictEqual(fp1, fp2, "Same input should produce same fingerprint");
+  });
+
+  it("should produce different fingerprints for different files", async () => {
+    const { generateFindingFingerprint } = await import("../src/finding-lifecycle.js");
+    const f = makeFinding({ ruleId: "SEC-001", title: "SQL Injection", lineNumbers: [10] });
+    assert.notStrictEqual(
+      generateFindingFingerprint(f, "src/a.ts"),
+      generateFindingFingerprint(f, "src/b.ts"),
+      "Different files should produce different fingerprints",
+    );
+  });
+
+  it("should bucket nearby lines into the same fingerprint", async () => {
+    const { generateFindingFingerprint } = await import("../src/finding-lifecycle.js");
+    const f1 = makeFinding({ ruleId: "SEC-001", title: "SQL Injection", lineNumbers: [41] });
+    const f2 = makeFinding({ ruleId: "SEC-001", title: "SQL Injection", lineNumbers: [44] });
+    assert.strictEqual(
+      generateFindingFingerprint(f1, "src/a.ts"),
+      generateFindingFingerprint(f2, "src/a.ts"),
+      "Lines 41 and 44 (same 5-line bucket) should produce same fingerprint",
+    );
+  });
+
+  it("should NOT bucket distant lines into the same fingerprint", async () => {
+    const { generateFindingFingerprint } = await import("../src/finding-lifecycle.js");
+    const f1 = makeFinding({ ruleId: "SEC-001", title: "SQL Injection", lineNumbers: [10] });
+    const f2 = makeFinding({ ruleId: "SEC-001", title: "SQL Injection", lineNumbers: [50] });
+    assert.notStrictEqual(
+      generateFindingFingerprint(f1, "src/a.ts"),
+      generateFindingFingerprint(f2, "src/a.ts"),
+      "Lines 10 and 50 should bucket to different 5-line windows",
+    );
+  });
+});
+
+describe("Finding Lifecycle — updateFindings", () => {
+  it("should mark all findings as introduced on first run", async () => {
+    const { updateFindings } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    const entries = [
+      { finding: makeFinding({ ruleId: "SEC-001", title: "Issue A", lineNumbers: [10] }), filePath: "a.ts" },
+      { finding: makeFinding({ ruleId: "SEC-002", title: "Issue B", lineNumbers: [20] }), filePath: "b.ts" },
+    ];
+    const delta = updateFindings(entries, store);
+    assert.strictEqual(delta.introduced.length, 2, "Should have 2 introduced");
+    assert.strictEqual(delta.recurring.length, 0, "Should have 0 recurring");
+    assert.strictEqual(delta.fixed.length, 0, "Should have 0 fixed");
+    assert.strictEqual(store.runNumber, 1, "Run number should increment");
+  });
+
+  it("should detect recurring findings on second run", async () => {
+    const { updateFindings } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    const entries = [
+      { finding: makeFinding({ ruleId: "SEC-001", title: "Issue A", lineNumbers: [10] }), filePath: "a.ts" },
+    ];
+    updateFindings(entries, store);
+    const delta2 = updateFindings(entries, store);
+    assert.strictEqual(delta2.introduced.length, 0, "No new findings");
+    assert.strictEqual(delta2.recurring.length, 1, "1 recurring");
+    assert.strictEqual(delta2.fixed.length, 0, "None fixed");
+  });
+
+  it("should detect fixed findings when they disappear", async () => {
+    const { updateFindings } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    const entries = [
+      { finding: makeFinding({ ruleId: "SEC-001", title: "Issue A", lineNumbers: [10] }), filePath: "a.ts" },
+    ];
+    updateFindings(entries, store);
+    const delta2 = updateFindings([], store);
+    assert.strictEqual(delta2.introduced.length, 0, "No new findings");
+    assert.strictEqual(delta2.recurring.length, 0, "None recurring");
+    assert.strictEqual(delta2.fixed.length, 1, "1 fixed");
+  });
+
+  it("should compute trend correctly", async () => {
+    const { updateFindings } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    // Run 1: 3 findings
+    const batch1 = [
+      { finding: makeFinding({ ruleId: "SEC-001", title: "A", lineNumbers: [10] }), filePath: "a.ts" },
+      { finding: makeFinding({ ruleId: "SEC-002", title: "B", lineNumbers: [20] }), filePath: "b.ts" },
+      { finding: makeFinding({ ruleId: "SEC-003", title: "C", lineNumbers: [30] }), filePath: "c.ts" },
+    ];
+    updateFindings(batch1, store);
+
+    // Run 2: 1 finding (2 fixed, 1 recurring)
+    const batch2 = [{ finding: makeFinding({ ruleId: "SEC-001", title: "A", lineNumbers: [10] }), filePath: "a.ts" }];
+    const delta = updateFindings(batch2, store);
+    assert.strictEqual(delta.stats.trend, "improving", "Should be improving when more fixed than introduced");
+  });
+});
+
+describe("Finding Lifecycle — getFindingStats", () => {
+  it("should count open and fixed findings", async () => {
+    const { updateFindings, getFindingStats } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    const entries = [
+      { finding: makeFinding({ ruleId: "SEC-001", title: "A", lineNumbers: [10] }), filePath: "a.ts" },
+      { finding: makeFinding({ ruleId: "SEC-002", title: "B", lineNumbers: [20] }), filePath: "b.ts" },
+    ];
+    updateFindings(entries, store);
+    updateFindings(
+      [{ finding: makeFinding({ ruleId: "SEC-001", title: "A", lineNumbers: [10] }), filePath: "a.ts" }],
+      store,
+    );
+
+    const stats = getFindingStats(store);
+    assert.strictEqual(stats.totalOpen, 1, "1 still open");
+    assert.strictEqual(stats.totalFixed, 1, "1 fixed");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// New Language Patches — enrichWithPatches
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("New Language Patches — enrichWithPatches single-line rules", () => {
+  it("should patch Python eval() → ast.literal_eval()", () => {
+    const findings = enrichWithPatches(
+      [makeFinding({ ruleId: "SEC-001", title: "python eval is dangerous", lineNumbers: [1] })],
+      `data = eval(user_input)`,
+    );
+    const patched = findings.filter((f) => f.patch);
+    assert.ok(patched.length >= 1, "Should produce a patch for eval()");
+    const p = patched.find((f) => f.patch!.newText.includes("ast.literal_eval"));
+    assert.ok(p, "Patch should suggest ast.literal_eval");
+  });
+
+  it("should patch Python requests verify=False → verify=True", () => {
+    const findings = enrichWithPatches(
+      [makeFinding({ ruleId: "SEC-002", title: "SSL verification disabled", lineNumbers: [1] })],
+      `resp = requests.get(url, verify=False)`,
+    );
+    const patched = findings.filter((f) => f.patch);
+    assert.ok(patched.length >= 1, "Should produce a patch for verify=False");
+  });
+
+  it("should patch Python subprocess shell=True → shell=False", () => {
+    const findings = enrichWithPatches(
+      [makeFinding({ ruleId: "SEC-003", title: "shell injection command", lineNumbers: [1] })],
+      `subprocess.call(cmd, shell=True)`,
+    );
+    const patched = findings.filter((f) => f.patch);
+    assert.ok(patched.length >= 1, "Should produce a patch for shell=True");
+  });
+
+  it("should patch Rust panic!() → return Err()", () => {
+    const findings = enrichWithPatches(
+      [makeFinding({ ruleId: "SEC-004", title: "panic in library code", lineNumbers: [1] })],
+      `panic!("unexpected state")`,
+    );
+    const patched = findings.filter((f) => f.patch);
+    assert.ok(patched.length >= 1, "Should produce a patch for panic!()");
+  });
+
+  it("should patch Go log.Fatal in handler → http.Error", () => {
+    const findings = enrichWithPatches(
+      [makeFinding({ ruleId: "SEC-005", title: "log.Fatal in HTTP handler", lineNumbers: [1] })],
+      `log.Fatal(err)`,
+    );
+    const patched = findings.filter((f) => f.patch);
+    assert.ok(patched.length >= 1, "Should produce a patch for log.Fatal");
+  });
+
+  it("should patch Java System.out.println → logger.info()", () => {
+    const findings = enrichWithPatches(
+      [makeFinding({ ruleId: "LOG-001", title: "System.out logging in production", lineNumbers: [1] })],
+      `System.out.println("Processing request");`,
+    );
+    const patched = findings.filter((f) => f.patch);
+    assert.ok(patched.length >= 1, "Should produce a patch for System.out.println");
+  });
+
+  it("should patch C# Console.WriteLine → _logger.LogInformation()", () => {
+    const findings = enrichWithPatches(
+      [makeFinding({ ruleId: "LOG-002", title: "Console.WriteLine logging in production", lineNumbers: [1] })],
+      `Console.WriteLine("Starting service");`,
+    );
+    const patched = findings.filter((f) => f.patch);
+    assert.ok(patched.length >= 1, "Should produce a patch for Console.WriteLine");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Review Command — parseReviewArgs & parsePatchToHunk
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Review Command — parseReviewArgs", () => {
+  it("should parse --pr and --repo flags", async () => {
+    const { parseReviewArgs } = await import("../src/commands/review.js");
+    const args = parseReviewArgs(["node", "judges", "review", "--pr", "42", "--repo", "octo/repo"]);
+    assert.strictEqual(args.pr, 42, "Should parse PR number");
+    assert.strictEqual(args.repo, "octo/repo", "Should parse repo");
+  });
+
+  it("should parse short flags -p -r -n", async () => {
+    const { parseReviewArgs } = await import("../src/commands/review.js");
+    const args = parseReviewArgs(["node", "judges", "review", "-p", "7", "-r", "own/rep", "-n"]);
+    assert.strictEqual(args.pr, 7, "Should parse -p as PR number");
+    assert.strictEqual(args.repo, "own/rep", "Should parse -r as repo");
+    assert.strictEqual(args.dryRun, true, "Should parse -n as dry-run");
+  });
+
+  it("should set defaults correctly", async () => {
+    const { parseReviewArgs } = await import("../src/commands/review.js");
+    const args = parseReviewArgs(["node", "judges", "review", "--pr", "1"]);
+    assert.strictEqual(args.approve, false, "approve default false");
+    assert.strictEqual(args.dryRun, false, "dryRun default false");
+    assert.strictEqual(args.minSeverity, "medium", "default minSeverity medium");
+    assert.strictEqual(args.maxComments, 25, "default maxComments 25");
+    assert.strictEqual(args.format, "text", "default format text");
+  });
+
+  it("should parse --approve and --min-severity", async () => {
+    const { parseReviewArgs } = await import("../src/commands/review.js");
+    const args = parseReviewArgs(["node", "judges", "review", "--pr", "5", "--approve", "--min-severity", "error"]);
+    assert.strictEqual(args.approve, true, "Should set approve");
+    assert.strictEqual(args.minSeverity, "error", "Should set minSeverity");
+  });
+});
+
+describe("Review Command — parsePatchToHunk", () => {
+  it("should parse a GitHub patch into a DiffHunk", async () => {
+    const { parsePatchToHunk } = await import("../src/commands/review.js");
+    const patch = `@@ -10,6 +10,8 @@ function hello() {
+ const a = 1;
+ const b = 2;
++const c = 3;
++const d = 4;
+ const e = 5;
+ const f = 6;`;
+    const hunk = parsePatchToHunk("test.ts", patch);
+    assert.ok(hunk, "Should produce a DiffHunk");
+    assert.ok(hunk.changedLines.length >= 2, "Should detect at least 2 changed lines");
+    assert.ok(hunk.newContent.includes("const c = 3"), "Should include added line content");
+  });
+
+  it("should handle empty patch gracefully", async () => {
+    const { parsePatchToHunk } = await import("../src/commands/review.js");
+    const hunk = parsePatchToHunk("test.ts", "");
+    assert.ok(hunk, "Should return a DiffHunk object");
+    assert.strictEqual(hunk.changedLines.length, 0, "Empty patch produces no changed lines");
+  });
+});
+
+describe("Review Command — findingToCommentBody", () => {
+  it("should format finding as markdown with severity emoji", async () => {
+    const { findingToCommentBody } = await import("../src/commands/review.js");
+    const body = findingToCommentBody(
+      makeFinding({
+        ruleId: "SEC-001",
+        severity: "high",
+        title: "SQL Injection",
+        description: "Unsanitized input in query",
+        recommendation: "Use parameterized queries",
+      }),
+    );
+    assert.ok(body.includes("SEC-001"), "Should include rule ID");
+    assert.ok(body.includes("SQL Injection"), "Should include title");
+    assert.ok(body.includes("parameterized"), "Should include recommendation");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tune Command — parseTuneArgs
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Tune Command — parseTuneArgs", () => {
+  it("should parse --dir and --apply flags", async () => {
+    const { parseTuneArgs } = await import("../src/commands/tune.js");
+    const path = await import("path");
+    const args = parseTuneArgs(["node", "judges", "tune", "--dir", "/tmp/project", "--apply"]);
+    assert.strictEqual(args.dir, path.resolve("/tmp/project"), "Should parse dir (resolved)");
+    assert.strictEqual(args.apply, true, "Should parse apply");
+  });
+
+  it("should parse short flags -d -v", async () => {
+    const { parseTuneArgs } = await import("../src/commands/tune.js");
+    const path = await import("path");
+    const args = parseTuneArgs(["node", "judges", "tune", "-d", "./src", "-v"]);
+    assert.strictEqual(args.dir, path.resolve("./src"), "Should parse -d as dir (resolved)");
+    assert.strictEqual(args.verbose, true, "Should parse -v as verbose");
+  });
+
+  it("should set defaults correctly", async () => {
+    const { parseTuneArgs } = await import("../src/commands/tune.js");
+    const args = parseTuneArgs(["node", "judges", "tune"]);
+    assert.strictEqual(args.dir, process.cwd(), "default dir should be cwd");
+    assert.strictEqual(args.apply, false, "default apply should be false");
+    assert.strictEqual(args.maxFiles, 15, "default maxFiles should be 15");
+    assert.strictEqual(args.verbose, false, "default verbose should be false");
+  });
+
+  it("should parse --max-files", async () => {
+    const { parseTuneArgs } = await import("../src/commands/tune.js");
+    const args = parseTuneArgs(["node", "judges", "tune", "--max-files", "50"]);
+    assert.strictEqual(args.maxFiles, 50, "Should parse max-files");
+  });
+});

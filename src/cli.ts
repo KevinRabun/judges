@@ -259,6 +259,8 @@ USAGE:
   judges pack                         Manage language-specific rule packs
   judges config                       Export/import shared team configs
   judges compare                      Compare judges vs other tools
+  judges review                       Post inline review comments on a GitHub PR
+  judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
   judges --help                       Show this help
@@ -272,8 +274,10 @@ EVAL OPTIONS:
   --baseline, -b <path>      Suppress findings already in baseline file
   --summary                  Show one-line summary instead of full output
   --config, -c <path>        Path to .judgesrc config file
-  --preset, -p <name>        Use a named preset (strict, lenient, security-only, startup, compliance, performance)
-                             Compose presets with commas: --preset security-only,performance
+  --preset, -p <name>        Use a named preset (strict, lenient, security-only, startup, compliance,
+                             performance, react, express, fastapi, django, spring-boot, rails, nextjs,
+                             terraform, kubernetes)
+                             Compose presets with commas: --preset security-only,react
   --min-score <n>            Fail if score drops below threshold (0-100)
   --exclude, -x <glob>       Exclude files matching glob pattern (repeatable)
   --include, -i <glob>       Only include files matching glob pattern (repeatable)
@@ -312,6 +316,21 @@ COMPLETIONS:
   judges completions fish        Fish completions
   judges completions powershell  PowerShell completions
 
+REVIEW OPTIONS:
+  --pr, -p <number>          PR number to review (required)
+  --repo, -r <owner/repo>    Repository (default: current repo from git remote)
+  --approve                  Approve PR if no findings
+  --dry-run, -n              Print comments without posting
+  --min-severity <level>     Minimum severity: info, warning, error (default: warning)
+  --max-comments <n>         Maximum review comments (default: 25)
+  --format, -o <fmt>         Output: text, json, sarif, markdown
+
+TUNE OPTIONS:
+  --dir, -d <path>           Project directory to analyze (default: .)
+  --apply                    Write recommended .judgesrc.json
+  --max-files <n>            Max files to sample (default: 200)
+  --verbose, -v              Show detailed analysis
+
 STDIN:
   cat file.ts | judges eval --language typescript
   git diff | judges diff --language typescript
@@ -339,6 +358,10 @@ EXAMPLES:
   judges ci-templates github
   judges docs --output docs/rules/
   judges completions bash >> ~/.bashrc
+  judges review --pr 42 --dry-run
+  judges review --pr 42 --repo owner/repo --approve
+  judges tune
+  judges tune --dir ./my-project --apply
   judges list
 
 SUPPORTED LANGUAGES:
@@ -753,6 +776,20 @@ export async function runCli(argv: string[]): Promise<void> {
   // ─── Config Command ───────────────────────────────────────────────────
   if (args.command === "config") {
     runConfig(argv);
+    return;
+  }
+
+  // ─── Review Command ────────────────────────────────────────────────
+  if (args.command === "review") {
+    const { runReview } = await import("./commands/review.js");
+    await runReview(argv);
+    return;
+  }
+
+  // ─── Tune Command ─────────────────────────────────────────────────
+  if (args.command === "tune") {
+    const { runTune } = await import("./commands/tune.js");
+    await runTune(argv);
     return;
   }
 

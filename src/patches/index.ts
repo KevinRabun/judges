@@ -686,6 +686,128 @@ const PATCH_RULES: Array<{
       return { oldText: m[0], newText: `${m[1]}// SAFETY: TODO: document why unsafe is needed\n${m[1]}unsafe {` };
     },
   },
+  // Rust: panic!() in library → return Result comment
+  {
+    match: /panic.*library|panic.*production|avoid.*panic/i,
+    generate: (line) => {
+      const m = line.match(/panic!\s*\(\s*(["'][^"']*["'])\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `return Err(anyhow::anyhow!(${m[1]})) /* TODO: replace panic with Result */` };
+    },
+  },
+  // Rust: .clone() hint → borrow comment
+  {
+    match: /unnecessary.*clone|avoid.*clone|excessive.*clone/i,
+    generate: (line) => {
+      const m = line.match(/(\w+)\.clone\(\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}.clone() /* TODO: consider borrowing &${m[1]} instead */` };
+    },
+  },
+
+  // ── Additional Python Patches ──
+
+  // Python: eval() → ast.literal_eval()
+  {
+    match: /dangerous.*eval|python.*eval|eval.*usage/i,
+    generate: (line) => {
+      const m = line.match(/\beval\s*\(\s*(\w+)\s*\)/);
+      if (!m) return null;
+      // Only match if it looks like Python (no 'new Function' around it)
+      if (line.includes("new Function") || line.includes("Function(")) return null;
+      return { oldText: m[0], newText: `ast.literal_eval(${m[1]})` };
+    },
+  },
+  // Python: requests without verify → verify=True
+  {
+    match: /ssl.*verif.*disabled|tls.*verif.*disabled|certificate.*verif/i,
+    generate: (line) => {
+      const m = line.match(/(requests\.(?:get|post|put|delete|patch)\s*\([^)]*?)verify\s*=\s*False/);
+      if (!m) return null;
+      return { oldText: "verify=False", newText: "verify=True" };
+    },
+  },
+  // Python: subprocess with shell=True → shell=False
+  {
+    match: /shell.*true|subprocess.*shell|shell.*inject/i,
+    generate: (line) => {
+      const m = line.match(/(subprocess\.(?:run|call|check_call|check_output|Popen)\s*\([^)]*?)shell\s*=\s*True/);
+      if (!m) return null;
+      return { oldText: "shell=True", newText: "shell=False" };
+    },
+  },
+  // Python: open() without encoding → add encoding
+  {
+    match: /missing.*encoding|file.*encoding|open.*without.*encoding/i,
+    generate: (line) => {
+      const m = line.match(/(open\s*\(\s*\w+\s*,\s*["'][rw](?:t)?["'])\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}, encoding="utf-8")` };
+    },
+  },
+
+  // ── Additional Go Patches ──
+
+  // Go: log.Fatal in HTTP handler → http.Error
+  {
+    match: /log\.fatal.*handler|fatal.*http.*handler|log.*fatal.*request/i,
+    generate: (line) => {
+      const m = line.match(/log\.Fatal(?:f|ln)?\s*\(([^)]*)\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `http.Error(w, ${m[1]}, http.StatusInternalServerError)` };
+    },
+  },
+  // Go: defer file.Close() without error check → named return
+  {
+    match: /defer.*close.*error|close.*without.*check|resource.*leak/i,
+    generate: (line) => {
+      const m = line.match(/(defer\s+\w+\.Close)\s*\(\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}() // TODO: check Close() error in named return` };
+    },
+  },
+
+  // ── Additional Java Patches ──
+
+  // Java: System.out.println → Logger
+  {
+    match: /system\.out|console.*output|print.*instead.*log/i,
+    generate: (line) => {
+      const m = line.match(/System\.out\.println\s*\(([^)]*)\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `logger.info(${m[1]})` };
+    },
+  },
+  // Java: String concatenation in SQL → PreparedStatement marker
+  {
+    match: /sql.*concatenat|string.*concat.*sql|sql.*inject/i,
+    generate: (line) => {
+      const m = line.match(/(Statement\s*\w+\s*=\s*\w+\.createStatement)\s*\(\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `/* TODO: use PreparedStatement instead */ ${m[0]}` };
+    },
+  },
+
+  // ── Additional C# Patches ──
+
+  // C#: string.Format/interpolation in SQL → parameterized
+  {
+    match: /sql.*inject|string.*interpol.*sql|sql.*concat/i,
+    generate: (line) => {
+      const m = line.match(/ExecuteSqlRaw\s*\(\s*\$/);
+      if (!m) return null;
+      return { oldText: "ExecuteSqlRaw($", newText: "ExecuteSqlInterpolated($" };
+    },
+  },
+  // C#: Console.WriteLine → ILogger
+  {
+    match: /console.*writeline.*log|console.*instead.*logger/i,
+    generate: (line) => {
+      const m = line.match(/Console\.WriteLine\s*\(([^)]*)\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `_logger.LogInformation(${m[1]})` };
+    },
+  },
 
   // ── Hardcoded Secrets ──
   // Hardcoded password/secret → environment variable

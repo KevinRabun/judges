@@ -1761,6 +1761,573 @@ app.post("/api/v1/login", async (req, res) => {
     category: "clean",
     difficulty: "hard",
   },
+
+  // ── FP Benchmark Corpus — Multi-Language Clean Code ──────────────────────
+  // These cases are well-written code that should NOT trigger findings.
+  // They measure the false positive rate across languages.
+  // ────────────────────────────────────────────────────────────────────────────
+
+  // ── Clean Python: FastAPI with Pydantic validation ──
+  {
+    id: "clean-python-fastapi",
+    description: "Well-structured FastAPI endpoint with Pydantic validation, auth, and error handling",
+    language: "python",
+    code: `from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from pydantic import BaseModel, EmailStr, Field
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+import logging
+import secrets
+
+app = FastAPI()
+limiter = Limiter(key_func=get_remote_address)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+logger = logging.getLogger(__name__)
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=12, max_length=128)
+    name: str = Field(min_length=1, max_length=200)
+
+@app.post("/api/v1/users", status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
+async def create_user(user: UserCreate, token: str = Depends(oauth2_scheme)):
+    current_user = await verify_token(token)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    hashed = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt())
+    new_user = await db.users.create(email=user.email, password_hash=hashed, name=user.name)
+    logger.info("User created: %s by admin %s", new_user.id, current_user.id)
+    return {"id": new_user.id, "email": new_user.email}`,
+    expectedRuleIds: [],
+    unexpectedRuleIds: ["CYBER-001", "CYBER-002", "AUTH-001", "SEC-001", "RATE-001", "DATA-001"],
+    category: "clean",
+    difficulty: "hard",
+  },
+
+  // ── Clean Go: HTTP handler with proper error handling ──
+  {
+    id: "clean-go-handler",
+    description: "Well-structured Go HTTP handler with parameterized queries, auth, and logging",
+    language: "go",
+    code: `package handlers
+
+import (
+    "encoding/json"
+    "log/slog"
+    "net/http"
+    "github.com/go-chi/chi/v5"
+    "github.com/jmoiron/sqlx"
+)
+
+type UserHandler struct {
+    db     *sqlx.DB
+    logger *slog.Logger
+}
+
+type CreateUserRequest struct {
+    Email string \`json:"email" validate:"required,email"\`
+    Name  string \`json:"name" validate:"required,min=1,max=200"\`
+}
+
+func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+    userID := chi.URLParam(r, "id")
+    if userID == "" {
+        http.Error(w, "missing user id", http.StatusBadRequest)
+        return
+    }
+    var user User
+    err := h.db.QueryRowContext(r.Context(), "SELECT id, email, name FROM users WHERE id = $1", userID).Scan(&user.ID, &user.Email, &user.Name)
+    if err != nil {
+        h.logger.Error("failed to fetch user", "error", err, "user_id", userID)
+        http.Error(w, "user not found", http.StatusNotFound)
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(user)
+}`,
+    expectedRuleIds: [],
+    unexpectedRuleIds: ["CYBER-001", "CYBER-002", "SEC-001", "ERR-001"],
+    category: "clean",
+    difficulty: "hard",
+  },
+
+  // ── Clean Rust: Safe web handler ──
+  {
+    id: "clean-rust-handler",
+    description: "Well-structured Rust Actix-web handler with validation and error types",
+    language: "rust",
+    code: `use actix_web::{web, HttpResponse, Result};
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
+use validator::Validate;
+use tracing::{info, error};
+
+#[derive(Deserialize, Validate)]
+pub struct CreateItemRequest {
+    #[validate(length(min = 1, max = 200))]
+    pub name: String,
+    #[validate(range(min = 0.01, max = 999999.99))]
+    pub price: f64,
+}
+
+#[derive(Serialize)]
+pub struct ItemResponse {
+    pub id: i64,
+    pub name: String,
+    pub price: f64,
+}
+
+pub async fn create_item(
+    pool: web::Data<PgPool>,
+    body: web::Json<CreateItemRequest>,
+) -> Result<HttpResponse> {
+    body.validate().map_err(|e| {
+        actix_web::error::ErrorBadRequest(format!("Validation error: {}", e))
+    })?;
+    let row = sqlx::query_as!(
+        ItemResponse,
+        "INSERT INTO items (name, price) VALUES ($1, $2) RETURNING id, name, price",
+        body.name,
+        body.price,
+    )
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| {
+        error!("DB insert failed: {}", e);
+        actix_web::error::ErrorInternalServerError("Failed to create item")
+    })?;
+    info!(item_id = row.id, "Item created");
+    Ok(HttpResponse::Created().json(row))
+}`,
+    expectedRuleIds: [],
+    unexpectedRuleIds: ["CYBER-001", "CYBER-002", "SEC-001", "ERR-001"],
+    category: "clean",
+    difficulty: "hard",
+  },
+
+  // ── Clean Java: Spring Boot controller with validation ──
+  {
+    id: "clean-java-spring",
+    description: "Well-structured Spring Boot REST controller with validation and auth",
+    language: "java",
+    code: `import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import javax.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@RestController
+@RequestMapping("/api/v1/products")
+public class ProductController {
+    private static final Logger log = LoggerFactory.getLogger(ProductController.class);
+    private final ProductService productService;
+
+    public ProductController(ProductService productService) {
+        this.productService = productService;
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ProductDTO> getProduct(@PathVariable Long id) {
+        return productService.findById(id)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ProductDTO> createProduct(@Valid @RequestBody CreateProductRequest request) {
+        log.info("Creating product: {}", request.getName());
+        ProductDTO created = productService.create(request);
+        return ResponseEntity.status(201).body(created);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
+        log.info("Deleting product: {}", id);
+        productService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+}`,
+    expectedRuleIds: [],
+    unexpectedRuleIds: ["CYBER-001", "CYBER-002", "AUTH-001", "SEC-001"],
+    category: "clean",
+    difficulty: "hard",
+  },
+
+  // ── Clean C#: ASP.NET Core controller ──
+  {
+    id: "clean-csharp-aspnet",
+    description: "Well-structured ASP.NET Core controller with EF Core parameterized queries",
+    language: "csharp",
+    code: `using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using FluentValidation;
+
+[ApiController]
+[Route("api/v1/[controller]")]
+[Authorize]
+public class OrdersController : ControllerBase
+{
+    private readonly AppDbContext _db;
+    private readonly ILogger<OrdersController> _logger;
+    private readonly IValidator<CreateOrderRequest> _validator;
+
+    public OrdersController(AppDbContext db, ILogger<OrdersController> logger, IValidator<CreateOrderRequest> validator)
+    {
+        _db = db;
+        _logger = logger;
+        _validator = validator;
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetOrder(int id)
+    {
+        var order = await _db.Orders
+            .Where(o => o.Id == id && o.UserId == User.GetUserId())
+            .FirstOrDefaultAsync();
+        if (order == null) return NotFound();
+        return Ok(order);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateOrder([FromBody] CreateOrderRequest request)
+    {
+        var validation = await _validator.ValidateAsync(request);
+        if (!validation.IsValid) return BadRequest(validation.Errors);
+        var order = new Order { UserId = User.GetUserId(), Total = request.Total, Items = request.Items };
+        _db.Orders.Add(order);
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Order {OrderId} created by user {UserId}", order.Id, User.GetUserId());
+        return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, order);
+    }
+}`,
+    expectedRuleIds: [],
+    unexpectedRuleIds: ["CYBER-001", "CYBER-002", "AUTH-001", "SEC-001", "DATA-001"],
+    category: "clean",
+    difficulty: "hard",
+  },
+
+  // ── Clean TypeScript: Pure utility library (no server) ──
+  {
+    id: "clean-ts-utility-lib",
+    description: "Pure TypeScript utility library — no server code, should have zero security findings",
+    language: "typescript",
+    code: `/**
+ * A type-safe result type for error handling without exceptions.
+ */
+export type Result<T, E = Error> = { ok: true; value: T } | { ok: false; error: E };
+
+export function ok<T>(value: T): Result<T, never> {
+  return { ok: true, value };
+}
+
+export function err<E>(error: E): Result<never, E> {
+  return { ok: false, error };
+}
+
+export function map<T, U, E>(result: Result<T, E>, fn: (value: T) => U): Result<U, E> {
+  return result.ok ? ok(fn(result.value)) : result;
+}
+
+export function flatMap<T, U, E>(result: Result<T, E>, fn: (value: T) => Result<U, E>): Result<U, E> {
+  return result.ok ? fn(result.value) : result;
+}
+
+export function unwrapOr<T, E>(result: Result<T, E>, defaultValue: T): T {
+  return result.ok ? result.value : defaultValue;
+}
+
+/** Retry an async operation with exponential backoff. */
+export async function retry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 100): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      await new Promise((r) => setTimeout(r, baseDelay * Math.pow(2, attempt)));
+    }
+  }
+  throw new Error("Unreachable");
+}`,
+    expectedRuleIds: [],
+    unexpectedRuleIds: ["CYBER-001", "CYBER-002", "SEC-001", "AUTH-001", "RATE-001", "ERR-001"],
+    category: "clean",
+    difficulty: "hard",
+  },
+
+  // ── Clean Terraform: Hardened AWS infrastructure ──
+  {
+    id: "clean-terraform-hardened",
+    description: "Terraform with encryption, private access, and proper security groups",
+    language: "hcl",
+    code: `resource "aws_s3_bucket" "data" {
+  bucket = "myapp-data-prod"
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "data" {
+  bucket = aws_s3_bucket.data.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "aws:kms"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "data" {
+  bucket                  = aws_s3_bucket.data.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_db_instance" "main" {
+  engine               = "postgres"
+  instance_class       = "db.r6g.large"
+  publicly_accessible  = false
+  storage_encrypted    = true
+  multi_az             = true
+  deletion_protection  = true
+  backup_retention_period = 7
+}
+
+resource "aws_security_group" "web" {
+  name   = "web-sg"
+  vpc_id = var.vpc_id
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.allowed_cidr]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}`,
+    expectedRuleIds: [],
+    unexpectedRuleIds: ["IAC-001", "SEC-001", "CYBER-001", "DATA-001"],
+    category: "clean",
+    difficulty: "hard",
+  },
+
+  // ── Clean Python: Data processing script (not a server) ──
+  {
+    id: "clean-python-data-script",
+    description: "Python data processing script — no web endpoints, should not flag server concerns",
+    language: "python",
+    code: `"""Data pipeline for aggregating daily sales metrics."""
+import csv
+import logging
+from pathlib import Path
+from dataclasses import dataclass
+from typing import Iterator
+
+logger = logging.getLogger(__name__)
+
+@dataclass
+class SalesRecord:
+    date: str
+    product_id: str
+    quantity: int
+    unit_price: float
+
+    @property
+    def total(self) -> float:
+        return self.quantity * self.unit_price
+
+def read_records(path: Path) -> Iterator[SalesRecord]:
+    with path.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                yield SalesRecord(
+                    date=row["date"],
+                    product_id=row["product_id"],
+                    quantity=int(row["quantity"]),
+                    unit_price=float(row["unit_price"]),
+                )
+            except (KeyError, ValueError) as e:
+                logger.warning("Skipping invalid row: %s (%s)", row, e)
+
+def aggregate_by_date(records: Iterator[SalesRecord]) -> dict[str, float]:
+    totals: dict[str, float] = {}
+    for record in records:
+        totals[record.date] = totals.get(record.date, 0.0) + record.total
+    return totals
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    path = Path("data/sales.csv")
+    if not path.exists():
+        logger.error("File not found: %s", path)
+        raise SystemExit(1)
+    results = aggregate_by_date(read_records(path))
+    for date, total in sorted(results.items()):
+        logger.info("Date: %s, Total: $%.2f", date, total)`,
+    expectedRuleIds: [],
+    unexpectedRuleIds: ["CYBER-001", "CYBER-002", "SEC-001", "AUTH-001", "RATE-001"],
+    category: "clean",
+    difficulty: "hard",
+  },
+
+  // ── Clean Go: CLI tool (not a server) ──
+  {
+    id: "clean-go-cli-tool",
+    description: "Go CLI tool — should not flag server-side security concerns",
+    language: "go",
+    code: `package main
+
+import (
+    "encoding/json"
+    "flag"
+    "fmt"
+    "log"
+    "os"
+    "path/filepath"
+    "sort"
+)
+
+type Config struct {
+    InputDir  string \`json:"input_dir"\`
+    OutputDir string \`json:"output_dir"\`
+    Verbose   bool   \`json:"verbose"\`
+}
+
+func loadConfig(path string) (*Config, error) {
+    data, err := os.ReadFile(path)
+    if err != nil {
+        return nil, fmt.Errorf("read config: %w", err)
+    }
+    var cfg Config
+    if err := json.Unmarshal(data, &cfg); err != nil {
+        return nil, fmt.Errorf("parse config: %w", err)
+    }
+    return &cfg, nil
+}
+
+func processFiles(cfg *Config) error {
+    entries, err := os.ReadDir(cfg.InputDir)
+    if err != nil {
+        return fmt.Errorf("read dir: %w", err)
+    }
+    sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+    for _, entry := range entries {
+        if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+            continue
+        }
+        src := filepath.Join(cfg.InputDir, entry.Name())
+        dst := filepath.Join(cfg.OutputDir, entry.Name())
+        if cfg.Verbose {
+            log.Printf("Processing: %s -> %s", src, dst)
+        }
+        data, err := os.ReadFile(src)
+        if err != nil {
+            log.Printf("Warning: skip %s: %v", src, err)
+            continue
+        }
+        if err := os.WriteFile(dst, data, 0644); err != nil {
+            return fmt.Errorf("write %s: %w", dst, err)
+        }
+    }
+    return nil
+}
+
+func main() {
+    configPath := flag.String("config", "config.json", "path to config file")
+    flag.Parse()
+    cfg, err := loadConfig(*configPath)
+    if err != nil {
+        log.Fatal(err)
+    }
+    if err := processFiles(cfg); err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println("Done.")
+}`,
+    expectedRuleIds: [],
+    unexpectedRuleIds: ["CYBER-001", "CYBER-002", "SEC-001", "AUTH-001", "RATE-001", "ERR-001"],
+    category: "clean",
+    difficulty: "hard",
+  },
+
+  // ── Clean TypeScript: React component (not a server) ──
+  {
+    id: "clean-ts-react-component",
+    description: "React component with hooks — should not trigger server-side security findings",
+    language: "typescript",
+    code: `import React, { useState, useCallback, useMemo } from "react";
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface UserListProps {
+  users: User[];
+  onSelect: (user: User) => void;
+  searchLabel?: string;
+}
+
+export function UserList({ users, onSelect, searchLabel = "Search users" }: UserListProps): React.JSX.Element {
+  const [filter, setFilter] = useState("");
+
+  const handleFilterChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setFilter(event.target.value);
+    },
+    [],
+  );
+
+  const filteredUsers = useMemo(() => {
+    const lower = filter.toLowerCase();
+    return users.filter(
+      (u) => u.name.toLowerCase().includes(lower) || u.email.toLowerCase().includes(lower),
+    );
+  }, [users, filter]);
+
+  return (
+    <div role="search" aria-label={searchLabel}>
+      <label htmlFor="user-search">{searchLabel}</label>
+      <input
+        id="user-search"
+        type="text"
+        value={filter}
+        onChange={handleFilterChange}
+        placeholder="Type to filter..."
+        aria-describedby="user-count"
+      />
+      <p id="user-count" aria-live="polite">
+        {filteredUsers.length} users found
+      </p>
+      <ul role="list">
+        {filteredUsers.map((user) => (
+          <li key={user.id}>
+            <button onClick={() => onSelect(user)} aria-label={\`Select \${user.name}\`}>
+              {user.name} ({user.email})
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}`,
+    expectedRuleIds: [],
+    unexpectedRuleIds: ["CYBER-001", "CYBER-002", "SEC-001", "AUTH-001", "A11Y-001"],
+    category: "clean",
+    difficulty: "hard",
+  },
 ];
 
 // ─── Benchmark Runner ───────────────────────────────────────────────────────

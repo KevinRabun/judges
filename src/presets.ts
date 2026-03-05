@@ -110,6 +110,119 @@ export const PRESETS: Record<string, Preset> = {
       minSeverity: "low" as Severity,
     },
   },
+
+  // ── Framework-Aware Presets ────────────────────────────────────────────────
+
+  react: {
+    name: "React",
+    description: "Tuned for React/Next.js apps — enables accessibility, XSS protection, disables backend-only judges.",
+    config: {
+      disabledJudges: ["database", "iac-security", "cloud-readiness", "data-sovereignty", "compliance"],
+      disabledRules: [
+        "CONSOLE_LOG_PRODUCTION", // console usage in dev is normal
+      ],
+      minSeverity: "low" as Severity,
+    },
+  },
+
+  express: {
+    name: "Express",
+    description: "Tuned for Express.js APIs — emphasizes middleware security, authentication, CORS, and rate limiting.",
+    config: {
+      disabledJudges: ["accessibility", "ux", "internationalization", "portability"],
+      minSeverity: "low" as Severity,
+    },
+  },
+
+  fastapi: {
+    name: "FastAPI",
+    description: "Tuned for Python FastAPI — focuses on input validation, async patterns, and API security.",
+    config: {
+      languages: ["python"],
+      disabledJudges: ["accessibility", "ux", "internationalization", "portability"],
+      minSeverity: "low" as Severity,
+    },
+  },
+
+  django: {
+    name: "Django",
+    description: "Tuned for Django apps — emphasizes template security, ORM misuse, CSRF, admin security.",
+    config: {
+      languages: ["python"],
+      disabledJudges: ["portability"],
+      minSeverity: "low" as Severity,
+    },
+  },
+
+  "spring-boot": {
+    name: "Spring Boot",
+    description: "Tuned for Java Spring Boot — emphasizes injection, configuration, actuator security.",
+    config: {
+      languages: ["java"],
+      disabledJudges: ["accessibility", "ux", "internationalization", "portability"],
+      minSeverity: "low" as Severity,
+    },
+  },
+
+  rails: {
+    name: "Rails",
+    description: "Tuned for Ruby on Rails — emphasizes mass assignment, CSRF, SQL injection, strong params.",
+    config: {
+      languages: ["ruby"],
+      disabledJudges: ["portability"],
+      minSeverity: "low" as Severity,
+    },
+  },
+
+  nextjs: {
+    name: "Next.js",
+    description: "Tuned for Next.js — covers both server and client security, API routes, SSR/ISR patterns.",
+    config: {
+      disabledJudges: ["database", "iac-security", "data-sovereignty", "compliance"],
+      minSeverity: "low" as Severity,
+    },
+  },
+
+  terraform: {
+    name: "Terraform",
+    description: "Tuned for Terraform/OpenTofu IaC — focuses on infrastructure security, cloud-readiness, compliance.",
+    config: {
+      languages: ["terraform", "hcl"],
+      disabledJudges: [
+        "accessibility",
+        "ux",
+        "internationalization",
+        "caching",
+        "code-structure",
+        "backwards-compatibility",
+        "documentation",
+        "concurrency",
+        "agent-instructions",
+      ],
+      minSeverity: "low" as Severity,
+    },
+  },
+
+  kubernetes: {
+    name: "Kubernetes",
+    description: "Tuned for Kubernetes manifests — security contexts, RBAC, resource limits, network policies.",
+    config: {
+      languages: ["yaml"],
+      disabledJudges: [
+        "accessibility",
+        "ux",
+        "internationalization",
+        "caching",
+        "code-structure",
+        "backwards-compatibility",
+        "documentation",
+        "concurrency",
+        "agent-instructions",
+        "scalability",
+      ],
+      minSeverity: "low" as Severity,
+    },
+  },
 };
 
 /**

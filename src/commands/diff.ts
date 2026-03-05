@@ -208,7 +208,24 @@ export function runDiff(argv: string[]): void {
     if (hunk.changedLines.length === 0) continue;
 
     const lang = args.language || detectLanguage(hunk.filePath) || "typescript";
-    const verdict = evaluateDiff(hunk.newContent, lang, hunk.changedLines);
+
+    // Enhanced: load full file from disk when available for richer context.
+    // The evaluator still scopes findings to only the changed lines.
+    let codeToEvaluate = hunk.newContent;
+    const changedLines = hunk.changedLines;
+    const absPath = resolve(hunk.filePath);
+    if (existsSync(absPath)) {
+      try {
+        codeToEvaluate = readFileSync(absPath, "utf-8");
+        // changedLines remain the same — they reference the new-side line numbers
+        // which correspond to the on-disk file (post-patch)
+      } catch {
+        // Fall back to reconstructed content from the diff
+        codeToEvaluate = hunk.newContent;
+      }
+    }
+
+    const verdict = evaluateDiff(codeToEvaluate, lang, changedLines);
     totalFindings += verdict.findings.length;
     if (verdict.score < worstScore) worstScore = verdict.score;
     allResults.push({ file: hunk.filePath, verdict });
