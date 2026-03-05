@@ -3,6 +3,7 @@ import {
   getLineNumbers,
   getLangLineNumbers,
   getLangFamily,
+  isIaCTemplate,
   looksLikeRealCredentialValue,
   testCode,
   getContextWindow,
@@ -62,6 +63,13 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   // Analysis code references PII/secret/credential keywords in regex patterns
   // for detection purposes — these are not real sensitive data.
   if (isLikelyAnalysisCode(code)) return findings;
+
+  // IaC templates (Bicep/Terraform/ARM) use property names like `token`,
+  // `secret`, and `key` for configuration settings (e.g., `useCustomToken:
+  // 'false'`).  The iac-security evaluator handles actual IaC secret detection
+  // with patterns tuned for infrastructure definitions — skip here to avoid
+  // duplicate / false-positive findings.
+  if (isIaCTemplate(code)) return findings;
 
   // Hardcoded secrets (multi-language)
   const secretPatterns = [

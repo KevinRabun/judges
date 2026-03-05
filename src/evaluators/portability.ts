@@ -1,11 +1,18 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangFamily, testCode, getContextWindow } from "./shared.js";
+import { getLineNumbers, getLangFamily, isIaCTemplate, testCode, getContextWindow } from "./shared.js";
 
 export function analyzePortability(code: string, language: string): Finding[] {
   const findings: Finding[] = [];
   let ruleNum = 1;
   const prefix = "PORTA";
   const _lang = getLangFamily(language);
+
+  // IaC templates (Bicep/Terraform/ARM) are inherently platform- and
+  // vendor-specific by design.  Filesystem paths in IaC refer to the target
+  // machine (e.g. VM SSH keys at /home/user/.ssh/), not the developer's
+  // workstation, and vendor SDK references (Azure.*, @aws-sdk) are the resource
+  // type identifiers — abstraction layers are architecturally inappropriate.
+  if (isIaCTemplate(code)) return findings;
 
   // Hardcoded Windows/Unix file paths
   const windowsPathPattern = /['"` ](?:[A-Z]:\\|\\\\[a-zA-Z])/g;

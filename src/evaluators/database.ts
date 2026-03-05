@@ -4,6 +4,7 @@ import {
   getLangLineNumbers,
   getLangFamily,
   isCommentLine,
+  isIaCTemplate,
   isLikelyAnalysisCode,
   testCode,
 } from "./shared.js";
@@ -19,6 +20,11 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   // reference database operations (`.save(`, `Model.create`, `Schema(`, etc.)
   // but are not actual database calls — skip to avoid false positives.
   if (isLikelyAnalysisCode(code)) return findings;
+
+  // IaC templates (Bicep/Terraform/ARM) may reference data-store resource names
+  // or connection properties that match DB patterns, but are declarative
+  // infrastructure definitions — not application-level database calls.
+  if (isIaCTemplate(code)) return findings;
 
   // SQL injection via string concatenation (multi-language)
   const rawSqlInjectionLines = getLangLineNumbers(code, language, LP.SQL_INJECTION);

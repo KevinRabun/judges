@@ -55,9 +55,11 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   }
 
   // Local filesystem dependency
+  // IaC templates reference target-machine paths (e.g., /home/user/.ssh/authorized_keys
+  // on a deployed VM) — these are not local dev-machine filesystem dependencies.
   const fsPattern = /(?:\/tmp\/|C:\\|D:\\|\/var\/|\/home\/|\/etc\/|\.\/data\/|\.\/uploads\/|E:\\|F:\\)/gi;
   const fsLines = getLineNumbers(code, fsPattern);
-  if (fsLines.length > 0) {
+  if (fsLines.length > 0 && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -246,6 +248,9 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
   }
 
   // Missing retry/resilience for cloud services (multi-language)
+  // IaC templates (Bicep/ARM/Terraform) are declarative — the deployment engine
+  // (ARM, Terraform provider) handles retries.  Flagging `Azure.` references in
+  // Bicep resource-type strings as "cloud SDK without retry" is a false positive.
   const cloudSdkPattern =
     /aws-sdk|@aws-sdk|@azure|googleapis|firebase|@google-cloud|boto3|azure\.identity|google\.cloud|Azure\.|Amazon\.|cloud\.google\.com/gi;
   const cloudSdkLines = getLineNumbers(code, cloudSdkPattern);
@@ -253,7 +258,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
     /retry|retries|backoff|exponential|resilience|polly|cockatiel|tenacity|resilience4j|backoff::|go-retryablehttp/gi.test(
       code,
     );
-  if (cloudSdkLines.length > 0 && !hasRetry) {
+  if (cloudSdkLines.length > 0 && !hasRetry && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, isCommentLine, isIaCTemplate } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeMaintainability(code: string, language: string): Finding[] {
@@ -177,7 +177,11 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   }
 
   // Excessive file length
-  if (totalLines > 300) {
+  // IaC templates (Bicep/Terraform/ARM) typically define multiple resources,
+  // parameters, and outputs in a single file — 500+ lines is common and
+  // expected.  Use a higher threshold to avoid false positives.
+  const fileLengthLimit = isIaCTemplate(code) ? 600 : 300;
+  if (totalLines > fileLengthLimit) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -305,32 +309,37 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   }
 
   // Duplicate string literals
-  const stringLiterals: Record<string, number> = {};
-  const stringLiteralPattern = /["'`]([^"'`]{10,})["'`]/g;
-  let strMatch;
-  while ((strMatch = stringLiteralPattern.exec(code)) !== null) {
-    const val = strMatch[1];
-    // Skip format-template strings containing placeholders — these are
-    // intentionally repeated in different contexts.
-    if (/\{[\w:,.]*\}|%[sdifFeEgGcrbox%]|\$\{/.test(val)) continue;
-    // Skip strings that are purely whitespace / paragraph spacing
-    if (/^\s+$/.test(val)) continue;
-    stringLiterals[val] = (stringLiterals[val] || 0) + 1;
-  }
-  const duplicateStrings = Object.entries(stringLiterals).filter(([, count]) => count >= 3);
-  if (duplicateStrings.length > 0) {
-    findings.push({
-      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
-      severity: "low",
-      title: "Duplicate string literals — extract to constants",
-      description: `Found ${duplicateStrings.length} string value(s) repeated 3+ times. Duplicate strings are easy to typo and hard to update consistently.`,
-      recommendation:
-        "Extract repeated strings into named constants. This makes updates a single-point change and prevents typos.",
-      reference: "DRY Principle / Clean Code",
-      suggestedFix:
-        "Create a shared constants file and export each repeated string as a named const, then import and use the constant everywhere.",
-      confidence: 0.8,
-    });
+  // IaC templates idiomatically repeat tag values, location references, and
+  // SKU strings across multiple resources — this is expected, not a DRY
+  // violation.  Skip the check entirely for IaC files.
+  if (!isIaCTemplate(code)) {
+    const stringLiterals: Record<string, number> = {};
+    const stringLiteralPattern = /["'`]([^"'`]{10,})["'`]/g;
+    let strMatch;
+    while ((strMatch = stringLiteralPattern.exec(code)) !== null) {
+      const val = strMatch[1];
+      // Skip format-template strings containing placeholders — these are
+      // intentionally repeated in different contexts.
+      if (/\{[\w:,.]*\}|%[sdifFeEgGcrbox%]|\$\{/.test(val)) continue;
+      // Skip strings that are purely whitespace / paragraph spacing
+      if (/^\s+$/.test(val)) continue;
+      stringLiterals[val] = (stringLiterals[val] || 0) + 1;
+    }
+    const duplicateStrings = Object.entries(stringLiterals).filter(([, count]) => count >= 3);
+    if (duplicateStrings.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        severity: "low",
+        title: "Duplicate string literals — extract to constants",
+        description: `Found ${duplicateStrings.length} string value(s) repeated 3+ times. Duplicate strings are easy to typo and hard to update consistently.`,
+        recommendation:
+          "Extract repeated strings into named constants. This makes updates a single-point change and prevents typos.",
+        reference: "DRY Principle / Clean Code",
+        suggestedFix:
+          "Create a shared constants file and export each repeated string as a named const, then import and use the constant everywhere.",
+        confidence: 0.8,
+      });
+    }
   }
 
   return findings;

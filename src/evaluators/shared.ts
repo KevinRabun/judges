@@ -1067,6 +1067,42 @@ export function looksLikeRealCredentialValue(value: string): boolean {
 }
 
 /**
+ * Determine whether a value extracted from an IaC property (Bicep/Terraform/ARM)
+ * looks like a real secret rather than a benign config value.
+ *
+ * IaC patterns match property names like `token`, `key`, `secret` — but the
+ * values are often boolean-strings (`'true'`/`'false'`), enum identifiers
+ * (`'GuestAttestation'`), or well-known config placeholders.  This filter
+ * rejects those non-secret values.
+ */
+export function looksLikeIaCSecretValue(value: string): boolean {
+  const v = value.trim();
+
+  // Boolean-string config values
+  if (/^(?:true|false|yes|no|enabled|disabled|on|off|none)$/i.test(v)) return false;
+
+  // Too short to be a real secret (less than 8 chars)
+  if (v.length < 8) return false;
+
+  // PascalCase / camelCase single-word identifiers — enum-style config values
+  // e.g., 'GuestAttestation', 'SystemAssigned', 'ConfidentialVM'
+  if (/^[A-Z][a-zA-Z0-9]+$/.test(v) && !/[0-9]{4,}/.test(v)) return false;
+
+  // Known non-secret IaC config values
+  if (
+    /^(?:SystemAssigned|UserAssigned|Standard|Premium|Basic|Hot|Cool|Archive|Enabled|Disabled|Allow|Deny|ReadOnly|ReadWrite|CanNotDelete|NotSpecified|Succeeded|Failed|Running|Stopped|Deallocated|TLS1_2|GuestAttestation|ManagedDisks|ConfidentialVM|DiskWithVMGuestState)$/i.test(
+      v,
+    )
+  )
+    return false;
+
+  // Placeholder / example markers
+  if (isLikelyPlaceholderCredentialValue(v)) return false;
+
+  return true;
+}
+
+/**
  * Format a single judge evaluation as a readable Markdown string.
  */
 export function formatEvaluationAsMarkdown(evaluation: JudgeEvaluation): string {

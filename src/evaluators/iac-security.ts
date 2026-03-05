@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, testCode } from "./shared.js";
+import { getLineNumbers, getLangLineNumbers, getLangFamily, testCode, looksLikeIaCSecretValue } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 /**
@@ -18,7 +18,21 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
   if (!LP.isIaC(lang)) return findings;
 
   // ── IAC-001: Hardcoded secrets / passwords / keys ─────────────────────
-  const secretLines = getLangLineNumbers(code, language, LP.IAC_HARDCODED_SECRET);
+  const rawSecretLines = getLangLineNumbers(code, language, LP.IAC_HARDCODED_SECRET);
+  // Post-filter: reject lines where the matched value is a boolean-string,
+  // enum identifier, or known non-secret config value (e.g., 'false',
+  // 'GuestAttestation', 'SystemAssigned').
+  const codeLines = code.split("\n");
+  const secretLines = rawSecretLines.filter((ln) => {
+    const line = codeLines[ln - 1] ?? "";
+    // Extract the quoted value from the IaC property assignment
+    const valMatch =
+      /(?:password|secret|key|token|apiKey|accessKey|connectionString|api_key|access_key|secret_key|connection_string|value)\s*[:=]\s*['"]([^'"]+)['"]/i.exec(
+        line,
+      );
+    if (!valMatch) return true; // keep if we can't parse — let it through
+    return looksLikeIaCSecretValue(valMatch[1]);
+  });
   if (secretLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
