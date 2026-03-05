@@ -316,7 +316,7 @@ function parseInlineSuppressions(code: string): {
 
   // Pattern: // judges-ignore[-next-line|-block] RULE-ID [, RULE-ID ...] [-- reason]
   const suppressPattern =
-    /(?:\/\/|#|\/\*)\s*judges-ignore(?:-(next-line|block))?\s+([\w*,\s-]+?)(?:\s+--\s+(.+?))?(?:\s*\*\/)?$/gi;
+    /(?:\/\/|#|\/\*)\s*judges-ignore(?:-(next-line|block))?\s+([\w*,-]+(?:\s+(?!--)[\w*,-]+)*)(?:\s+--\s+(.+?))?(?:\s*\*\/)?$/gi;
   const endBlockPattern = /(?:\/\/|#|\/\*)\s*judges-end-block/i;
 
   for (let i = 0; i < lines.length; i++) {
@@ -362,7 +362,8 @@ function parseInlineSuppressions(code: string): {
     }
 
     // File-level suppression: // judges-file-ignore RULE-ID [-- reason]
-    const filePattern = /(?:\/\/|#|\/\*)\s*judges-file-ignore\s+([\w*,\s-]+?)(?:\s+--\s+(.+?))?(?:\s*\*\/)?$/gi;
+    const filePattern =
+      /(?:\/\/|#|\/\*)\s*judges-file-ignore\s+([\w*,-]+(?:\s+(?!--)[\w*,-]+)*)(?:\s+--\s+(.+?))?(?:\s*\*\/)?$/gi;
     let fileMatch;
     filePattern.lastIndex = 0;
     while ((fileMatch = filePattern.exec(line)) !== null) {

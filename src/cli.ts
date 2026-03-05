@@ -386,7 +386,7 @@ export function globToRegex(pattern: string): RegExp {
   // Normalize to forward slashes
   let p = pattern.replace(/\\/g, "/");
   // Escape regex chars except * and ?
-  p = p.replace(/[.+^${}()|[\]]/g, "\\$&");
+  p = p.replace(/[.+^${}()|[\]\\-]/g, "\\$&");
   // ** matches any path segment(s)
   p = p.replace(/\*\*/g, "{{GLOBSTAR}}");
   // * matches anything except /

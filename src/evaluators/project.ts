@@ -351,7 +351,7 @@ function detectSharedMutableState(files: Array<{ path: string; content: string; 
   for (const f of files) {
     if (f.language !== "typescript" && f.language !== "javascript") continue;
     // Match `export const state = { ... }` that is later mutated via `state.x = ...`
-    const singletonRe = /^[ \t]*export\s+const\s+(\w+)\s*(?::\s*\w[^=]*)?\s*=\s*\{/gm;
+    const singletonRe = /^[ \t]*export\s+const\s+(\w+)(?:\s*:\s*[^=\s]+(?:\s+[^=\s]+)*)?\s*=\s*\{/gm;
     let sm;
     while ((sm = singletonRe.exec(f.content)) !== null) {
       const objName = sm[1];
