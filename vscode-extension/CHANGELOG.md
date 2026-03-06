@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.8] — 2026-03-06
+
+### Added
+- **Disk-backed persistent cache** — Cross-run LRU cache with TTL for faster repeated evaluations
+- **GitHub Actions formatter** — `--format github-actions` emits native `::error`/`::warning`/`::notice` annotations
+- **Confidence explanations** — Each finding now includes an evidence basis explaining the confidence score
+- **Per-path config overrides** — Glob-matched `overrides` in `.judgesrc.json` for per-directory rule/severity customization
+- **LSP server scaffold** — `judges lsp --stdio` for real-time editor diagnostics
+- **Block-level selective autofix** — `--rule`, `--severity`, `--lines` flags for targeted patching
+- **Plugin scaffolding** — `judges scaffold-plugin` generates a starter plugin template
+- **Score trend command** — `judges trend` tracks evaluation scores over time
+- See [core CHANGELOG](../CHANGELOG.md) for full details on all 15 P0–P2 features
+
 ## [3.23.7] — 2026-03-05
 
 ### Added

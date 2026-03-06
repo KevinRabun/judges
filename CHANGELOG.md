@@ -2,6 +2,31 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.8] — 2026-03-06
+
+### Added
+- **MCP batch parallelism** (`evaluateFilesBatch`) — Bounded-concurrency multi-file evaluation for MCP tool calls, processing files in parallel batches instead of sequentially.
+- **Disk-backed persistent cache** (`DiskCache`) — Content-addressable LRU cache with TTL and configurable max entries, persisted to `.judges-cache/` for cross-run performance. Cache keys now incorporate evaluation options (AST, confidence, severity, rules, weights) for correctness.
+- **Incremental `--changed-only` flag** — Evaluate only files changed since the last git commit, using `git diff --name-only` for fast CI feedback loops.
+- **GitHub Actions annotation formatter** (`--format github-actions`) — Emit `::error`, `::warning`, and `::notice` annotations for native GitHub Actions integration.
+- **Confidence explanations** (`estimateFindingConfidenceWithBasis`) — Each finding now includes an `evidenceBasis` string explaining why the confidence score was assigned (line-precise signal, AST match, pattern heuristic, etc.).
+- **Per-path config overrides** — `.judgesrc.json` `overrides` array supports glob-matched per-path `minSeverity`, `disabledRules`, and `disabledJudges` settings via `applyOverridesForFile()`.
+- **`failOnScoreBelow` config** — Set a minimum score threshold in config; CI exits non-zero when the overall score falls below.
+- **Weighted judge scoring** — `judgeWeights` config field allows per-judge influence weighting on the aggregate score.
+- **LSP server scaffold** (`judges lsp --stdio`) — JSON-RPC/LSP server for real-time diagnostics in editors, exposed via `runLsp()`.
+- **Score trend CLI command** (`judges trend`) — Track and display evaluation score trends over time.
+- **Migration guides** (`docs/migration-guides.md`) — Step-by-step guides for migrating from ESLint, SonarQube, Semgrep, and CodeQL.
+- **Block-level selective autofix** — `judges fix` now supports `--rule`, `--severity`, and `--lines` flags for targeted patching.
+- **MCP `evaluate_file` tool** — Single-file evaluation tool for MCP integrations via `register-evaluation.ts`.
+- **Plugin scaffolding** (`judges scaffold-plugin`) — Generate a starter plugin directory with evaluator template, test harness, and `package.json`.
+
+### Fixed
+- **Fix README patch count** — Updated from 53 to 114 to reflect actual patch coverage.
+
+### Tests
+- 300+ new test lines covering all P0–P2 features
+- All 2084 tests passing (1324 judges + 760 subsystems)
+
 ## [3.23.7] — 2026-03-05
 
 ### Added
