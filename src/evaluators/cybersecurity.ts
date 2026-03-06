@@ -88,10 +88,12 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
       .join("\n");
 
     const dangerousSink =
-      /\b(?:exec|execSync|spawn|spawnSync|system|popen|Runtime\.getRuntime\(\)\.exec|subprocess\.(?:Popen|run|call)|os\.system)\s*\(/i;
+      /\b(?:exec|execSync|spawn|spawnSync|system|popen|passthru|shell_exec|proc_open|Runtime\.getRuntime\(\)\.exec|subprocess\.(?:Popen|run|call)|os\.system|exec\.Command|ProcessBuilder)\s*\(|`[^`]*#\{/i;
     const safeSink = /\bexecFile\s*\(/i;
-    const untrustedInput = /(?:req\.|request\.|params\.|query\.|body\.|argv|input|user|prompt|command)/i;
-    const unsafeConstruction = /(?:\+\s*\w|\$\{[^}]+\}|\.concat\s*\(|\.join\s*\(|shell\s*:\s*true)/i;
+    const untrustedInput =
+      /(?:req\.|request\.|params[\[.]|query\.|body\.|argv|input|user|prompt|command|\$_(?:GET|POST|REQUEST|COOKIE|SERVER|FILES)\[|call\.(?:parameters|receive)|r\.(?:URL|FormValue|Body|Form))/i;
+    const unsafeConstruction =
+      /(?:\+\s*\w|\$\{[^}]+\}|#\{[^}]+\}|\.concat\s*\(|\.join\s*\(|shell\s*:\s*true|\.\s*\$\w+|%[sdvq]|fmt\.Sprintf)/i;
 
     return (
       dangerousSink.test(context) &&
@@ -153,14 +155,30 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
 
   // Insecure CORS (multi-language)
   const corsLines = getLangLineNumbers(code, language, LP.CORS_WILDCARD);
-  if (corsLines.length > 0) {
+  // Also detect CORS origin reflection: setting Access-Control-Allow-Origin to the request origin
+  const corsReflectionLines: number[] = [];
+  {
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      if (
+        /Access-Control-Allow-Origin/i.test(line) &&
+        /(?:req\.headers\.origin|request\.headers|origin|headers\[)/i.test(line) &&
+        !/["']\*["']/.test(line) // not a wildcard (already handled)
+      ) {
+        corsReflectionLines.push(i + 1);
+      }
+    }
+  }
+  const allCorsLines = [...new Set([...corsLines, ...corsReflectionLines])].sort((a, b) => a - b);
+  if (allCorsLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Overly permissive CORS configuration",
       description:
-        "CORS is configured to allow all origins ('*'), which may allow malicious websites to make cross-origin requests to your API.",
-      lineNumbers: corsLines,
+        "CORS is configured to allow all origins ('*') or reflects the request origin, which may allow malicious websites to make cross-origin requests to your API.",
+      lineNumbers: allCorsLines,
       recommendation:
         "Restrict CORS to specific trusted origins. If credentials are used, '*' is not allowed by browsers anyway — be explicit about allowed origins.",
       reference: "OWASP CORS Misconfiguration — CWE-942",
@@ -213,12 +231,18 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
 
   // XML External Entity (XXE) injection
   const xxePatterns =
-    /DocumentBuilder|SAXParser|XMLReader|DOMParser|etree\.parse|xml\.sax|parseXML|lxml\.etree|XmlReader|XmlDocument|LIBXML_NOENT/gi;
+    /DocumentBuilder|SAXParser(?:Factory)?|XMLReader|DOMParser|etree\.(?:parse|XML|fromstring|XMLParser)|xml\.sax|parseXML|lxml\.etree|XmlReader|XmlDocument|LIBXML_NOENT/gi;
   const xxeLines = getLineNumbers(code, xxePatterns);
   if (xxeLines.length > 0) {
+    // Strip comments before checking for protection to avoid false positives
+    // from comments like "// Missing: FEATURE_SECURE_PROCESSING"
+    const codeWithoutComments = code
+      .replace(/\/\/[^\n]*/g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/#[^\n]*/g, "");
     const hasProtection =
-      /disallow-doctype-decl|FEATURE_SECURE_PROCESSING|resolve_entities\s*=\s*False|DtdProcessing\.Prohibit|LIBXML_NONET/gi.test(
-        code,
+      /disallow-doctype-decl|FEATURE_SECURE_PROCESSING|resolve_entities\s*=\s*False|DtdProcessing\.Prohibit|LIBXML_NONET|defusedxml/gi.test(
+        codeWithoutComments,
       );
     if (!hasProtection) {
       findings.push({
@@ -480,7 +504,15 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
   // Suppress when the file is primarily code-analysis / evaluator logic (many regex .test() calls)
   const authAnalysisTestCount = (code.match(/\.test\s*\(/g) || []).length;
   const isAuthAnalysisCode = authAnalysisTestCount >= 8;
-  const authEndpoints = getLineNumbers(code, /(?:login|signin|sign-in|authenticate|auth|password|token)\s*['",:]/gi);
+  const authEndpoints = getLineNumbers(code, /(?:login|signin|sign-in|authenticate|password|token)\s*['",:]/gi).filter(
+    (ln) => {
+      // Exclude middleware/facade/decorator patterns that use auth keywords safely
+      const line = code.split("\n")[ln - 1] || "";
+      return !/middleware\s*\(|Auth::|@auth|->auth\(\)|auth_required|authorize|authorization|authenticated|authenticate_user/i.test(
+        line,
+      );
+    },
+  );
   const hasRateLimit = testCode(code, /rate.?limit|throttle|limiter|brute/gi);
   if (authEndpoints.length > 0 && !hasRateLimit && !isIaCTemplate(code) && !isAuthAnalysisCode) {
     findings.push({
@@ -682,7 +714,11 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
         /\.format\s*\(/.test(line) || // Python .format() / C# String.Format
         /String\.format/i.test(line) || // Java String.format
         /fmt\.Sprintf/i.test(line) || // Go fmt.Sprintf
-        /%[sdvq]/.test(line); // printf-style
+        /%[sdvq]/.test(line) || // printf-style
+        /#\{[^}]+\}/.test(line) || // Ruby string interpolation
+        /["'].*\$[a-zA-Z_]\w*/.test(line) || // Kotlin/PHP $var inside string (excludes PostgreSQL $1)
+        /\\\([^)]+\)/.test(line) || // Swift string interpolation \(var)
+        /format!\s*\(\s*["'].*\b(?:SELECT|INSERT|UPDATE|DELETE)\b/i.test(line); // Rust format! building SQL
       if (hasInterpolation) {
         sqlFallbackLines.push(i + 1);
       }
@@ -751,11 +787,28 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
     const codeLines = code.split("\n");
     for (let i = 0; i < codeLines.length; i++) {
       const line = codeLines[i];
+      // Standard Node.js / Go file operations with user input on same line
       if (
         /(?:readFile|readFileSync|createReadStream|open|os\.ReadFile|os\.Open|ioutil\.ReadFile)\s*\(/i.test(line) &&
         /(?:req\.|request\.|params\.|query\.)/i.test(line) &&
         /\+/i.test(line)
       ) {
+        pathTravMultiLines.push(i + 1);
+        continue;
+      }
+      // Multi-language path traversal: file operations with user-controlled path in context
+      const ctx = codeLines.slice(Math.max(0, i - 3), i + 4).join("\n");
+      const hasFileOp =
+        /(?:File\.(?:join|read|new|open)|send_file|filepath\.Join|http\.ServeFile|Path\.Combine|File\.ReadAll|respondFile|ServeContent|file_get_contents)\s*\(/i.test(
+          line,
+        ) ||
+        /\bnew\s+File\s*\(/i.test(line) ||
+        /File\s*\(\s*[""][^""]*\$/i.test(line); // Kotlin File("/path/$var")
+      const hasUserInput =
+        /(?:params\[|params\.|request\.|req\.|query\.|call\.parameters|\$_(?:GET|POST|REQUEST)\[|r\.URL|r\.FormValue)/i.test(
+          ctx,
+        );
+      if (hasFileOp && hasUserInput) {
         pathTravMultiLines.push(i + 1);
       }
     }
@@ -928,6 +981,321 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
   }
 
   // ── Framework-specific security rules ─────────────────────────────────────
+
+  // ── PHP/Ruby Reflected XSS — echo/print with user input ──
+  {
+    const xssReflectLines: number[] = [];
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      // PHP: echo/print with $_GET/$_POST directly
+      if (/\b(?:echo|print)\b/i.test(line) && /\$_(?:GET|POST|REQUEST|COOKIE)\[/i.test(line)) {
+        xssReflectLines.push(i + 1);
+        continue;
+      }
+      // PHP: echo with variable that was assigned from user input in context
+      if (/\b(?:echo|print)\b.*\$/i.test(line) && lang === "php") {
+        const ctx = codeLines.slice(Math.max(0, i - 5), i).join("\n");
+        if (/\$_(?:GET|POST|REQUEST)\[/i.test(ctx)) {
+          xssReflectLines.push(i + 1);
+          continue;
+        }
+      }
+      // Ruby ERB: raw, html_safe, or <%== (unescaped output)
+      if (/\braw\s+@?\w+|\.html_safe\b|<%==?\s/i.test(line)) {
+        const ctx = codeLines.slice(Math.max(0, i - 5), i + 1).join("\n");
+        if (/params\[|request\.|@\w+/i.test(ctx)) {
+          xssReflectLines.push(i + 1);
+        }
+      }
+    }
+    if (xssReflectLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Reflected XSS via unsanitized user input in output",
+        description:
+          "User input is directly included in HTML output without sanitization, allowing Cross-Site Scripting (XSS) attacks.",
+        lineNumbers: xssReflectLines,
+        recommendation:
+          "Sanitize all user input before output. Use htmlspecialchars() in PHP or ERB's default escaping (<%= %>) in Ruby.",
+        reference: "OWASP XSS — CWE-79",
+        suggestedFix:
+          "PHP: echo htmlspecialchars($input, ENT_QUOTES, 'UTF-8'); Ruby: use <%= %> (escaped) instead of raw/html_safe.",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  // ── Server-Side Template Injection (SSTI) ──
+  {
+    const sstiLines: number[] = [];
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      // Jinja2/Flask: render_template_string, Environment().from_string with user input
+      if (/(?:render_template_string|from_string|Template)\s*\(/i.test(line)) {
+        const ctx = codeLines.slice(Math.max(0, i - 5), i + 1).join("\n");
+        if (/(?:request\.|params\.|user|input|args\.get)/i.test(ctx)) {
+          sstiLines.push(i + 1);
+        }
+      }
+      // Express/Node: rendering user-controlled template strings
+      if (/\.render\s*\(.*(?:req\.|request\.)/i.test(line)) {
+        sstiLines.push(i + 1);
+      }
+    }
+    if (sstiLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Potential Server-Side Template Injection (SSTI)",
+        description:
+          "User input is used to construct or render templates, which could allow attackers to execute arbitrary code on the server.",
+        lineNumbers: sstiLines,
+        recommendation:
+          "Never pass user input to template rendering functions. Use render_template with pre-defined templates instead of render_template_string.",
+        reference: "OWASP SSTI — CWE-1336",
+        suggestedFix: "Use render_template('page.html', data=user_data) instead of render_template_string(user_input).",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  // ── Open Redirect — redirecting to user-controlled URL ──
+  {
+    const openRedirectLines: number[] = [];
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      if (
+        /(?:redirect|redirect_to|res\.redirect|response\.redirect|sendRedirect|header\s*\(\s*["']Location)/i.test(line)
+      ) {
+        const ctx = codeLines.slice(Math.max(0, i - 5), i + 1).join("\n");
+        if (
+          /(?:req\.|request\.|params\[|params\.|query\.|body\.|\$_GET|\$_POST|args\.get)/i.test(ctx) &&
+          !/(?:url\.startsWith|startswith|whitelist|allowlist|allowed_hosts|validate_url|safe_redirect)/i.test(ctx)
+        ) {
+          openRedirectLines.push(i + 1);
+        }
+      }
+    }
+    if (openRedirectLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Potential open redirect vulnerability",
+        description:
+          "The application redirects to a URL derived from user input without validation, which can be used for phishing attacks.",
+        lineNumbers: openRedirectLines,
+        recommendation:
+          "Validate redirect URLs against a whitelist of allowed domains. Use relative paths or verify the URL starts with your domain.",
+        reference: "OWASP Unvalidated Redirects — CWE-601",
+        suggestedFix:
+          "Validate redirects: const url = new URL(target, baseUrl); if (url.origin !== baseUrl) throw new Error('blocked');",
+        confidence: 0.85,
+      });
+    }
+  }
+
+  // ── Mass assignment — unfiltered request body passed to ORM/model ──
+  {
+    const massAssignLines: number[] = [];
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      // Ruby: Model.create(params) or update(params) without permit/strong_parameters
+      if (/\.(?:create|update|new|assign_attributes)\s*\(\s*params(?:\[|\.)/i.test(line)) {
+        const ctx = codeLines.slice(Math.max(0, i - 10), i + 1).join("\n");
+        if (!/\.permit\s*\(|strong_parameters|require\s*\(/i.test(ctx)) {
+          massAssignLines.push(i + 1);
+        }
+      }
+      // Python Django/DRF: form.save() with all fields, or Model(**request.data)
+      if (/\*\*request\.(?:data|POST|json|body)/i.test(line)) {
+        massAssignLines.push(i + 1);
+      }
+      // JS/TS: Model.create(req.body) / Object.assign(model, req.body)
+      if (
+        /(?:\.create|\.update|Object\.assign|Object\.keys.*forEach)\s*\(.*(?:req\.body|request\.body)/i.test(line) &&
+        !/(?:pick|omit|whitelist|allowlist|\{[^}]+\}\s*=)/i.test(line)
+      ) {
+        massAssignLines.push(i + 1);
+      }
+    }
+    if (massAssignLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Potential mass assignment vulnerability",
+        description:
+          "Request data is directly passed to model creation/update without field filtering, allowing attackers to set privileged fields.",
+        lineNumbers: massAssignLines,
+        recommendation:
+          "Explicitly whitelist allowed fields. Use strong parameters (Ruby), serializers (Python), or DTOs (Java/C#).",
+        reference: "CWE-915: Mass Assignment",
+        suggestedFix:
+          "Whitelist fields: const { name, email } = req.body; Ruby: params.require(:user).permit(:name, :email).",
+        confidence: 0.85,
+      });
+    }
+  }
+
+  // ── Weak Cryptography — static IV, ECB mode, short keys ──
+  {
+    const weakCryptoLines: number[] = [];
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      // Static/hardcoded IV
+      if (/(?:static\s*IV|iv\s*=\s*\[?\s*["']|iv\s*:=\s*\[\]byte\s*\()/i.test(line)) {
+        weakCryptoLines.push(i + 1);
+      }
+      // ECB mode (any language)
+      if (/\bECB\b|NewCipher\s*\(|cipher\.NewCFBEncrypter\s*\(.*static/i.test(line)) {
+        weakCryptoLines.push(i + 1);
+      }
+    }
+    if (weakCryptoLines.length > 0) {
+      // Don't duplicate if weak-crypto is already detected by the pattern-based check
+      const existingCryptoFinding = findings.some(
+        (f) => f.title.includes("Weak cryptographic") || f.title.includes("ECB"),
+      );
+      if (!existingCryptoFinding) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "high",
+          title: "Weak cryptographic configuration",
+          description:
+            "Static IVs, ECB mode, or other weak cryptographic configurations are used, reducing the confidentiality of encrypted data.",
+          lineNumbers: weakCryptoLines,
+          recommendation:
+            "Use a random IV for each encryption operation. Use AES-GCM or AES-CBC (never ECB). Use keys of at least 256 bits.",
+          reference: "CWE-327: Use of Broken Crypto Algorithm",
+          suggestedFix:
+            "Generate random IV: crypto.randomBytes(16) (Node.js), os.urandom(16) (Python), SecureRandom (Java).",
+          confidence: 0.85,
+        });
+      }
+    }
+  }
+
+  // ── Regex DoS (ReDoS) — super-linear regex patterns ──
+  {
+    const redosLines: number[] = [];
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      // Detect common ReDoS patterns: nested quantifiers, overlapping alternations
+      if (/(?:new\s+RegExp|re\.compile|Regex|Pattern\.compile)\s*\(/i.test(line)) {
+        // Check for nested quantifiers like (a+)+ or (a*)*
+        if (/[+*]\s*\)\s*[+*]|(?:\.\*){2,}|\([^)]*[+*][^)]*\)\s*[+*]/.test(line)) {
+          redosLines.push(i + 1);
+        }
+      }
+      // User input passed directly to regex constructor
+      if (
+        /(?:new\s+RegExp|re\.compile|Regex|Pattern\.compile)\s*\(.*(?:req\.|request\.|params\.|query\.|body\.|input|user)/i.test(
+          line,
+        )
+      ) {
+        redosLines.push(i + 1);
+      }
+    }
+    if (redosLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Potential Regular Expression Denial of Service (ReDoS)",
+        description:
+          "User input is used in regex construction or a regex with nested quantifiers is used, which could cause catastrophic backtracking.",
+        lineNumbers: redosLines,
+        recommendation:
+          "Validate and escape user input before using in regex. Avoid nested quantifiers. Consider using a linear-time regex engine.",
+        reference: "CWE-1333: Inefficient Regular Expression Complexity",
+        suggestedFix: "Escape user input: new RegExp(input.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'))",
+        confidence: 0.8,
+      });
+    }
+  }
+
+  // ── PHP File Inclusion (LFI/RFI) ──
+  {
+    const fileInclusionLines: number[] = [];
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      // Match include/require with any PHP variable on the same line (covers $var, "str" . $var, etc.)
+      if (
+        /\b(?:include|require|include_once|require_once)\b/i.test(line) &&
+        /\$\w+/.test(line) &&
+        !/^\s*(?:\/\/|#|\*)/.test(line)
+      ) {
+        fileInclusionLines.push(i + 1);
+      }
+    }
+    if (fileInclusionLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Potential PHP file inclusion vulnerability (LFI/RFI)",
+        description:
+          "PHP include/require uses a variable path, which may allow attackers to include arbitrary local or remote files.",
+        lineNumbers: fileInclusionLines,
+        recommendation: "Use a whitelist of allowed files. Never pass user input directly to include/require.",
+        reference: "OWASP File Inclusion — CWE-98",
+        suggestedFix:
+          "Whitelist: $allowed = ['header', 'footer']; if (in_array($page, $allowed)) { include \"$page.php\"; }",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  // ── Insecure WebView — loading untrusted content with JS enabled ──
+  {
+    const webviewLines: number[] = [];
+    const codeLines = code.split("\n");
+    const hasJSEnabled = /(?:javaScriptEnabled|setJavaScriptEnabled\s*\(\s*true|JavaScriptMode\.unrestricted)/i.test(
+      code,
+    );
+    if (hasJSEnabled) {
+      for (let i = 0; i < codeLines.length; i++) {
+        const line = codeLines[i];
+        if (
+          /(?:loadUrl|loadData|evaluateJavascript|addJavascriptInterface)\s*\(/i.test(line) &&
+          /(?:\+|\$\{|\$\w+|user|input|params|intent)/i.test(line)
+        ) {
+          webviewLines.push(i + 1);
+        }
+      }
+    }
+    // Also detect WebView with JavaScript enabled + loading external/user content
+    if (hasJSEnabled) {
+      const hasUntrustedLoad = /loadUrl\s*\(|url\s*=.*(?:intent|getStringExtra|params|query)/i.test(code);
+      if (hasUntrustedLoad && webviewLines.length === 0) {
+        const jsEnabledLine = getLineNumbers(
+          code,
+          /javaScriptEnabled|setJavaScriptEnabled\s*\(\s*true|JavaScriptMode\.unrestricted/gi,
+        );
+        webviewLines.push(...jsEnabledLine);
+      }
+    }
+    if (webviewLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Insecure WebView configuration",
+        description:
+          "WebView has JavaScript enabled and loads untrusted content, which could allow XSS or code execution attacks.",
+        lineNumbers: webviewLines,
+        recommendation:
+          "Disable JavaScript in WebViews unless absolutely necessary. Validate all URLs loaded in WebViews.",
+        reference: "CWE-749: Exposed Dangerous Method or Function",
+        suggestedFix: "Validate WebView URLs against a whitelist and disable JavaScript when not needed.",
+        confidence: 0.8,
+      });
+    }
+  }
 
   // Debug mode enabled in production-ready code
   const debugLines = getLangLineNumbers(code, language, LP.FRAMEWORK_DEBUG_MODE);

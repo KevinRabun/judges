@@ -184,7 +184,10 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       code,
     );
   const hasTransactions = testCode(code, /transaction|BEGIN|COMMIT|ROLLBACK|startTransaction|withTransaction/gi);
-  if (hasMutations && !hasTransactions && hasDbSignals && code.split("\n").length > 30) {
+  // Count distinct mutation SQL statements — single-statement CRUD repos don't need explicit transactions
+  const mutationCount = (code.match(/\b(?:INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b/gi) || []).length;
+  const hasManyMutations = mutationCount >= 2;
+  if (hasMutations && hasManyMutations && !hasTransactions && hasDbSignals && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

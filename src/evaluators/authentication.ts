@@ -296,7 +296,9 @@ export function analyzeAuthentication(code: string, language: string, context?: 
   // JWT decode used for auth decisions without signature verification
   const hasJwtDecode = testCode(code, /jwt\.decode|jwtDecode|jose\.decodeJwt/gi);
   const jwtDecodeLines = getLineNumbers(code, /jwt\.decode\s*\(|jwtDecode\s*\(|jose\.decodeJwt\s*\(/gi);
-  if (hasJwtDecode && !hasJwtVerify) {
+  // Python PyJWT: jwt.decode(token, key, algorithms=[...]) DOES verify the signature
+  const hasPyJwtVerify = /jwt\.decode\s*\([^)]*,\s*\w+[^)]*algorithms/i.test(code);
+  if (hasJwtDecode && !hasJwtVerify && !hasPyJwtVerify) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",

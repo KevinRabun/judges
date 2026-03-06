@@ -494,6 +494,8 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
         /(?:===?|!==?)\s*(?:signature|secret|token|hmac|hash|digest|apiKey|api_key|expected|computed)/i.test(line) ||
         /(?:signature|secret|token|hmac|hash|digest|apiKey|api_key|expected|computed)\s*(?:===?|!==?)/i.test(line)
       ) {
+        // Skip test assertions (assert x == expected, expect(...).toEqual(expected), etc.)
+        if (/\bassert\b|\bexpect\b|\bshould\b|it\s*\(|test\s*\(|describe\s*\(/i.test(line)) continue;
         const ctx = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 6)).join("\n");
         if (
           !/timingSafeEqual|constantTimeCompare|hmac\.Equal|secure_compare|constant_time_compare|compare_digest|MessageDigest\.isEqual/i.test(

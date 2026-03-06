@@ -220,7 +220,11 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
 
   // Recursive/infinite retry without backoff
   const retryPattern = /retry|retryCount|maxRetries|attempts?\s*[<>]/gi;
-  const retryLines = getLineNumbers(code, retryPattern);
+  const retryLines = getLineNumbers(code, retryPattern).filter((ln) => {
+    // Exclude Retry-After HTTP header references — those are response metadata, not retry logic
+    const line = code.split("\n")[ln - 1] || "";
+    return !/Retry-After/i.test(line) && !/retryAfter\s*\(/i.test(line);
+  });
   const hasBackoffStrategy = testCode(
     code,
     /backoff|exponential|delay\s*\*|Math\.pow|jitter|p-retry|axios-retry|retry-axios|got\.retry|ky\.retry/gi,

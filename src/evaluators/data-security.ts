@@ -440,7 +440,13 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   // Path traversal risk
   const pathTraversalPatterns =
     /(?:readFile|writeFile|readdir|open|fopen|file_get_contents|include|require)\s*\(.*(?:req\.|request\.|params\.|query\.|body\.|input\.|args)/gi;
-  const pathTravLines = getLineNumbers(code, pathTraversalPatterns);
+  const pathTravLines = getLineNumbers(code, pathTraversalPatterns).filter((ln) => {
+    // Kotlin require() is a precondition assertion, not a file include
+    const line = code.split("\n")[ln - 1] || "";
+    return (
+      !/\brequire\s*\(.*\{/.test(line) && !/\brequire\s*\(.*\.is/.test(line) && !/\brequire\s*\(.*\.all\b/.test(line)
+    );
+  });
   if (pathTravLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

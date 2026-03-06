@@ -323,7 +323,9 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
   if (lang === "terraform") {
     const hasBackend = testCode(code, /backend\s+"[^"]+"\s*\{/i);
     const hasTerraformBlock = testCode(code, /terraform\s*\{/i);
-    if (hasTerraformBlock && !hasBackend) {
+    // Reusable modules define variables/outputs but not backends — skip
+    const isTerraformModule = /\bvariable\s+"[^"]+"\s*\{/i.test(code) && !/\bprovider\s+"[^"]+"\s*\{/i.test(code);
+    if (hasTerraformBlock && !hasBackend && !isTerraformModule) {
       const terraformLines = getLineNumbers(code, /terraform\s*\{/i);
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

@@ -220,17 +220,17 @@ export const TRY_CATCH = {
 };
 
 export const EMPTY_CATCH = {
-  jsts: String.raw`catch\s*\([^)]*\)\s*\{\s*\}`,
-  python: String.raw`except(?:\s+\w+)?(?:\s+as\s+\w+)?\s*:\s*(?:pass|\.\.\.)\s*$`,
+  jsts: String.raw`catch\s*(?:\([^)]*\))?\s*\{\s*(?:\/\/[^\n]*)?\s*\}`,
+  python: String.raw`except(?:\s+\w+)?(?:\s+as\s+\w+)?\s*:\s*(?:pass|\.\.\.)\s*(?:#.*)?$`,
   rust: String.raw`\.unwrap_or_default\(\)`,
-  csharp: String.raw`catch\s*(?:\([^)]*\))?\s*\{\s*\}`,
-  java: String.raw`catch\s*\([^)]*\)\s*\{\s*\}`,
-  go: String.raw`if\s+err\s*!=\s*nil\s*\{\s*\}|_\s*=\s*\w+\(`,
-  powershell: String.raw`catch\s*\{\s*\}`,
-  php: String.raw`catch\s*\([^)]*\)\s*\{\s*\}`,
+  csharp: String.raw`catch\s*(?:\([^)]*\))?\s*\{\s*(?:\/\/[^\n]*)?\s*\}`,
+  java: String.raw`catch\s*\([^)]*\)\s*\{\s*(?:\/\/[^\n]*)?\s*\}`,
+  go: String.raw`if\s+err\s*!=\s*nil\s*\{\s*(?:\/\/[^\n]*)?\s*\}|_\s*=\s*\w+\(`,
+  powershell: String.raw`catch\s*\{\s*(?:#[^\n]*)?\s*\}`,
+  php: String.raw`catch\s*\([^)]*\)\s*\{\s*(?:\/\/[^\n]*)?\s*\}`,
   ruby: String.raw`rescue\s*(?:=>\s*\w+)?\s*$`,
-  kotlin: String.raw`catch\s*\([^)]*\)\s*\{\s*\}`,
-  swift: String.raw`catch\s*\{\s*\}`,
+  kotlin: String.raw`catch\s*\([^)]*\)\s*\{\s*(?:\/\/[^\n]*)?\s*\}`,
+  swift: String.raw`catch\s*\{\s*(?:\/\/[^\n]*)?\s*\}`,
 };
 
 export const GENERIC_CATCH = {
@@ -256,7 +256,7 @@ export const PANIC_UNWRAP = {
   powershell: String.raw`\[Environment\]::Exit\s*\(|exit\s+\d|throw\s`,
   php: String.raw`die\s*\(|exit\s*\(`,
   ruby: String.raw`exit\s*\(!?|abort\s*\(|Kernel\.exit`,
-  kotlin: String.raw`exitProcess\s*\(|error\s*\(`,
+  kotlin: String.raw`exitProcess\s*\(|(?<![.\w])error\s*\(`,
   swift: String.raw`fatalError\s*\(|preconditionFailure\s*\(|exit\s*\(`,
 };
 
@@ -347,7 +347,7 @@ export const SQL_INJECTION = {
   powershell: String.raw`Invoke-Sqlcmd.*["'].*\$|Invoke-DbaQuery.*["'].*\$`,
   php: String.raw`(?:mysqli?_query|\$(?:pdo|db|conn)->query)\s*\(\s*(?:["'].*\.\s*\$|\$\w+)`,
   ruby: String.raw`(?:ActiveRecord|\w+\.(?:where|find_by_sql|execute))\s*\(\s*(?:["'].*#\{|["'].*\+)`,
-  kotlin: String.raw`(?:executeQuery|createQuery|nativeQuery)\s*\(\s*(?:["'].*\+|\$["'])`,
+  kotlin: String.raw`(?:executeQuery|createQuery|nativeQuery|createStatement)\s*\(\s*(?:["'].*\+|\$?["'].*\$\w+)`,
   swift: String.raw`(?:execute|prepare)\s*\(\s*(?:["'].*\\\(|["'].*\+)`,
 };
 
@@ -432,7 +432,7 @@ export const TLS_DISABLED = {
 // ── Security: CORS ───────────────────────────────────────────────────────────
 
 export const CORS_WILDCARD = {
-  jsts: String.raw`(?:Access-Control-Allow-Origin|cors)\s*[:({]\s*['"]\*`,
+  jsts: String.raw`(?:Access-Control-Allow-Origin|cors)\s*[:({]\s*(?:['"]\*|(?:\{[^}]*)?origin\s*:\s*['"]\*)`,
   python: String.raw`(?:CORS_ALLOW_ALL_ORIGINS|CORS_ORIGIN_ALLOW_ALL)\s*=\s*True|allow_origins\s*=\s*\[["']\*["']\]`,
   csharp: String.raw`AllowAnyOrigin\s*\(\)|WithOrigins\s*\(\s*["']\*["']\s*\)`,
   java: String.raw`@CrossOrigin\s*$|allowedOrigins\s*=.*\*|addMapping\s*\(\s*["']/\*\*["']\s*\)`,
