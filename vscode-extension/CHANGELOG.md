@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.11] — 2026-03-06
+
+### Added
+- **Security judge** — New SEC-prefixed judge (38th) with 15 rules for input validation, path traversal, file access, rate limiting, insecure randomness, and information disclosure
+- **AUTH improvements** — JWT decode-without-verify detection and timing-unsafe secret comparison rules
+- **CONC Go detection** — Unsynchronized map access in HTTP handlers and goroutines
+- **Auto-fix patches** — 40+ new patch rules for Ruby, Rust, Kotlin, Swift, and Scala
+
+### Fixed
+- **FP reductions** — Pydantic/Django validation recognition, tighter file access input matching, URL stripping from non-production context checks
+- **Benchmark: P=97.8%, R=80.2%, F1=88.1%**
+- See [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.23.10] — 2026-03-06
 
 ### Fixed

@@ -209,7 +209,12 @@ export {
 export type { ToolProfile, ToolCapability, ComparisonResult } from "./comparison.js";
 
 // ─── Benchmark Gate ──────────────────────────────────────────────────────────
-export { runBenchmarkSuite, benchmarkGate, formatBenchmarkReport } from "./commands/benchmark.js";
+export {
+  runBenchmarkSuite,
+  benchmarkGate,
+  formatBenchmarkReport,
+  formatBenchmarkMarkdown,
+} from "./commands/benchmark.js";
 export type { BenchmarkResult, BenchmarkGateOptions, BenchmarkGateResult } from "./commands/benchmark.js";
 
 // ─── Language Packs ──────────────────────────────────────────────────────────

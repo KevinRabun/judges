@@ -15,7 +15,6 @@
  * - textDocument/codeAction → quick-fix patches
  */
 
-import { createInterface } from "readline";
 import { evaluateWithTribunal, type EvaluationOptions } from "../evaluators/index.js";
 import {
   findingToDiagnostic,

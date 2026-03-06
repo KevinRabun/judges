@@ -1055,6 +1055,379 @@ const PATCH_RULES: Array<{
       return { oldText: m[0], newText: `${m[0]} /* TODO: add app.use(helmet()) for security headers */` };
     },
   },
+
+  // ── Ruby Patches ──
+
+  // Ruby: system/exec → Shellwords.shellescape
+  {
+    match: /command.*inject|shell.*inject|os.*command|dangerous.*system/i,
+    generate: (line) => {
+      const m = line.match(/\bsystem\s*\(\s*(["'])(.+?)\1\s*\+\s*(\w+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `system(${m[1]}${m[2]}#{Shellwords.shellescape(${m[3]})}${m[1]})` };
+    },
+  },
+  // Ruby: exec with string interpolation → shellescape
+  {
+    match: /command.*inject|shell.*inject|os.*command/i,
+    generate: (line) => {
+      const m = line.match(/`([^`]*#\{(\w+)\}[^`]*)`/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `Shellwords.shelljoin(["${m[1].replace(/#\{\w+\}/, '", ' + m[2] + ', "')}"])` };
+    },
+  },
+  // Ruby: eval → safer alternative
+  {
+    match: /dangerous.*eval|eval.*usage|code.*inject/i,
+    generate: (line) => {
+      const m = line.match(/\beval\s*\(\s*(\w+)\s*\)/);
+      if (!m) return null;
+      // Only match Ruby-style (no 'new Function' or JS context)
+      if (line.includes("new Function") || line.includes("JSON.parse")) return null;
+      return { oldText: m[0], newText: `JSON.parse(${m[1]}) # TODO: eliminate eval — use safe deserialization` };
+    },
+  },
+  // Ruby: send with user input → allowlist
+  {
+    match: /dynamic.*method|unsafe.*send|method.*inject/i,
+    generate: (line) => {
+      const m = line.match(/(\.send\s*\(\s*)(\w+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}${m[2]}) # TODO: validate against allowlist before .send` };
+    },
+  },
+  // Ruby: open-uri with user URL → validate
+  {
+    match: /ssrf|open-uri.*untrusted|server.*side.*request/i,
+    generate: (line) => {
+      const m = line.match(/(URI\.open\s*\(\s*)(\w+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}${m[2]}) # TODO: validate URL against allowlist to prevent SSRF` };
+    },
+  },
+  // Ruby: yaml.load → YAML.safe_load
+  {
+    match: /unsafe.*yaml|yaml.*load|insecure.*yaml|deserialization/i,
+    generate: (line) => {
+      const m = line.match(/YAML\.load\s*\(/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "YAML.safe_load(" };
+    },
+  },
+  // Ruby: Marshal.load → JSON.parse
+  {
+    match: /unsafe.*deserialization|marshal.*untrusted|insecure.*deserialization/i,
+    generate: (line) => {
+      const m = line.match(/Marshal\.load\s*\(/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "JSON.parse( # TODO: replace Marshal with safe serialization" };
+    },
+  },
+  // Ruby: String interpolation in SQL → parameterized
+  {
+    match: /sql.*inject|string.*interpol.*sql|sql.*concat/i,
+    generate: (line) => {
+      const m = line.match(/(\.(?:where|find_by_sql|execute)\s*\(\s*)"([^"]*?)#\{(\w+)\}([^"]*)"/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}"${m[2]}?${m[4]}", ${m[3]}` };
+    },
+  },
+  // Ruby: Digest::MD5 → Digest::SHA256
+  {
+    match: /weak.*hash|insecure.*hash|md5|sha1/i,
+    generate: (line) => {
+      const m = line.match(/Digest::(MD5|SHA1)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "Digest::SHA256" };
+    },
+  },
+  // Ruby: render inline with user input → sanitize
+  {
+    match: /xss|cross.*site.*script|render.*untrusted/i,
+    generate: (line) => {
+      const m = line.match(/(render\s+inline:\s*)(\w+)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}ERB::Util.html_escape(${m[2]})` };
+    },
+  },
+
+  // ── PHP Patches ──
+
+  // PHP: mysql_query → PDO prepared statement marker
+  {
+    match: /deprecated.*mysql|mysql_query|sql.*inject/i,
+    generate: (line) => {
+      const m = line.match(/mysql_query\s*\(\s*(".*?"|\$\w+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `$pdo->prepare(${m[1]})->execute() /* TODO: use PDO with bound parameters */` };
+    },
+  },
+  // PHP: eval → safer alternative
+  {
+    match: /dangerous.*eval|eval.*usage|code.*inject/i,
+    generate: (line) => {
+      const m = line.match(/\beval\s*\(\s*(\$\w+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `json_decode(${m[1]}, true) /* TODO: eliminate eval — use safe parsing */` };
+    },
+  },
+  // PHP: shell_exec/exec → escapeshellarg
+  {
+    match: /command.*inject|shell.*inject|os.*command/i,
+    generate: (line) => {
+      const m = line.match(/((?:shell_exec|exec|system|passthru)\s*\(\s*(?:["'].*?["']\s*\.\s*))(\$\w+)/);
+      if (!m) return null;
+      return { oldText: m[2], newText: `escapeshellarg(${m[2]})` };
+    },
+  },
+  // PHP: md5/sha1 → password_hash for passwords
+  {
+    match: /weak.*hash|password.*hash|insecure.*hash/i,
+    generate: (line) => {
+      const m = line.match(/\bmd5\s*\(\s*(\$\w+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `password_hash(${m[1]}, PASSWORD_BCRYPT)` };
+    },
+  },
+  // PHP: extract($_POST/GET/REQUEST) → manual assignment
+  {
+    match: /variable.*inject|mass.*assign|extract.*superglobal/i,
+    generate: (line) => {
+      const m = line.match(/extract\s*\(\s*\$_(POST|GET|REQUEST)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `/* TODO: assign specific variables from \$_${m[1]} instead of extract() */` };
+    },
+  },
+  // PHP: htmlspecialchars missing → add
+  {
+    match: /xss|cross.*site.*script|output.*encod|unescaped.*output/i,
+    generate: (line) => {
+      const m = line.match(/(echo\s+)(\$\w+)\s*;/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}htmlspecialchars(${m[2]}, ENT_QUOTES, 'UTF-8');` };
+    },
+  },
+  // PHP: unserialize → json_decode
+  {
+    match: /unsafe.*deserialization|unserialize.*untrusted|insecure.*deserialization/i,
+    generate: (line) => {
+      const m = line.match(/unserialize\s*\(\s*(\$\w+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `json_decode(${m[1]}, true) /* TODO: replace unserialize with safe format */` };
+    },
+  },
+  // PHP: file_get_contents with user URL → validate
+  {
+    match: /ssrf|server.*side.*request|unvalidated.*url/i,
+    generate: (line) => {
+      const m = line.match(/(file_get_contents\s*\(\s*)(\$\w+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}${m[2]}) /* TODO: validate URL against allowlist to prevent SSRF */` };
+    },
+  },
+  // PHP: rand() → random_int() (cryptographic)
+  {
+    match: /insecure.*random|weak.*random|predictable.*random/i,
+    generate: (line) => {
+      const m = line.match(/\brand\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `random_int(${m[1]}, ${m[2]})` };
+    },
+  },
+
+  // ── Kotlin Patches ──
+
+  // Kotlin: !! (force unwrap) → safe call + default
+  {
+    match: /force.*unwrap|non-null.*assert|!!.*operator|null.*safety/i,
+    generate: (line) => {
+      const m = line.match(/(\w+)!!(\.\w+)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}?${m[2]} ?: throw IllegalStateException("${m[1]} was null")` };
+    },
+  },
+  // Kotlin: Thread.sleep → delay (coroutines)
+  {
+    match: /thread.*sleep|blocking.*call|blocking.*thread/i,
+    generate: (line) => {
+      const m = line.match(/Thread\.sleep\s*\(\s*(\d+)\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `delay(${m[1]}) // TODO: ensure calling function is suspend` };
+    },
+  },
+  // Kotlin: var → val (immutability)
+  {
+    match: /mutable.*variable|var.*instead.*val|prefer.*immutable/i,
+    generate: (line) => {
+      const m = line.match(/\bvar\s+(\w+)\s*[:=]/);
+      if (!m) return null;
+      return { oldText: `var ${m[1]}`, newText: `val ${m[1]}` };
+    },
+  },
+  // Kotlin: catching generic Exception → specific
+  {
+    match: /catch.*generic|broad.*exception|catching.*exception/i,
+    generate: (line) => {
+      const m = line.match(/catch\s*\(\s*(e|ex|err)\s*:\s*Exception\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `catch (${m[1]}: Exception) /* TODO: use specific exception type */` };
+    },
+  },
+  // Kotlin: hardcoded URL → BuildConfig
+  {
+    match: /hardcoded.*url|url.*hardcoded|base.*url.*literal/i,
+    generate: (line) => {
+      const m = line.match(/(["'])(https?:\/\/[^"']+)\1/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `BuildConfig.BASE_URL /* TODO: move URL to build config */` };
+    },
+  },
+  // Kotlin: String SQL concatenation → parameterized
+  {
+    match: /sql.*inject|sql.*concat|string.*template.*sql/i,
+    generate: (line) => {
+      const m = line.match(/(rawQuery\s*\(\s*)"([^"]*)\$(\w+)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}"${m[2]}?", arrayOf(${m[3]}` };
+    },
+  },
+
+  // ── Swift Patches ──
+
+  // Swift: force unwrap (!) → optional binding
+  {
+    match: /force.*unwrap|implicit.*unwrap|!.*operator.*crash/i,
+    generate: (line) => {
+      const m = line.match(/(\w+)!\s*\./);
+      if (!m) return null;
+      // Don't match Kotlin !! or negation
+      if (line.includes("!!")) return null;
+      return { oldText: m[0], newText: `${m[1]}?. // TODO: use if-let or guard-let for safe unwrapping` };
+    },
+  },
+  // Swift: try! → do-catch reminder
+  {
+    match: /force.*try|try!.*crash|unhandled.*throw/i,
+    generate: (line) => {
+      const m = line.match(/\btry!\s+/);
+      if (!m) return null;
+      return { oldText: m[0], newText: "try /* TODO: wrap in do-catch */ " };
+    },
+  },
+  // Swift: implicitly unwrapped optional → regular optional
+  {
+    match: /implicit.*unwrap.*optional|iuo.*declaration/i,
+    generate: (line) => {
+      const m = line.match(/(:\s*\w+)!/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}?` };
+    },
+  },
+  // Swift: NSLog → os_log (structured logging)
+  {
+    match: /nslog.*os_log|nslog.*instead|structured.*log/i,
+    generate: (line) => {
+      const m = line.match(/NSLog\s*\(([^)]*)\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `os_log(.info, ${m[1]})` };
+    },
+  },
+  // Swift: UserDefaults for sensitive data → Keychain
+  {
+    match: /userdefaults.*sensitive|insecure.*storage|keychain.*instead/i,
+    generate: (line) => {
+      const m = line.match(
+        /(UserDefaults\.standard\.set\s*\([^,]+,\s*forKey:\s*)(["'][^"']*(?:password|token|secret|key)[^"']*["'])\s*\)/i,
+      );
+      if (!m) return null;
+      return {
+        oldText: m[0],
+        newText: `KeychainWrapper.standard.set(/* value */, forKey: ${m[2]}) /* TODO: use Keychain for sensitive data */`,
+      };
+    },
+  },
+  // Swift: print() → Logger
+  {
+    match: /print.*instead.*log|print.*production|remove.*print/i,
+    generate: (line) => {
+      const m = line.match(/\bprint\s*\(([^)]*)\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `Logger().info(${m[1]})` };
+    },
+  },
+
+  // ── Additional Cross-Language Patches ──
+
+  // Terraform: overly broad CIDR → restrict
+  {
+    match: /overly.*broad.*cidr|0\.0\.0\.0\/0|unrestricted.*ingress|open.*to.*world/i,
+    generate: (line) => {
+      const m = line.match(/(["'])0\.0\.0\.0\/0\1/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}10.0.0.0/8${m[1]} /* TODO: restrict to your CIDR range */` };
+    },
+  },
+  // Terraform: public access enabled → private
+  {
+    match: /public.*access.*enabled|publicly.*accessible|public.*bucket/i,
+    generate: (line) => {
+      const m = line.match(/((?:publicly_accessible|public_access|public)\s*=\s*)true/i);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}false` };
+    },
+  },
+  // Terraform: encryption disabled → enabled
+  {
+    match: /encryption.*disabled|unencrypted.*storage|encrypt.*at.*rest/i,
+    generate: (line) => {
+      const m = line.match(/((?:encrypted|encryption_enabled|encrypt)\s*=\s*)false/i);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}true` };
+    },
+  },
+  // Bicep/ARM: HTTP allowed → HTTPS only
+  {
+    match: /http.*allowed|https.*only|transport.*security/i,
+    generate: (line) => {
+      const m = line.match(/(httpsOnly\s*:\s*)false/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}true` };
+    },
+  },
+
+  // ── Dockerfile additional patches ──
+  // ADD → COPY (Docker best practice)
+  {
+    match: /add.*instead.*copy|docker.*add|prefer.*copy/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)ADD\s+(?!https?:)/);
+      if (!m) return null;
+      return { oldText: `${m[1]}ADD `, newText: `${m[1]}COPY ` };
+    },
+  },
+  // Missing HEALTHCHECK
+  {
+    match: /missing.*healthcheck|no.*healthcheck|docker.*health/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)(CMD\s+.+)$/);
+      if (!m) return null;
+      return {
+        oldText: m[0],
+        newText: `HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:8080/ || exit 1\n${m[1]}${m[2]}`,
+      };
+    },
+  },
+
+  // ── GitHub Actions / CI Patches ──
+  // Unpinned action version → pin to SHA
+  {
+    match: /unpinned.*action|action.*version.*pin|uses.*latest/i,
+    generate: (line) => {
+      const m = line.match(/(uses:\s*)(\S+)@(master|main|latest)\b/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}${m[2]}@v4 /* TODO: pin to specific SHA */` };
+    },
+  },
 ];
 
 /**
@@ -1369,6 +1742,103 @@ const MULTI_LINE_PATCH_RULES: MultiLinePatchRule[] = [
         `${indent}app.use(cors({ origin: process.env.ALLOWED_ORIGIN || "http://localhost:3000", credentials: true }));`,
       ].join("\n");
       return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Ruby: begin/rescue without specific exception → add specific ──
+  {
+    match: /bare.*rescue|rescue.*generic|rescue.*exception/i,
+    contextLines: 4,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)rescue\s*$/);
+      if (!m) return null;
+      return {
+        oldText: line,
+        newText: `${m[1]}rescue StandardError => e # TODO: use specific exception class`,
+        startLine: findingLine,
+        endLine: findingLine,
+      };
+    },
+  },
+
+  // ── PHP: missing CSRF token in form → add hidden field ──
+  {
+    match: /csrf.*missing|cross.*site.*request|no.*csrf/i,
+    contextLines: 5,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)(<form\s[^>]*method=["']post["'][^>]*>)/i);
+      if (!m) return null;
+      const [, indent, formTag] = m;
+      return {
+        oldText: line,
+        newText: `${indent}${formTag}\n${indent}  <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>" />`,
+        startLine: findingLine,
+        endLine: findingLine,
+      };
+    },
+  },
+
+  // ── Kotlin: runOnUiThread with long operation → coroutine ──
+  {
+    match: /blocking.*main.*thread|ui.*thread.*block|network.*main/i,
+    contextLines: 5,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)runOnUiThread\s*\{/);
+      if (!m) return null;
+      return {
+        oldText: line,
+        newText: `${m[1]}lifecycleScope.launch(Dispatchers.IO) { // TODO: move I/O-bound work off main thread`,
+        startLine: findingLine,
+        endLine: findingLine,
+      };
+    },
+  },
+
+  // ── Swift: DispatchQueue.main.sync → async ──
+  {
+    match: /deadlock|main.*thread.*sync|dispatch.*main.*sync/i,
+    contextLines: 3,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)DispatchQueue\.main\.sync\b/);
+      if (!m) return null;
+      return {
+        oldText: "DispatchQueue.main.sync",
+        newText: "DispatchQueue.main.async",
+        startLine: findingLine,
+        endLine: findingLine,
+      };
+    },
+  },
+
+  // ── Terraform: missing logging/monitoring block ──
+  {
+    match: /missing.*logging|no.*monitoring|audit.*log.*disabled/i,
+    contextLines: 5,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)(resource\s+"[^"]+"\s+"[^"]+"\s*\{)/);
+      if (!m) return null;
+      const [, indent, resourceBlock] = m;
+      return {
+        oldText: line,
+        newText: `${indent}${resourceBlock}\n${indent}  # TODO: add logging/monitoring configuration\n${indent}  # logging { enabled = true }`,
+        startLine: findingLine,
+        endLine: findingLine,
+      };
     },
   },
 ];

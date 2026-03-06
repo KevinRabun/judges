@@ -15,9 +15,9 @@
  */
 
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
-import { resolve, extname, join, basename } from "path";
+import { resolve, extname, join } from "path";
 import { evaluateWithTribunal } from "../evaluators/index.js";
-import { listPresets, PRESETS } from "../presets.js";
+import { PRESETS } from "../presets.js";
 import type { Finding, JudgesConfig, RuleOverride, Severity } from "../types.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────

@@ -19,12 +19,45 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate Judges report
+      - name: Build
+        run: npm run build
+
+      - name: Run Judges inline PR review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node dist/cli.js review \
+            --pr ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} \
+            --approve \
+            --min-severity medium \
+            --max-comments 25 \
+            --calibrate \
+            --format json > judges-review-result.json 2>&1 || true
+
+      - name: Read review result
+        id: review_result
+        run: |
+          if [ -f judges-review-result.json ] && jq -e '.filesAnalyzed' judges-review-result.json > /dev/null 2>&1; then
+            echo "files=$(jq -r '.filesAnalyzed' judges-review-result.json)" >> "$GITHUB_OUTPUT"
+            echo "findings=$(jq -r '.totalFindings' judges-review-result.json)" >> "$GITHUB_OUTPUT"
+            echo "comments=$(jq -r '.commentsPosted' judges-review-result.json)" >> "$GITHUB_OUTPUT"
+            echo "approved=$(jq -r '.approved' judges-review-result.json)" >> "$GITHUB_OUTPUT"
+            echo "critical=$(jq -r '.criticalCount' judges-review-result.json)" >> "$GITHUB_OUTPUT"
+            echo "high=$(jq -r '.highCount' judges-review-result.json)" >> "$GITHUB_OUTPUT"
+            echo "suppressed=$(jq -r '.fpSuppressed' judges-review-result.json)" >> "$GITHUB_OUTPUT"
+            echo "success=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "success=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fallback — Generate full repo report
+        if: steps.review_result.outputs.success != 'true'
         run: |
           npx tsx -e "import { writeFileSync } from 'node:fs';
           import { generateRepoReportFromLocalPath } from './src/reports/public-repo-report.ts';
@@ -52,39 +85,60 @@ jobs:
             averageScore: result.averageScore,
             totalFindings: result.totalFindings,
             analyzedFileCount: result.analyzedFileCount,
-          }, null, 2));
-          console.log('Overall verdict:', result.overallVerdict);
-          console.log('Average score:', result.averageScore);
-          console.log('Findings:', result.totalFindings);"
+          }, null, 2));"
 
-      - name: Read Judges summary
-        id: judges_summary
-        run: |
-          echo "verdict=$(jq -r '.overallVerdict' judges-summary.json)" >> "$GITHUB_OUTPUT"
-          echo "score=$(jq -r '.averageScore' judges-summary.json)" >> "$GITHUB_OUTPUT"
-          echo "findings=$(jq -r '.totalFindings' judges-summary.json)" >> "$GITHUB_OUTPUT"
-          echo "files=$(jq -r '.analyzedFileCount' judges-summary.json)" >> "$GITHUB_OUTPUT"
-
-      - name: Upload Judges report artifact
+      - name: Upload report artifact
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: judges-pr-report
-          path: judges-pr-report.md
+          path: |
+            judges-pr-report.md
+            judges-review-result.json
+          if-no-files-found: ignore
 
       - name: Post Judges summary comment
         uses: actions/github-script@v8
         env:
-          JUDGES_VERDICT: ${{ steps.judges_summary.outputs.verdict }}
-          JUDGES_SCORE: ${{ steps.judges_summary.outputs.score }}
-          JUDGES_FINDINGS: ${{ steps.judges_summary.outputs.findings }}
-          JUDGES_FILES: ${{ steps.judges_summary.outputs.files }}
+          REVIEW_SUCCESS: ${{ steps.review_result.outputs.success }}
+          REVIEW_FILES: ${{ steps.review_result.outputs.files }}
+          REVIEW_FINDINGS: ${{ steps.review_result.outputs.findings }}
+          REVIEW_COMMENTS: ${{ steps.review_result.outputs.comments }}
+          REVIEW_APPROVED: ${{ steps.review_result.outputs.approved }}
+          REVIEW_CRITICAL: ${{ steps.review_result.outputs.critical }}
+          REVIEW_HIGH: ${{ steps.review_result.outputs.high }}
+          REVIEW_SUPPRESSED: ${{ steps.review_result.outputs.suppressed }}
         with:
           script: |
             const marker = '<!-- judges-pr-summary -->';
-            const verdictRaw = (process.env.JUDGES_VERDICT ?? 'unknown').toLowerCase();
-            const verdictLabel = verdictRaw.toUpperCase();
-            const verdictBadge = verdictRaw === 'pass' ? '✅' : verdictRaw === 'warning' ? '⚠️' : verdictRaw === 'fail' ? '❌' : '❔';
-            const body = `${marker}\n## Judges PR Summary\n\n- Verdict: ${verdictBadge} **${verdictLabel}**\n- Average score: **${process.env.JUDGES_SCORE ?? 'n/a'}/100**\n- Total findings: **${process.env.JUDGES_FINDINGS ?? 'n/a'}**\n- Files analyzed: **${process.env.JUDGES_FILES ?? 'n/a'}**\n\nFull details are available in the workflow artifact: \`judges-pr-report\`.`;
+            const success = process.env.REVIEW_SUCCESS === 'true';
+
+            let body;
+            if (success) {
+              const approved = process.env.REVIEW_APPROVED === 'true';
+              const badge = approved ? '✅' : '❌';
+              const verdict = approved ? 'APPROVED' : 'CHANGES REQUESTED';
+              const suppressed = parseInt(process.env.REVIEW_SUPPRESSED || '0', 10);
+              const parts = [
+                `${marker}`,
+                `## ${badge} Judges PR Review`,
+                '',
+                `- Verdict: **${verdict}**`,
+                `- Files analyzed: **${process.env.REVIEW_FILES}**`,
+                `- Total findings: **${process.env.REVIEW_FINDINGS}**`,
+                `- Inline comments: **${process.env.REVIEW_COMMENTS}**`,
+              ];
+              if (parseInt(process.env.REVIEW_CRITICAL || '0', 10) > 0)
+                parts.push(`- 🔴 Critical: **${process.env.REVIEW_CRITICAL}**`);
+              if (parseInt(process.env.REVIEW_HIGH || '0', 10) > 0)
+                parts.push(`- 🟠 High: **${process.env.REVIEW_HIGH}**`);
+              if (suppressed > 0)
+                parts.push(`- 🧪 FP-suppressed: **${suppressed}**`);
+              parts.push('', '*Powered by [Judges Panel](https://github.com/KevinRabun/judges)*');
+              body = parts.join('\n');
+            } else {
+              body = `${marker}\n## ⚠️ Judges PR Review\n\nInline review failed — see workflow artifact for full report.\n\n*Powered by [Judges Panel](https://github.com/KevinRabun/judges)*`;
+            }
 
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;

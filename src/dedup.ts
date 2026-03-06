@@ -280,7 +280,10 @@ export function crossEvaluatorDedup(findings: Finding[]): Finding[] {
     components.set(root, comp);
   }
 
-  // Pick the best finding from each component
+  // Pick the best finding from each component, preserving prefix diversity.
+  // When a cluster merges findings from different evaluators (e.g., AUTH + CFG),
+  // keep the best finding per unique rule prefix so each evaluator's perspective
+  // is represented in the output.
   const result: Finding[] = [];
   for (const indices of components.values()) {
     if (indices.length === 1) {
@@ -302,8 +305,18 @@ export function crossEvaluatorDedup(findings: Finding[]): Finding[] {
       });
 
     const best = { ...sorted[0] };
+    const bestPrefix = best.ruleId.split("-")[0];
 
-    // Annotate with cross-references
+    // Collect the best finding from each non-winner prefix
+    const prefixRepresentatives = new Map<string, Finding>();
+    for (const f of sorted.slice(1)) {
+      const prefix = f.ruleId.split("-")[0];
+      if (prefix !== bestPrefix && !prefixRepresentatives.has(prefix)) {
+        prefixRepresentatives.set(prefix, f);
+      }
+    }
+
+    // Annotate the winner with cross-references (all other rule IDs)
     const otherRuleIds = sorted.slice(1).map((f) => f.ruleId);
     best.description += `\n\n_Also identified by: ${otherRuleIds.join(", ")}_`;
 
@@ -317,6 +330,16 @@ export function crossEvaluatorDedup(findings: Finding[]): Finding[] {
     }
 
     result.push(best);
+
+    // Preserve one representative from each additional prefix (max 3)
+    let preserved = 0;
+    for (const [_prefix, rep] of prefixRepresentatives) {
+      if (preserved >= 3) break;
+      const kept = { ...rep };
+      kept.description += `\n\n_Primary finding: ${best.ruleId}_`;
+      result.push(kept);
+      preserved++;
+    }
   }
 
   return result;

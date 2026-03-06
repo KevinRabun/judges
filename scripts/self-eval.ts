@@ -40,7 +40,7 @@ for (const f of files) {
           ": " +
           finding.title +
           " (line " +
-          (finding.line ?? "?") +
+          (finding.lineNumbers?.[0] ?? "?") +
           ")",
       );
     }

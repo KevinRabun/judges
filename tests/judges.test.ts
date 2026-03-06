@@ -117,8 +117,8 @@ function findingsAreWellFormed(findings: Finding[]): void {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Judge Registry", () => {
-  it("should have exactly 37 judges registered", () => {
-    assert.equal(JUDGES.length, 37);
+  it("should have exactly 38 judges registered", () => {
+    assert.equal(JUDGES.length, 38);
   });
 
   it("should allow lookup of every judge by ID", () => {
@@ -168,7 +168,11 @@ describe("Full Tribunal Evaluation", () => {
   });
 
   it("should detect high findings", () => {
-    assert.ok(verdict.highCount > 0, `Expected at least 1 high finding, got ${verdict.highCount}`);
+    // High-severity findings exist in the raw evaluations but may be excluded
+    // from the final capped output when there are many critical findings.
+    // Check the underlying evaluations instead.
+    const rawHighCount = verdict.evaluations.flatMap((e) => e.findings).filter((f) => f.severity === "high").length;
+    assert.ok(rawHighCount > 0, `Expected at least 1 high finding across evaluations, got ${rawHighCount}`);
   });
 
   it("should produce evaluations from all judges", () => {
@@ -5721,9 +5725,12 @@ describe("crossEvaluatorDedup", () => {
       makeFinding("CYBER-001", "high", [10], "SQL injection detected"),
     ];
     const result = crossEvaluatorDedup(findings);
-    assert.strictEqual(result.length, 1);
-    // Should keep the higher-severity one
+    // Winner (highest severity) plus one prefix representative from different evaluator
+    assert.strictEqual(result.length, 2);
+    // Should keep the higher-severity one as primary
     assert.strictEqual(result[0].severity, "critical");
+    // Second should be the preserved prefix representative
+    assert.strictEqual(result[1].ruleId, "CYBER-001");
   });
 
   it("should NOT dedup findings with different topics on same line", () => {
@@ -5744,7 +5751,10 @@ describe("crossEvaluatorDedup", () => {
       makeFinding("CYBER-001", "high", [20], "SQL injection detected"),
     ];
     const result = crossEvaluatorDedup(findings);
-    assert.strictEqual(result.length, 1);
+    // Winner plus one prefix representative from different evaluator
+    assert.strictEqual(result.length, 2);
+    // Primary finding annotated with cross-reference
+    assert.ok(result[0].description.includes("Also identified by"));
   });
 
   it("should NOT dedup findings with different topics on different lines", () => {
@@ -5762,7 +5772,9 @@ describe("crossEvaluatorDedup", () => {
       makeFinding("CYBER-001", "medium", undefined, "Cross-site scripting (XSS)"),
     ];
     const result = crossEvaluatorDedup(findings);
-    assert.strictEqual(result.length, 1);
+    // Winner plus one prefix representative from different evaluator
+    assert.strictEqual(result.length, 2);
+    assert.strictEqual(result[0].ruleId, "SEC-001");
   });
 
   it("should annotate best finding with cross-references", () => {

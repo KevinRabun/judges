@@ -1,0 +1,92 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run weekly on Sundays at 06:00 UTC
+    - cron: "0 6 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run benchmark suite
+        run: |
+          npx tsx -e "
+          import { runBenchmarkSuite, formatBenchmarkReport, formatBenchmarkMarkdown } from './src/commands/benchmark.ts';
+          import { writeFileSync, mkdirSync } from 'fs';
+
+          const result = runBenchmarkSuite();
+
+          // Save raw JSON results
+          writeFileSync('benchmark-results.json', JSON.stringify(result, null, 2));
+
+          // Print text report to CI log
+          console.log(formatBenchmarkReport(result));
+
+          // Generate markdown report for GitHub
+          const md = formatBenchmarkMarkdown(result);
+          writeFileSync('docs/benchmark-report.md', md);
+
+          console.log('');
+          console.log('Benchmark report generated successfully.');
+          console.log('Detection rate:', (result.detectionRate * 100).toFixed(1) + '%');
+          console.log('F1 score:', (result.f1Score * 100).toFixed(1) + '%');
+          console.log('FP rate:', result.truePositives + result.falsePositives > 0
+            ? ((result.falsePositives / (result.truePositives + result.falsePositives)) * 100).toFixed(1) + '%'
+            : '0.0%');
+          "
+
+      - name: Run benchmark gate
+        run: |
+          npx tsx -e "
+          import { benchmarkGate } from './src/commands/benchmark.ts';
+          const gate = benchmarkGate({ minF1: 0.6, minPrecision: 0.5, minRecall: 0.5, minDetectionRate: 0.5 });
+          if (!gate.passed) {
+            console.error('Benchmark gate FAILED:');
+            for (const f of gate.failures) console.error('  •', f);
+            process.exit(1);
+          }
+          console.log('Benchmark gate PASSED');
+          "
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-results
+          path: |
+            benchmark-results.json
+            docs/benchmark-report.md
+
+      - name: Commit benchmark report (main branch only)
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/benchmark-report.md
+          git diff --cached --quiet || git commit -m "docs: update benchmark report [skip ci]"
+          git push

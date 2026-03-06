@@ -6,7 +6,7 @@
 // file paths and/or package.json content, not direct filesystem access.
 // ──────────────────────────────────────────────────────────────────────────────
 
-import { PRESETS, listPresets } from "../presets.js";
+import { PRESETS } from "../presets.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

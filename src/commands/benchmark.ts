@@ -2703,6 +2703,152 @@ export function formatBenchmarkReport(result: BenchmarkResult): string {
   return lines.join("\n");
 }
 
+// ─── Markdown Report for GitHub Publishing ─────────────────────────────────
+
+export function formatBenchmarkMarkdown(result: BenchmarkResult): string {
+  const lines: string[] = [];
+  const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+  const grade =
+    result.f1Score >= 0.9
+      ? "A"
+      : result.f1Score >= 0.8
+        ? "B"
+        : result.f1Score >= 0.7
+          ? "C"
+          : result.f1Score >= 0.6
+            ? "D"
+            : "F";
+  const gradeEmoji = grade === "A" ? "🟢" : grade === "B" ? "🟡" : grade === "C" ? "🟠" : "🔴";
+
+  lines.push("# Judges Panel — Benchmark Report");
+  lines.push("");
+  lines.push(`> Auto-generated on ${result.timestamp} · v${result.version}`);
+  lines.push("");
+
+  // Summary badges
+  lines.push(`| Metric | Value |`);
+  lines.push(`|--------|-------|`);
+  lines.push(`| Overall Grade | ${gradeEmoji} **${grade}** |`);
+  lines.push(`| Test Cases | ${result.totalCases} |`);
+  lines.push(`| Detection Rate | ${pct(result.detectionRate)} (${result.detected}/${result.totalCases}) |`);
+  lines.push(`| Precision (lenient) | ${pct(result.precision)} |`);
+  lines.push(`| Recall (lenient) | ${pct(result.recall)} |`);
+  lines.push(`| F1 Score (lenient) | ${pct(result.f1Score)} |`);
+  lines.push(`| Precision (strict) | ${pct(result.strictPrecision)} |`);
+  lines.push(`| Recall (strict) | ${pct(result.strictRecall)} |`);
+  lines.push(`| F1 Score (strict) | ${pct(result.strictF1Score)} |`);
+  lines.push(`| True Positives | ${result.truePositives} (strict: ${result.strictTruePositives}) |`);
+  lines.push(`| False Negatives | ${result.falseNegatives} (strict: ${result.strictFalseNegatives}) |`);
+  lines.push(`| False Positives | ${result.falsePositives} |`);
+  lines.push("");
+
+  // FP Rate section
+  const totalTP = result.truePositives;
+  const totalFP = result.falsePositives;
+  const overallFpRate = totalTP + totalFP > 0 ? totalFP / (totalTP + totalFP) : 0;
+  lines.push("## False Positive Rate");
+  lines.push("");
+  lines.push(`**Overall FP Rate: ${pct(overallFpRate)}**`);
+  lines.push("");
+  lines.push("The false positive rate measures how often the tool flags code that is actually correct.");
+  lines.push("Lower is better. Industry-standard SAST tools typically range from 20-60% FP rates.");
+  lines.push("");
+
+  // Per-difficulty breakdown
+  if (result.perDifficulty && Object.keys(result.perDifficulty).length > 0) {
+    lines.push("## Detection by Difficulty");
+    lines.push("");
+    lines.push("| Difficulty | Detected | Total | Rate |");
+    lines.push("|------------|----------|-------|------|");
+    for (const diff of ["easy", "medium", "hard"]) {
+      const d = result.perDifficulty[diff];
+      if (d) {
+        lines.push(`| ${diff} | ${d.detected} | ${d.total} | ${pct(d.detectionRate)} |`);
+      }
+    }
+    lines.push("");
+  }
+
+  // Per-category breakdown
+  lines.push("## Results by Category");
+  lines.push("");
+  lines.push("| Category | Detected | Total | Precision | Recall | F1 | FP Rate |");
+  lines.push("|----------|----------|-------|-----------|--------|-----|---------|");
+  for (const [cat, stats] of Object.entries(result.perCategory).sort(([a], [b]) => a.localeCompare(b))) {
+    const catFpRate =
+      stats.truePositives + stats.falsePositives > 0
+        ? stats.falsePositives / (stats.truePositives + stats.falsePositives)
+        : 0;
+    lines.push(
+      `| ${cat} | ${stats.detected} | ${stats.total} | ${pct(stats.precision)} | ${pct(stats.recall)} | ${pct(stats.f1Score)} | ${pct(catFpRate)} |`,
+    );
+  }
+  lines.push("");
+
+  // Per-judge breakdown
+  if (result.perJudge && Object.keys(result.perJudge).length > 0) {
+    lines.push("## Results by Judge");
+    lines.push("");
+    lines.push("| Judge | Findings | TP | FP | Precision | FP Rate |");
+    lines.push("|-------|----------|-----|-----|-----------|---------|");
+    for (const [judgeId, stats] of Object.entries(result.perJudge).sort(([a], [b]) => a.localeCompare(b))) {
+      const judgeFpRate =
+        stats.truePositives + stats.falsePositives > 0
+          ? stats.falsePositives / (stats.truePositives + stats.falsePositives)
+          : 0;
+      lines.push(
+        `| ${judgeId} | ${stats.total} | ${stats.truePositives} | ${stats.falsePositives} | ${pct(stats.precision)} | ${pct(judgeFpRate)} |`,
+      );
+    }
+    lines.push("");
+  }
+
+  // Clean code / FP test results
+  const cleanCases = result.cases.filter((c) => c.category === "clean");
+  if (cleanCases.length > 0) {
+    lines.push("## Clean Code (False Positive Tests)");
+    lines.push("");
+    lines.push("These test cases are well-written code that should produce **zero** findings.");
+    lines.push("Any finding on these cases is a false positive.");
+    lines.push("");
+    lines.push("| Case | Passed | False Positives |");
+    lines.push("|------|--------|-----------------|");
+    for (const c of cleanCases) {
+      const status = c.passed ? "✅" : "❌";
+      const fps = c.falsePositiveRuleIds.length > 0 ? c.falsePositiveRuleIds.join(", ") : "none";
+      lines.push(`| ${c.caseId} | ${status} | ${fps} |`);
+    }
+    const fpCleanTotal = cleanCases.filter((c) => !c.passed).length;
+    lines.push("");
+    lines.push(
+      `**Clean code FP rate: ${fpCleanTotal}/${cleanCases.length} cases had false positives (${pct(fpCleanTotal / cleanCases.length)})**`,
+    );
+    lines.push("");
+  }
+
+  // Failed cases detail
+  const failed = result.cases.filter((c) => !c.passed);
+  if (failed.length > 0) {
+    lines.push("## Failed Cases");
+    lines.push("");
+    lines.push("| Case | Difficulty | Category | Missed Rules | False Positives |");
+    lines.push("|------|------------|----------|--------------|-----------------|");
+    for (const c of failed) {
+      const missed = c.missedRuleIds.length > 0 ? c.missedRuleIds.join(", ") : "—";
+      const fps = c.falsePositiveRuleIds.length > 0 ? c.falsePositiveRuleIds.join(", ") : "—";
+      lines.push(`| ${c.caseId} | ${c.difficulty} | ${c.category} | ${missed} | ${fps} |`);
+    }
+    lines.push("");
+  }
+
+  lines.push("---");
+  lines.push("");
+  lines.push("*Generated by [Judges Panel](https://github.com/KevinRabun/judges) benchmark suite.*");
+  lines.push("");
+
+  return lines.join("\n");
+}
+
 // ─── CLI Command ────────────────────────────────────────────────────────────
 
 export function runBenchmark(argv: string[]): void {
@@ -2714,14 +2860,15 @@ Judges Panel — Benchmark Suite
 
 USAGE:
   judges benchmark run [--judge <id>]     Run benchmark suite
-  judges benchmark report                  View last benchmark report
+  judges benchmark report                  Generate markdown benchmark report
   judges benchmark compare <a.json> <b.json>  Compare two runs
 
 OPTIONS:
   --judge, -j <id>     Benchmark a single judge
-  --output, -o <path>  Save results to JSON file
+  --output, -o <path>  Save results to file
   --save               Save results to benchmark-results.json
-  --format <fmt>       Output: text, json
+  --format <fmt>       Output: text, json, markdown
+  --fresh              Re-run benchmark even if saved results exist
 
 CI GATE OPTIONS:
   --gate                     Enable CI gate mode (exit 1 on failure)
@@ -2843,6 +2990,46 @@ CI GATE OPTIONS:
         process.exit(1);
       } else {
         console.log("\n  ✅ CI Gate PASSED — all thresholds met.");
+      }
+    }
+
+    process.exit(0);
+  }
+
+  if (subcommand === "report") {
+    // Generate or display a benchmark report in markdown format
+    const reportOutputPath = argv.find((_, i) => argv[i - 1] === "--output" || argv[i - 1] === "-o") || undefined;
+    const reportFormat = argv.find((_, i) => argv[i - 1] === "--format") || "markdown";
+
+    // Check if there's a saved result to load, otherwise run fresh
+    let result: BenchmarkResult;
+    const savedPath = resolve("benchmark-results.json");
+    if (existsSync(savedPath) && !argv.includes("--fresh")) {
+      result = JSON.parse(readFileSync(savedPath, "utf-8"));
+      console.log(`  Loaded saved benchmark results from: benchmark-results.json`);
+    } else {
+      result = runBenchmarkSuite(undefined, judgeId);
+    }
+
+    if (reportFormat === "json") {
+      const output = JSON.stringify(result, null, 2);
+      if (reportOutputPath) {
+        const rDir = dirname(resolve(reportOutputPath));
+        if (!existsSync(rDir)) mkdirSync(rDir, { recursive: true });
+        writeFileSync(resolve(reportOutputPath), output, "utf-8");
+        console.log(`  Report saved to: ${reportOutputPath}`);
+      } else {
+        console.log(output);
+      }
+    } else {
+      const md = formatBenchmarkMarkdown(result);
+      if (reportOutputPath) {
+        const rDir = dirname(resolve(reportOutputPath));
+        if (!existsSync(rDir)) mkdirSync(rDir, { recursive: true });
+        writeFileSync(resolve(reportOutputPath), md, "utf-8");
+        console.log(`  Report saved to: ${reportOutputPath}`);
+      } else {
+        console.log(md);
       }
     }
 

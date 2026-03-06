@@ -36,6 +36,7 @@ import { agentInstructionsJudge } from "./agent-instructions.js";
 import { aiCodeSafetyJudge } from "./ai-code-safety.js";
 import { frameworkSafetyJudge } from "./framework-safety.js";
 import { iacSecurityJudge } from "./iac-security.js";
+import { securityJudge } from "./security.js";
 import { falsePositiveReviewJudge } from "./false-positive-review.js";
 
 // ─── Analyzer Imports ────────────────────────────────────────────────────────
@@ -75,6 +76,7 @@ import { analyzeAgentInstructions } from "../evaluators/agent-instructions.js";
 import { analyzeAiCodeSafety } from "../evaluators/ai-code-safety.js";
 import { analyzeFrameworkSafety } from "../evaluators/framework-safety.js";
 import { analyzeIacSecurity } from "../evaluators/iac-security.js";
+import { analyzeSecurity } from "../evaluators/security.js";
 
 // ─── Wire each judge to its analyzer ─────────────────────────────────────────
 
@@ -114,6 +116,7 @@ agentInstructionsJudge.analyze = analyzeAgentInstructions;
 aiCodeSafetyJudge.analyze = analyzeAiCodeSafety;
 frameworkSafetyJudge.analyze = analyzeFrameworkSafety;
 iacSecurityJudge.analyze = analyzeIacSecurity;
+securityJudge.analyze = analyzeSecurity;
 
 /**
  * The panel of judges that comprise the Judges Panel.
@@ -159,6 +162,7 @@ export const JUDGES: JudgeDefinition[] = [
   aiCodeSafetyJudge,
   frameworkSafetyJudge,
   iacSecurityJudge,
+  securityJudge,
   falsePositiveReviewJudge,
 ];
 

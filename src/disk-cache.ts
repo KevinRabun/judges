@@ -12,7 +12,7 @@
 // be overridden via the JUDGES_CACHE_DIR env variable or config.
 // ──────────────────────────────────────────────────────────────────────────────
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { contentHash } from "./cache.js";
 

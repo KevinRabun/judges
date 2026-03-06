@@ -56,6 +56,9 @@ const LANG_ALIAS_MAP: Record<string, LangFamily> = {
   kt: "kotlin",
   kts: "kotlin",
   swift: "swift",
+  dockerfile: "dockerfile",
+  docker: "dockerfile",
+  containerfile: "dockerfile",
 };
 
 /**
@@ -83,7 +86,8 @@ export function isBraceLang(lang: LangFamily): boolean {
     lang !== "unknown" &&
     lang !== "terraform" &&
     lang !== "bicep" &&
-    lang !== "arm"
+    lang !== "arm" &&
+    lang !== "dockerfile"
   );
 }
 
@@ -91,7 +95,7 @@ export function isBraceLang(lang: LangFamily): boolean {
  * Returns true if the language is an Infrastructure as Code language.
  */
 export function isIaC(lang: LangFamily): boolean {
-  return lang === "terraform" || lang === "bicep" || lang === "arm";
+  return lang === "terraform" || lang === "bicep" || lang === "arm" || lang === "dockerfile";
 }
 
 // ─── Pattern Builders ────────────────────────────────────────────────────────
@@ -577,6 +581,7 @@ export const MANIFEST_FILES: Record<LangFamily, string[]> = {
   ruby: ["Gemfile", "Gemfile.lock", "*.gemspec"],
   kotlin: ["build.gradle.kts", "build.gradle", "pom.xml"],
   swift: ["Package.swift", "*.xcodeproj", "Podfile"],
+  dockerfile: ["Dockerfile", "Containerfile", ".dockerignore"],
   unknown: [],
 };
 
@@ -684,7 +689,7 @@ export const UNSAFE_DESERIALIZATION = {
   python: String.raw`pickle\.loads?\s*\(|yaml\.(?:load|unsafe_load)\s*\(|marshal\.loads?\s*\(`,
   rust: String.raw`serde_yaml::from_str.*(?:unsafe|user)`,
   csharp: String.raw`BinaryFormatter\.Deserialize|JsonConvert\.DeserializeObject.*(?:TypeNameHandling|TypeNameAssemblyFormatHandling)`,
-  java: String.raw`ObjectInputStream\.readObject|XMLDecoder\.readObject|readUnshared`,
+  java: String.raw`ObjectInputStream\.readObject|XMLDecoder\.readObject|readUnshared|new\s+ObjectInputStream|\w+\.readObject\s*\(`,
   go: String.raw`encoding/gob|json\.Unmarshal\(.*(?:req\.|request\.)`,
   powershell: String.raw`Import-Clixml|\[System\.Runtime\.Serialization.*Deserialize|ConvertFrom-Json.*\$`,
   php: String.raw`unserialize\s*\(|json_decode\s*\(\s*\$_`,

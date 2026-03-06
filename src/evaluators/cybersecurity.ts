@@ -645,6 +645,287 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
     });
   }
 
+  // ── SQL Injection (multi-language) — string concatenation / interpolation in SQL context ──
+  const sqlInjLines = getLangLineNumbers(code, language, LP.SQL_INJECTION);
+  if (sqlInjLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "critical",
+      title: "Potential SQL injection via string concatenation",
+      description:
+        "SQL queries are constructed using string concatenation or interpolation with potentially untrusted input, allowing attackers to manipulate queries.",
+      lineNumbers: sqlInjLines,
+      recommendation:
+        "Use parameterized queries or prepared statements. Never concatenate user input into SQL strings.",
+      reference: "OWASP SQL Injection — CWE-89",
+      suggestedFix:
+        "Use parameterized queries: db.query('SELECT * FROM users WHERE id = $1', [userId]) instead of string concatenation.",
+      confidence: 0.95,
+    });
+  } else {
+    // Fallback: detect SQL string construction via template interpolation or concatenation
+    // Catches both direct patterns (query(`SELECT ${x}`)) and indirect ones (const sql = `SELECT ${x}`)
+    const sqlFallbackLines: number[] = [];
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      // Skip comment lines
+      if (/^\s*(?:\/\/|\/\*|\*[\s/]|\*$|#(?![![])|"""|'''|<!--)/.test(line)) continue;
+      const hasSqlKeyword = /\b(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN|INTO|VALUES|SET)\b/i.test(line);
+      if (!hasSqlKeyword) continue;
+      const hasInterpolation =
+        /\$\{/.test(line) || // JS/TS template literal interpolation
+        /\$"[^"]*\{/.test(line) || // C# string interpolation ($"...{var}...")
+        /\+\s*\w/.test(line) || // String concatenation
+        /f["']/.test(line) || // Python f-string
+        /\.format\s*\(/.test(line) || // Python .format() / C# String.Format
+        /String\.format/i.test(line) || // Java String.format
+        /fmt\.Sprintf/i.test(line) || // Go fmt.Sprintf
+        /%[sdvq]/.test(line); // printf-style
+      if (hasInterpolation) {
+        sqlFallbackLines.push(i + 1);
+      }
+    }
+    if (sqlFallbackLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Potential SQL injection via string concatenation",
+        description:
+          "SQL queries appear to include dynamically concatenated or interpolated values, which may allow SQL injection if user input is included.",
+        lineNumbers: sqlFallbackLines,
+        recommendation:
+          "Use parameterized queries or prepared statements. Never concatenate variables into SQL strings.",
+        reference: "OWASP SQL Injection — CWE-89",
+        suggestedFix:
+          "Use parameterized queries: db.query('SELECT * FROM users WHERE id = $1', [userId]) instead of string concatenation.",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  // ── Server-side XSS — unsanitized output in HTTP responses ──
+  {
+    const ssXssPattern =
+      /(?:res\.send|res\.write|response\.write|response\.send|resp\.getWriter|fmt\.Fprint|HttpResponse)\s*\(.*(?:\+\s*(?:req\.|request\.|params\.|query\.)|\$\{.*(?:req\.|request\.|query|params))/gi;
+    const ssXssLines = getLineNumbers(code, ssXssPattern);
+    // Also check multi-line: response method on one line with user input concat
+    const lines = code.split("\n");
+    const multiLineXssLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (/(?:res\.send|res\.write|response\.write|fmt\.Fprint)\s*\(/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 3), i + 1).join("\n");
+        if (/(?:req\.|request\.|params\.|query\.)/i.test(ctx) && /\+|`[^`]*\$\{|\.format\s*\(|Sprintf/i.test(ctx)) {
+          multiLineXssLines.push(i + 1);
+        }
+      }
+    }
+    const allXssLines = [...new Set([...ssXssLines, ...multiLineXssLines])].sort((a, b) => a - b);
+    if (allXssLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Potential server-side XSS via unsanitized response output",
+        description:
+          "User input is concatenated into an HTTP response without sanitization, allowing reflected Cross-Site Scripting (XSS) attacks.",
+        lineNumbers: allXssLines,
+        recommendation:
+          "Sanitize all user input before including in responses. Use template engines with auto-escaping or HTML encoding functions.",
+        reference: "OWASP XSS Prevention — CWE-79",
+        suggestedFix:
+          "Encode output: res.send(escapeHtml(userInput)) or use a template engine with auto-escaping enabled.",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  // ── Path Traversal — file operations with user input ──
+  {
+    const pathTravPattern =
+      /(?:readFile|readFileSync|createReadStream|readdir|stat|access|open|unlink|writeFile|writeFileSync|os\.ReadFile|os\.Open|ioutil\.ReadFile|File\.read|file_get_contents)\s*\(.*(?:\+\s*(?:req\.|request\.|params\.|query\.)|`[^`]*\$\{.*(?:req\.|request\.|params\.|query\.))/gi;
+    const pathTravLines = getLineNumbers(code, pathTravPattern);
+    // Also multi-line: file read with user input in context
+    const pathTravMultiLines: number[] = [];
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      if (
+        /(?:readFile|readFileSync|createReadStream|open|os\.ReadFile|os\.Open|ioutil\.ReadFile)\s*\(/i.test(line) &&
+        /(?:req\.|request\.|params\.|query\.)/i.test(line) &&
+        /\+/i.test(line)
+      ) {
+        pathTravMultiLines.push(i + 1);
+      }
+    }
+    const allPathTravLines = [...new Set([...pathTravLines, ...pathTravMultiLines])].sort((a, b) => a - b);
+    if (allPathTravLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Potential path traversal via user input in file operations",
+        description:
+          "File system operations use paths that include user-controlled input, allowing attackers to read or write arbitrary files using ../sequences.",
+        lineNumbers: allPathTravLines,
+        recommendation:
+          "Validate and sanitize file paths. Use path.resolve() or path.normalize() and ensure the resolved path is within an allowed directory. Reject paths containing '..'.",
+        reference: "OWASP Path Traversal — CWE-22",
+        suggestedFix:
+          "Validate paths: const safePath = path.resolve(BASE_DIR, userInput); if (!safePath.startsWith(BASE_DIR)) throw new Error('path traversal blocked');",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  // ── Unsafe Deserialization (multi-language) ──
+  const deserLines = getLangLineNumbers(code, language, LP.UNSAFE_DESERIALIZATION);
+  if (deserLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "critical",
+      title: "Unsafe deserialization of untrusted data",
+      description:
+        "Deserializing data from untrusted sources can lead to remote code execution (RCE). Attackers can craft malicious serialized payloads to execute arbitrary code.",
+      lineNumbers: deserLines,
+      recommendation:
+        "Never deserialize untrusted data. Use safe alternatives: JSON for data exchange, schema validation before processing. Avoid pickle, ObjectInputStream, Marshal with untrusted input.",
+      reference: "OWASP Deserialization — CWE-502",
+      suggestedFix:
+        "Replace unsafe deserialization with JSON parsing and schema validation. Python: use json.loads() instead of pickle.loads(). Java: use JSON libraries instead of ObjectInputStream.",
+      confidence: 0.9,
+    });
+  }
+
+  // ── Enhanced SSRF — multi-line variable tracking ──
+  if (ssrfLines.length === 0) {
+    // If the single-line SSRF regex didn't match, check multi-line patterns:
+    // fetch(variable) where variable was assigned from req.* in surrounding lines
+    const cLines = code.split("\n");
+    const ssrfMultiLines: number[] = [];
+    for (let i = 0; i < cLines.length; i++) {
+      const line = cLines[i];
+      const fetchMatch = line.match(
+        /(?:fetch|axios|http\.get|requests\.get|urllib|HttpClient|WebClient|reqwest|http\.NewRequest|httpx|aiohttp)\s*\(\s*(\w+)/i,
+      );
+      if (fetchMatch) {
+        const varName = fetchMatch[1];
+        // Check surrounding lines for assignment from user input
+        const start = Math.max(0, i - 10);
+        const ctx = cLines.slice(start, i).join("\n");
+        const assignPattern = new RegExp(
+          `(?:const|let|var|:=)?\\s*${varName}\\s*[:=]\\s*.*(?:req\\.|request\\.|params\\.|query\\.|body\\.|input|url)`,
+          "i",
+        );
+        if (assignPattern.test(ctx)) {
+          ssrfMultiLines.push(i + 1);
+        }
+      }
+    }
+    if (ssrfMultiLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Potential Server-Side Request Forgery (SSRF)",
+        description:
+          "A URL from user input is passed to a server-side HTTP client via a variable, allowing attackers to access internal services or cloud metadata endpoints.",
+        lineNumbers: ssrfMultiLines,
+        recommendation:
+          "Validate and whitelist allowed URLs/domains. Block access to internal IP ranges (10.x, 172.16-31.x, 192.168.x, 169.254.169.254). Use a URL parser to verify the host.",
+        reference: "OWASP SSRF — CWE-918",
+        suggestedFix:
+          "Validate URLs against an allowlist: const url = new URL(input); if (!ALLOWED_HOSTS.includes(url.hostname)) throw new Error('blocked');",
+        confidence: 0.85,
+      });
+    }
+  }
+
+  // ── Timing attack — non-constant-time comparison of secrets ──
+  {
+    const timingLines: number[] = [];
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      // Check for string comparison (===, ==) involving secret/signature/token/hmac/hash
+      if (
+        /(?:signature|secret|token|hmac|hash|digest|apikey|api_key)\s*(?:===?|!==?)\s*\w+|^\s*if\s*\(.*(?:signature|secret|token|hmac|hash|digest)\s*(?:===?|!==?)/i.test(
+          line,
+        )
+      ) {
+        const ctx = codeLines.slice(Math.max(0, i - 5), Math.min(codeLines.length, i + 6)).join("\n");
+        // Only flag if no constant-time comparison (crypto.timingSafeEqual, hmac.equal, etc.)
+        if (
+          !/timingSafeEqual|constantTimeCompare|hmac\.Equal|secure_compare|constant_time_compare|compare_digest/i.test(
+            ctx,
+          )
+        ) {
+          timingLines.push(i + 1);
+        }
+      }
+    }
+    if (timingLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Non-constant-time comparison of secrets",
+        description:
+          "Secrets, signatures, or tokens are compared using standard equality operators (===, ==) which are vulnerable to timing attacks. An attacker can determine the correct value byte-by-byte by measuring response time.",
+        lineNumbers: timingLines,
+        recommendation:
+          "Use constant-time comparison: crypto.timingSafeEqual() (Node.js), hmac.Equal() (Go), hmac.compare_digest() (Python), or MessageDigest.isEqual() (Java).",
+        reference: "CWE-208: Observable Timing Discrepancy",
+        suggestedFix: "Replace === comparison with: crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));",
+        confidence: 0.85,
+      });
+    }
+  }
+
+  // ── Unsafe Rust code — unsafe blocks without safety documentation ──
+  if (lang === "rust") {
+    const unsafeLines = getLineNumbers(code, /\bunsafe\s*\{/g);
+    if (unsafeLines.length > 0) {
+      const hasSafetyDoc = testCode(code, /\/\/\s*SAFETY:|\/\/\s*UNSAFE:|#\[allow\(unsafe_code\)\]/gi);
+      if (!hasSafetyDoc) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "high",
+          title: "Unsafe code block without safety documentation",
+          description:
+            "Unsafe code bypasses Rust's safety guarantees (bounds checking, lifetime tracking). Undocumented unsafe blocks are high-risk for memory safety bugs.",
+          lineNumbers: unsafeLines,
+          recommendation:
+            "Minimize unsafe code. Document safety invariants with // SAFETY: comments. Consider safe alternatives. Review for buffer overflows and dangling pointers.",
+          reference: "CWE-119 / CWE-787: Buffer Overflow / Out-of-bounds Write",
+          suggestedFix:
+            "Add safety documentation: // SAFETY: <explain why this is safe> above each unsafe block, and minimize the scope of unsafe.",
+          confidence: 0.85,
+        });
+      }
+    }
+  }
+
+  // ── Insecure HTTP URLs for sensitive operations ──
+  {
+    const httpUrlLines = getLineNumbers(
+      code,
+      /["'`]http:\/\/(?!localhost|127\.0\.0\.1|0\.0\.0\.0)[^"'`\s]+(?:auth|login|password|token|payment|charge|api|secret)/gi,
+    );
+    if (httpUrlLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Sensitive operations over insecure HTTP",
+        description:
+          "Sensitive operations (authentication, payment, API calls) use unencrypted HTTP URLs, exposing data to network interception.",
+        lineNumbers: httpUrlLines,
+        recommendation:
+          "Use HTTPS for all sensitive operations. Replace http:// with https:// and enforce TLS for all API communication.",
+        reference: "CWE-319: Cleartext Transmission of Sensitive Information",
+        suggestedFix: "Replace http:// with https:// for all sensitive endpoints.",
+        confidence: 0.85,
+      });
+    }
+  }
+
   // ── Framework-specific security rules ─────────────────────────────────────
 
   // Debug mode enabled in production-ready code

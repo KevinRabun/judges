@@ -10,10 +10,10 @@
 // ──────────────────────────────────────────────────────────────────────────────
 
 import { existsSync, readFileSync } from "fs";
-import { resolve, join } from "path";
-import { parseConfig, mergeConfigs, defaultConfig, validatePluginSpecifiers } from "../config.js";
+import { resolve } from "path";
+import { parseConfig, validatePluginSpecifiers } from "../config.js";
 import { JUDGES } from "../judges/index.js";
-import { listPresets, getPreset } from "../presets.js";
+import { listPresets } from "../presets.js";
 import type { JudgesConfig } from "../types.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────

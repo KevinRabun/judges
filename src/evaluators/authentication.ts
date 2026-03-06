@@ -16,6 +16,10 @@ function getHardcodedCredentialLinesWithoutPlaceholders(code: string): number[] 
   const assignmentPattern =
     /\b(password|passwd|pwd|secret|api_?key|apikey|token|auth_?token)\b\s*[:=]\s*["'`]([^"'`]{3,})["'`]/gi;
 
+  // Also match compound identifiers like DB_PASSWORD, ADMIN_SECRET, MY_API_KEY
+  const compoundAssignmentPattern =
+    /\b\w+[_-](password|passwd|pwd|secret|api_?key|apikey|token|auth_?token)\b\s*[:=]\s*["'`]([^"'`]{3,})["'`]/gi;
+
   const nonProductionContextPattern =
     /\b(?:test|tests|mock|mocks|fixture|fixtures|harness|e2e|example|sample|dummy)\b/i;
   const productionContextPattern = /\b(?:prod|production|release|deploy|deployment)\b/i;
@@ -30,15 +34,21 @@ function getHardcodedCredentialLinesWithoutPlaceholders(code: string): number[] 
     if (isCommentLine(line)) continue;
     // Skip lines where credential keywords appear inside regex literals or test/match calls
     if (/\/[^/\n]+\/[gimsuy]*/.test(line) && /\.test\s*\(|\.match\s*\(|new\s+RegExp/i.test(line)) continue;
-    const matches = [...line.matchAll(assignmentPattern)];
+    const matches = [...line.matchAll(assignmentPattern), ...line.matchAll(compoundAssignmentPattern)];
     if (matches.length === 0) continue;
 
     const contextStart = Math.max(0, index - 2);
     const contextEnd = Math.min(lines.length, index + 3);
     const context = lines.slice(contextStart, contextEnd).join("\n");
 
+    // Strip URLs and domain names before checking non-production context
+    // to avoid false suppression from domains like "api.example.com"
+    const contextWithoutUrls = context
+      .replace(/https?:\/\/[^\s"'`]+/gi, "")
+      .replace(/[a-z0-9-]+\.(?:example|test|localhost)\.[a-z]{2,}/gi, "");
+
     const isLikelyNonProductionContext =
-      nonProductionContextPattern.test(context) && !productionContextPattern.test(context);
+      nonProductionContextPattern.test(contextWithoutUrls) && !productionContextPattern.test(contextWithoutUrls);
 
     const hasRealCredential = matches.some((match) => {
       const value = match[2] ?? "";
@@ -280,6 +290,63 @@ export function analyzeAuthentication(code: string, language: string, context?: 
       confidence: 0.55,
       isAbsenceBased: true,
       provenance: "absence-of-pattern",
+    });
+  }
+
+  // JWT decode used for auth decisions without signature verification
+  const hasJwtDecode = testCode(code, /jwt\.decode|jwtDecode|jose\.decodeJwt/gi);
+  const jwtDecodeLines = getLineNumbers(code, /jwt\.decode\s*\(|jwtDecode\s*\(|jose\.decodeJwt\s*\(/gi);
+  if (hasJwtDecode && !hasJwtVerify) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "critical",
+      title: "JWT decoded without signature verification",
+      description:
+        "JWT tokens are decoded (jwt.decode) but never verified (jwt.verify). jwt.decode does NOT validate the signature — any attacker can forge tokens with arbitrary claims. This is the 'none algorithm' vulnerability.",
+      lineNumbers: jwtDecodeLines,
+      recommendation:
+        "Always use jwt.verify() with a secret/key and explicit algorithm restriction. Never use jwt.decode() for authorization decisions.",
+      reference: "CWE-347: Improper Verification of Cryptographic Signature / OWASP JWT Cheat Sheet",
+      suggestedFix:
+        "Replace jwt.decode(token) with jwt.verify(token, secret, { algorithms: ['HS256'] }). Never trust decoded JWT claims without verifying the signature.",
+      confidence: 0.95,
+    });
+  }
+
+  // Timing-unsafe comparison of secrets/tokens/signatures
+  const timingLines: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Detect === or == comparison of variables named secret/token/signature/hash/hmac/expected/digest
+    if (
+      /(?:secret|token|signature|hash|hmac|expected|digest|apiKey|api_key)\s*===?\s*\w|(?:\w)\s*===?\s*(?:secret|token|signature|hash|hmac|expected|digest|apiKey|api_key)/i.test(
+        line,
+      )
+    ) {
+      // Make sure it's actually a comparison, not assignment
+      if (/===|==[^=]/.test(line)) {
+        timingLines.push(i + 1);
+      }
+    }
+  }
+  const hasTimingSafe = testCode(
+    code,
+    /timingSafeEqual|constantTimeCompare|constant_time_compare|secure_compare|MessageDigest\.isEqual|hmac\.Equal|subtle\.ConstantTimeCompare/gi,
+  );
+  if (timingLines.length > 0 && !hasTimingSafe) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Timing-unsafe comparison of secrets or signatures",
+      description:
+        "Secrets, tokens, or cryptographic signatures are compared using === or == instead of a constant-time comparison function. An attacker can measure response times to deduce the expected value byte-by-byte.",
+      lineNumbers: timingLines,
+      recommendation:
+        "Use crypto.timingSafeEqual() (Node.js), hmac.compare_digest() (Python), MessageDigest.isEqual() (Java), subtle.ConstantTimeCompare() (Go), or equivalent constant-time comparison.",
+      reference: "CWE-208: Observable Timing Discrepancy",
+      suggestedFix:
+        "Replace `if (a === b)` with `if (crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b)))` to prevent timing attacks.",
+      confidence: 0.85,
     });
   }
 

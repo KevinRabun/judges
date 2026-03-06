@@ -134,6 +134,7 @@ export type LangFamily =
   | "terraform"
   | "bicep"
   | "arm"
+  | "dockerfile"
   | "unknown";
 
 /**

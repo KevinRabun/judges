@@ -73,6 +73,43 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
     });
   }
 
+  // ── Go: Unsynchronized map in HTTP handler context ──
+  if (_lang === "go") {
+    const goMapLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Detect package-level map declarations (var cache = make(map[...]) or var cache map[...])
+      if (/^\s*var\s+\w+\s*=\s*make\s*\(\s*map\b/.test(line) || /^\s*var\s+\w+\s+map\[/.test(line)) {
+        const varName = line.match(/var\s+(\w+)/)?.[1];
+        if (!varName) continue;
+        const restOfFile = lines.slice(i + 1).join("\n");
+        // Check if accessed from HTTP handler or goroutine context
+        const hasHttpHandler = /func\s+\w+\s*\(\s*\w+\s+http\.ResponseWriter/.test(restOfFile);
+        const hasGoroutine = /\bgo\s+func\b/.test(restOfFile);
+        const hasMutex = /sync\.(RW)?Mutex|sync\.Map/.test(code);
+        if ((hasHttpHandler || hasGoroutine) && !hasMutex && new RegExp(`\\b${varName}\\b`).test(restOfFile)) {
+          goMapLines.push(i + 1);
+        }
+      }
+    }
+    if (goMapLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Unsynchronized map access in concurrent context",
+        description:
+          "Go maps are not safe for concurrent use. Accessing a package-level map from HTTP handlers (which run concurrently) causes data races and potential panics.",
+        lineNumbers: goMapLines,
+        recommendation:
+          "Use sync.RWMutex to guard map access, or replace with sync.Map for simple key-value caching. For high-concurrency cases, consider sharded maps.",
+        reference: "Go Race Detector / Go Maps in Action",
+        suggestedFix:
+          "Protect map access with a mutex: var mu sync.RWMutex; mu.RLock(); v := cache[key]; mu.RUnlock(); or use sync.Map instead.",
+        confidence: 0.9,
+      });
+    }
+  }
+
   // Detect missing await
   const missingAwaitLines: number[] = [];
   lines.forEach((line, i) => {

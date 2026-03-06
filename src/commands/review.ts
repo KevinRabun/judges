@@ -15,10 +15,13 @@
  */
 
 import { execSync } from "child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
-import { resolve, extname, dirname } from "path";
+import { readFileSync, writeFileSync } from "fs";
+import { resolve, extname } from "path";
 import { evaluateDiff } from "../evaluators/index.js";
-import type { Finding, Severity } from "../types.js";
+import type { EvaluationOptions } from "../evaluators/index.js";
+import type { Finding, Severity, JudgesConfig } from "../types.js";
+import { parseConfig, loadCascadingConfig } from "../config.js";
+import { loadFeedbackStore, getFpRateByRule } from "./feedback.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -31,6 +34,12 @@ interface ReviewArgs {
   format: "text" | "json";
   maxComments: number;
   token: string | undefined;
+  /** Path to .judgesrc config file (auto-discovered if not set) */
+  configPath: string | undefined;
+  /** Maximum FP rate threshold — suppress rules with FP rate above this (0–1) */
+  confidence: number;
+  /** Enable feedback-driven confidence calibration */
+  calibrate: boolean;
 }
 
 interface PrFile {
@@ -260,7 +269,7 @@ function ghCliRequest(method: string, endpoint: string, body?: unknown): { statu
       }
     }
     return { status: 200, data: output ? JSON.parse(output) : null };
-  } catch (e: unknown) {
+  } catch {
     if (body) {
       try {
         const tmpFile = resolve(".judges-review-tmp.json");
@@ -333,11 +342,19 @@ interface ReviewResult {
   highCount: number;
   mediumCount: number;
   lowCount: number;
+  fpSuppressed: number;
   approved: boolean;
   comments: ReviewComment[];
 }
 
-function reviewPrFiles(files: PrFile[], minSeverity: Severity, maxComments: number): ReviewResult {
+function reviewPrFiles(
+  files: PrFile[],
+  minSeverity: Severity,
+  maxComments: number,
+  options?: EvaluationOptions,
+  fpRates?: Map<string, number>,
+  fpThreshold?: number,
+): ReviewResult {
   const comments: ReviewComment[] = [];
   let totalFindings = 0;
   let criticalCount = 0;
@@ -345,6 +362,7 @@ function reviewPrFiles(files: PrFile[], minSeverity: Severity, maxComments: numb
   let mediumCount = 0;
   let lowCount = 0;
   let filesAnalyzed = 0;
+  let fpSuppressed = 0;
 
   for (const file of files) {
     // Skip removed files and files without patches
@@ -359,9 +377,24 @@ function reviewPrFiles(files: PrFile[], minSeverity: Severity, maxComments: numb
     const hunk = parsePatchToHunk(file.filename, file.patch);
     if (hunk.changedLines.length === 0) continue;
 
-    const verdict = evaluateDiff(hunk.newContent, lang, hunk.changedLines);
+    // Build per-file EvaluationOptions (includes config + filePath)
+    const fileOpts: EvaluationOptions = {
+      ...options,
+      filePath: file.filename,
+    };
+
+    const verdict = evaluateDiff(hunk.newContent, lang, hunk.changedLines, undefined, fileOpts);
 
     for (const finding of verdict.findings) {
+      // Suppress findings from rules with high FP rates
+      if (fpRates && fpThreshold !== undefined) {
+        const rate = fpRates.get(finding.ruleId);
+        if (rate !== undefined && rate > fpThreshold) {
+          fpSuppressed++;
+          continue;
+        }
+      }
+
       totalFindings++;
 
       switch (finding.severity) {
@@ -416,6 +449,7 @@ function reviewPrFiles(files: PrFile[], minSeverity: Severity, maxComments: numb
     highCount,
     mediumCount,
     lowCount,
+    fpSuppressed,
     approved: !hasBlockers,
     comments: truncated,
   };
@@ -437,6 +471,11 @@ function buildReviewSummary(result: ReviewResult): string {
     if (result.highCount > 0) lines.push(`| 🟠 High | ${result.highCount} |`);
     if (result.mediumCount > 0) lines.push(`| 🟡 Medium | ${result.mediumCount} |`);
     if (result.lowCount > 0) lines.push(`| 🔵 Low | ${result.lowCount} |`);
+    lines.push("");
+  }
+
+  if (result.fpSuppressed > 0) {
+    lines.push(`> 🧪 ${result.fpSuppressed} finding(s) suppressed by FP-rate calibration.`);
     lines.push("");
   }
 
@@ -470,6 +509,9 @@ export function parseReviewArgs(argv: string[]): ReviewArgs {
     format: "text",
     maxComments: 25,
     token: getToken(),
+    configPath: undefined,
+    confidence: 1.0,
+    calibrate: false,
   };
 
   for (let i = 3; i < argv.length; i++) {
@@ -499,6 +541,16 @@ export function parseReviewArgs(argv: string[]): ReviewArgs {
       case "--max-comments":
         args.maxComments = parseInt(argv[++i], 10);
         break;
+      case "--config":
+      case "-c":
+        args.configPath = argv[++i];
+        break;
+      case "--confidence":
+        args.confidence = parseFloat(argv[++i]);
+        break;
+      case "--calibrate":
+        args.calibrate = true;
+        break;
       default:
         // Positional: treat as PR number if numeric
         if (!arg.startsWith("-") && /^\d+$/.test(arg) && args.pr === 0) {
@@ -521,8 +573,9 @@ Judges Panel — Pull Request Review
 USAGE:
   judges review --pr <number>                Review a pull request
   judges review --pr <number> --dry-run      Preview without posting
-  judges review --pr 42 --approve            Auto-approve if clean
+  judges review --pr 42 --approve            Auto-approve if no critical/high
   judges review --pr 42 --repo owner/repo    Review PR in specific repo
+  judges review --pr 42 --calibrate          Enable FP-rate calibration
 
 OPTIONS:
   --pr, -p <number>       PR number (required)
@@ -532,6 +585,9 @@ OPTIONS:
   --min-severity <level>  Minimum severity: critical, high, medium (default), low, info
   --max-comments <n>      Maximum inline comments (default: 25)
   --format <fmt>          Output: text (default), json
+  --config, -c <path>     Path to .judgesrc config file (auto-discovered if omitted)
+  --confidence <0-1>      Suppress rules with FP rate above this threshold (default: 1.0)
+  --calibrate             Enable feedback-driven confidence calibration
 
 AUTHENTICATION:
   Set GITHUB_TOKEN env var, or install the \`gh\` CLI and run \`gh auth login\`.
@@ -573,8 +629,55 @@ AUTHENTICATION:
 
   console.log(`  Files in PR: ${prFiles.length}`);
 
+  // ── Load .judgesrc config ───────────────────────────────────────────────
+  let config: JudgesConfig | undefined;
+  if (args.configPath) {
+    // Explicit config path
+    try {
+      const raw = readFileSync(resolve(args.configPath), "utf-8");
+      config = parseConfig(raw);
+      console.log(`  Config     : ${args.configPath}`);
+    } catch (e) {
+      console.error(`  ⚠️  Failed to load config: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  } else {
+    // Auto-discover .judgesrc from cwd
+    try {
+      config = loadCascadingConfig(resolve("."));
+      if (config && Object.keys(config).length > 0) {
+        console.log("  Config     : auto-discovered .judgesrc");
+      }
+    } catch {
+      // No config found — fine
+    }
+  }
+
+  // ── Load FP rates from feedback store ─────────────────────────────────
+  let fpRates: Map<string, number> | undefined;
+  const fpThreshold = args.confidence < 1.0 ? args.confidence : undefined;
+  if (fpThreshold !== undefined) {
+    try {
+      const store = loadFeedbackStore();
+      fpRates = getFpRateByRule(store);
+      if (fpRates.size > 0) {
+        console.log(
+          `  FP filter  : suppressing rules with FP rate > ${(fpThreshold * 100).toFixed(0)}% (${fpRates.size} rules tracked)`,
+        );
+      }
+    } catch {
+      // No feedback store — skip
+    }
+  }
+
+  // ── Build EvaluationOptions ───────────────────────────────────────────
+  const evalOptions: EvaluationOptions = {};
+  if (config) evalOptions.config = config;
+  if (args.calibrate) evalOptions.calibrate = true;
+
+  console.log("");
+
   // Run analysis
-  const result = reviewPrFiles(prFiles, args.minSeverity, args.maxComments);
+  const result = reviewPrFiles(prFiles, args.minSeverity, args.maxComments, evalOptions, fpRates, fpThreshold);
 
   if (args.format === "json") {
     console.log(JSON.stringify(result, null, 2));
@@ -588,6 +691,7 @@ AUTHENTICATION:
   if (result.highCount > 0) console.log(`  🟠 High: ${result.highCount}`);
   if (result.mediumCount > 0) console.log(`  🟡 Medium: ${result.mediumCount}`);
   if (result.lowCount > 0) console.log(`  🔵 Low: ${result.lowCount}`);
+  if (result.fpSuppressed > 0) console.log(`  🧪 FP-suppressed: ${result.fpSuppressed}`);
   console.log("");
 
   if (args.dryRun) {

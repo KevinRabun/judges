@@ -2,6 +2,39 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.11] — 2026-03-06
+
+### Added
+- **Security evaluator + judge** — New SEC-prefixed evaluator with 15 rules covering input validation, path traversal, uncontrolled file access, missing rate limiting, insecure randomness, information disclosure, and more. Registered as the 38th judge in the panel.
+- **AUTH: JWT decode-without-verify rule** — Detects `jwt.decode()` usage without corresponding `jwt.verify()`, catching the JWT "none algorithm" vulnerability. Severity: critical, confidence: 0.95.
+- **AUTH: Timing-unsafe comparison rule** — Detects `===`/`==` comparison of secrets, tokens, signatures, or hashes without `timingSafeEqual` or `constantTimeCompare`. Severity: high, confidence: 0.85.
+- **CONC: Go unsynchronized map detection** — Detects package-level `map` declarations accessed from HTTP handlers or goroutines without `sync.Mutex`/`sync.Map` protection. Severity: critical, confidence: 0.9.
+- **Auto-fix patches for Ruby, Rust, Kotlin, Swift, and Scala** — 40+ new patch rules covering command injection, SQL injection, path traversal, eval usage, deserialization, XSS, CSRF, and cryptographic weaknesses across five additional languages.
+- **Benchmark markdown report** — `formatBenchmarkMarkdown()` generates a publishable markdown report with grade badges, per-category breakdown, FP analysis, and missed-case details.
+- **Benchmark GitHub Actions workflow** — `.github/workflows/benchmark.yml` runs the benchmark suite on push/PR and publishes `benchmark-results.json` and `docs/benchmark-report.md` as artifacts.
+- **PR review: config and calibration support** — `judges review` now accepts `--config`, `--confidence`, and `--calibrate` flags. Loads `.judgesrc` cascading config, suppresses rules with high FP rates from feedback history, and applies feedback-driven confidence calibration.
+- **PR review: FP suppression tracking** — Review results now report `fpSuppressed` count for rules filtered by feedback-driven confidence thresholds.
+- **PR review workflow overhaul** — `.github/workflows/judges-pr-review.yml` upgraded to Node 22, adds build step, uses inline `judges review` command with `--approve`, `--calibrate`, and `--format json`, and posts structured summary comments.
+
+### Fixed
+- **AUTH hardcoded-secret false negatives** — URLs containing `example` (e.g., `api.example.com`) no longer trigger the non-production context suppression. URLs and domain names are stripped from context before the non-production pattern check.
+- **AUTH compound identifier matching** — Variables like `DB_PASSWORD`, `ADMIN_SECRET`, and `API_KEY` are now detected via a compound assignment pattern (`\w+[_-](password|secret|api_key|token|...)`).
+- **CYBER Java deserialization detection** — Broadened `UNSAFE_DESERIALIZATION.java` pattern to catch instance-style `ois.readObject()` calls and `new ObjectInputStream` construction, not just static `ObjectInputStream.readObject`.
+- **CYBER C# SQL injection detection** — SQL injection fallback now detects C# string interpolation (`$"SELECT ... {query} ..."`) in addition to JavaScript template literals.
+- **SEC input validation FP on Pydantic/Django** — `BaseModel`, `Field()`, `EmailStr`, `HttpUrl`, `Serializer`, `Form`, and `ModelForm` are now recognized as validation frameworks, preventing false positives on clean Python FastAPI code.
+- **SEC file access FP on compound identifiers** — Tightened user input matching from broad `/input|user/i` to require assignment/access operators (e.g., `input[`, `user.`), preventing false positives on config properties like `cfg.InputDir`.
+- **Cross-evaluator dedup prefix preservation** — Dedup now preserves up to 3 findings from unique non-winner prefixes per cluster, annotated with `_Primary finding: [winner ruleId]_`, ensuring diverse evaluator perspectives are retained.
+- **Tribunal "high findings" test** — Fixed test to check raw evaluations instead of capped output, since the 20-finding cap can exclude high-severity findings when many critical findings exist.
+
+### Changed
+- **Judge count** — Panel increased from 37 to 38 judges with the addition of the security judge.
+
+### Tests
+- 1044 tests passing
+
+### Benchmark
+- **P=97.8%, R=80.2%, F1=88.1%** (TP=89, FN=22, FP=2)
+
 ## [3.23.10] — 2026-03-06
 
 ### Fixed
