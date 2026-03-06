@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.14] — 2026-03-06
+
+### Fixed
+- **Benchmark Grade A** — F1 score improved to 0.900 (Grade A) with TP=352, FN=78, FP=0
+- **False positive reductions** — Fixed SEC-018 path traversal FP on CLI tools, ERR-002 Go builtin `close()` FP
+- **False negative fixes** — Added camelCase credential detection, JWT 'none' algorithm broadening, YAML IaC detection (Docker Compose + K8s), cross-line format string matching, Python `.format()` SSTI detection, multi-line empty catch detection
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.23.13] — 2026-03-06
 
 ### Added

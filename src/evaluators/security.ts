@@ -435,16 +435,16 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (
-        /(?:res\.redirect|response\.redirect|Response\.Redirect|redirect\(|sendRedirect|header\s*\(\s*['"]Location)/i.test(
+        /(?:res\.redirect|response\.redirect|Response\.Redirect|redirect\(|redirect_to\s|sendRedirect|header\s*\(\s*['"]Location)/i.test(
           line,
         ) &&
-        /(?:req\.|request\.|params\.|query\.|body\.|args\.|input|url)/i.test(line)
+        /(?:req\.|request\.|params\[|params\.|query\.|body\.|args\.|input|url)/i.test(line)
       ) {
         redirectLines.push(i + 1);
       }
       // Indirect: redirect with a variable from user input
-      if (/(?:res\.redirect|response\.redirect|redirect)\s*\(\s*(\w+)/i.test(line)) {
-        const match = line.match(/(?:res\.redirect|response\.redirect|redirect)\s*\(\s*(\w+)/i);
+      if (/(?:res\.redirect|response\.redirect|redirect_to\s|redirect)\s*\(?\s*(\w+)/i.test(line)) {
+        const match = line.match(/(?:res\.redirect|response\.redirect|redirect_to\s|redirect)\s*\(?\s*(\w+)/i);
         if (match) {
           const varName = match[1];
           if (
@@ -530,18 +530,24 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
       const line = lines[i];
       // Java: DocumentBuilderFactory, SAXParserFactory, XMLInputFactory without setFeature
       if (/(?:DocumentBuilderFactory|SAXParserFactory|XMLInputFactory|XMLReader|TransformerFactory)\.new/i.test(line)) {
-        const ctx = lines.slice(i, Math.min(lines.length, i + 10)).join("\n");
+        const ctxLines = lines.slice(i, Math.min(lines.length, i + 10));
+        // Strip comment lines to avoid false negatives from "// Missing: setFeature(...)" annotations
+        const ctxCode = ctxLines.filter((l) => !/^\s*(?:\/\/|\/\*|\*[\s/]|\*$|#)/.test(l)).join("\n");
         if (
           !/setFeature\s*\(.*(?:FEATURE_SECURE_PROCESSING|XMLConstants\.FEATURE_SECURE_PROCESSING|disallow-doctype-decl|external-general-entities)/i.test(
-            ctx,
+            ctxCode,
           ) &&
-          !/setProperty.*ACCESS_EXTERNAL/i.test(ctx)
+          !/setProperty.*ACCESS_EXTERNAL/i.test(ctxCode)
         ) {
           xxeLines.push(i + 1);
         }
       }
       // Python: xml.etree, lxml without defused
-      if (/(?:ElementTree\.parse|etree\.parse|minidom\.parse|xml\.sax\.parse|lxml\.etree)\s*\(/i.test(line)) {
+      if (
+        /(?:ElementTree\.parse|etree\.(?:parse|fromstring|XMLParser)|minidom\.parse|xml\.sax\.parse|lxml\.etree)\s*\(/i.test(
+          line,
+        )
+      ) {
         const fullCode = lines.join("\n");
         if (!/defusedxml|defused/i.test(fullCode)) {
           xxeLines.push(i + 1);
@@ -641,6 +647,295 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
         suggestedFix:
           "Replace with safe alternatives: JSON with schema validation, data transfer objects, or type-safe serialization formats.",
         confidence: 0.9,
+      });
+    }
+  }
+
+  // ── SEC-016: Command injection / code execution with user input ────────
+  {
+    const cmdInjLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Go exec.Command("sh", "-c", ... + variable)
+      if (/exec\.Command\s*\(\s*["'](?:sh|bash|cmd)['"]/i.test(line) && /\+/.test(line)) {
+        cmdInjLines.push(i + 1);
+      }
+      // Ruby backtick/system/exec with interpolation
+      if (/`[^`]*#\{[^}]*(?:params|input|user|request)[^}]*\}[^`]*`/i.test(line)) {
+        cmdInjLines.push(i + 1);
+      }
+      if (/\b(?:system|exec|spawn)\s*\(\s*["'][^"']*#\{/i.test(line)) {
+        cmdInjLines.push(i + 1);
+      }
+      // Python eval/exec with user input
+      if (/\b(?:eval|exec)\s*\(/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 2)).join("\n");
+        if (/(?:request\.|args\.get|input\(|params|query|body|form\.|POST|GET)/i.test(ctx)) {
+          cmdInjLines.push(i + 1);
+        }
+      }
+      // PHP system/exec/passthru/shell_exec with user input variables
+      if (
+        /\b(?:system|exec|passthru|shell_exec|popen)\s*\(/i.test(line) &&
+        /\$_(?:GET|POST|REQUEST)\[|(?:\.\s*\$|\$\w+)/i.test(line)
+      ) {
+        cmdInjLines.push(i + 1);
+      }
+    }
+    const uniqueCmd = [...new Set(cmdInjLines)].sort((a, b) => a - b);
+    if (uniqueCmd.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Command injection via unsanitized user input",
+        description:
+          "User-controlled input is passed to command execution functions (exec, system, eval) without sanitization, allowing attackers to execute arbitrary commands on the server.",
+        lineNumbers: uniqueCmd,
+        recommendation:
+          "Never pass user input directly to command execution functions. Use parameterized APIs, allowlists, or sandboxed execution environments.",
+        reference: "CWE-78 / CWE-94",
+        suggestedFix:
+          "Use parameterized exec: exec.Command('ping', '-c', '4', host) instead of shell string concatenation.",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  // ── SEC-017: Server-side template injection (SSTI) ─────────────────────
+  {
+    const sstiLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Python render_template_string / Jinja2 from_string / Template() with user input
+      if (/(?:render_template_string|from_string|Template)\s*\(/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 2)).join("\n");
+        if (/(?:request\.|params|args\.get|input|user|form\.|query)/i.test(ctx)) {
+          sstiLines.push(i + 1);
+        }
+      }
+      // String formatting used to build templates with user input
+      if (/f["'].*\{.*(?:username|name|user|input).*\}/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 3)).join("\n");
+        if (/(?:render_template_string|render|template|html)/i.test(ctx)) {
+          sstiLines.push(i + 1);
+        }
+      }
+    }
+    const uniqueSsti = [...new Set(sstiLines)].sort((a, b) => a - b);
+    if (uniqueSsti.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Server-side template injection with user-controlled content",
+        description:
+          "User input is used to construct or render server-side templates, allowing attackers to execute arbitrary code through template expressions.",
+        lineNumbers: uniqueSsti,
+        recommendation:
+          "Never pass user input to template rendering functions. Use pre-defined templates with data binding instead of dynamic template construction.",
+        reference: "CWE-1336",
+        suggestedFix: "Use render_template('page.html', data=user_data) instead of render_template_string(user_input).",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  // ── SEC-018: Path traversal via file path construction with user input ──
+  {
+    const pathTravLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // C# Path.Combine, Go filepath.Join, Python os.path.join with user-derived args
+      if (/(?:Path\.Combine|filepath\.Join|os\.path\.join|path\.join)\s*\(/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 10), Math.min(lines.length, i + 3)).join("\n");
+        // Check for user input in method params, route params, request data
+        if (
+          /(?:filename|file|filepath|path|name)\s*[=:]/i.test(ctx) &&
+          /(?:\[Http|@app\.route|@Get|@Post|func\s+\w+.*http\.ResponseWriter|def\s+\w+.*request|params\[)/i.test(ctx)
+        ) {
+          pathTravLines.push(i + 1);
+        }
+      }
+      // Direct: file operations using user-derived variable without traversal guard
+      if (
+        /(?:os\.Open|os\.ReadFile|ioutil\.ReadFile|File\.read|http\.ServeFile|PhysicalFile|send_file)\s*\(/i.test(line)
+      ) {
+        const ctx = lines.slice(Math.max(0, i - 8), Math.min(lines.length, i + 2)).join("\n");
+        if (
+          /(?:filepath\.Join|Path\.Combine|os\.path\.join|path\.join)/i.test(ctx) &&
+          !/(?:Contains\s*\(\s*"\.\."|strings\.Contains|filepath\.Rel|path\.resolve|realpath|Clean)/i.test(ctx) &&
+          /(?:\[Http|@app\.route|@Get|@Post|func\s+\w+.*http\.ResponseWriter|def\s+\w+.*request|params\[|r\.FormValue|request\.|req\.)/i.test(
+            ctx,
+          )
+        ) {
+          pathTravLines.push(i + 1);
+        }
+      }
+    }
+    const uniquePath = [...new Set(pathTravLines)].sort((a, b) => a - b);
+    if (uniquePath.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Path traversal via user-controlled file path construction",
+        description:
+          "File paths are constructed using user input via join functions (Path.Combine, filepath.Join) without traversal validation, allowing access to files outside the intended directory.",
+        lineNumbers: uniquePath,
+        recommendation:
+          "Validate resolved paths stay within the base directory. Reject paths containing '..'. Use path canonicalization and check that the final path starts with the base directory.",
+        reference: "CWE-22 / CWE-73",
+        suggestedFix:
+          "Validate: resolved := filepath.Clean(filepath.Join(base, input)); if !strings.HasPrefix(resolved, base) { return error }",
+        confidence: 0.85,
+      });
+    }
+  }
+
+  // ── SEC-019: Weak random number generator for security operations ──────
+  {
+    const weakRandLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Java: new Random() for tokens/sessions/keys
+      if (/\bnew\s+Random\s*\(/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 5)).join("\n");
+        if (/\b(?:token|session|secret|key|password|salt|nonce|otp|code|id)\b/i.test(ctx)) {
+          weakRandLines.push(i + 1);
+        }
+      }
+      // Math.random() in security context
+      if (/\bMath\.random\s*\(\)/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 5)).join("\n");
+        if (/\b(?:token|session|secret|key|password|salt|nonce|otp|code)\b/i.test(ctx)) {
+          weakRandLines.push(i + 1);
+        }
+      }
+    }
+    if (weakRandLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Weak random number generator used for security-sensitive operations",
+        description:
+          "A non-cryptographic random number generator (java.util.Random, Math.random()) is used to generate tokens, session IDs, or other security-sensitive values. These are predictable and can be exploited.",
+        lineNumbers: weakRandLines,
+        recommendation:
+          "Use cryptographically secure random generators: SecureRandom (Java), crypto.randomBytes (Node.js), secrets module (Python).",
+        reference: "CWE-330 / CWE-338",
+        suggestedFix:
+          "Replace with SecureRandom: new SecureRandom().nextBytes(bytes) (Java), crypto.randomBytes(32) (Node.js).",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  // ── SEC-020: Static IV or insecure cryptographic configuration ────────
+  {
+    const cryptoMiscLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Static/hardcoded IV
+      if (/(?:static\s*IV|(?:iv|IV)\s*[:=]\s*(?:\[\]byte\s*\(|["'\[])|var\s+\w*[Ii][Vv]\s*=)/i.test(line)) {
+        cryptoMiscLines.push(i + 1);
+      }
+      // ECB-like mode: manual block-by-block encryption without chain/GCM
+      if (/block\.Encrypt\s*\(/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 5)).join("\n");
+        if (/for\s|range\s|BlockSize/i.test(ctx) && !/GCM|CBC|CTR|cipher\.NewGCM/i.test(ctx)) {
+          cryptoMiscLines.push(i + 1);
+        }
+      }
+    }
+    const uniqueCrypto = [...new Set(cryptoMiscLines)].sort((a, b) => a - b);
+    if (uniqueCrypto.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Insecure cryptographic configuration",
+        description:
+          "Static/hardcoded initialization vectors (IVs) or manual ECB-like encryption without proper chaining mode. Static IVs allow ciphertext analysis, and ECB mode preserves plaintext patterns.",
+        lineNumbers: uniqueCrypto,
+        recommendation:
+          "Use a random IV/nonce for each encryption operation. Use authenticated encryption modes (AES-GCM). Never reuse IVs with the same key.",
+        reference: "CWE-329 / CWE-327",
+        suggestedFix:
+          "Generate random IV: make([]byte, 12) filled with crypto/rand (Go), crypto.randomBytes(12) (Node.js). Use GCM mode.",
+        confidence: 0.85,
+      });
+    }
+  }
+
+  // ── SEC-021: TLS certificate verification disabled ─────────────────────
+  {
+    const tlsSkipLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Go: InsecureSkipVerify: true
+      if (/InsecureSkipVerify\s*:\s*true/i.test(line)) {
+        tlsSkipLines.push(i + 1);
+      }
+      // Python: verify=False in requests
+      if (/verify\s*=\s*False/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 2)).join("\n");
+        if (/requests\.|urllib|httpx|aiohttp/i.test(ctx)) {
+          tlsSkipLines.push(i + 1);
+        }
+      }
+      // Node.js: rejectUnauthorized: false
+      if (/rejectUnauthorized\s*:\s*false/i.test(line)) {
+        tlsSkipLines.push(i + 1);
+      }
+      // C#: ServerCertificateCustomValidationCallback that always returns true
+      if (/ServerCertificateCustomValidationCallback\s*=.*=>\s*true/i.test(line)) {
+        tlsSkipLines.push(i + 1);
+      }
+    }
+    if (tlsSkipLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "TLS certificate verification disabled",
+        description:
+          "TLS certificate verification is explicitly disabled, allowing man-in-the-middle attacks. Attackers on the network can intercept and modify all traffic.",
+        lineNumbers: tlsSkipLines,
+        recommendation:
+          "Enable TLS certificate verification in production. Use proper CA certificates. Only disable verification in test environments with clear environment guards.",
+        reference: "CWE-295",
+        suggestedFix: "Remove InsecureSkipVerify/rejectUnauthorized=false and configure proper CA certificates.",
+        confidence: 0.95,
+      });
+    }
+  }
+
+  // ── SEC-022: Format string attack with user input ──────────────────────
+  {
+    const fmtLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Python: user_string.format(...) or template.format(key=user_input)
+      if (/\.format\s*\(/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 2)).join("\n");
+        if (/(?:request\.|args\.get|input\(|params|query|form\.)/i.test(ctx)) {
+          // Check if the format target itself comes from user input (allow cross-line match)
+          if (/(?:request|args|input|params|query|form)\b[\s\S]*\.format\s*\(/i.test(ctx)) {
+            fmtLines.push(i + 1);
+          }
+        }
+      }
+    }
+    if (fmtLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Format string attack with user-controlled template",
+        description:
+          "A user-controlled string is used as a format template. Attackers can access object attributes and globals via format specifiers like {self.__class__.__init__.__globals__}.",
+        lineNumbers: fmtLines,
+        recommendation:
+          "Never use user input as a format string template. Use safe string concatenation or template engines with sandboxed rendering.",
+        reference: "CWE-134",
+        suggestedFix:
+          "Use safe rendering: output = f'Hello, {name}' with pre-validated name, or use a template engine with auto-escaping.",
+        confidence: 0.85,
       });
     }
   }

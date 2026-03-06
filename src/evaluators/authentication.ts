@@ -20,6 +20,10 @@ function getHardcodedCredentialLinesWithoutPlaceholders(code: string): number[] 
   const compoundAssignmentPattern =
     /\b\w+[_-](password|passwd|pwd|secret|api_?key|apikey|token|auth_?token)\b\s*[:=]\s*["'`]([^"'`]{3,})["'`]/gi;
 
+  // Also match camelCase identifiers like dockerPassword, awsSecretAccessKey
+  const camelCaseAssignmentPattern =
+    /\b(\w+(?:Password|Passwd|Pwd|Secret|SecretKey|AccessKey|ApiKey|APIKey|Token|AuthToken))\s*[:=]\s*["'`]([^"'`]{3,})["'`]/gi;
+
   const nonProductionContextPattern =
     /\b(?:test|tests|mock|mocks|fixture|fixtures|harness|e2e|example|sample|dummy)\b/i;
   const productionContextPattern = /\b(?:prod|production|release|deploy|deployment)\b/i;
@@ -34,7 +38,11 @@ function getHardcodedCredentialLinesWithoutPlaceholders(code: string): number[] 
     if (isCommentLine(line)) continue;
     // Skip lines where credential keywords appear inside regex literals or test/match calls
     if (/\/[^/\n]+\/[gimsuy]*/.test(line) && /\.test\s*\(|\.match\s*\(|new\s+RegExp/i.test(line)) continue;
-    const matches = [...line.matchAll(assignmentPattern), ...line.matchAll(compoundAssignmentPattern)];
+    const matches = [
+      ...line.matchAll(assignmentPattern),
+      ...line.matchAll(compoundAssignmentPattern),
+      ...line.matchAll(camelCaseAssignmentPattern),
+    ];
     if (matches.length === 0) continue;
 
     const contextStart = Math.max(0, index - 2);
@@ -130,13 +138,38 @@ export function analyzeAuthentication(code: string, language: string, context?: 
 
   // Hardcoded credentials
   const credentialLines = getHardcodedCredentialLinesWithoutPlaceholders(code);
-  if (credentialLines.length > 0) {
+  // Also detect PHP define() with credential constants
+  const defineCredLines: number[] = [];
+  const envCredLines: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (isCommentLine(line)) continue;
+    // PHP define('DB_PASSWORD', 'value') or define('SECRET_KEY', 'value')
+    const defineMatch = line.match(
+      /\bdefine\s*\(\s*['"]([^'"]*(?:password|passwd|pwd|secret|api_?key|apikey|token|auth_?token|db_pass)[^'"]*)['"],\s*['"]([^'"]{3,})['"]/i,
+    );
+    if (defineMatch) {
+      const val = defineMatch[2];
+      if (looksLikeRealCredentialValue(val)) {
+        defineCredLines.push(i + 1);
+      }
+    }
+    // Dockerfile ENV with secret values: ENV SECRET_KEY=value or ENV SECRET_KEY value
+    if (/^\s*ENV\s+\w*(?:password|passwd|pwd|secret|api_?key|token|auth_?token|db_pass)\w*[\s=]+/i.test(line)) {
+      // Exclude variable references like ${VAR} or $VAR
+      if (!/\$\{?\w+\}?/.test(line)) {
+        envCredLines.push(i + 1);
+      }
+    }
+  }
+  const allCredLines = [...new Set([...credentialLines, ...defineCredLines, ...envCredLines])].sort((a, b) => a - b);
+  if (allCredLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
       title: "Hardcoded credentials in source code",
-      description: `Found ${credentialLines.length} instance(s) of what appears to be hardcoded credentials. Credentials in source code are exposed in version control and cannot be rotated without redeployment.`,
-      lineNumbers: credentialLines,
+      description: `Found ${allCredLines.length} instance(s) of what appears to be hardcoded credentials. Credentials in source code are exposed in version control and cannot be rotated without redeployment.`,
+      lineNumbers: allCredLines,
       recommendation:
         "Use environment variables or a secrets manager (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault). Never commit credentials to version control.",
       reference: "OWASP: Credential Management / CWE-798",
@@ -313,6 +346,38 @@ export function analyzeAuthentication(code: string, language: string, context?: 
         "Replace jwt.decode(token) with jwt.verify(token, secret, { algorithms: ['HS256'] }). Never trust decoded JWT claims without verifying the signature.",
       confidence: 0.95,
     });
+  }
+
+  // JWT 'none' algorithm — accepting unsigned tokens
+  {
+    const jwtNoneLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // algorithms: ['none'] or ['HS256','none'] or algorithm: 'none'
+      if (/algorithm[s]?\s*[:=].*['"]none['"]/i.test(line)) {
+        jwtNoneLines.push(i + 1);
+      }
+      // Explicitly passing empty string as secret with jwt.sign/verify
+      if (/jwt\.(?:sign|verify)\s*\([^,]+,\s*['"](?:['"]|\s*$)/i.test(line)) {
+        jwtNoneLines.push(i + 1);
+      }
+    }
+    if (jwtNoneLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "JWT 'none' algorithm accepted — unsigned tokens",
+        description:
+          "The JWT configuration accepts the 'none' algorithm, allowing attackers to forge tokens without any cryptographic signature. This completely bypasses authentication.",
+        lineNumbers: jwtNoneLines,
+        recommendation:
+          "Never accept the 'none' algorithm. Explicitly whitelist strong algorithms: { algorithms: ['HS256'] } or { algorithms: ['RS256'] }.",
+        reference: "CWE-327: Use of a Broken Crypto Algorithm / JWT 'none' Attack",
+        suggestedFix:
+          "Restrict algorithms: jwt.verify(token, secret, { algorithms: ['HS256'] }); — remove 'none' from any algorithm list.",
+        confidence: 0.95,
+      });
+    }
   }
 
   // Timing-unsafe comparison of secrets/tokens/signatures

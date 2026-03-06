@@ -16,8 +16,34 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   const prefix = "ERR";
   const _lang = getLangFamily(language);
 
-  // Empty catch blocks (multi-language)
+  // Empty catch blocks (multi-language) — single-line via LP.EMPTY_CATCH
   const emptyCatchLines = getLangLineNumbers(code, language, LP.EMPTY_CATCH);
+
+  // Multi-line empty catch blocks (body is only comments/whitespace)
+  {
+    const cLines = code.split("\n");
+    for (let i = 0; i < cLines.length; i++) {
+      const line = cLines[i];
+      if (/catch\s*(?:\([^)]*\))?\s*\{\s*$/.test(line) || /catch\s*\{\s*$/.test(line)) {
+        // Scan forward to find closing }
+        let j = i + 1;
+        let isEmpty = true;
+        while (j < cLines.length) {
+          const bodyLine = cLines[j].trim();
+          if (bodyLine === "}") break;
+          if (bodyLine !== "" && !bodyLine.startsWith("//") && !bodyLine.startsWith("#") && !bodyLine.startsWith("*")) {
+            isEmpty = false;
+            break;
+          }
+          j++;
+        }
+        if (isEmpty && j < cLines.length && !emptyCatchLines.includes(i + 1)) {
+          emptyCatchLines.push(i + 1);
+        }
+      }
+    }
+  }
+
   if (emptyCatchLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -322,7 +348,7 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
   const stackExposureLines = getLineNumbers(code, stackExposurePattern);
   if (stackExposureLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Stack trace or error internals exposed to client",
       description: `Found ${stackExposureLines.length} location(s) where error objects or stack traces may be sent directly in HTTP responses. This leaks internal file paths, library versions, and system details to attackers.`,
@@ -334,6 +360,138 @@ export function analyzeErrorHandling(code: string, language: string): Finding[] 
         "Return a generic message with correlation ID: res.status(500).json({ error: 'Internal error', correlationId: req.id }); and log the full error server-side.",
       confidence: 0.85,
     });
+  }
+
+  // Go ignored error: result, _ := someFunc() — discarding error return value
+  {
+    const goIgnoredLines: number[] = [];
+    const cLines = code.split("\n");
+    for (let i = 0; i < cLines.length; i++) {
+      const line = cLines[i];
+      // Go pattern: var, _ := func() — underscore discarding error
+      if (/,\s*_\s*:?=\s*\w+[\w.]*\s*\(/i.test(line)) {
+        goIgnoredLines.push(i + 1);
+      }
+      // Go pattern: func() called without capturing error return (multi-return functions)
+      // Only detect well-known Go funcs that return errors: json.Unmarshal, f.Close, etc.
+      // Exclude chained calls like json.NewEncoder(w).Encode(x) — idiomatic Go for HTTP responses
+      // Require receiver for Close/Flush (w+.Close) to avoid matching Go builtin close() which has no return value
+      if (/^\s*(?:json\.Unmarshal|\w+\.Close|\w+\.Flush)\s*\(/i.test(line)) {
+        // Check if error is captured (look for = or := on the line)
+        if (!/[:=]\s*/.test(line.split(/(?:Unmarshal|Close|Flush)\s*\(/i)[0])) {
+          goIgnoredLines.push(i + 1);
+        }
+      }
+      // Standalone Write/Encode calls (not chained from constructors)
+      if (/^\s*\w+\.(?:Write|Encode)\s*\(/i.test(line) && !/\)\s*\.\s*(?:Write|Encode)/i.test(line)) {
+        if (!/[:=]\s*/.test(line.split(/(?:Write|Encode)\s*\(/)[0])) {
+          goIgnoredLines.push(i + 1);
+        }
+      }
+    }
+    if (goIgnoredLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Error return value ignored",
+        description: `Found ${goIgnoredLines.length} location(s) where error return values are discarded (assigned to _) or not captured. Ignoring errors can lead to silent data corruption, resource leaks, and undefined behavior.`,
+        lineNumbers: goIgnoredLines,
+        recommendation: "Always check error return values. Handle errors explicitly or propagate them to callers.",
+        reference: "Go Error Handling — CWE-252: Unchecked Return Value",
+        suggestedFix:
+          'Capture and handle errors: data, err := io.ReadAll(r.Body); if err != nil { return fmt.Errorf("read body: %w", err) }',
+        confidence: 0.85,
+      });
+    }
+  }
+
+  // Python bare except / swallowed exceptions (except: pass, except Exception: pass/return)
+  {
+    const bareExceptLines: number[] = [];
+    const cLines = code.split("\n");
+    for (let i = 0; i < cLines.length; i++) {
+      const line = cLines[i];
+      // Match except: or except Exception: followed by pass/return on next line(s)
+      if (/^\s*except\s*(?:Exception\s*)?(?:\s+as\s+\w+)?\s*:\s*(?:#.*)?$/.test(line)) {
+        const nextLines = cLines.slice(i + 1, Math.min(cLines.length, i + 4)).join("\n");
+        if (/^\s*(?:pass|return\s|continue|\.\.\.)\s*(?:#.*)?$/m.test(nextLines)) {
+          bareExceptLines.push(i + 1);
+        }
+      }
+    }
+    if (bareExceptLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Bare except clause silently swallows errors",
+        description: `Found ${bareExceptLines.length} bare except clause(s) (except: or except Exception:) that silently discard errors with pass/return. This hides bugs, masks failures, and makes debugging impossible.`,
+        lineNumbers: bareExceptLines,
+        recommendation: "Catch specific exception types. Log errors before handling. Never use bare except: with pass.",
+        reference: "Python PEP 8 / CWE-391: Unchecked Error Condition",
+        suggestedFix:
+          "Catch specific exceptions: except ValueError as e: logger.error('Validation failed: %s', e); raise",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  // Java catch (Throwable) — catches OutOfMemoryError, StackOverflowError, etc.
+  {
+    const throwableLines: number[] = [];
+    const cLines = code.split("\n");
+    for (let i = 0; i < cLines.length; i++) {
+      if (/\bcatch\s*\(\s*Throwable\s/i.test(cLines[i])) {
+        throwableLines.push(i + 1);
+      }
+    }
+    if (throwableLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Catching Throwable swallows critical JVM errors",
+        description: `Found ${throwableLines.length} catch(Throwable) clause(s). This catches OutOfMemoryError, StackOverflowError, and other unrecoverable JVM errors that should crash the process.`,
+        lineNumbers: throwableLines,
+        recommendation:
+          "Catch Exception instead of Throwable. Let Errors propagate to crash the JVM gracefully. If you must catch Throwable, rethrow Errors.",
+        reference: "CWE-396: Declaration of Catch for Generic Exception",
+        suggestedFix: "Replace catch (Throwable t) with: catch (Exception e) { handle(e); } — let Errors propagate.",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  // Kotlin force unwrap (!!) — crashes with NullPointerException
+  {
+    const forceUnwrapLines: number[] = [];
+    const cLines = code.split("\n");
+    for (let i = 0; i < cLines.length; i++) {
+      const line = cLines[i];
+      if (isCommentLine(line)) continue;
+      // Match !! operator (not inside strings or comments)
+      const matches = line.match(/!!/g);
+      if (matches && matches.length > 0) {
+        // Avoid false positives from logical NOT NOT (!!value for boolean coercion in JS)
+        // Kotlin !! is specifically used as a.b!! or val!! pattern
+        if (/\w+!!(?:\.|,|\s*$|\s*[;)\]])/i.test(line)) {
+          forceUnwrapLines.push(i + 1);
+        }
+      }
+    }
+    if (forceUnwrapLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Kotlin force unwrap (!!) risks NullPointerException",
+        description: `Found ${forceUnwrapLines.length} force unwrap (!!) usage(s). This crashes with NullPointerException at runtime if the value is null, bypassing Kotlin's null safety guarantees.`,
+        lineNumbers: forceUnwrapLines,
+        recommendation:
+          "Use safe alternatives: ?. (safe call), ?: (elvis operator), let { }, or explicit null checks instead of !!.",
+        reference: "Kotlin Null Safety — CWE-476: NULL Pointer Dereference",
+        suggestedFix:
+          'Replace val x = obj!! with: val x = obj ?: throw IllegalStateException("obj was null") or use obj?.let { ... }.',
+        confidence: 0.8,
+      });
+    }
   }
 
   return findings;

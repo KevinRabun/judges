@@ -14,8 +14,11 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
   const prefix = "IAC";
   const lang = getLangFamily(language);
 
-  // Skip non-IaC languages entirely
-  if (!LP.isIaC(lang)) return findings;
+  // Detect YAML IaC content (Docker Compose, Kubernetes manifests)
+  const isYamlIaC = lang === "unknown" && (/^\s*(?:apiVersion|kind)\s*:/m.test(code) || /^\s*services\s*:/m.test(code));
+
+  // Skip non-IaC languages entirely (allow YAML IaC through)
+  if (!LP.isIaC(lang) && !isYamlIaC) return findings;
 
   // ── IAC-001: Hardcoded secrets / passwords / keys ─────────────────────
   const rawSecretLines = getLangLineNumbers(code, language, LP.IAC_HARDCODED_SECRET);
@@ -387,7 +390,7 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
         return code.slice(0, idx).split("\n").length;
       });
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "critical",
         title: "ARM template secret parameter has default value",
         description:
@@ -399,6 +402,195 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
         suggestedFix:
           'Change the parameter type to `"type": "securestring"` and remove the `"defaultValue"` property. Use Key Vault references at deployment time.',
         confidence: 0.95,
+      });
+    }
+  }
+
+  // ── IAC-016: Docker-specific: privileged mode, USER directive, secrets ─
+  if (lang === "dockerfile") {
+    const dockerLines = code.split("\n");
+    const privilegedLines: number[] = [];
+    const runAsRootLines: number[] = [];
+    const dockerSecretEnvLines: number[] = [];
+    let hasUserDirective = false;
+
+    for (let i = 0; i < dockerLines.length; i++) {
+      const line = dockerLines[i];
+      // Detect --privileged flag in RUN docker commands
+      if (/--privileged/i.test(line)) {
+        privilegedLines.push(i + 1);
+      }
+      // Detect USER directive (means container changes user)
+      if (/^\s*USER\s+/i.test(line)) {
+        hasUserDirective = true;
+      }
+      // Detect secrets in ENV directives
+      if (/^\s*ENV\s+\w*(?:password|passwd|pwd|secret|api_?key|token|private_key|db_pass)\w*[\s=]+/i.test(line)) {
+        if (!/\$\{?\w+\}?/.test(line)) {
+          dockerSecretEnvLines.push(i + 1);
+        }
+      }
+    }
+
+    if (privilegedLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Docker container running in privileged mode",
+        description:
+          "The --privileged flag gives the container full access to the host, effectively disabling all security boundaries. A compromised container can take over the host.",
+        lineNumbers: privilegedLines,
+        recommendation:
+          "Remove --privileged. Use specific capabilities (--cap-add) only for what is needed. Use securityContext.privileged: false in Kubernetes.",
+        reference: "CIS Docker Benchmark: Container Runtime Security",
+        suggestedFix:
+          "Remove --privileged and use granular capabilities: docker run --cap-add NET_ADMIN instead of --privileged.",
+        confidence: 0.95,
+      });
+    }
+
+    // Only flag missing USER if the Dockerfile has RUN commands (not just a trivial FROM)
+    const hasRunCmd = /^\s*RUN\s+/im.test(code);
+    if (hasRunCmd && !hasUserDirective && dockerLines.length > 5) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Docker container running as root",
+        description:
+          "No USER directive found — the container runs as root by default. If compromised, the attacker has root privileges inside the container.",
+        recommendation:
+          "Add a USER directive to run as a non-root user: USER 1001 or USER appuser. Create the user in a preceding RUN step.",
+        reference: "CIS Docker Benchmark: Container Security",
+        suggestedFix: "Add before the final CMD/ENTRYPOINT: RUN adduser -D appuser && USER appuser",
+        confidence: 0.8,
+      });
+    }
+
+    if (dockerSecretEnvLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Secrets exposed in Dockerfile ENV directive",
+        description:
+          "Secrets are hardcoded in ENV directives. These values are baked into the image layer and visible to anyone who can pull the image.",
+        lineNumbers: dockerSecretEnvLines,
+        recommendation:
+          "Use Docker secrets, build-time ARG with --secret, or inject secrets at runtime via environment variables from the orchestrator.",
+        reference: "CIS Docker Benchmark: Image Security",
+        suggestedFix:
+          "Remove hardcoded secrets from ENV. Use runtime injection: docker run -e SECRET_KEY=$SECRET_KEY or Docker secrets.",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  // ── IAC-020: Terraform S3 public ACL / public access blocks ───────────
+  if (lang === "terraform") {
+    const s3PublicLines: number[] = [];
+    const tfLines = code.split("\n");
+    for (let i = 0; i < tfLines.length; i++) {
+      const line = tfLines[i];
+      // S3 bucket with public-read or public-read-write ACL
+      if (/acl\s*=\s*["']public-read(?:-write)?["']/i.test(line)) {
+        s3PublicLines.push(i + 1);
+      }
+      // S3 public access block explicitly disabled
+      if (
+        /block_public_acls\s*=\s*false|block_public_policy\s*=\s*false|ignore_public_acls\s*=\s*false|restrict_public_buckets\s*=\s*false/i.test(
+          line,
+        )
+      ) {
+        s3PublicLines.push(i + 1);
+      }
+    }
+    if (s3PublicLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "S3 bucket with public access enabled",
+        description:
+          "S3 bucket has a public ACL or public access block settings are disabled, allowing anyone on the internet to access the bucket contents.",
+        lineNumbers: s3PublicLines,
+        recommendation:
+          "Set acl to 'private' and enable all public access block settings. Use bucket policies for controlled access.",
+        reference: "CIS AWS Benchmark: S3 Bucket Security",
+        suggestedFix:
+          'Set acl = "private" and configure aws_s3_bucket_public_access_block with block_public_acls = true, block_public_policy = true.',
+        confidence: 0.95,
+      });
+    }
+  }
+
+  // ── YAML IaC: Docker Compose and Kubernetes manifests ─────────────────
+  if (isYamlIaC) {
+    const yamlLines = code.split("\n");
+    const yamlSecretLines: number[] = [];
+    const yamlPrivilegedLines: number[] = [];
+
+    for (let i = 0; i < yamlLines.length; i++) {
+      const line = yamlLines[i];
+
+      // Detect privileged containers (Docker Compose + K8s)
+      if (/^\s*privileged\s*:\s*true/i.test(line)) {
+        yamlPrivilegedLines.push(i + 1);
+      }
+      // network_mode: host (Docker Compose)
+      if (/^\s*network_mode\s*:\s*['"]?host['"]?/i.test(line)) {
+        yamlPrivilegedLines.push(i + 1);
+      }
+      // allowPrivilegeEscalation: true (K8s)
+      if (/^\s*allowPrivilegeEscalation\s*:\s*true/i.test(line)) {
+        yamlPrivilegedLines.push(i + 1);
+      }
+
+      // Hardcoded secrets in YAML environment variables
+      // Docker Compose: PASSWORD=value or KEY: value patterns
+      if (/(?:PASSWORD|SECRET|API_KEY|ACCESS_KEY|PRIVATE_KEY|TOKEN)\s*[:=]\s*["']?\w{3,}/i.test(line)) {
+        // Exclude references to external secrets (${{ secrets.XXX }}) and variables (${VAR})
+        if (!/\$\{[{]?\s*(?:secrets\.|\w+\s*$)|valueFrom/i.test(line)) {
+          yamlSecretLines.push(i + 1);
+        }
+      }
+      // K8s env value: "plaintext-password" pattern
+      if (/^\s*value\s*:\s*["'](?![\s"']*$)\S+/i.test(line)) {
+        const ctx = yamlLines.slice(Math.max(0, i - 3), i + 1).join("\n");
+        if (/\bname\s*:\s*\S*(?:PASSWORD|SECRET|KEY|TOKEN)\b/i.test(ctx)) {
+          yamlSecretLines.push(i + 1);
+        }
+      }
+    }
+
+    if (yamlPrivilegedLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Container running in privileged mode",
+        description:
+          "Containers are configured with elevated privileges (privileged: true, host networking, or privilege escalation). A compromised container can take over the host.",
+        lineNumbers: yamlPrivilegedLines,
+        recommendation:
+          "Remove privileged: true. Use specific securityContext options only as needed. Avoid host networking.",
+        reference: "CIS Docker/Kubernetes Benchmark: Container Security",
+        suggestedFix:
+          "Set privileged: false, allowPrivilegeEscalation: false, and use read-only root filesystem where possible.",
+        confidence: 0.95,
+      });
+    }
+
+    if (yamlSecretLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Hardcoded secrets in YAML infrastructure code",
+        description:
+          "Passwords, API keys, or secrets are hardcoded in Docker Compose or Kubernetes manifests. These values are stored in version control and visible to anyone with repository access.",
+        lineNumbers: yamlSecretLines,
+        recommendation:
+          "Use secrets management: Docker secrets, Kubernetes Secrets with external secret operators, or reference environment variables from a secure vault.",
+        reference: "CIS Benchmark: Secrets Management",
+        suggestedFix:
+          "Replace plaintext values with secret references: use Docker secrets, K8s external-secrets, or environment variable injection from a vault.",
+        confidence: 0.9,
       });
     }
   }

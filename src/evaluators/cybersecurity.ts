@@ -264,9 +264,28 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
 
   // LDAP injection (multi-language)
   const ldapPatterns =
-    /ldap\.search|ldap_search|DirectorySearcher|LdapTemplate|ldap\.bind|python-ldap|go-ldap|novell\.directory/gi;
+    /ldap\.search|ldap_search|DirectorySearcher|LdapTemplate|ldap\.bind|python-ldap|go-ldap|novell\.directory|DirContext|InitialDirContext|NamingEnumeration/gi;
   const ldapLines = getLineNumbers(code, ldapPatterns);
-  if (ldapLines.length > 0) {
+  // Also detect LDAP filter string concatenation: "(uid=" + username + ")"
+  const ldapFilterConcat: number[] = [];
+  {
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      if (/["']\s*\(\s*&?\s*\(\s*(?:uid|cn|sAMAccountName|userPassword|mail)\s*=\s*["']\s*\+/i.test(line)) {
+        ldapFilterConcat.push(i + 1);
+      }
+      // Also match ctx.search with string concatenation for filter
+      if (/\.search\s*\(/i.test(line) && /\+\s*\w/.test(line)) {
+        const ctx = codeLines.slice(Math.max(0, i - 5), Math.min(codeLines.length, i + 2)).join("\n");
+        if (/(?:ldap|DirContext|InitialDirContext|NamingContext|uid|dn|filter)/i.test(ctx)) {
+          ldapFilterConcat.push(i + 1);
+        }
+      }
+    }
+  }
+  const allLdapLines = [...new Set([...ldapLines, ...ldapFilterConcat])].sort((a, b) => a - b);
+  if (allLdapLines.length > 0) {
     const hasLdapSanitation = testCode(code, /escape|sanitize|ldap_escape|filter_format/gi);
     if (!hasLdapSanitation) {
       findings.push({
@@ -275,7 +294,7 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
         title: "Potential LDAP injection",
         description:
           "LDAP queries are constructed without visible input sanitization, potentially allowing LDAP injection attacks.",
-        lineNumbers: ldapLines,
+        lineNumbers: allLdapLines,
         recommendation:
           "Escape special LDAP characters in user input. Use parameterized LDAP queries or the ldap_escape function.",
         reference: "OWASP LDAP Injection — CWE-90",
@@ -799,13 +818,13 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
       // Multi-language path traversal: file operations with user-controlled path in context
       const ctx = codeLines.slice(Math.max(0, i - 3), i + 4).join("\n");
       const hasFileOp =
-        /(?:File\.(?:join|read|new|open)|send_file|filepath\.Join|http\.ServeFile|Path\.Combine|File\.ReadAll|respondFile|ServeContent|file_get_contents)\s*\(/i.test(
+        /(?:File\.(?:join|read|new|open)|send_file|filepath\.Join|http\.ServeFile|Path\.Combine|File\.ReadAll|respondFile|ServeContent|file_get_contents|os\.path\.join)\s*\(/i.test(
           line,
         ) ||
         /\bnew\s+File\s*\(/i.test(line) ||
         /File\s*\(\s*[""][^""]*\$/i.test(line); // Kotlin File("/path/$var")
       const hasUserInput =
-        /(?:params\[|params\.|request\.|req\.|query\.|call\.parameters|\$_(?:GET|POST|REQUEST)\[|r\.URL|r\.FormValue)/i.test(
+        /(?:params\[|params\.|request\.|req\.|query\.|call\.parameters|\$_(?:GET|POST|REQUEST)\[|r\.URL|r\.FormValue|\[Http(?:Get|Post|Put|Delete|Patch)\s*\(|ResponseWriter|flask\.request)/i.test(
           ctx,
         );
       if (hasFileOp && hasUserInput) {
@@ -1044,6 +1063,13 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
       if (/\.render\s*\(.*(?:req\.|request\.)/i.test(line)) {
         sstiLines.push(i + 1);
       }
+      // Python format string injection: user-controlled string.format()
+      if (/\.format\s*\(/i.test(line)) {
+        const ctx = codeLines.slice(Math.max(0, i - 5), i + 1).join("\n");
+        if (/(?:request\.(?:args|form|values|data|get)|params\[|input\s*\()/i.test(ctx)) {
+          sstiLines.push(i + 1);
+        }
+      }
     }
     if (sstiLines.length > 0) {
       findings.push({
@@ -1114,6 +1140,13 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
       // Python Django/DRF: form.save() with all fields, or Model(**request.data)
       if (/\*\*request\.(?:data|POST|json|body)/i.test(line)) {
         massAssignLines.push(i + 1);
+      }
+      // Python setattr in loop with request data — mass assignment
+      if (/setattr\s*\(/i.test(line)) {
+        const ctx = codeLines.slice(Math.max(0, i - 8), Math.min(codeLines.length, i + 3)).join("\n");
+        if (/(?:for\s+\w+.*in\s+|request\.|\.items\(\)|\.data|\.POST|\.json)/i.test(ctx)) {
+          massAssignLines.push(i + 1);
+        }
       }
       // JS/TS: Model.create(req.body) / Object.assign(model, req.body)
       if (
@@ -1187,11 +1220,21 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
     for (let i = 0; i < codeLines.length; i++) {
       const line = codeLines[i];
       // Detect common ReDoS patterns: nested quantifiers, overlapping alternations
+      // Check in regex constructor calls
       if (/(?:new\s+RegExp|re\.compile|Regex|Pattern\.compile)\s*\(/i.test(line)) {
-        // Check for nested quantifiers like (a+)+ or (a*)*
         if (/[+*]\s*\)\s*[+*]|(?:\.\*){2,}|\([^)]*[+*][^)]*\)\s*[+*]/.test(line)) {
           redosLines.push(i + 1);
         }
+      }
+      // Also check regex literals and raw strings for nested quantifiers
+      if (/\/[^/]+\/|r["'][^"']+["']|re\.compile\s*\(/.test(line)) {
+        if (/\([^)]*[+*][^)]*\)\s*[+*]|\(\?\:[^)]*[+*][^)]*\)\s*[+*]/.test(line)) {
+          redosLines.push(i + 1);
+        }
+      }
+      // Detect dangerous patterns like ([a-zA-Z]+)* or (\w+)* even in variable assignments
+      if (/\([^)]*(?:\[[^\]]+\]|\\[wdsDWS])\+\)\s*[*+]/.test(line)) {
+        redosLines.push(i + 1);
       }
       // User input passed directly to regex constructor
       if (
@@ -1339,7 +1382,7 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
   const fwMassAssignLines = getLangLineNumbers(code, language, LP.FRAMEWORK_MASS_ASSIGNMENT);
   if (fwMassAssignLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
       title: "Potential mass assignment vulnerability",
       description:
@@ -1352,6 +1395,74 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
         "Whitelist fields: const { name, email } = req.body; await User.create({ name, email }); instead of User.create(req.body).",
       confidence: 0.8,
     });
+  }
+
+  // ── Kubernetes YAML security: privileged containers, host networking ──
+  {
+    const k8sPrivilegedLines: number[] = [];
+    const k8sHostNetLines: number[] = [];
+    const k8sRunAsRootLines: number[] = [];
+    const codeLines = code.split("\n");
+    for (let i = 0; i < codeLines.length; i++) {
+      const line = codeLines[i];
+      // privileged: true in securityContext
+      if (/^\s*privileged\s*:\s*true/i.test(line)) {
+        k8sPrivilegedLines.push(i + 1);
+      }
+      // hostNetwork: true
+      if (/^\s*hostNetwork\s*:\s*true/i.test(line)) {
+        k8sHostNetLines.push(i + 1);
+      }
+      // runAsUser: 0 (root)
+      if (/^\s*runAsUser\s*:\s*0\s*$/i.test(line)) {
+        k8sRunAsRootLines.push(i + 1);
+      }
+    }
+    const allK8sLines = [...new Set([...k8sPrivilegedLines, ...k8sHostNetLines, ...k8sRunAsRootLines])].sort(
+      (a, b) => a - b,
+    );
+    // Only emit if the file looks like K8s manifest (has kind: or apiVersion:)
+    const isK8sManifest = /^\s*(?:kind|apiVersion)\s*:/im.test(code) || /securityContext\s*:/i.test(code);
+    if (allK8sLines.length > 0 && isK8sManifest) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Insecure Kubernetes pod/container configuration",
+        description:
+          "Kubernetes manifest has insecure settings: privileged containers, host networking, or running as root. These disable container isolation.",
+        lineNumbers: allK8sLines,
+        recommendation:
+          "Set privileged: false, runAsNonRoot: true, readOnlyRootFilesystem: true, and drop all capabilities. Avoid hostNetwork: true.",
+        reference: "CIS Kubernetes Benchmark: Pod Security",
+        suggestedFix:
+          "Set securityContext: { privileged: false, runAsNonRoot: true, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true }",
+        confidence: 0.95,
+      });
+    }
+    // Also detect Docker run commands with --privileged in any language
+    if (k8sPrivilegedLines.length === 0) {
+      const dockerPrivLines: number[] = [];
+      for (let i = 0; i < codeLines.length; i++) {
+        if (/docker\s+run\s+.*--privileged/i.test(codeLines[i])) {
+          dockerPrivLines.push(i + 1);
+        }
+      }
+      if (dockerPrivLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "critical",
+          title: "Docker container running in privileged mode",
+          description:
+            "Docker run command uses --privileged, giving the container full host access and disabling all security boundaries.",
+          lineNumbers: dockerPrivLines,
+          recommendation: "Remove --privileged. Use specific capabilities (--cap-add) only as needed.",
+          reference: "CIS Docker Benchmark: Container Runtime",
+          suggestedFix:
+            "Replace --privileged with granular capabilities: docker run --cap-add NET_ADMIN instead of --privileged.",
+          confidence: 0.95,
+        });
+      }
+    }
   }
 
   return findings;

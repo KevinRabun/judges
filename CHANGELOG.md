@@ -2,6 +2,23 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.14] — 2026-03-06
+
+### Fixed
+- **Benchmark Grade A achieved** — F1 score improved from 0.889 (Grade B) to 0.900 (Grade A) with TP=352, FN=78, FP=0
+- **SEC-018 path traversal FP on CLI tools** — Added HTTP handler context requirement to the direct file-ops-near-path-join detection block, preventing false positives on Go/Python CLI tools that use `filepath.Join` + `os.ReadFile` without any HTTP context
+- **ERR-002 Go builtin `close()` FP** — Changed unchecked-close pattern from `(?:\w+\.)?Close` to `\w+\.Close` requiring a method receiver, so Go's builtin `close(ch)` (which doesn't return a value) is no longer flagged
+- **AUTH hardcoded credential detection for camelCase identifiers** — Added `camelCaseAssignmentPattern` to detect credentials in camelCase identifiers like `dockerPassword`, `awsSecretAccessKey`, `awsAccessKeyId` that were missed by word-boundary patterns
+- **AUTH JWT 'none' algorithm detection** — Broadened pattern from exact `['none']` to match `'none'` anywhere in the algorithms list (e.g., `algorithms: ['HS256', 'none']`)
+- **IAC YAML IaC detection** — Added content-based detection for Docker Compose (`services:`) and Kubernetes (`apiVersion:|kind:`) manifests, since YAML was not recognized as IaC by the language normalizer. Detects `privileged: true`, `network_mode: host`, `allowPrivilegeEscalation: true`, and hardcoded secrets in environment variables
+- **SEC-022 format string cross-line matching** — Changed `.*` to `[\s\S]*` in the format-string injection context check so `request.args.get` on one line and `.format()` on the next are correctly matched
+- **CYBER SSTI Python `.format()` injection** — Added detection of Python `.format()` calls with user-controlled input (`request.args`, `request.form`, etc.)
+- **ERR multi-line empty catch block detection** — Added forward-scanning logic to detect catch blocks spanning multiple lines that contain only comments or whitespace, complementing the existing single-line empty catch pattern
+
+### Tests
+- 1059 tests passing
+- 301 benchmark cases: TP=352, FN=78, FP=0, F1=0.900, Grade A
+
 ## [3.23.13] — 2026-03-06
 
 ### Added
