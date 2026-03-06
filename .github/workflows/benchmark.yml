@@ -82,12 +82,20 @@ jobs:
             benchmark-results.json
             docs/benchmark-report.md
 
-      - name: Commit benchmark report (main branch only)
+      - name: Post benchmark report to Job Summary
+        if: always()
+        run: cat docs/benchmark-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish benchmark report to Wiki (main branch only)
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.wiki.git" wiki
+          cp docs/benchmark-report.md wiki/Benchmark-Report.md
+          cd wiki
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/benchmark-report.md
-          git diff --cached --quiet || git commit -m "docs: update benchmark report [skip ci]"
+          git add Benchmark-Report.md
+          git diff --cached --quiet || git commit -m "Update benchmark report — $(date -u +'%Y-%m-%d %H:%M UTC')"
           git push
