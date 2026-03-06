@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.9] — 2026-03-06
+
+### Changed
+- **Deep review is now the default** — `@judges`, `/review`, and `/deepreview` all run Layer 1 (pattern analysis) + Layer 2 (AI contextual review) by default.
+- **New `/shallowreview` command** — Added `/shallowreview` slash command for fast Layer 1 pattern-only analysis without the LLM deep review step.
+
+### Fixed
+- **Disk cache key includes `mustFixGate`** — The `evaluateWithTribunal` cache key now incorporates `mustFixGate` options, preventing stale cached results when toggling the must-fix gate on identical code. This caused CI failures when the must-fix gate test reused a cached result that lacked gate metadata.
+- **Added `.judges-cache/` to `.gitignore`** — Prevent disk cache artifacts from being committed.
+
+### Tests
+- All 2084 tests passing (1324 judges + 760 subsystems)
+
 ## [3.23.8] — 2026-03-06
 
 ### Added

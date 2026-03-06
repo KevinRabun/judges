@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.9] — 2026-03-06
+
+### Changed
+- **Deep review is now the default** — `@judges`, `/review`, and `/deepreview` all run Layer 1 + Layer 2 (pattern analysis + AI contextual review) by default
+- **New `/shallowreview` command** — Fast pattern-only analysis without the LLM deep review step
+- Updated help text and command descriptions for new review modes
+
+### Fixed
+- **Disk cache key correctness** — Cache key now includes `mustFixGate` options to prevent stale results
+- See [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.23.8] — 2026-03-06
 
 ### Added
