@@ -112,17 +112,18 @@ const handleChatRequest: vscode.ChatRequestHandler = async (
 
   switch (command) {
     case "review":
-      return await handleReview(request, stream, token);
-    case "security":
-      return await handleReview(request, stream, token, "security-only");
     case "deepreview":
       return await handleDeepReview(request, stream, token);
+    case "shallowreview":
+      return await handleShallowReview(request, stream, token);
+    case "security":
+      return await handleShallowReview(request, stream, token, "security-only");
     case "fix":
       return await handleFix(stream, token);
     case "help":
       return handleHelp(stream);
     default:
-      return await handleReview(request, stream, token);
+      return await handleDeepReview(request, stream, token);
   }
 };
 
@@ -135,7 +136,8 @@ const handleChatRequest: vscode.ChatRequestHandler = async (
 function inferCommand(prompt: string): string {
   const lower = prompt.toLowerCase();
   if (/\bfix\b/.test(lower)) return "fix";
-  if (/\bdeep\s*review\b/.test(lower)) return "deepreview";
+  if (/\bshallow\s*review\b/.test(lower)) return "shallowreview";
+  if (/\bpattern\s*(only|analysis)\b/.test(lower)) return "shallowreview";
   if (/\bsecur/.test(lower)) return "security";
   if (/\bhelp\b/.test(lower)) return "help";
   return "review";
@@ -195,9 +197,9 @@ function isWorkspaceIntent(prompt: string): boolean {
   return /\b(codebase|workspace|project|all\s+files|entire|whole|repo|repository|folder)\b/i.test(prompt);
 }
 
-// ─── /review Handler ─────────────────────────────────────────────────────────
+// ─── /shallowreview Handler (pattern analysis only) ─────────────────────────
 
-async function handleReview(
+async function handleShallowReview(
   request: vscode.ChatRequest,
   stream: vscode.ChatResponseStream,
   token: vscode.CancellationToken,
@@ -324,7 +326,7 @@ async function handleReview(
     return {
       metadata: {
         showReEvaluate: true,
-        reviewCommand: preset === "security-only" ? "security" : "review",
+        reviewCommand: preset === "security-only" ? "security" : "shallowreview",
       },
     };
   } catch (error) {
@@ -857,16 +859,19 @@ function handleHelp(stream: vscode.ChatResponseStream): vscode.ChatResult | void
     `### Judges Panel — Chat Commands\n\n` +
       `| Command | What it does |\n` +
       `|---|---|\n` +
-      `| \`@judges\` | Review the active file with all 37 judges |\n` +
+      `| \`@judges\` | Deep review — Layer 1 (pattern analysis) + Layer 2 (AI contextual review) |\n` +
       `| \`@judges /review\` | Same as above |\n` +
-      `| \`@judges /review review the codebase\` | Review all files in the workspace |\n` +
-      `| \`@judges /deepreview\` | Combined Layer 1 (pattern) + Layer 2 (AI deep review) |\n` +
-      `| \`@judges /security\` | Security-focused review only |\n` +
+      `| \`@judges /review review the codebase\` | Deep review all files in the workspace |\n` +
+      `| \`@judges /deepreview\` | Same as \`/review\` (Layer 1 + Layer 2 deep review) |\n` +
+      `| \`@judges /shallowreview\` | Pattern analysis only (Layer 1 — no AI deep review) |\n` +
+      `| \`@judges /security\` | Security-focused pattern review only |\n` +
       `| \`@judges /fix\` | Auto-fix findings that have patches (not all findings are auto-fixable) |\n` +
       `| \`@judges /help\` | Show this help |\n\n` +
-      `**\`/deepreview\`** runs the fast deterministic evaluators first, then sends the code ` +
-      `and findings to an AI model for contextual deep analysis — catching semantic issues, ` +
+      `**Default behavior** runs the fast deterministic evaluators first (Layer 1), then sends the code ` +
+      `and findings to an AI model for contextual deep analysis (Layer 2) — catching semantic issues, ` +
       `false positives, and architectural concerns that pattern matching cannot detect.\n\n` +
+      `**\`/shallowreview\`** runs only Layer 1 (pattern analysis) without the AI deep review — ` +
+      `faster, but may include more false positives.\n\n` +
       `**Workspace review** triggers automatically when you mention ` +
       `*codebase*, *workspace*, *project*, *all files*, *repo*, or *folder* ` +
       `in your prompt (up to ${getMaxWorkspaceFiles()} files).\n\n` +
@@ -874,7 +879,7 @@ function handleHelp(stream: vscode.ChatResponseStream): vscode.ChatResult | void
       `- *"@judges review this file for performance issues"*\n` +
       `- *"@judges review the entire codebase"*\n` +
       `- *"@judges check security across the project"*\n` +
-      `- *"@judges deep review this file"*\n` +
+      `- *"@judges shallow review this file"*\n` +
       `- *"@judges fix this file"*\n`,
   );
 }

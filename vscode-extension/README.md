@@ -13,7 +13,7 @@ Install one extension. Get **37 specialized judges** reviewing every file you sa
 - **Workspace evaluation** — evaluate all supported files with progress reporting
 - **Status bar** — one-click evaluation from the status bar shield icon
 - **Configurable** — choose presets, severity filters, and specific judges
-- **Combined deep review** — `/deepreview` runs Layer 1 (instant pattern analysis) and Layer 2 (LLM contextual review) in a single action, streaming results directly in chat or opening a markdown report
+- **Deep review by default** — every review runs Layer 1 (instant pattern analysis) and Layer 2 (LLM contextual review), streaming results directly in chat or opening a markdown report
 - **AI-powered false-positive refinement** — right-click in the editor and select "Refine Findings with AI" to use the available language model to review pattern-matched findings and filter out false positives
 
 ## Chat Participant — `@judges`
@@ -22,10 +22,11 @@ Talk to the Judges Panel directly in Copilot Chat:
 
 | Command | What it does |
 |---------|-------------|
-| `@judges` | Review the active file with all 37 judges |
+| `@judges` | Deep review — Layer 1 (pattern analysis) + Layer 2 (AI contextual review) |
 | `@judges /review` | Same as above |
-| `@judges /security` | Security-focused review only |
-| `@judges /deepreview` | Combined Layer 1 + Layer 2 deep review (pattern analysis + AI contextual review) |
+| `@judges /deepreview` | Same as above |
+| `@judges /shallowreview` | Pattern analysis only (Layer 1 — no AI deep review) |
+| `@judges /security` | Security-focused pattern review only |
 | `@judges /fix` | Auto-fix all fixable findings |
 | `@judges /help` | Show available commands |
 

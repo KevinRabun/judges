@@ -305,15 +305,19 @@
         "commands": [
           {
             "name": "review",
-            "description": "Review the current file with all 37 judges"
+            "description": "Deep review — Layer 1 (pattern analysis) + Layer 2 (AI contextual review)"
           },
           {
             "name": "deepreview",
-            "description": "Combined Layer 1 + Layer 2 deep review (pattern analysis + AI contextual review)"
+            "description": "Same as /review — Layer 1 + Layer 2 deep review"
+          },
+          {
+            "name": "shallowreview",
+            "description": "Pattern analysis only (Layer 1 — no AI deep review)"
           },
           {
             "name": "security",
-            "description": "Security-focused review of the current file"
+            "description": "Security-focused pattern review of the current file"
           },
           {
             "name": "fix",

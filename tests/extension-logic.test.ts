@@ -55,7 +55,8 @@ function isWorkspaceIntent(prompt: string): boolean {
 function inferCommand(prompt: string): string {
   const lower = prompt.toLowerCase();
   if (/\bfix\b/.test(lower)) return "fix";
-  if (/\bdeep\s*review\b/.test(lower)) return "deepreview";
+  if (/\bshallow\s*review\b/.test(lower)) return "shallowreview";
+  if (/\bpattern\s*(only|analysis)\b/.test(lower)) return "shallowreview";
   if (/\bsecur/.test(lower)) return "security";
   if (/\bhelp\b/.test(lower)) return "help";
   return "review";
@@ -647,15 +648,16 @@ describe("Refine with AI — Contract", () => {
 // and L1/L2 integration contracts.
 
 describe("Deep Review — Contract", () => {
-  it("inferCommand should detect 'deep review' intent", () => {
-    assert.equal(inferCommand("deep review this file"), "deepreview");
-    assert.equal(inferCommand("do a deep review"), "deepreview");
-    assert.equal(inferCommand("run deep review on my code"), "deepreview");
-    assert.equal(inferCommand("deepreview"), "deepreview");
+  it("inferCommand should detect 'shallow review' intent", () => {
+    assert.equal(inferCommand("shallow review this file"), "shallowreview");
+    assert.equal(inferCommand("do a shallow review"), "shallowreview");
+    assert.equal(inferCommand("run pattern only analysis"), "shallowreview");
+    assert.equal(inferCommand("pattern analysis on my code"), "shallowreview");
   });
 
-  it("inferCommand should not confuse 'deep review' with regular 'review'", () => {
+  it("inferCommand should default to 'review' (deep review) for general prompts", () => {
     assert.equal(inferCommand("review this file"), "review");
+    assert.equal(inferCommand("deep review this file"), "review");
     assert.equal(inferCommand(""), "review");
     assert.equal(inferCommand("check this code"), "review");
   });
