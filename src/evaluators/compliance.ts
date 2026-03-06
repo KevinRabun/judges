@@ -383,7 +383,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
   lines.forEach((line, i) => {
     if (isCommentLine(line)) return;
     // Skip attribute/annotation lines (e.g., [Authorize], @Authorize) — these are access control, not operations
-    if (/^\s*[\[@]/.test(line)) return;
+    if (/^\s*[[@]/.test(line)) return;
     if (/(?:transfer|payment|withdrawal|approve|certify|attest)\s*[=(]/i.test(line)) {
       regulatedOpLines.push(i + 1);
     }

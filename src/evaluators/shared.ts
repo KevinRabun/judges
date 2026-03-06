@@ -42,6 +42,9 @@ export type FileCategory =
   | "config" // configuration / build / manifest files
   | "types" // pure type definitions (interfaces, enums, no runtime code)
   | "utility" // small utility / helper modules (no I/O, no HTTP endpoints)
+  | "cli" // CLI commands — short-lived processes with console output
+  | "analysis-tool" // code analysis tools, linters, pattern matchers, formatters
+  | "vscode-extension" // VS Code extension code — desktop plugin, not web service
   | "server" // entry points, route handlers, API controllers
   | "unknown"; // cannot determine — treat as server-like (all rules apply)
 
@@ -92,14 +95,51 @@ export function classifyFile(code: string, language: string, filePath?: string):
     if (/\.(?:ya?ml|json|jsonc|toml|ini|env|properties|cfg|conf)$/i.test(lowerPath)) {
       return "config";
     }
+    // VS Code extension files — desktop plugin, not a web service
+    if (/vscode[_-]?extension[/\\]/i.test(lowerPath)) {
+      return "vscode-extension";
+    }
+    // Code analysis / pattern-matching tool directories
+    if (
+      /[/\\](?:judges|evaluators|analyzers|linters|rules|checks|ast|formatters|patches|reports|tools)[/\\]/i.test(
+        lowerPath,
+      )
+    ) {
+      return "analysis-tool";
+    }
+    // CLI entry points and command files — must come before server detection
+    // to prevent server-signal patterns in sample code from mis-classifying
+    if (/[/\\](?:commands?|cmd|scripts)[/\\]/i.test(lowerPath)) {
+      return "cli";
+    }
+    if (/[/\\]cli\.\w+$/i.test(lowerPath)) {
+      return "cli";
+    }
   }
 
   // ── Content-based classification ─────────────────────────────────────────
 
-  // Test files: heavy test framework usage
-  const testFrameworkLines = lines.filter((l) =>
-    /\b(?:describe|it|test|beforeEach|afterEach|beforeAll|afterAll|expect|assert)\s*\(/i.test(l),
-  ).length;
+  // Regex-heavy pattern libraries are analysis tools, not test files.
+  // Check this BEFORE test detection to prevent string-embedded assert/test
+  // keywords from mis-classifying pattern libraries.
+  const regexTestCallCount = lines.filter((l) => /\.test\s*\(/.test(l)).length;
+  const regexLiteralCount = lines.filter((l) => /\/[^/\s][^/\n]*\/[gimsuy]*/.test(l)).length;
+  if (regexLiteralCount >= 20) {
+    return "analysis-tool";
+  }
+  if (regexTestCallCount >= 5 && regexLiteralCount >= 8) {
+    return "analysis-tool";
+  }
+
+  // Test files: heavy test framework usage.
+  // Exclude lines where "test" is preceded by a dot — those are regex
+  // .test() calls, not test-framework invocations.
+  const testFrameworkLines = lines.filter((l) => {
+    if (!/\b(?:describe|it|test|beforeEach|afterEach|beforeAll|afterAll|expect|assert)\s*\(/i.test(l)) return false;
+    // If the only match is .test( (regex invocation), skip the line
+    const stripped = l.replace(/\.test\s*\(/g, ".XXXX(");
+    return /\b(?:describe|it|test|beforeEach|afterEach|beforeAll|afterAll|expect|assert)\s*\(/i.test(stripped);
+  }).length;
   if (testFrameworkLines >= 3) {
     return "test";
   }
@@ -134,6 +174,21 @@ export function classifyFile(code: string, language: string, filePath?: string):
     return "config";
   }
 
+  // Content-based VS Code detection: imports from 'vscode' package
+  if (/import\s.*from\s+['"]vscode['"]/i.test(code) || /require\s*\(\s*['"]vscode['"]\s*\)/i.test(code)) {
+    return "vscode-extension";
+  }
+
+  // Files with many scoring/evaluation patterns are also analysis tools
+  const scoringPatterns = lines.filter((l) =>
+    /\b(?:scoreFindings|evaluateWith|filterFalsePositive|classifyFile|isIaCTemplate|normalizeLanguage|langPattern)\b/.test(
+      l,
+    ),
+  ).length;
+  if (scoringPatterns >= 2 && regexLiteralCount >= 3) {
+    return "analysis-tool";
+  }
+
   // Health-check endpoints detected by content (lightweight route returning 200/ok)
   if (
     /(?:\/health|\/ready|\/live|\/ping|\/status)\b/i.test(code) &&
@@ -145,6 +200,18 @@ export function classifyFile(code: string, language: string, filePath?: string):
     return "utility";
   }
 
+  // Library modules that import judges domain types are part of the analysis
+  // tool even if they lack many regex patterns.  Check this BEFORE server
+  // signals — files like presets.ts reference framework names (Django, Spring)
+  // inside preset data, which would otherwise false-trigger server detection.
+  if (
+    /\b(?:scoreFindings|evaluateWith|filterFalsePositive|classifyFile|Finding|TribunalVerdict|JudgeDefinition|JudgeEvaluation|JudgesConfig|LangFamily|Severity|FileCategory|EvaluatorResult|normalizeLanguage|RuleSeverity|Preset|ToolCapability|ComparisonResult)\b/.test(
+      code,
+    )
+  ) {
+    return "analysis-tool";
+  }
+
   // Server / entry point: has HTTP handlers, route definitions, or listen
   const serverSignals =
     /\b(?:app\.(?:get|post|put|delete|patch|use|listen)|router\.|express\(|createServer|fastify|Koa|hono|http\.(?:Server|createServer)|new\s+Hono|Flask|Django|Spring|@(?:Get|Post|Put|Delete|Controller|RequestMapping)|func\s+\w+Handler|gin\.\w+|http\.Handle)/i;
@@ -152,12 +219,32 @@ export function classifyFile(code: string, language: string, filePath?: string):
     return "server";
   }
 
+  // CLI commands: short-lived processes with console output, process.exit,
+  // argument parsing, synchronous I/O — should not trigger scalability,
+  // structured logging, or graceful-shutdown rules.
+  const cliSignals = [
+    /\bprocess\.exit\s*\(/i.test(code), // explicit exit codes
+    /\bprocess\.argv\b/i.test(code), // CLI argument access
+    /\bconsole\.(?:log|error|warn)\s*\(/i.test(code) && /\bprocess\.exit\s*\(/i.test(code), // console output + exit
+    /\b(?:commander|yargs|minimist|meow|inquirer|vorpal|oclif|clipanion|cac)\b/i.test(code), // CLI frameworks
+    /\b(?:parseArgs|parse_args|add_argument|\.option\s*\(\s*["']-)/i.test(code), // argument parsing
+  ];
+  const cliScore = cliSignals.filter(Boolean).length;
+  if (cliScore >= 2 && !serverSignals.test(code)) {
+    return "cli";
+  }
   // Small utility with no I/O
   const hasIO =
     /\b(?:fetch|axios|http|https|net|fs\.|readFile|writeFile|database|query|exec|spawn|child_process|socket)\b/i.test(
       code,
     );
   if (!hasIO && lineCount < 200) {
+    return "utility";
+  }
+
+  // Files that primarily export utility functions (no server, no test, no CLI,
+  // has I/O or is large) are general utility modules.
+  if (functionDeclLines >= 2 && !hasIO) {
     return "utility";
   }
 
@@ -202,7 +289,7 @@ const VERSION_DETECT_PATTERNS: [DetectedFramework, RegExp][] = [
   ["express", /["']express["']\s*:\s*["'][~^]?([\d.]+)/i],
   ["next", /["']next["']\s*:\s*["'][~^]?([\d.]+)/i],
   // Java / Kotlin — Spring Boot
-  ["spring", /spring-boot(?:-starter)?[:\-](\d+\.\d+[\d.]*)/i],
+  ["spring", /spring-boot(?:-starter)?[:-](\d+\.\d+[\d.]*)/i],
   ["spring", /org\.springframework\.boot.*version\s*=?\s*['"]?(\d+\.\d+[\d.]*)/i],
   // C# — ASP.NET
   ["aspnet", /Microsoft\.AspNetCore[.\w]*Version=["']?([\d.]+)/i],

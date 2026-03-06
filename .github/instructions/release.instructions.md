@@ -60,7 +60,7 @@ This is a separate changelog for the VS Code Marketplace listing. It should:
 
 - Have its own `[X.Y.Z]` section matching the release version
 - Summarize extension-specific changes (new commands, UI changes, diagnostics improvements)
-- Reference core engine changes briefly with a link: `see [core CHANGELOG](../CHANGELOG.md) for full details`
+- Reference core engine changes briefly with a link: `see [core CHANGELOG](../../CHANGELOG.md) for full details`
 - Previously used independent version numbers (0.2.x, 0.3.0, 0.4.0); now synced to the core version starting from 3.18.1
 
 ---

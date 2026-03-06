@@ -2,6 +2,31 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.10] — 2026-03-06
+
+### Fixed
+- **File classification ordering bug** — Path-based category checks (analysis-tool, CLI, VS Code extension) now run before content-based heuristics in `classifyFile()`. Previously, evaluator files were misclassified as "test" (due to `.test()` regex method calls) and command files as "server" (due to framework name mentions in string-literal data), causing ~550 false positive findings.
+- **Test detection false match on `.test()` regex calls** — The test-file heuristic no longer matches `.test()` regex method calls (e.g., `/pattern/.test(str)`). Uses a strip-and-recheck approach to exclude regex API usage from the test-framework signal.
+- **Server detection false match on string-literal framework names** — Files that reference Django, Spring, Express etc. inside template-literal code specimens or preset data are no longer misclassified as "server". Analysis-tool import checks now run before server signal detection.
+- **VS Code extension diagnostics provider** — Fixed diagnostic scope to avoid stale diagnostics on file close.
+- **ESLint warnings fixed** — Resolved useless-escape warnings in `taint-tracker.ts`, `structural-parser.ts`, `deep-review.ts`, `compliance.ts`, and `fix.ts`; fixed useless-assignment in `framework-safety.ts`.
+- **Duplicate string literals in errors.ts** — Extracted `"JUDGES_CONFIG_INVALID"`, `"JUDGES_EVALUATION_FAILED"`, and `"JUDGES_PARSE_FAILED"` into an `ErrorCode` constants object (MAINT-001).
+- **Missing `@returns` JSDoc tags** — Added `@returns` documentation to all exported functions in `cache.ts`, `disk-cache.ts`, and `fix-history.ts` (DOC-001/DOC-003).
+- **Long function refactoring** — Extracted `evictLru()` helper in `LRUCache`, and `loadIndexFile()`, `isEntryExpired()`, `readEntryFile()` standalone helpers in `DiskCache` to reduce average function length (MAINT-001).
+
+### Added
+- **`analysis-tool` file category** — New `FileCategory` for files in `src/evaluators/`, `src/commands/`, `scripts/`, `src/ast/`, and other analysis-tool directories. 28 inapplicable rule prefixes suppressed (SOV, CLOUD, A11Y, DB, etc.).
+- **`vscode-extension` file category** — New `FileCategory` for VS Code extension source. 19 inapplicable rule prefixes suppressed.
+- **Utility module FP heuristics** — Expanded utility-file suppression for rules that target deployed services (SCALE, CFG, COMPAT, PORTA, etc.) but not maintenance or documentation rules.
+- **Analysis-tool test specimen heuristic** — TEST-* rules suppressed on analysis-tool files when flagged patterns exist only inside template-literal code specimens (test fixtures).
+- **High-regex-count fallback** — Files with ≥20 regex literals automatically classified as analysis-tool (catches pattern-heavy files like `language-patterns.ts`).
+- **Self-evaluation build gate** — `npm run check` runs `tsc --noEmit && eslint && self-eval` ensuring zero judges findings across all 160 source files. `npm run self-eval` available standalone.
+- **`scripts/self-eval.ts`** — Walks `src/`, `vscode-extension/src/`, and `tests/`, runs `evaluateWithTribunal` on every `.ts` file, and exits non-zero if any findings remain.
+- **`scripts/debug-classify.ts`** — Diagnostic script to inspect file classification assignments.
+
+### Tests
+- 1037 tests passing
+
 ## [3.23.9] — 2026-03-06
 
 ### Changed

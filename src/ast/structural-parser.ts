@@ -305,7 +305,7 @@ const DECISION_POINTS: Record<string, RegExp> = {
   go: /\b(if|else\s+if|for|switch|case|select|&&|\|\|)\b/g,
   java: /\b(if|else\s+if|for|while|do|case|catch|\?|&&|\|\|)\b/g,
   csharp: /\b(if|else\s+if|for|foreach|while|do|case|catch|\?|&&|\|\|)\b/g,
-  powershell: /\b(if|elseif|foreach|for|while|do|switch|catch|\-and|\-or)\b/g,
+  powershell: /\b(if|elseif|foreach|for|while|do|switch|catch|-and|-or)\b/g,
 };
 
 function computeComplexityFromLines(lines: string[], language: string): number {

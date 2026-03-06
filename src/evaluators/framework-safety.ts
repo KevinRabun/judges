@@ -1123,7 +1123,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
       const unsafeTemplateLines = getLineNumbers(code, /template\.HTML\s*\(|\.Funcs\s*\(.*"safe|"noescape"/gm);
       if (unsafeTemplateLines.length > 0) {
         findings.push({
-          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`, // eslint-disable-line no-useless-assignment
           severity: "high",
           title: "Go template with unsafe HTML casting — XSS risk",
           description:

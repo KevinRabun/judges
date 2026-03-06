@@ -123,8 +123,13 @@ export class JudgesDiagnosticProvider {
     const minConfidence = confidenceThresholds[confidenceTier] ?? 0.6;
 
     try {
-      const verdict = evaluateWithTribunal(code, language);
-      const allFindings = verdict.evaluations.flatMap((e) => e.findings);
+      // Pass filePath so FP heuristics can use path-based file classification
+      // (e.g. commands/ → CLI tool, tests/ → test file).
+      // Use verdict.findings which includes dedup, FP filtering, calibration,
+      // and per-file capping — NOT verdict.evaluations which has raw per-judge output.
+      const filePath = document.uri.fsPath;
+      const verdict = evaluateWithTribunal(code, language, undefined, { filePath });
+      const allFindings = verdict.findings;
 
       // Filter by severity
       const severityOrder = ["critical", "high", "medium", "low", "info"];

@@ -91,7 +91,7 @@ export function buildSingleJudgeDeepReviewSection(judge: JudgeDefinition, langua
   md += `Speculative findings erode developer trust — prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
   md += `**IaC identifier handling:** Azure resource identifiers (policy definition IDs, role definition IDs, `;
   md += `built-in policy assignments, subscription GUIDs, tenant IDs, etc.) are opaque platform identifiers `;
-  md += `provided by Microsoft. Do NOT validate them for strict UUID/GUID hex compliance or flag them as \"invalid\" — `;
+  md += `provided by Microsoft. Do NOT validate them for strict UUID/GUID hex compliance or flag them as "invalid" — `;
   md += `they may contain characters outside the hex range and are still correct. Treat all Azure resource IDs as verbatim constants.\n\n`;
 
   md += `### False Positive Review\n\n`;

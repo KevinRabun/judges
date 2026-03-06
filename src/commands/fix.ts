@@ -332,7 +332,7 @@ export function runFix(argv: string[]): void {
   console.log("  " + "─".repeat(60));
   for (let idx = 0; idx < fixable.length; idx++) {
     const p = fixable[idx];
-    const line = p.lineNumbers?.[0] ?? p.patch.startLine;
+    const _line = p.lineNumbers?.[0] ?? p.patch.startLine;
     const overlapTag = overlaps.has(idx) ? " [OVERLAP — will skip]" : "";
     console.log(`  [${p.severity.toUpperCase().padEnd(8)}] ${p.ruleId}: ${p.title}${overlapTag}`);
 

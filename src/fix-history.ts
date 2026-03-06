@@ -47,6 +47,12 @@ export interface FixStats {
 
 const FIX_HISTORY_FILE = ".judges-fix-history.json";
 
+/**
+ * Load fix history from disk.
+ *
+ * @returns The persisted fix history, or an empty history if the file
+ *          does not exist or cannot be parsed.
+ */
 export function loadFixHistory(dir: string = "."): FixHistory {
   const filePath = resolve(dir, FIX_HISTORY_FILE);
   if (!existsSync(filePath)) {
@@ -59,6 +65,11 @@ export function loadFixHistory(dir: string = "."): FixHistory {
   }
 }
 
+/**
+ * Persist fix history to disk.
+ *
+ * @returns Nothing — writes the history JSON to the configured directory.
+ */
 export function saveFixHistory(history: FixHistory, dir: string = "."): void {
   const filePath = resolve(dir, FIX_HISTORY_FILE);
   writeFileSync(filePath, JSON.stringify(history, null, 2) + "\n", "utf-8");
@@ -68,6 +79,8 @@ export function saveFixHistory(history: FixHistory, dir: string = "."): void {
 
 /**
  * Record that a fix was accepted (applied).
+ *
+ * @returns Nothing — appends the outcome and persists to disk.
  */
 export function recordFixAccepted(ruleId: string, filePath?: string, dir?: string): void {
   const history = loadFixHistory(dir);
@@ -82,6 +95,8 @@ export function recordFixAccepted(ruleId: string, filePath?: string, dir?: strin
 
 /**
  * Record that a fix was rejected (skipped).
+ *
+ * @returns Nothing — appends the outcome and persists to disk.
  */
 export function recordFixRejected(ruleId: string, reason?: string, filePath?: string, dir?: string): void {
   const history = loadFixHistory(dir);
@@ -97,6 +112,8 @@ export function recordFixRejected(ruleId: string, reason?: string, filePath?: st
 
 /**
  * Record that a previously applied fix was reverted.
+ *
+ * @returns Nothing — appends the outcome and persists to disk.
  */
 export function recordFixReverted(ruleId: string, filePath?: string, dir?: string): void {
   const history = loadFixHistory(dir);
@@ -114,6 +131,8 @@ export function recordFixReverted(ruleId: string, filePath?: string, dir?: strin
 
 /**
  * Compute fix acceptance statistics from history.
+ *
+ * @returns Aggregated statistics including per-rule acceptance rates.
  */
 export function computeFixStats(history?: FixHistory, dir?: string): FixStats {
   const h = history || loadFixHistory(dir);
@@ -152,7 +171,8 @@ export function computeFixStats(history?: FixHistory, dir?: string): FixStats {
 
 /**
  * Get fix acceptance rate for a specific rule.
- * Returns undefined if no data available for that rule.
+ *
+ * @returns The acceptance rate (0–1), or `undefined` if no data exists for that rule.
  */
 export function getFixAcceptanceRate(ruleId: string, dir?: string): number | undefined {
   const stats = computeFixStats(undefined, dir);
@@ -163,6 +183,9 @@ export function getFixAcceptanceRate(ruleId: string, dir?: string): number | und
 
 /**
  * Get rules with low acceptance rates (potential problematic patches).
+ *
+ * @returns An array of rules whose acceptance rate falls below the threshold,
+ *          sorted by rate ascending.
  */
 export function getLowAcceptanceRules(
   threshold: number = 0.5,

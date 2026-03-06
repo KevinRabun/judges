@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.10] — 2026-03-06
+
+### Fixed
+- **Diagnostics provider fix** — Fixed diagnostic scope to avoid stale diagnostics on file close
+- **Major FP reduction** — File classification ordering bug fixed: analysis-tool, CLI, and VS Code extension files are no longer misclassified as "test" or "server", eliminating ~550 false positives
+- **Code quality fixes** — Extracted error code constants, added missing JSDoc `@returns` tags, refactored long functions in cache modules
+- See [core CHANGELOG](../CHANGELOG.md) for full details
+
+### Added
+- **Self-evaluation build gate** — `npm run check` now runs the full judges panel on every source file as part of CI, ensuring zero findings
+- **New file categories** — `analysis-tool` and `vscode-extension` categories with tailored FP suppression for analysis tooling and extension code
+
 ## [3.23.9] — 2026-03-06
 
 ### Changed

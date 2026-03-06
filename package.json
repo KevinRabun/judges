@@ -1,6 +1,6 @@
 {
   "name": "@kevinrabun/judges",
-  "version": "3.23.9",
+  "version": "3.23.10",
   "description": "37 specialized judges that evaluate AI-generated code for security, cost, and quality.",
   "mcpName": "io.github.KevinRabun/judges",
   "type": "module",
@@ -70,6 +70,8 @@
     "clean": "rimraf dist",
     "test": "npx tsx --test tests/judges.test.ts",
     "test:coverage": "npx c8 --reporter=text --reporter=lcov npx tsx --test tests/judges.test.ts",
+    "self-eval": "npx tsx scripts/self-eval.ts",
+    "check": "tsc --noEmit && eslint src/ tests/ && npx tsx scripts/self-eval.ts",
     "lint": "eslint src/ tests/",
     "lint:fix": "eslint src/ tests/ --fix",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",

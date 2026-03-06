@@ -6,6 +6,17 @@
  * instead of relying on untyped `Error` messages.
  */
 
+// ─── Error Codes ─────────────────────────────────────────────────────────────
+
+/** Machine-readable error codes used across the error hierarchy. */
+export const ErrorCode = {
+  CONFIG_INVALID: "JUDGES_CONFIG_INVALID",
+  EVALUATION_FAILED: "JUDGES_EVALUATION_FAILED",
+  PARSE_FAILED: "JUDGES_PARSE_FAILED",
+} as const;
+
+export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
+
 // ─── Base Error ──────────────────────────────────────────────────────────────
 
 /**
@@ -13,7 +24,7 @@
  * Carries a machine-readable `code` for programmatic matching.
  */
 export class JudgesError extends Error {
-  /** Machine-readable error code, e.g. "JUDGES_CONFIG_INVALID". */
+  /** Machine-readable error code, e.g. `ErrorCode.CONFIG_INVALID`. */
   readonly code: string;
 
   constructor(message: string, code: string, options?: ErrorOptions) {
@@ -32,7 +43,7 @@ export class JudgesError extends Error {
  */
 export class ConfigError extends JudgesError {
   constructor(message: string, options?: ErrorOptions) {
-    super(message, "JUDGES_CONFIG_INVALID", options);
+    super(message, ErrorCode.CONFIG_INVALID, options);
     this.name = "ConfigError";
   }
 }
@@ -47,7 +58,7 @@ export class EvaluationError extends JudgesError {
   readonly judgeId?: string;
 
   constructor(message: string, judgeId?: string, options?: ErrorOptions) {
-    super(message, "JUDGES_EVALUATION_FAILED", options);
+    super(message, ErrorCode.EVALUATION_FAILED, options);
     this.name = "EvaluationError";
     this.judgeId = judgeId;
   }
@@ -60,7 +71,7 @@ export class EvaluationError extends JudgesError {
  */
 export class ParseError extends JudgesError {
   constructor(message: string, options?: ErrorOptions) {
-    super(message, "JUDGES_PARSE_FAILED", options);
+    super(message, ErrorCode.PARSE_FAILED, options);
     this.name = "ParseError";
   }
 }

@@ -713,7 +713,7 @@ const KOTLIN_PATTERNS: LanguagePatternSet = {
     { pattern: /\bProcessBuilder\s*\(/i, kind: "command-exec" },
     { pattern: /\.(?:executeQuery|executeUpdate|createQuery|nativeQuery)\s*\(/i, kind: "sql-query" },
     { pattern: /\bString\.format\s*\(.*(?:SELECT|INSERT|UPDATE|DELETE)\b/i, kind: "sql-query" },
-    { pattern: /\"\$\{?\w+\}?.*(?:SELECT|INSERT|UPDATE|DELETE)\b/i, kind: "sql-query" },
+    { pattern: /"\$\{?\w+\}?.*(?:SELECT|INSERT|UPDATE|DELETE)\b/i, kind: "sql-query" },
     { pattern: /\bFile\s*\(\s*(?:\$|[^")]+\+)/i, kind: "path-traversal" },
     { pattern: /\bScriptEngine\b.*\.eval\s*\(/i, kind: "code-execution" },
     { pattern: /\bObjectInputStream\b.*\.readObject\s*\(/i, kind: "deserialization" },

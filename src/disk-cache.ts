@@ -41,6 +41,49 @@ interface CacheIndex {
   entries: Record<string, CacheIndexEntry>;
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Read and parse a cache index file, returning a default empty index on
+ * any failure (missing file, corrupt JSON, wrong version).
+ *
+ * @returns The parsed `CacheIndex`, or a fresh empty index.
+ */
+function loadIndexFile(indexPath: string): CacheIndex {
+  if (!existsSync(indexPath)) return { version: 1, entries: {} };
+  try {
+    const raw = readFileSync(indexPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (parsed?.version === 1 && parsed.entries) return parsed as CacheIndex;
+    return { version: 1, entries: {} };
+  } catch {
+    return { version: 1, entries: {} };
+  }
+}
+
+/**
+ * Check whether a cache index entry has exceeded its maximum age.
+ *
+ * @returns `true` if the entry is older than `maxAgeMs` milliseconds.
+ */
+function isEntryExpired(meta: CacheIndexEntry, maxAgeMs: number): boolean {
+  return Date.now() - new Date(meta.ts).getTime() > maxAgeMs;
+}
+
+/**
+ * Read and parse a JSON cache entry from disk.
+ *
+ * @returns The parsed value, or `undefined` if the file is missing or corrupt.
+ */
+function readEntryFile<T>(entryPath: string): T | undefined {
+  if (!existsSync(entryPath)) return undefined;
+  try {
+    return JSON.parse(readFileSync(entryPath, "utf-8")) as T;
+  } catch {
+    return undefined;
+  }
+}
+
 // ─── DiskCache class ─────────────────────────────────────────────────────────
 
 export class DiskCache<T = unknown> {
@@ -58,38 +101,36 @@ export class DiskCache<T = unknown> {
 
   // ── Public API ──────────────────────────────────────────────────────────
 
-  /** Compute a cache key from code + language. */
+  /**
+   * Compute a cache key from code + language.
+   *
+   * @returns A content-addressable hash key.
+   */
   static key(code: string, language: string): string {
     return contentHash(code, language);
   }
 
-  /** Retrieve a cached result, or undefined if miss / stale. */
+  /**
+   * Retrieve a cached result, or `undefined` if miss / stale.
+   *
+   * @returns The cached value, or `undefined` on miss or staleness.
+   */
   get(key: string): T | undefined {
     const meta = this.index.entries[key];
     if (!meta) return undefined;
 
-    // Check staleness
-    const age = Date.now() - new Date(meta.ts).getTime();
-    if (age > this.maxAgeMs) {
+    if (isEntryExpired(meta, this.maxAgeMs)) {
       this.evictEntry(key);
       return undefined;
     }
 
-    const entryPath = this.entryPath(key);
-    if (!existsSync(entryPath)) {
-      // Index out of sync — clean up
-      delete this.index.entries[key];
-      this.saveIndex();
-      return undefined;
-    }
-
-    try {
-      const raw = readFileSync(entryPath, "utf-8");
-      return JSON.parse(raw) as T;
-    } catch {
+    const ep = this.entryPath(key);
+    const value = readEntryFile<T>(ep);
+    if (value === undefined) {
+      // Index out of sync or corrupt file — clean up
       this.evictEntry(key);
-      return undefined;
     }
+    return value;
   }
 
   /** Store a result on disk. */
@@ -110,12 +151,15 @@ export class DiskCache<T = unknown> {
     this.saveIndex();
   }
 
-  /** Check if a key exists (not stale). */
+  /**
+   * Check if a key exists (not stale).
+   *
+   * @returns `true` if the key is cached and not expired.
+   */
   has(key: string): boolean {
     const meta = this.index.entries[key];
     if (!meta) return false;
-    const age = Date.now() - new Date(meta.ts).getTime();
-    if (age > this.maxAgeMs) {
+    if (isEntryExpired(meta, this.maxAgeMs)) {
       this.evictEntry(key);
       return false;
     }
@@ -139,7 +183,11 @@ export class DiskCache<T = unknown> {
     this.index = { version: 1, entries: {} };
   }
 
-  /** Number of entries currently cached. */
+  /**
+   * Number of entries currently cached.
+   *
+   * @returns The current entry count.
+   */
   get size(): number {
     return Object.keys(this.index.entries).length;
   }
@@ -161,16 +209,7 @@ export class DiskCache<T = unknown> {
   }
 
   private loadIndex(): CacheIndex {
-    const p = this.indexPath();
-    if (!existsSync(p)) return { version: 1, entries: {} };
-    try {
-      const raw = readFileSync(p, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (parsed?.version === 1 && parsed.entries) return parsed as CacheIndex;
-      return { version: 1, entries: {} };
-    } catch {
-      return { version: 1, entries: {} };
-    }
+    return loadIndexFile(this.indexPath());
   }
 
   private saveIndex(): void {
@@ -213,7 +252,9 @@ let _sharedDiskCache: DiskCache | null = null;
 
 /**
  * Get or create the shared disk cache instance.
- * Returns null if disk caching is disabled via JUDGES_NO_DISK_CACHE=1.
+ *
+ * @returns The shared `DiskCache` instance, or `null` if disk caching is disabled
+ *          via `JUDGES_NO_DISK_CACHE=1`.
  */
 export function getSharedDiskCache(): DiskCache | null {
   if (process.env.JUDGES_NO_DISK_CACHE === "1") return null;
@@ -225,6 +266,8 @@ export function getSharedDiskCache(): DiskCache | null {
 
 /**
  * Clear the shared disk cache (useful in tests).
+ *
+ * @returns Nothing — clears state and resets the singleton.
  */
 export function clearSharedDiskCache(): void {
   _sharedDiskCache?.clear();

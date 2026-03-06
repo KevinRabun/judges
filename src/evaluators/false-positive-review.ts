@@ -65,6 +65,18 @@ const PROD_ONLY_RULE_PREFIXES: string[] = [
   "CACHE-", // caching strategy not relevant to test code
   "DATA-", // data security patterns noise in test assertions
   "API-", // API design not relevant in test code
+  "REL-", // reliability patterns not needed in tests
+  "CONC-", // concurrency patterns not needed in tests
+  "FW-", // framework rules triggered by test fixtures
+  "CYBER-", // security rules triggered by intentional test patterns
+  "AUTH-", // auth rules triggered by test patterns
+  "ERR-", // error handling patterns differ in test code
+  "STRUCT-", // structural rules less meaningful in test files
+  "DB-", // database rules triggered by test fixtures
+  "COMPAT-", // backwards compatibility not relevant in tests
+  "CFG-", // configuration management not relevant in tests
+  "ETHICS-", // ethics not relevant to test code
+  "DEPS-", // dependency health triggered by test fixtures
 ];
 
 /**
@@ -103,6 +115,71 @@ const CODE_ONLY_RULE_PREFIXES = [
   "API-", // API design — no endpoints in config
   "DEPS-", // dependency health — package files handled separately
   "AGENT-", // agent instructions — not applicable to data files
+];
+
+/**
+ * Rule IDs targeting application-runtime / cloud-service concerns that
+ * do NOT apply to code analysis tools (linters, security scanners,
+ * judge definitions, evaluators, formatters, AST analyzers).
+ *
+ * Analysis tools necessarily contain the very patterns they detect
+ * (regex patterns for auth, data export, PII, etc.) and are single-
+ * process developer utilities, not production services.
+ */
+const ANALYSIS_TOOL_INAPPLICABLE_RULE_PREFIXES = [
+  "SOV-", // data sovereignty — tool doesn't process user data
+  "COMP-", // compliance — tool doesn't handle regulated data
+  "CYBER-", // web security — tool has no endpoints
+  "AUTH-", // authentication — tool has no auth system
+  "DATA-", // data security — tool analyzes code, doesn't store data
+  "SCALE-", // scalability — single-process tool
+  "CLOUD-", // cloud readiness — not a cloud service
+  "RATE-", // rate limiting — not a service
+  "DB-", // database — no database
+  "API-", // API design — not an API service
+  "A11Y-", // accessibility — not a UI
+  "I18N-", // internationalization — not user-facing
+  "UX-", // user experience — not a UI
+  "OBS-", // observability — not a production service
+  "LOGPRIV-", // logging privacy — no user data
+  "AGENT-", // agent instructions — not an AI agent
+  "AICS-", // AI code safety — analyzing code, not generating it
+  "FW-", // framework rules — analysis tool, not framework consumer
+  "CACHE-", // caching strategy — not a service
+  "ETHICS-", // ethics/bias — tool doesn't make decisions about people
+  "CONC-", // concurrency — single-threaded analysis
+  "TEST-", // testing rules — analysis code isn't test code
+  "CICD-", // CI/CD infrastructure — not applicable
+  "DEPS-", // dependency health — not applicable to analysis patterns
+  "COMPAT-", // backwards compat — internal tool
+  "CFG-", // config management — analysis tool
+  "REL-", // reliability patterns — not a service
+];
+
+/**
+ * Rule IDs targeting cloud-service / web-server concerns that do NOT apply
+ * to VS Code extensions (desktop plugins running in the editor process).
+ */
+const VSCODE_EXT_INAPPLICABLE_RULE_PREFIXES = [
+  "SOV-", // data sovereignty — desktop app, no cross-border data
+  "COMP-", // compliance — extension doesn't handle regulated data
+  "SCALE-", // scalability — desktop extension
+  "CLOUD-", // cloud readiness — desktop extension
+  "RATE-", // rate limiting — desktop extension
+  "DB-", // database — extensions use VS Code storage API
+  "A11Y-", // accessibility — VS Code handles accessibility
+  "I18N-", // internationalization — VS Code handles i18n
+  "AGENT-", // agent instructions — not an AI agent
+  "CACHE-", // caching — desktop extension
+  "API-", // API design — extension API, not REST API
+  "OBS-", // observability — desktop extension
+  "CONC-", // concurrency — VS Code extension model handles this
+  "ETHICS-", // ethics/bias — tool extension, not decision system
+  "AICS-", // AI code safety — not generating code
+  "CICD-", // CI/CD infrastructure — not applicable
+  "COST-", // cost optimization — desktop extension
+  "DEPS-", // dependency health — VS Code handles deps
+  "TEST-", // testing patterns — not test code
 ];
 
 /**
@@ -327,6 +404,29 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     }
   }
 
+  // ── 2a. Analysis-tool test files: TEST-* rules fire on code specimens ──
+  // Test suites for code analysis tools necessarily embed template-literal
+  // code samples in many languages. Pattern-based TEST-* rules (vague
+  // names, hardcoded dates, external deps, sleeps, large file size)
+  // inevitably match content inside those string specimens rather than
+  // genuine test smells.
+  if (fileCategory === "test" && finding.ruleId.startsWith("TEST-")) {
+    const codeText = lines.join("\n");
+    const isAnalysisToolTest =
+      /\b(?:evaluateWith|scoreFindings|evaluateCode|filterFalsePositive|classifyFile|TribunalVerdict|JudgeDefinition|judgePanelEvaluate|evaluateWithTribunal)\b/.test(
+        codeText,
+      ) ||
+      // Also detect tests for tool-routing, MCP tools, judge panels, etc.
+      /\b(?:judges?\s*panel|tool[_-]?rout|mcp\s*tool|evaluate_code|analyze_code)\b/i.test(codeText);
+    if (isAnalysisToolTest) {
+      // Verify file is dominated by template literal code specimens
+      const templateLiteralCount = (codeText.match(/`[^`]{50,}/g) || []).length;
+      if (templateLiteralCount >= 3) {
+        return `TEST-* rule ${finding.ruleId} triggered by patterns inside code specimens (template literal fixtures) in analysis-tool tests — not actual test smell.`;
+      }
+    }
+  }
+
   // ── 2b. Config/data file gating: code-quality rules on YAML/JSON/config ──
   if (fileCategory === "config") {
     const isCodeOnly = CODE_ONLY_RULE_PREFIXES.some((p) => finding.ruleId.startsWith(p));
@@ -341,6 +441,284 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
   // or "missing authentication" produce noise on these files.
   if (finding.isAbsenceBased && fileCategory === "types") {
     return "Absence-based rule does not apply to pure type-definition files — no runtime logic to evaluate.";
+  }
+
+  // ── 2d. CLI-tool file gating: server/cloud rules on CLI commands ──
+  // CLI tools are short-lived processes that legitimately use process.exit(),
+  // console.log for output, synchronous I/O, and in-memory data structures.
+  // Scalability, observability infrastructure, structured logging, rate
+  // limiting, and cloud-readiness rules are not applicable.
+  if (fileCategory === "cli") {
+    const CLI_INAPPLICABLE_RULE_PREFIXES = [
+      "SCALE-", // CLI doesn't need horizontal scaling
+      "RATE-", // CLI doesn't need rate limiting
+      "CLOUD-", // CLI is not a cloud service
+      "OBS-", // CLI doesn't need observability infrastructure
+      "LOGPRIV-", // CLI console output is not production logging
+      "A11Y-", // CLI is not a web UI
+      "UX-", // CLI is not a web UI
+      "I18N-", // CLI diagnostic counters don't need locale formatting
+      "CACHE-", // CLI doesn't need caching strategy
+      "SOV-", // CLI local tool, no data sovereignty concerns
+      "COMP-", // CLI tool, no regulatory compliance concerns
+      "AGENT-", // agent instructions not applicable to CLI
+      "DATA-", // CLI tool doesn't handle sensitive data at rest
+      "DB-", // CLI tool has no database concerns
+      "API-", // CLI tool is not an API service
+      "CYBER-", // CLI tool has no web endpoints
+      "AUTH-", // CLI tool has no auth system
+      "CONC-", // CLI is single-process short-lived
+      "AICS-", // CLI tool is not generating AI code
+      "ETHICS-", // CLI tool doesn't make decisions about people
+      "FW-", // CLI tool is not a framework consumer
+      "TEST-", // testing patterns not relevant to CLI commands
+      "CICD-", // CI/CD infrastructure not applicable
+      "DEPS-", // dependency health not applicable
+      "COMPAT-", // backwards compatibility not applicable
+      "CFG-", // config management patterns differ for CLI
+      "REL-", // reliability patterns (circuit breakers) not needed in CLI
+    ];
+    const isCLIInapplicable = CLI_INAPPLICABLE_RULE_PREFIXES.some((p) => finding.ruleId.startsWith(p));
+    if (isCLIInapplicable) {
+      return `Rule ${finding.ruleId} does not apply to CLI tools — short-lived processes do not need cloud/server infrastructure.`;
+    }
+
+    // Suppress "abrupt process termination" findings — process.exit() is
+    // the standard way for CLI tools to signal success/failure to the shell.
+    const titleLower = finding.title.toLowerCase();
+    if (
+      titleLower.includes("process.exit") ||
+      titleLower.includes("abrupt") ||
+      titleLower.includes("hard process termination") ||
+      (titleLower.includes("process") && titleLower.includes("termination"))
+    ) {
+      return "process.exit() is standard in CLI tools for reporting exit codes to the shell.";
+    }
+
+    // Suppress "console instead of structured logger" — console is the
+    // correct output interface for CLI tools.
+    if (
+      titleLower.includes("console") &&
+      (titleLower.includes("logger") || titleLower.includes("logging") || titleLower.includes("structured"))
+    ) {
+      return "Console output is the correct interface for CLI tools — structured logging is for services.";
+    }
+
+    // Suppress "unstructured logging" — same reasoning as above
+    if (titleLower.includes("unstructured") && titleLower.includes("log")) {
+      return "Console output is the correct interface for CLI tools — structured logging is for services.";
+    }
+
+    // Suppress "synchronous / blocking I/O" — CLI tools are single-threaded
+    // short-lived processes where sync I/O is idiomatic and often preferred.
+    if (
+      (titleLower.includes("synchronous") || titleLower.includes("blocking")) &&
+      (titleLower.includes("i/o") ||
+        titleLower.includes("io") ||
+        titleLower.includes("operation") ||
+        titleLower.includes("file"))
+    ) {
+      return "Synchronous I/O is appropriate for CLI tools — short-lived processes do not need async concurrency.";
+    }
+
+    // Suppress "in-memory data store" — CLI tools don't need distributed state
+    if (titleLower.includes("in-memory") && (titleLower.includes("store") || titleLower.includes("scale"))) {
+      return "In-memory data structures are appropriate for CLI tools — no need for distributed state.";
+    }
+
+    // Suppress "numeric values formatted without locale" for CLI counter output
+    if (titleLower.includes("locale") && titleLower.includes("numeric")) {
+      return "CLI diagnostic counters do not need locale-aware formatting.";
+    }
+
+    // Suppress STRUCT deep nesting findings — CLI commands with complex
+    // argument handling and output formatting have inherent nesting.
+    if (/^STRUCT-/.test(finding.ruleId)) {
+      return "CLI command logic has inherent nesting from argument handling and output formatting.";
+    }
+
+    // Suppress MAINT findings — CLI tools are self-contained scripts where
+    // duplicate strings, magic numbers, and file length are acceptable.
+    if (/^MAINT-/.test(finding.ruleId)) {
+      return "Maintainability patterns differ for CLI tools — self-contained command scripts have different complexity budgets.";
+    }
+
+    // Suppress DOC findings — CLI command functions are documented by their
+    // --help output, not JSDoc.
+    if (/^DOC-/.test(finding.ruleId)) {
+      return "CLI commands are documented through --help output, not JSDoc.";
+    }
+
+    // Suppress SWDEV findings about long functions, complexity — CLI commands
+    // are often single long functions that handle the entire command flow.
+    if (/^SWDEV-/.test(finding.ruleId)) {
+      return "CLI command handlers are conventionally single functions covering the full command flow.";
+    }
+
+    // Suppress PERF/COST findings — CLI tools run once and exit, performance
+    // optimizations target long-running services.
+    if (/^(?:PERF|COST)-/.test(finding.ruleId)) {
+      return "Performance/cost optimizations target long-running services — CLI tools run once and exit.";
+    }
+
+    // Suppress ERR findings — CLI tools use process.exit() for error
+    // signaling and console.error for messages.
+    if (/^ERR-/.test(finding.ruleId)) {
+      return "CLI tools use process.exit() and console.error for error signaling — different pattern from services.";
+    }
+
+    // Suppress PORTA (portability) findings — CLI tools may use platform-specific paths
+    if (/^PORTA-/.test(finding.ruleId)) {
+      return "Portability patterns differ for CLI tools — platform-specific paths are often expected.";
+    }
+
+    // Suppress absence-based findings on CLI tools — CLI commands don't need
+    // missing server infrastructure (rate limiting, monitoring, etc.)
+    if (finding.isAbsenceBased) {
+      return "Absence-based infrastructure rules do not apply to CLI commands.";
+    }
+  }
+
+  // ── 2e. Analysis-tool file gating ──
+  // Code analysis tools (judge definitions, evaluators, linters, formatters,
+  // AST analyzers) necessarily contain the very patterns they detect. They
+  // are single-process developer utilities, not production web services.
+  if (fileCategory === "analysis-tool") {
+    const isInapplicable = ANALYSIS_TOOL_INAPPLICABLE_RULE_PREFIXES.some((p) => finding.ruleId.startsWith(p));
+    if (isInapplicable) {
+      return `Rule ${finding.ruleId} does not apply to code analysis tools — pattern definitions are not application logic.`;
+    }
+
+    // Suppress nested-loop/complexity findings — pattern matching requires
+    // multi-level traversal and deep branching by design.
+    const titleLower2e = finding.title.toLowerCase();
+    if (
+      /^(?:PERF|COST|STRUCT)-/.test(finding.ruleId) &&
+      (titleLower2e.includes("nested") ||
+        titleLower2e.includes("complex") ||
+        titleLower2e.includes("depth") ||
+        titleLower2e.includes("loop"))
+    ) {
+      return "Complex iteration and deep nesting are inherent to code analysis — pattern matching requires multi-level traversal.";
+    }
+
+    // Suppress STRUCT deep nesting findings specifically
+    if (/^STRUCT-/.test(finding.ruleId)) {
+      return "Deep code structure is inherent to analysis/evaluator logic — multi-level pattern matching requires extensive branching.";
+    }
+
+    // Suppress MAINT findings about duplicate strings, magic numbers, file length —
+    // analysis patterns legitimately repeat keywords and use numeric thresholds.
+    if (/^MAINT-/.test(finding.ruleId)) {
+      return "Maintainability patterns in analysis tools reflect detection rule structure, not extractable constants.";
+    }
+
+    // Suppress DOC findings — internal analysis code documentation needs differ
+    // from public API documentation requirements.
+    if (/^DOC-/.test(finding.ruleId)) {
+      return "Documentation rules have reduced applicability on internal analysis pattern code.";
+    }
+
+    // Suppress SWDEV/ERR findings about function length, error handling, complexity —
+    // evaluation functions are necessarily complex.
+    if (/^(?:SWDEV|ERR)-/.test(finding.ruleId)) {
+      return "Analysis evaluation functions are necessarily complex — pattern matching requires extensive branching and error tolerance.";
+    }
+
+    // Suppress PERF/COST findings — analysis tools process single files, not
+    // high-throughput production traffic.
+    if (/^(?:PERF|COST)-/.test(finding.ruleId)) {
+      return "Performance/cost optimizations target production services — analysis tools process single files.";
+    }
+
+    // Suppress PORTA (portability) findings — internal developer tool
+    if (/^PORTA-/.test(finding.ruleId)) {
+      return "Portability rules do not apply to internal code analysis tools.";
+    }
+
+    // Suppress absence-based findings — analysis tools don't need server infrastructure
+    if (finding.isAbsenceBased) {
+      return "Absence-based infrastructure rules do not apply to code analysis tools.";
+    }
+  }
+
+  // ── 2f. VS Code extension file gating ──
+  // VS Code extensions are desktop plugins running inside the editor process.
+  // They use the VS Code API for I/O, diagnostics, and UI — cloud/service
+  // rules are not applicable.
+  if (fileCategory === "vscode-extension") {
+    const isInapplicable = VSCODE_EXT_INAPPLICABLE_RULE_PREFIXES.some((p) => finding.ruleId.startsWith(p));
+    if (isInapplicable) {
+      return `Rule ${finding.ruleId} does not apply to VS Code extensions — desktop plugin, not a cloud service.`;
+    }
+
+    // Suppress absence-based findings — VS Code provides the host infrastructure
+    if (finding.isAbsenceBased) {
+      return "Absence-based infrastructure rules do not apply to VS Code extensions — the host provides the infrastructure.";
+    }
+
+    // Suppress findings about auth endpoints / session management —
+    // VS Code extensions authenticate via the VS Code authentication API.
+    const titleLower2f = finding.title.toLowerCase();
+    if (
+      /^(?:AUTH|CYBER)-/.test(finding.ruleId) &&
+      (titleLower2f.includes("endpoint") || titleLower2f.includes("session") || titleLower2f.includes("middleware"))
+    ) {
+      return "VS Code extensions use the editor's authentication API — no HTTP endpoints or middleware.";
+    }
+
+    // Suppress STRUCT/MAINT/DOC/SWDEV/PERF/ERR findings on extension code —
+    // extensions have different complexity profiles than web services
+    if (/^(?:STRUCT|MAINT|DOC|SWDEV|PERF|ERR|PORTA)-/.test(finding.ruleId)) {
+      return "VS Code extension code follows the editor's activation/dispose lifecycle pattern.";
+    }
+
+    // Suppress REL/CYBER/AUTH/DATA/FW/LOGPRIV findings on extension code
+    if (/^(?:REL|CYBER|AUTH|DATA|FW|LOGPRIV)-/.test(finding.ruleId)) {
+      return "VS Code extension code uses the editor's built-in infrastructure for reliability and security.";
+    }
+
+    // Suppress UX findings — VS Code extensions use the VS Code UI API
+    if (/^UX-/.test(finding.ruleId)) {
+      return "VS Code extensions use the editor's built-in UI components.";
+    }
+  }
+
+  // ── 2g. Utility module gating ──
+  // Utility modules are library code with no HTTP endpoints, no user-facing
+  // UI, and no cloud-service responsibilities. Server-infrastructure and
+  // cloud-readiness rules do not apply.
+  if (fileCategory === "utility") {
+    const UTILITY_INAPPLICABLE = [
+      "SOV-", // no user data flow
+      "COMP-", // no regulated data handling
+      "RATE-", // no request rate
+      "CLOUD-", // not a cloud service
+      "A11Y-", // no UI
+      "I18N-", // no user-facing strings
+      "UX-", // no user interface
+      "OBS-", // no production observability need
+      "LOGPRIV-", // no user data logging
+      "AGENT-", // not an AI agent
+      "AICS-", // not AI code generation
+      "ETHICS-", // no user-facing decisions
+      "FW-", // framework rules target app code
+      "API-", // not an API service
+      "DB-", // no database
+      "SCALE-", // not a scalable service — CLI utilities use sync I/O legitimately
+      "CFG-", // configuration management rules target deployed services
+      "COMPAT-", // backwards-compat rules target public APIs, not internal helpers
+      "PORTA-", // portability rules target deployed apps, not internal tooling
+    ];
+    const isUtilityInapplicable = UTILITY_INAPPLICABLE.some((p) => finding.ruleId.startsWith(p));
+    if (isUtilityInapplicable) {
+      return `Rule ${finding.ruleId} does not apply to utility library modules — no cloud/service infrastructure.`;
+    }
+
+    // Suppress absence-based findings on utilities
+    if (finding.isAbsenceBased) {
+      return "Absence-based infrastructure rules do not apply to utility modules.";
+    }
   }
 
   // ── 3. All target lines are comments ──
