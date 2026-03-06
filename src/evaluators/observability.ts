@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine, isLikelyCLI, testCode } from "./shared.js";
+import { getLangLineNumbers, getLineNumbers, getLangFamily, isCommentLine, isLikelyCLI, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeObservability(code: string, language: string): Finding[] {
@@ -8,6 +8,37 @@ export function analyzeObservability(code: string, language: string): Finding[] 
   const prefix = "OBS";
   let ruleNum = 1;
   const _lang = getLangFamily(language);
+
+  // Detect HTTP services with no logging at all
+  const hasAnyLogging = testCode(
+    code,
+    /console\.|logger\.|log\.\w+\(|logging\.|slog\.|tracing::|println!|System\.out|Debug\.Log|log\.Printf|log\.Fatal/i,
+  );
+  const hasHttpRoutes =
+    /app\.(get|post|put|delete|use)|router\.(get|post)|@app\.route|@GetMapping|@PostMapping|http\.HandleFunc/i.test(
+      code,
+    );
+  if (hasHttpRoutes && !hasAnyLogging && !isLikelyCLI(code)) {
+    // Find the route handler lines to use as evidence
+    const routeHandlerLines = getLineNumbers(
+      code,
+      /app\.(get|post|put|delete|use)|router\.(get|post)|@app\.route|@GetMapping|@PostMapping|http\.HandleFunc/gi,
+    );
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "HTTP service with no logging",
+      description:
+        "HTTP route handlers have no logging calls. Without any logging, errors, requests, and operational events are invisible in production.",
+      lineNumbers: routeHandlerLines.slice(0, 5),
+      recommendation:
+        "Add structured logging to route handlers — at minimum log incoming requests, errors, and key business events. Use a structured logger (winston/pino for JS, slog for Go).",
+      reference: "Observability Best Practices: Service Logging",
+      suggestedFix:
+        "Add request logging middleware and per-handler logging: app.use((req, res, next) => { logger.info({ method: req.method, url: req.url }, 'request'); next(); });",
+      confidence: 0.85,
+    });
+  }
 
   // Detect console.log used instead of structured logging (multi-language)
   const consoleLogLines = getLangLineNumbers(code, language, LP.CONSOLE_LOG);

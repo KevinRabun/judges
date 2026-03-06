@@ -42,6 +42,14 @@ const cliCommands = new Set([
   "pack",
   "config",
   "compare",
+  "review",
+  "tune",
+  "app",
+  "trend",
+  "doctor",
+  "scaffold-plugin",
+  "lsp",
+  "version",
 ]);
 const cliFlags = new Set(["--help", "-h", "--file", "-f", "--version", "-v"]);
 const firstArg = process.argv[2];

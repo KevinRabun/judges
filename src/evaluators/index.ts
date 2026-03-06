@@ -45,6 +45,8 @@ import { crossEvaluatorDedup, severityRank } from "../dedup.js";
 import { filterFalsePositiveHeuristics } from "./false-positive-review.js";
 import { buildCalibrationProfile, calibrateFindings, loadCalibrationProfile } from "../calibration.js";
 import type { CalibrationOptions, CalibrationProfile } from "../calibration.js";
+import { applyAutoTune } from "../auto-tune.js";
+import { loadFeedbackStore } from "../commands/feedback.js";
 
 // ─── Individual Analyzers ────────────────────────────────────────────────────
 // NOTE: Analyzer functions are now registered directly on each JudgeDefinition
@@ -699,17 +701,26 @@ export function evaluateWithTribunal(
   );
   const configFiltered = applyConfig(fpFiltered, options?.config);
 
-  // ── Feedback-driven confidence calibration ──
-  // When options.calibrate is set, load the feedback store and adjust
-  // confidence scores based on historical FP rates.
+  // ── Feedback-driven confidence calibration & auto-tuning ──
+  // When options.calibrate is set, load the feedback store and apply:
+  // 1. Auto-suppression of rules with FP rate ≥ 80%
+  // 2. Severity downgrade for rules with FP rate 50-80%
+  // 3. Confidence calibration based on historical FP rates
   let calibrated = configFiltered;
   if (enrichedOptions.calibrate) {
     try {
       const calOpts: CalibrationOptions | undefined =
         typeof enrichedOptions.calibrate === "object" ? enrichedOptions.calibrate : undefined;
-      const profile = loadCalibrationProfile(calOpts);
-      if (profile.isActive) {
-        calibrated = calibrateFindings(calibrated, profile, calOpts);
+      const feedbackStore = loadFeedbackStore(calOpts?.feedbackPath);
+      if (feedbackStore.entries.length > 0) {
+        const tuned = applyAutoTune(calibrated, feedbackStore);
+        calibrated = tuned.findings;
+      } else {
+        // No feedback data — try plain calibration profile
+        const profile = loadCalibrationProfile(calOpts);
+        if (profile.isActive) {
+          calibrated = calibrateFindings(calibrated, profile, calOpts);
+        }
       }
     } catch {
       // Calibration failure is non-fatal — continue with uncalibrated findings

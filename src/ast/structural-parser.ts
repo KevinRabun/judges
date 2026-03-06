@@ -16,13 +16,22 @@ export function analyzeStructurally(code: string, language: string): CodeStructu
   const totalLines = lines.length;
 
   const isPython = language === "python";
-  const functions = isPython ? extractPythonFunctions(lines) : extractBraceFunctions(lines, language);
+  const isRuby = language === "ruby";
+  const functions = isPython
+    ? extractPythonFunctions(lines)
+    : isRuby
+      ? extractRubyFunctions(lines)
+      : extractBraceFunctions(lines, language);
 
   const deadCodeLines = detectDeadCode(lines, language);
   const deepNestLines = detectDeepNesting(lines, isPython);
   const typeAnyLines = detectWeakTypes(lines, language);
   const imports = extractImports(lines, language);
-  const classes = isPython ? extractPythonClassNames(lines) : extractBraceClassNames(lines, language);
+  const classes = isPython
+    ? extractPythonClassNames(lines)
+    : isRuby
+      ? extractRubyClassNames(lines)
+      : extractBraceClassNames(lines, language);
 
   const fileCyclomaticComplexity = functions.reduce((sum, f) => sum + f.cyclomaticComplexity, 0) || 1;
   const maxNestingDepth = functions.reduce((max, f) => Math.max(max, f.maxNestingDepth), 0);
@@ -41,7 +50,7 @@ export function analyzeStructurally(code: string, language: string): CodeStructu
   };
 }
 
-// ─── Brace-Language Function Extraction (Rust, Go, Java, C#) ─────────────────
+// ─── Brace-Language Function Extraction (Rust, Go, Java, C#, PHP, Kotlin, Swift) ──
 
 // Patterns that identify function/method declarations per language
 const FUNC_PATTERNS: Record<string, RegExp> = {
@@ -51,6 +60,11 @@ const FUNC_PATTERNS: Record<string, RegExp> = {
   csharp:
     /^\s*(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|sealed)\s+)*\w[\w<>,\s[\]?]*\s+(\w+)\s*\(([^)]*)\)/,
   powershell: /^\s*function\s+([\w-]+)\s*(?:\(([^)]*)\))?/,
+  php: /^\s*(?:(?:public|private|protected|static|abstract|final)\s+)*function\s+(\w+)\s*\(([^)]*)\)/,
+  kotlin:
+    /^\s*(?:(?:public|private|protected|internal|open|override|abstract|suspend|inline)\s+)*fun\s+(?:<[^>]*>\s*)?(\w+)\s*\(([^)]*)\)/,
+  swift:
+    /^\s*(?:(?:public|private|internal|open|fileprivate|static|class|override|mutating|@\w+\s*)\s+)*func\s+(\w+)\s*\(([^)]*)\)/,
 };
 
 function extractBraceFunctions(lines: string[], language: string): FunctionInfo[] {
@@ -276,6 +290,110 @@ function extractPythonClassNames(lines: string[]): string[] {
   return classes;
 }
 
+// ─── Ruby Function Extraction (end-keyword-based) ────────────────────────────
+
+const RUBY_FUNC = /^\s*def\s+((?:self\.)?\w+[?!=]?)\s*(?:\(([^)]*)\))?/;
+const RUBY_CLASS_RE = /^\s*(?:class|module)\s+(\w+)/;
+const RUBY_LINE_OPENER = /^(def|class|module|if|unless|while|until|for|case|begin)\b/;
+const RUBY_DO_OPENER = /\bdo\s*(?:\|[^|]*\|)?\s*$/;
+const RUBY_END = /^end\b/;
+
+function rubyBlockOpens(trimmed: string): number {
+  if (trimmed.startsWith("#")) return 0;
+  let n = 0;
+  if (RUBY_LINE_OPENER.test(trimmed)) n++;
+  if (RUBY_DO_OPENER.test(trimmed)) n++;
+  return n;
+}
+
+function rubyBlockCloses(trimmed: string): number {
+  if (trimmed.startsWith("#")) return 0;
+  return RUBY_END.test(trimmed) ? 1 : 0;
+}
+
+function computeRubyNesting(lines: string[]): number {
+  let depth = 0;
+  let maxDepth = 0;
+  for (const line of lines) {
+    const t = line.trim();
+    depth += rubyBlockOpens(t);
+    if (depth > maxDepth) maxDepth = depth;
+    depth -= rubyBlockCloses(t);
+  }
+  return Math.max(0, maxDepth - 1); // subtract 1 for the def...end itself
+}
+
+function extractRubyFunctions(lines: string[]): FunctionInfo[] {
+  const functions: FunctionInfo[] = [];
+
+  // First pass: class/module ranges
+  const classRanges: Array<{ name: string; startLine: number; endLine: number }> = [];
+  for (let i = 0; i < lines.length; i++) {
+    const cm = lines[i].match(RUBY_CLASS_RE);
+    if (!cm) continue;
+    const className = cm[1];
+    let depth = 1;
+    let endIdx = i + 1;
+    while (endIdx < lines.length && depth > 0) {
+      const t = lines[endIdx].trim();
+      depth += rubyBlockOpens(t) - rubyBlockCloses(t);
+      endIdx++;
+    }
+    classRanges.push({ name: className, startLine: i + 1, endLine: endIdx });
+  }
+
+  // Second pass: extract functions
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(RUBY_FUNC);
+    if (!match) continue;
+
+    const name = match[1];
+    const params = (match[2] ?? "").trim();
+    const paramCount = params.length === 0 ? 0 : params.split(",").length;
+    const startLine = i + 1;
+
+    // Find matching end via depth tracking
+    let depth = 1;
+    let endIdx = i + 1;
+    while (endIdx < lines.length && depth > 0) {
+      const t = lines[endIdx].trim();
+      depth += rubyBlockOpens(t) - rubyBlockCloses(t);
+      endIdx++;
+    }
+
+    const endLine = endIdx;
+    const funcLines = lines.slice(i, endIdx);
+    const complexity = computeComplexityFromLines(funcLines, "ruby");
+    const maxNesting = computeRubyNesting(funcLines);
+
+    const containingClass = classRanges.find((c) => i + 1 > c.startLine && i + 1 <= c.endLine);
+
+    functions.push({
+      name: containingClass ? `${containingClass.name}.${name}` : name,
+      startLine,
+      endLine,
+      lineCount: endLine - startLine + 1,
+      parameterCount: paramCount,
+      cyclomaticComplexity: complexity,
+      maxNestingDepth: maxNesting,
+      ...(containingClass ? { className: containingClass.name } : {}),
+    });
+  }
+
+  return functions;
+}
+
+// ─── Ruby Class Name Extraction ──────────────────────────────────────────────
+
+function extractRubyClassNames(lines: string[]): string[] {
+  const classes: string[] = [];
+  for (const line of lines) {
+    const match = line.match(RUBY_CLASS_RE);
+    if (match) classes.push(match[1]);
+  }
+  return classes;
+}
+
 // ─── Brace-Language Class Name Extraction ────────────────────────────────────
 
 const CLASS_PATTERNS: Record<string, RegExp> = {
@@ -284,6 +402,9 @@ const CLASS_PATTERNS: Record<string, RegExp> = {
   rust: /^\s*(?:pub\s+)?struct\s+(\w+)/,
   go: /^\s*type\s+(\w+)\s+struct\b/,
   powershell: /^\s*class\s+(\w+)/,
+  php: /^\s*(?:(?:abstract|final)\s+)?class\s+(\w+)/,
+  kotlin: /^\s*(?:(?:data|sealed|open|abstract|internal|private)\s+)*class\s+(\w+)/,
+  swift: /^\s*(?:(?:public|private|internal|open|fileprivate|final)\s+)*class\s+(\w+)/,
 };
 
 function extractBraceClassNames(lines: string[], language: string): string[] {
@@ -306,6 +427,10 @@ const DECISION_POINTS: Record<string, RegExp> = {
   java: /\b(if|else\s+if|for|while|do|case|catch|\?|&&|\|\|)\b/g,
   csharp: /\b(if|else\s+if|for|foreach|while|do|case|catch|\?|&&|\|\|)\b/g,
   powershell: /\b(if|elseif|foreach|for|while|do|switch|catch|-and|-or)\b/g,
+  php: /\b(if|elseif|else\s+if|for|foreach|while|do|case|catch|\?|&&|\|\|)\b/g,
+  ruby: /\b(if|elsif|unless|case|when|for|while|until|rescue|&&|\|\|)\b/g,
+  kotlin: /\b(if|else\s+if|for|while|do|when|catch|\?|&&|\|\|)\b/g,
+  swift: /\b(if|else\s+if|for|while|repeat|switch|case|catch|\?|&&|\|\|)\b/g,
 };
 
 function computeComplexityFromLines(lines: string[], language: string): number {
@@ -443,6 +568,19 @@ function detectDeadCode(lines: string[], language: string): number[] {
         continue;
       }
 
+      // Skip multi-line return expressions: if the return line has an
+      // unmatched template literal (odd backtick count), open parenthesis,
+      // or open bracket, the expression spans subsequent lines and they
+      // are NOT dead code.
+      if (!isPython) {
+        const backtickCount = (trimmed.match(/`/g) || []).length;
+        const openParens = (trimmed.match(/\(/g) || []).length - (trimmed.match(/\)/g) || []).length;
+        const openBrackets = (trimmed.match(/\[/g) || []).length - (trimmed.match(/\]/g) || []).length;
+        if (backtickCount % 2 !== 0 || openParens > 0 || openBrackets > 0) {
+          continue;
+        }
+      }
+
       // Skip terminals inside braceless control structures (C#: `if (...)\n    return ...;`)
       // The next statement after the braceless block IS reachable.
       if (!isPython) {
@@ -519,6 +657,9 @@ function detectWeakTypes(lines: string[], language: string): number[] {
     java: /\bObject\b(?!\s*\.class)|\bClass<\?>/,
     csharp: /\bdynamic\b|\bobject\b/,
     powershell: /\[object\]|\[psobject\]|\[System\.Object\]/,
+    php: /\bmixed\b/,
+    kotlin: /\bAny\b|\bAny\?\b/,
+    swift: /\bAny\b|\bAnyObject\b/,
   };
 
   const pattern = patterns[language];
@@ -592,6 +733,21 @@ function extractImports(lines: string[], language: string): string[] {
     powershell: [
       /^\s*(?:Import-Module|using\s+module)\s+([\w.\\/-]+)/, // Import-Module Az.Accounts
       /^\s*#Requires\s+-Module\s+([\w.]+)/, // #Requires -Module PSScriptAnalyzer
+    ],
+    php: [
+      /^\s*use\s+([\w\\]+)/, // use App\Models\User
+      /^\s*(?:require|require_once|include|include_once)\s+['"]([^'"]+)['"]/, // require 'config.php'
+    ],
+    ruby: [
+      /^\s*require\s+['"]([^'"]+)['"]/, // require 'json'
+      /^\s*require_relative\s+['"]([^'"]+)['"]/, // require_relative 'helper'
+      /^\s*gem\s+['"](\w+)['"]/, // gem 'rails' (in Gemfile)
+    ],
+    kotlin: [
+      /^\s*import\s+([\w.]+)/, // import kotlin.coroutines.flow
+    ],
+    swift: [
+      /^\s*import\s+(\w+)/, // import Foundation
     ],
   };
 

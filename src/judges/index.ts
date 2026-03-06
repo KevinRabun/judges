@@ -38,6 +38,7 @@ import { frameworkSafetyJudge } from "./framework-safety.js";
 import { iacSecurityJudge } from "./iac-security.js";
 import { securityJudge } from "./security.js";
 import { falsePositiveReviewJudge } from "./false-positive-review.js";
+import { hallucinationDetectionJudge } from "./hallucination-detection.js";
 
 // ─── Analyzer Imports ────────────────────────────────────────────────────────
 import { analyzeDataSecurity } from "../evaluators/data-security.js";
@@ -77,6 +78,7 @@ import { analyzeAiCodeSafety } from "../evaluators/ai-code-safety.js";
 import { analyzeFrameworkSafety } from "../evaluators/framework-safety.js";
 import { analyzeIacSecurity } from "../evaluators/iac-security.js";
 import { analyzeSecurity } from "../evaluators/security.js";
+import { analyzeHallucinationDetection } from "../evaluators/hallucination-detection.js";
 
 // ─── Wire each judge to its analyzer ─────────────────────────────────────────
 
@@ -117,6 +119,7 @@ aiCodeSafetyJudge.analyze = analyzeAiCodeSafety;
 frameworkSafetyJudge.analyze = analyzeFrameworkSafety;
 iacSecurityJudge.analyze = analyzeIacSecurity;
 securityJudge.analyze = analyzeSecurity;
+hallucinationDetectionJudge.analyze = analyzeHallucinationDetection;
 
 /**
  * The panel of judges that comprise the Judges Panel.
@@ -163,6 +166,7 @@ export const JUDGES: JudgeDefinition[] = [
   frameworkSafetyJudge,
   iacSecurityJudge,
   securityJudge,
+  hallucinationDetectionJudge,
   falsePositiveReviewJudge,
 ];
 

@@ -271,6 +271,7 @@ USAGE:
   judges config                       Export/import shared team configs
   judges compare                      Compare judges vs other tools
   judges review                       Post inline review comments on a GitHub PR
+  judges app serve                    Start GitHub App webhook server (zero-config PR reviews)
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -841,6 +842,13 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review") {
     const { runReview } = await import("./commands/review.js");
     await runReview(argv);
+    return;
+  }
+
+  // ─── App Command (GitHub App) ─────────────────────────────────────
+  if (args.command === "app") {
+    const { runAppCommand } = await import("./github-app.js");
+    runAppCommand(argv.slice(3));
     return;
   }
 

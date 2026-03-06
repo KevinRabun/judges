@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
+import { getLangLineNumbers, getLineNumbers, getLangFamily, isCommentLine, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeTesting(code: string, language: string): Finding[] {
@@ -268,7 +268,7 @@ export function analyzeTesting(code: string, language: string): Finding[] {
     // No test structure detected - check if this is production code without tests
     // Exclude config files, type definitions, constants, and utility barrel files
     const hasFunctions = getLangLineNumbers(code, language, LP.FUNCTION_DEF).length > 0;
-    const isLargeFile = lines.length > 50;
+    const isLargeFile = lines.length > 20;
     // Check only the file header (first 5 lines) for module-purpose indicators
     // to avoid matching incidental mentions like `const config = ...` in code body
     const headerText = lines.slice(0, 5).join("\n");
@@ -297,13 +297,16 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         title: "No tests detected for production code",
         description:
           "This file contains significant logic (multiple branches/loops) but no accompanying tests were detected.",
+        lineNumbers: getLineNumbers(
+          code,
+          /(?:export\s+)?(?:async\s+)?function\s+\w+|(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?(?:\(|function)/gi,
+        ).slice(0, 5),
         recommendation:
           "Write unit tests covering the main functions, edge cases, and error paths. Aim for meaningful coverage of critical paths.",
         reference: "Test-Driven Development / Testing Pyramid",
         suggestedFix:
           "Create a co-located test file (e.g., `<filename>.test.ts`) with at least one test per exported function covering a happy path, an edge case, and an error path.",
         confidence: 0.7,
-        isAbsenceBased: true,
       });
     }
   }

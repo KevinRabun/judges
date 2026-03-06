@@ -1,6 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLineNumbers, getLangLineNumbers, getLangFamily, testCode } from "./shared.js";
-import * as LP from "../language-patterns.js";
+import { getLangFamily, testCode } from "./shared.js";
 
 /**
  * General Security Posture evaluator.
@@ -25,19 +24,21 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
     const sqlDataFlowLines: number[] = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      // SQL keyword on a line with interpolation or concat
-      if (/\b(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|SET|VALUES|INTO|JOIN|ORDER\s+BY|GROUP\s+BY)\b/i.test(line)) {
-        if (
-          /\$\{/.test(line) || // template literal interpolation
-          /\+\s*\w/.test(line) || // string concatenation
-          /f["']/.test(line) || // Python f-string
-          /\.format\s*\(/.test(line) || // Python .format()
-          /String\.format/i.test(line) || // Java String.format
-          /fmt\.Sprintf/i.test(line) || // Go fmt.Sprintf
-          /%s/.test(line) // printf-style interpolation
-        ) {
-          sqlDataFlowLines.push(i + 1);
-        }
+      // Require 2+ SQL keywords on the same line to avoid matching UI labels
+      // like "Select ${user.name}" which contain a single SQL keyword.
+      const sqlKeywords =
+        line.match(/\b(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|SET|VALUES|INTO|JOIN|ORDER\s+BY|GROUP\s+BY)\b/gi) || [];
+      if (sqlKeywords.length < 2) continue;
+      if (
+        /\$\{/.test(line) || // template literal interpolation
+        /\+\s*\w/.test(line) || // string concatenation
+        /f["']/.test(line) || // Python f-string
+        /\.format\s*\(/.test(line) || // Python .format()
+        /String\.format/i.test(line) || // Java String.format
+        /fmt\.Sprintf/i.test(line) || // Go fmt.Sprintf
+        /%s/.test(line) // printf-style interpolation
+      ) {
+        sqlDataFlowLines.push(i + 1);
       }
     }
     if (sqlDataFlowLines.length > 0) {
@@ -114,7 +115,7 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
         // Check if user input is involved (exclude compound identifiers like InputDir, userHome)
         const ctx = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 2)).join("\n");
         if (
-          /(?:req\.|request\.|params\.|query\.|body\.|args\.|argv|\binput\s*[=:\[.(]|\buser\s*[=:\[.(])/i.test(ctx) &&
+          /(?:req\.|request\.|params\.|query\.|body\.|args\.|argv|\binput\s*[=:[(.]|\buser\s*[=:[(.])/i.test(ctx) &&
           /(?:\+|`[^`]*\$\{|\.format|path\.join|Path\.Combine|filepath\.Join|os\.path\.join)/i.test(ctx)
         ) {
           fsAccessLines.push(i + 1);
@@ -626,7 +627,7 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
     }
     if (deserLines.length > 0) {
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "critical",
         title: "Deserialization of data from untrusted sources",
         description:

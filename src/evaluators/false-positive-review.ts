@@ -694,20 +694,15 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
       "COMP-", // no regulated data handling
       "RATE-", // no request rate
       "CLOUD-", // not a cloud service
-      "A11Y-", // no UI
-      "I18N-", // no user-facing strings
       "UX-", // no user interface
       "OBS-", // no production observability need
       "LOGPRIV-", // no user data logging
       "AGENT-", // not an AI agent
-      "AICS-", // not AI code generation
-      "ETHICS-", // no user-facing decisions
       "FW-", // framework rules target app code
       "API-", // not an API service
       "DB-", // no database
       "SCALE-", // not a scalable service — CLI utilities use sync I/O legitimately
       "CFG-", // configuration management rules target deployed services
-      "COMPAT-", // backwards-compat rules target public APIs, not internal helpers
       "PORTA-", // portability rules target deployed apps, not internal tooling
     ];
     const isUtilityInapplicable = UTILITY_INAPPLICABLE.some((p) => finding.ruleId.startsWith(p));
@@ -723,23 +718,33 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
 
   // ── 3. All target lines are comments ──
   if (finding.lineNumbers && finding.lineNumbers.length > 0) {
-    const allComments = finding.lineNumbers.every((ln) => {
-      const line = lines[ln - 1];
-      return line !== undefined && isCommentLine(line);
-    });
-    if (allComments) {
-      return "All flagged lines are comments — the pattern appears in documentation, not executable code.";
+    // AICS-003 specifically detects TODO/FIXME security placeholders in comments —
+    // commenting IS the signal, so exempt it from this filter.
+    // COMPAT-* detects renamed/removed fields via comments like "// Was: oldName" —
+    // the comment IS the evidence of a breaking change.
+    if (!finding.ruleId.startsWith("AICS-") && !finding.ruleId.startsWith("COMPAT-")) {
+      const allComments = finding.lineNumbers.every((ln) => {
+        const line = lines[ln - 1];
+        return line !== undefined && isCommentLine(line);
+      });
+      if (allComments) {
+        return "All flagged lines are comments — the pattern appears in documentation, not executable code.";
+      }
     }
   }
 
   // ── 4. All target lines are string literals ──
   if (finding.lineNumbers && finding.lineNumbers.length > 0) {
-    const allStrings = finding.lineNumbers.every((ln) => {
-      const line = lines[ln - 1];
-      return line !== undefined && isStringLiteralLine(line);
-    });
-    if (allStrings) {
-      return "All flagged lines are string literal values — the keyword appears in data, not code.";
+    // DEPS-* rules specifically target dependency declarations in package manifests
+    // where string literal values ARE the finding (e.g., '"express": "^3.0.0"').
+    if (!finding.ruleId.startsWith("DEPS-")) {
+      const allStrings = finding.lineNumbers.every((ln) => {
+        const line = lines[ln - 1];
+        return line !== undefined && isStringLiteralLine(line);
+      });
+      if (allStrings) {
+        return "All flagged lines are string literal values — the keyword appears in data, not code.";
+      }
     }
   }
 
@@ -807,12 +812,12 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
 
   // ── 9. Web-only rules on non-web code ──
   // Accessibility, UX, and i18n rendering rules are only meaningful on files
-  // that contain web-facing patterns (HTML, JSX, routes, templates, CSS).
-  const WEB_ONLY_PREFIXES = ["A11Y-", "UX-", "I18N-"];
+  // that contain web-facing patterns (HTML, JSX, routes, templates, CSS, or HTTP API responses).
+  const WEB_ONLY_PREFIXES = ["A11Y-", "UX-"];
   const isWebOnly = WEB_ONLY_PREFIXES.some((p) => finding.ruleId.startsWith(p));
   if (isWebOnly) {
     const hasWebPatterns =
-      /<\w+[\s>]|className=|style=|href=|jsx|tsx|\.html|\.css|render\s*\(|dangerouslySetInnerHTML|innerHTML|document\.|window\.|querySelector|getElementById/i.test(
+      /<\w+[\s>]|className=|style=|href=|jsx|tsx|\.html|\.css|render\s*\(|dangerouslySetInnerHTML|innerHTML|document\.|window\.|querySelector|getElementById|res\.(?:json|send|render|status)|app\.(?:get|post|put|delete|use)\s*\(|router\.(?:get|post|put|delete)\s*\(|@app\.route|@GetMapping|@PostMapping|@RequestMapping|http\.HandleFunc/i.test(
         lines.join("\n"),
       );
     if (!hasWebPatterns) {

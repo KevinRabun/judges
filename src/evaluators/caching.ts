@@ -29,26 +29,27 @@ export function analyzeCaching(code: string, language: string): Finding[] {
   }
 
   // No caching for expensive operations (multi-language)
-  const hasDbQueries = getLangLineNumbers(code, language, LP.DB_QUERY).length > 0;
-  const hasFetch = getLangLineNumbers(code, language, LP.HTTP_CLIENT).length > 0;
+  const dbQueryLines = getLangLineNumbers(code, language, LP.DB_QUERY);
+  const fetchLines = getLangLineNumbers(code, language, LP.HTTP_CLIENT);
+  const expensiveOpLines = [...dbQueryLines, ...fetchLines];
   const hasCaching = /cache|Cache|redis|memcache|lru|ttl|stale|expires|ETag|If-None-Match|If-Modified-Since/gi.test(
     code,
   );
   const iacTemplate = isIaCTemplate(code);
-  if ((hasDbQueries || hasFetch) && !hasCaching && !iacTemplate && code.split("\n").length > 40) {
+  if (expensiveOpLines.length > 0 && !hasCaching && !iacTemplate && code.split("\n").length > 15) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "No caching strategy for expensive operations",
       description:
         "Code performs database queries or external API calls without any caching layer. Every request triggers a full backend operation even for data that rarely changes.",
+      lineNumbers: expensiveOpLines.slice(0, 5),
       recommendation:
         "Implement cache-aside (lazy loading) for read-heavy operations. Use Redis or Memcached for shared caching. Set appropriate TTLs based on data freshness requirements.",
       reference: "Cache-Aside Pattern / AWS Caching Best Practices",
       suggestedFix:
         "Wrap expensive DB/API calls with a cache-aside helper: check cache first, return on hit, otherwise fetch, store with a TTL, and return.",
       confidence: 0.7,
-      isAbsenceBased: true,
     });
   }
 

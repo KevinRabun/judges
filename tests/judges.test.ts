@@ -117,8 +117,8 @@ function findingsAreWellFormed(findings: Finding[]): void {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Judge Registry", () => {
-  it("should have exactly 38 judges registered", () => {
-    assert.equal(JUDGES.length, 38);
+  it("should have exactly 39 judges registered", () => {
+    assert.equal(JUDGES.length, 39);
   });
 
   it("should allow lookup of every judge by ID", () => {
@@ -7607,6 +7607,220 @@ describe("Confidence Calibration", () => {
     };
     const calibrated = calibrateFindings(findings, profile);
     assert.ok(calibrated[0].confidence! < 0.9);
+  });
+});
+
+// ─── Auto-Tune Tests ───────────────────────────────────────────────────────
+
+describe("Auto-Tune Engine", () => {
+  it("should compute time-decay weights", async () => {
+    const { computeDecayWeight } = await import("../src/auto-tune.js");
+    const now = new Date();
+
+    // Entry from right now → weight ≈ 1.0
+    const recentWeight = computeDecayWeight(now.toISOString(), now, 30);
+    assert.ok(recentWeight > 0.99, `Recent weight should be ~1.0, got ${recentWeight}`);
+
+    // Entry from 30 days ago → weight ≈ 0.5
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const halfWeight = computeDecayWeight(thirtyDaysAgo.toISOString(), now, 30);
+    assert.ok(Math.abs(halfWeight - 0.5) < 0.01, `30-day weight should be ~0.5, got ${halfWeight}`);
+
+    // Entry from 60 days ago → weight ≈ 0.25
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const quarterWeight = computeDecayWeight(sixtyDaysAgo.toISOString(), now, 30);
+    assert.ok(Math.abs(quarterWeight - 0.25) < 0.01, `60-day weight should be ~0.25, got ${quarterWeight}`);
+  });
+
+  it("should generate auto-tune report with suppressions", async () => {
+    const { generateAutoTuneReport } = await import("../src/auto-tune.js");
+    const now = new Date().toISOString();
+
+    // Rule with 90% FP rate (9 FP out of 10 entries) → should be suppressed
+    const entries = [];
+    for (let i = 0; i < 9; i++) {
+      entries.push({ ruleId: "NOISY-001", verdict: "fp" as const, timestamp: now });
+    }
+    entries.push({ ruleId: "NOISY-001", verdict: "tp" as const, timestamp: now });
+
+    const store = {
+      version: 1 as const,
+      entries,
+      metadata: { createdAt: now, lastUpdated: now, totalSubmissions: entries.length },
+    };
+
+    const report = generateAutoTuneReport(store, { minSamples: 5 });
+    assert.ok(report.suppressions.length > 0, "Should have suppression recommendations");
+    assert.equal(report.suppressions[0].ruleId, "NOISY-001");
+    assert.ok(report.appliedSuppressions.includes("NOISY-001"));
+  });
+
+  it("should generate severity downgrades for moderate FP rates", async () => {
+    const { generateAutoTuneReport } = await import("../src/auto-tune.js");
+    const now = new Date().toISOString();
+
+    // Rule with 60% FP rate → should be downgraded
+    const entries = [];
+    for (let i = 0; i < 6; i++) {
+      entries.push({ ruleId: "MODERATE-001", verdict: "fp" as const, timestamp: now, severity: "high" });
+    }
+    for (let i = 0; i < 4; i++) {
+      entries.push({ ruleId: "MODERATE-001", verdict: "tp" as const, timestamp: now, severity: "high" });
+    }
+
+    const store = {
+      version: 1 as const,
+      entries,
+      metadata: { createdAt: now, lastUpdated: now, totalSubmissions: entries.length },
+    };
+
+    const report = generateAutoTuneReport(store, { minSamples: 5 });
+    assert.ok(report.downgrades.length > 0, "Should have downgrade recommendations");
+    assert.equal(report.downgrades[0].ruleId, "MODERATE-001");
+    assert.equal(report.downgrades[0].newSeverity, "medium"); // high → medium
+  });
+
+  it("should boost confidence for proven high-TP rules", async () => {
+    const { generateAutoTuneReport } = await import("../src/auto-tune.js");
+    const now = new Date().toISOString();
+
+    // Rule with 5% FP rate (1 FP, 19 TP) → should be boosted
+    const entries = [];
+    for (let i = 0; i < 19; i++) {
+      entries.push({ ruleId: "SOLID-001", verdict: "tp" as const, timestamp: now });
+    }
+    entries.push({ ruleId: "SOLID-001", verdict: "fp" as const, timestamp: now });
+
+    const store = {
+      version: 1 as const,
+      entries,
+      metadata: { createdAt: now, lastUpdated: now, totalSubmissions: entries.length },
+    };
+
+    const report = generateAutoTuneReport(store, { minSamples: 5 });
+    assert.ok(report.boosts.length > 0, "Should have boost recommendations");
+    assert.equal(report.boosts[0].ruleId, "SOLID-001");
+    assert.ok(report.boosts[0].confidenceAdjustment! > 0);
+  });
+
+  it("should apply auto-tune to findings — suppress and downgrade", async () => {
+    const { applyAutoTune } = await import("../src/auto-tune.js");
+    const now = new Date().toISOString();
+
+    // Create feedback: NOISY-001 = 90% FP, MODERATE-002 = 60% FP
+    const feedbackEntries = [];
+    for (let i = 0; i < 9; i++) {
+      feedbackEntries.push({ ruleId: "NOISY-001", verdict: "fp" as const, timestamp: now });
+    }
+    feedbackEntries.push({ ruleId: "NOISY-001", verdict: "tp" as const, timestamp: now });
+    for (let i = 0; i < 6; i++) {
+      feedbackEntries.push({ ruleId: "MODERATE-002", verdict: "fp" as const, timestamp: now, severity: "high" });
+    }
+    for (let i = 0; i < 4; i++) {
+      feedbackEntries.push({ ruleId: "MODERATE-002", verdict: "tp" as const, timestamp: now, severity: "high" });
+    }
+
+    const store = {
+      version: 1 as const,
+      entries: feedbackEntries,
+      metadata: { createdAt: now, lastUpdated: now, totalSubmissions: feedbackEntries.length },
+    };
+
+    const findings: Finding[] = [
+      { ruleId: "NOISY-001", severity: "high", title: "Noisy", description: "T", recommendation: "R" },
+      { ruleId: "MODERATE-002", severity: "high", title: "Moderate", description: "T", recommendation: "R" },
+      { ruleId: "GOOD-001", severity: "high", title: "Good", description: "T", recommendation: "R" },
+    ];
+
+    const result = applyAutoTune(findings, store, { minSamples: 5 });
+
+    // NOISY-001 should be suppressed
+    assert.equal(result.suppressed, 1);
+    assert.ok(!result.findings.some((f) => f.ruleId === "NOISY-001"));
+
+    // MODERATE-002 should be downgraded to medium
+    const mod = result.findings.find((f) => f.ruleId === "MODERATE-002");
+    assert.ok(mod, "MODERATE-002 should still exist");
+    assert.equal(mod!.severity, "medium");
+    assert.equal(result.downgraded, 1);
+
+    // GOOD-001 should be unchanged
+    const good = result.findings.find((f) => f.ruleId === "GOOD-001");
+    assert.ok(good, "GOOD-001 should still exist");
+    assert.equal(good!.severity, "high");
+  });
+
+  it("should format auto-tune report as text", async () => {
+    const { generateAutoTuneReport, formatAutoTuneReport } = await import("../src/auto-tune.js");
+    const now = new Date().toISOString();
+
+    const entries = [];
+    for (let i = 0; i < 9; i++) {
+      entries.push({ ruleId: "NOISY-001", verdict: "fp" as const, timestamp: now });
+    }
+    entries.push({ ruleId: "NOISY-001", verdict: "tp" as const, timestamp: now });
+
+    const store = {
+      version: 1 as const,
+      entries,
+      metadata: { createdAt: now, lastUpdated: now, totalSubmissions: entries.length },
+    };
+
+    const report = generateAutoTuneReport(store, { minSamples: 5 });
+    const text = formatAutoTuneReport(report);
+    assert.ok(text.includes("Auto-Tune Report"), "Should contain report header");
+    assert.ok(text.includes("NOISY-001"), "Should mention the suppressed rule");
+  });
+
+  it("should detect improving/worsening trends", async () => {
+    const { computeDecayWeightedStats } = await import("../src/auto-tune.js");
+    const now = new Date();
+
+    // Create entries with trend: older entries are FP, recent are TP → improving
+    const entries = [];
+    for (let i = 0; i < 4; i++) {
+      const oldDate = new Date(now.getTime() - (60 - i) * 24 * 60 * 60 * 1000);
+      entries.push({ ruleId: "TREND-001", verdict: "fp" as const, timestamp: oldDate.toISOString() });
+    }
+    for (let i = 0; i < 4; i++) {
+      const recentDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      entries.push({ ruleId: "TREND-001", verdict: "tp" as const, timestamp: recentDate.toISOString() });
+    }
+
+    const store = {
+      version: 1 as const,
+      entries,
+      metadata: { createdAt: now.toISOString(), lastUpdated: now.toISOString(), totalSubmissions: entries.length },
+    };
+
+    const stats = computeDecayWeightedStats(store);
+    const trendStats = stats.get("TREND-001");
+    assert.ok(trendStats, "Should have stats for TREND-001");
+    assert.equal(trendStats!.trend, "improving", "Trend should be improving (older FPs, recent TPs)");
+  });
+
+  it("should respect maxSuppressed safety cap", async () => {
+    const { generateAutoTuneReport } = await import("../src/auto-tune.js");
+    const now = new Date().toISOString();
+
+    // Create 25 rules, each with 100% FP rate → only maxSuppressed should be applied
+    const entries = [];
+    for (let i = 0; i < 25; i++) {
+      const ruleId = `SPAM-${String(i + 1).padStart(3, "0")}`;
+      for (let j = 0; j < 6; j++) {
+        entries.push({ ruleId, verdict: "fp" as const, timestamp: now });
+      }
+    }
+
+    const store = {
+      version: 1 as const,
+      entries,
+      metadata: { createdAt: now, lastUpdated: now, totalSubmissions: entries.length },
+    };
+
+    const report = generateAutoTuneReport(store, { minSamples: 5, maxSuppressed: 10 });
+    assert.equal(report.suppressions.length, 25, "All 25 should be in suppression list");
+    assert.equal(report.appliedSuppressions.length, 10, "Only 10 should be applied (maxSuppressed)");
   });
 });
 

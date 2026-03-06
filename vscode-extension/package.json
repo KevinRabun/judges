@@ -1,8 +1,8 @@
 {
   "name": "judges-panel",
   "displayName": "Judges Panel",
-  "description": "38 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.23.11",
+  "description": "39 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
+  "version": "3.23.13",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -44,7 +44,14 @@
     "onLanguage:rust",
     "onLanguage:java",
     "onLanguage:csharp",
-    "onLanguage:cpp"
+    "onLanguage:cpp",
+    "onLanguage:terraform",
+    "onLanguage:bicep",
+    "onLanguage:powershell",
+    "onLanguage:php",
+    "onLanguage:ruby",
+    "onLanguage:kotlin",
+    "onLanguage:swift"
   ],
   "main": "./out/extension.js",
   "contributes": {

@@ -247,5 +247,34 @@ export function analyzeCiCd(code: string, language: string): Finding[] {
     });
   }
 
+  // Package manifest without CI/CD configuration (package.json, composer.json, etc.)
+  const isPackageManifest =
+    /json/i.test(language) &&
+    /["']name["']\s*:/.test(code) &&
+    /["'](?:scripts|dependencies|devDependencies)["']\s*:/.test(code);
+  if (isPackageManifest) {
+    const hasTestScript =
+      /["']test["']\s*:\s*["'][^"']*(?:jest|vitest|mocha|ava|tap|pytest|cargo\s+test|go\s+test)/i.test(code);
+    const hasGenericTestScript = /["']test["']\s*:\s*["'][^"']+["']/i.test(code);
+    const hasCiConfig = /["'](?:ci|precommit|prepush|postinstall)["']\s*:/i.test(code);
+    const hasCiReference = /github.?actions|gitlab.?ci|circleci|jenkins|travis|azure.?pipelines/i.test(code);
+    if (!hasTestScript && !hasGenericTestScript && !hasCiConfig && !hasCiReference) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Package manifest missing test and CI configuration",
+        description:
+          "Project manifest defines scripts and dependencies but has no test script or CI/CD configuration. Tests and automation are essential for quality assurance.",
+        lineNumbers: getLineNumbers(code, /["']scripts["']\s*:/gi).slice(0, 3),
+        recommendation:
+          'Add a test script (e.g., "test": "jest" or "test": "vitest") and configure a CI pipeline (GitHub Actions, GitLab CI).',
+        reference: "Continuous Integration Best Practices",
+        suggestedFix:
+          'Add to scripts: "test": "jest --coverage", "lint": "eslint .". Add .github/workflows/ci.yml with build/test/lint steps.',
+        confidence: 0.7,
+      });
+    }
+  }
+
   return findings;
 }

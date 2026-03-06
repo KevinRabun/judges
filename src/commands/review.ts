@@ -17,7 +17,8 @@
 import { execSync } from "child_process";
 import { readFileSync, writeFileSync } from "fs";
 import { resolve, extname } from "path";
-import { evaluateDiff } from "../evaluators/index.js";
+import { evaluateDiff, evaluateWithTribunal } from "../evaluators/index.js";
+import { evaluateProject, type TribunalRunner } from "../evaluators/project.js";
 import type { EvaluationOptions } from "../evaluators/index.js";
 import type { Finding, Severity, JudgesConfig } from "../types.js";
 import { parseConfig, loadCascadingConfig } from "../config.js";
@@ -40,6 +41,8 @@ interface ReviewArgs {
   confidence: number;
   /** Enable feedback-driven confidence calibration */
   calibrate: boolean;
+  /** Enable cross-file analysis for architectural findings */
+  crossFile: boolean;
 }
 
 interface PrFile {
@@ -53,6 +56,10 @@ interface ReviewComment {
   line: number;
   side: "RIGHT";
   body: string;
+  /** Start line for multi-line suggestion ranges (GitHub suggestion blocks) */
+  start_line?: number;
+  /** Side for start line (always RIGHT for new code) */
+  start_side?: "RIGHT";
 }
 
 interface DiffHunk {
@@ -319,8 +326,14 @@ export function findingToCommentBody(finding: Finding): string {
     `**Recommendation:** ${finding.recommendation}`,
   ];
 
-  if (finding.suggestedFix) {
-    lines.push("", "**Suggested fix:**", "```", finding.suggestedFix, "```");
+  // Use GitHub suggestion blocks when a machine-applicable patch is available.
+  // This gives reviewers a one-click "Apply suggestion" button in the PR UI.
+  if (finding.patch) {
+    lines.push("", "**Suggested fix:**", "```suggestion", finding.patch.newText, "```");
+  } else if (finding.suggestedFix) {
+    // Wrap suggestedFix in a suggestion block if it looks like a direct replacement.
+    // Otherwise fall back to a plain fenced code block.
+    lines.push("", "**Suggested fix:**", "```suggestion", finding.suggestedFix, "```");
   }
 
   if (finding.reference) {
@@ -354,6 +367,7 @@ function reviewPrFiles(
   options?: EvaluationOptions,
   fpRates?: Map<string, number>,
   fpThreshold?: number,
+  crossFile?: boolean,
 ): ReviewResult {
   const comments: ReviewComment[] = [];
   let totalFindings = 0;
@@ -415,19 +429,79 @@ function reviewPrFiles(
       // Filter by min severity
       if (!meetsSeverityThreshold(finding.severity, minSeverity)) continue;
 
-      // Map finding line to the diff line number
-      const line = finding.lineNumbers?.[0];
+      // Map finding line to the diff line number.
+      // When a patch spans multiple lines, use endLine as the comment position
+      // (GitHub places the comment on `line`, and `start_line` marks the range start).
+      const line = finding.patch?.endLine ?? finding.lineNumbers?.[0];
       if (!line) continue;
 
-      // Only comment on changed lines
-      if (!hunk.changedLines.includes(line)) continue;
+      // Only comment on changed lines (check the primary finding line)
+      const checkLine = finding.lineNumbers?.[0] ?? line;
+      if (!hunk.changedLines.includes(checkLine)) continue;
 
       comments.push({
         path: file.filename,
         line,
         side: "RIGHT",
         body: findingToCommentBody(finding),
+        // Multi-line suggestion range: if the patch spans multiple lines, set start_line
+        // so the GitHub suggestion block covers the full replacement region.
+        ...(finding.patch && finding.patch.startLine < finding.patch.endLine
+          ? { start_line: finding.patch.startLine, start_side: "RIGHT" as const }
+          : {}),
       });
+    }
+  }
+
+  // ── Cross-file analysis ─────────────────────────────────────────────
+  if (crossFile && filesAnalyzed >= 2) {
+    // Collect all changed file contents for project-level analysis
+    const projectFiles: Array<{ path: string; content: string; language: string }> = [];
+    for (const file of files) {
+      if (file.status === "removed" || !file.patch) continue;
+      const lang = detectLanguage(file.filename);
+      if (!lang) continue;
+      const hunk = parsePatchToHunk(file.filename, file.patch);
+      if (hunk.newContent.trim()) {
+        projectFiles.push({ path: file.filename, content: hunk.newContent, language: lang });
+      }
+    }
+
+    if (projectFiles.length >= 2) {
+      try {
+        const runner: TribunalRunner = { evaluateWithTribunal };
+        const projectVerdict = evaluateProject(runner, projectFiles, undefined, options);
+        const archFindings = projectVerdict.architecturalFindings ?? [];
+
+        for (const finding of archFindings) {
+          if (!meetsSeverityThreshold(finding.severity, minSeverity)) continue;
+          totalFindings++;
+          switch (finding.severity) {
+            case "critical":
+              criticalCount++;
+              break;
+            case "high":
+              highCount++;
+              break;
+            case "medium":
+              mediumCount++;
+              break;
+            case "low":
+              lowCount++;
+              break;
+          }
+          // Architectural findings post as general PR comments (no specific line)
+          const firstFile = projectFiles[0]?.path ?? "";
+          comments.push({
+            path: firstFile,
+            line: 1,
+            side: "RIGHT",
+            body: findingToCommentBody(finding),
+          });
+        }
+      } catch {
+        // Cross-file analysis failure should not block the review
+      }
     }
   }
 
@@ -512,6 +586,7 @@ export function parseReviewArgs(argv: string[]): ReviewArgs {
     configPath: undefined,
     confidence: 1.0,
     calibrate: false,
+    crossFile: false,
   };
 
   for (let i = 3; i < argv.length; i++) {
@@ -551,6 +626,9 @@ export function parseReviewArgs(argv: string[]): ReviewArgs {
       case "--calibrate":
         args.calibrate = true;
         break;
+      case "--cross-file":
+        args.crossFile = true;
+        break;
       default:
         // Positional: treat as PR number if numeric
         if (!arg.startsWith("-") && /^\d+$/.test(arg) && args.pr === 0) {
@@ -576,6 +654,7 @@ USAGE:
   judges review --pr 42 --approve            Auto-approve if no critical/high
   judges review --pr 42 --repo owner/repo    Review PR in specific repo
   judges review --pr 42 --calibrate          Enable FP-rate calibration
+  judges review --pr 42 --cross-file         Enable cross-file architectural analysis
 
 OPTIONS:
   --pr, -p <number>       PR number (required)
@@ -588,6 +667,7 @@ OPTIONS:
   --config, -c <path>     Path to .judgesrc config file (auto-discovered if omitted)
   --confidence <0-1>      Suppress rules with FP rate above this threshold (default: 1.0)
   --calibrate             Enable feedback-driven confidence calibration
+  --cross-file            Enable cross-file architectural analysis (detects duplication, taint flows)
 
 AUTHENTICATION:
   Set GITHUB_TOKEN env var, or install the \`gh\` CLI and run \`gh auth login\`.
@@ -677,7 +757,15 @@ AUTHENTICATION:
   console.log("");
 
   // Run analysis
-  const result = reviewPrFiles(prFiles, args.minSeverity, args.maxComments, evalOptions, fpRates, fpThreshold);
+  const result = reviewPrFiles(
+    prFiles,
+    args.minSeverity,
+    args.maxComments,
+    evalOptions,
+    fpRates,
+    fpThreshold,
+    args.crossFile,
+  );
 
   if (args.format === "json") {
     console.log(JSON.stringify(result, null, 2));

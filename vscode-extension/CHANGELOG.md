@@ -4,6 +4,28 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.13] — 2026-03-06
+
+### Added
+- **15 languages supported**: Added PHP, Ruby, Kotlin, Swift to LANG_MAP, SUPPORTED_LANGUAGES, and activationEvents; added Terraform, Bicep, PowerShell to activationEvents
+- **39 judges**: Extension description updated to reflect new hallucination-detection judge
+
+### Changed
+- Code action provider now registers for all 15 supported languages
+- Chat participant and LM tool language maps expanded for full language coverage
+
+See [core CHANGELOG](../CHANGELOG.md) for full details on P3–P7 engine improvements.
+
+## [3.23.12] — 2026-03-06
+
+### Fixed
+- **Benchmark: 79/79 (0 FN, 0 FP)** — All benchmark failures resolved; see [core CHANGELOG](../CHANGELOG.md) for full details
+- **False positive reductions** — Fixed A11Y click handler on native elements, SQL injection on JSX labels, IaC egress rules, Go CLI tool detection, multi-line JSX input labels
+- **False negative fixes** — Fixed absence gating for 6 evaluators, classifyFile health-check misclassification, structural parser dead-code on template literals, I18N/COMPAT filtering
+
+### Changed
+- CLI tool detection expanded to Go, Python, Rust ecosystems
+
 ## [3.23.11] — 2026-03-06
 
 ### Added

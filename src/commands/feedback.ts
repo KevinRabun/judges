@@ -17,6 +17,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { resolve, dirname } from "path";
+import { generateAutoTuneReport, formatAutoTuneReport, formatAutoTuneReportJson } from "../auto-tune.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -464,6 +465,7 @@ Judges Panel — Feedback & False Positive Tracking
 USAGE:
   judges feedback submit --rule <id> --verdict <tp|fp|wontfix>   Submit feedback
   judges feedback stats                                           View FP rate stats
+  judges feedback tune                                            Auto-tune recommendations
   judges feedback export                                          Export as JSON
   judges feedback reset                                           Clear all feedback
 
@@ -595,6 +597,17 @@ export function runFeedback(argv: string[]): void {
       const empty = createEmptyStore();
       saveFeedbackStore(empty, args.feedbackFile);
       console.log("✓ Feedback store reset");
+      process.exit(0);
+      break;
+    }
+
+    case "tune": {
+      const report = generateAutoTuneReport(store);
+      if (args.format === "json") {
+        console.log(formatAutoTuneReportJson(report));
+      } else {
+        console.log(formatAutoTuneReport(report));
+      }
       process.exit(0);
       break;
     }

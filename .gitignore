@@ -65,6 +65,8 @@ one-time-sanity-summary.json
 reports/
 artifacts/
 test-output.txt
+benchmark-output.txt
+benchmark-results.json
 
 # VS Code Extension build artifacts
 vscode-extension/out/

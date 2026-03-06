@@ -16,6 +16,8 @@ import { resolve, dirname } from "path";
 import { evaluateWithTribunal, evaluateWithJudge } from "../evaluators/index.js";
 import { getJudge } from "../judges/index.js";
 import type { Finding } from "../types.js";
+import { EXPANDED_BENCHMARK_CASES } from "./benchmark-expanded.js";
+import { EXPANDED_BENCHMARK_CASES_2 } from "./benchmark-expanded-2.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -2328,6 +2330,9 @@ export function UserList({ users, onSelect, searchLabel = "Search users" }: User
     category: "clean",
     difficulty: "hard",
   },
+  // ── Expanded benchmark cases (additional 100+ cases) ──
+  ...EXPANDED_BENCHMARK_CASES,
+  ...EXPANDED_BENCHMARK_CASES_2,
 ];
 
 // ─── Benchmark Runner ───────────────────────────────────────────────────────

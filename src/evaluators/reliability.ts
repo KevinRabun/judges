@@ -1,5 +1,5 @@
 import type { Finding } from "../types.js";
-import { getLangLineNumbers, getLangFamily, isCommentLine, isLikelyCLI, testCode } from "./shared.js";
+import { getLangLineNumbers, getLineNumbers, getLangFamily, isCommentLine, isLikelyCLI, testCode } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
 export function analyzeReliability(code: string, language: string): Finding[] {
@@ -232,6 +232,29 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       suggestedFix:
         "Add idempotency: const key = req.headers['idempotency-key']; if (key && await cache.has(key)) return res.json(await cache.get(key)); // process then cache result.",
       confidence: 0.7,
+    });
+  }
+
+  // Detect HTTP server without graceful shutdown
+  const hasListenCall = testCode(code, /\.listen\s*\(|createServer\s*\(/i);
+  const hasGracefulShutdown = testCode(
+    code,
+    /SIGTERM|SIGINT|graceful.*shutdown|server\.close|httpTerminator|stoppable/i,
+  );
+  if (hasListenCall && !hasGracefulShutdown && !isLikelyCLI(code)) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "No graceful shutdown handler",
+      description:
+        "Server starts listening but has no SIGTERM/SIGINT handler for graceful shutdown. In-flight requests will be dropped during deployments and scaling events.",
+      recommendation:
+        "Register SIGTERM/SIGINT handlers that stop accepting new connections, drain in-flight requests, close database pools, then exit cleanly.",
+      reference: "12-Factor App: Disposability / Kubernetes Graceful Shutdown",
+      suggestedFix:
+        "Add graceful shutdown: process.on('SIGTERM', () => { server.close(() => { db.end(); process.exit(0); }); setTimeout(() => process.exit(1), 10000); });",
+      confidence: 0.75,
+      lineNumbers: getLineNumbers(code, /\.listen\s*\(|createServer\s*\(/gi).slice(0, 3),
     });
   }
 

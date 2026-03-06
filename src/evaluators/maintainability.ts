@@ -67,6 +67,52 @@ export function analyzeMaintainability(code: string, language: string): Finding[
     });
   }
 
+  // Decimal magic numbers in arithmetic contexts (e.g., 0.5, 2.99, 0.75)
+  // These are business-logic constants that should be named for clarity.
+  const decimalMagicLines: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (isCommentLine(line)) continue;
+    if (/^\s*\/\/|^\s*\*|^\s*import|^\s*#/.test(line)) continue;
+    // Skip named constant declarations
+    if (/(?:const|let|var|val|final|static|#define)\s+[A-Z_]/i.test(line)) continue;
+    // Match decimal literals in arithmetic context (*, +, -, /)
+    if (/[*+\-/]\s*\d+\.\d+|\d+\.\d+\s*[*+\-/]/.test(line)) {
+      // Exclude trivial values (0.0, 1.0) and version strings (x.y.z)
+      if (/\b(?:0\.0|1\.0)\b/.test(line) && !/\b\d+\.\d{2,}\b/.test(line)) continue;
+      if (/["'`]\d+\.\d+\.\d+["'`]/.test(line)) continue;
+      decimalMagicLines.push(i + 1);
+    }
+  }
+  if (decimalMagicLines.length > 0) {
+    // Merge with existing magic number finding or create new one
+    if (magicLines.length > 0) {
+      // Already reported magic numbers — add decimal lines to existing finding
+      const existingFinding = findings.find((f) => f.ruleId === `${prefix}-002`);
+      if (existingFinding && existingFinding.lineNumbers) {
+        existingFinding.lineNumbers.push(...decimalMagicLines.slice(0, 5));
+        existingFinding.description = existingFinding.description.replace(
+          /Found \d+ magic number/,
+          `Found ${magicLines.length + decimalMagicLines.length} magic number`,
+        );
+      }
+    } else {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "low",
+        title: "Magic numbers detected",
+        description: `Found ${decimalMagicLines.length} magic number(s) — decimal literals used directly in arithmetic without named constants.`,
+        lineNumbers: decimalMagicLines.slice(0, 5),
+        recommendation:
+          "Extract magic numbers into named constants (e.g., const BASE_SHIPPING_RATE = 0.5, const LOYALTY_DISCOUNT = 0.25).",
+        reference: "Clean Code: Chapter 17 — Smells and Heuristics (G25)",
+        suggestedFix:
+          "Extract each decimal literal into a descriptive const (e.g., `const SHIPPING_RATE = 0.5;`) and reference the constant instead.",
+        confidence: 0.8,
+      });
+    }
+  }
+
   // TODO / FIXME / HACK / XXX comments (multi-language comment styles)
   const todoLines = getLangLineNumbers(code, language, LP.TODO_FIXME, { skipComments: false });
   if (todoLines.length > 0) {

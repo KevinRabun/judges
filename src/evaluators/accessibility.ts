@@ -47,10 +47,14 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   }
 
   // Detect click handlers without keyboard equivalents
+  // Native interactive elements (<button>, <a>, <input>, <select>, <textarea>)
+  // already support keyboard interaction, so only flag non-interactive elements.
   const clickNoKeyLines: number[] = [];
   lines.forEach((line, i) => {
     if (isCommentLine(line)) return;
     if (/onClick/i.test(line) && !/onKeyDown|onKeyUp|onKeyPress/i.test(line)) {
+      // Skip native interactive elements — they inherently handle keyboard events
+      if (/<(?:button|a\b|input|select|textarea)\b/i.test(line)) return;
       clickNoKeyLines.push(i + 1);
     }
   });
@@ -99,12 +103,18 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   const inputNoLabelLines: number[] = [];
   lines.forEach((line, i) => {
     if (isCommentLine(line)) return;
-    if (
-      /<input\b/i.test(line) &&
-      !/aria-label|aria-labelledby|id\s*=/i.test(line) &&
-      !/type\s*=\s*["']hidden/i.test(line)
-    ) {
-      inputNoLabelLines.push(i + 1);
+    if (/<input\b/i.test(line) && !/type\s*=\s*["']hidden/i.test(line)) {
+      // Collect the full tag for multi-line JSX (attributes may span several lines)
+      let fullTag = line;
+      if (!/[/]?>/.test(line)) {
+        for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
+          fullTag += " " + lines[j];
+          if (/[/]?>/.test(lines[j])) break;
+        }
+      }
+      if (!/aria-label|aria-labelledby|id\s*=/i.test(fullTag)) {
+        inputNoLabelLines.push(i + 1);
+      }
     }
   });
   if (inputNoLabelLines.length > 0) {

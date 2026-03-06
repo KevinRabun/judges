@@ -189,8 +189,17 @@ export function classifyFile(code: string, language: string, filePath?: string):
     return "analysis-tool";
   }
 
-  // Health-check endpoints detected by content (lightweight route returning 200/ok)
+  // Health-check endpoints detected by content (lightweight route returning 200/ok).
+  // Only classify as utility when the file is a dedicated health-check module —
+  // if it defines multiple routes it is a real server that happens to include
+  // a health endpoint.
+  const routeHandlerCount = (
+    code.match(
+      /\bapp\.(?:get|post|put|delete|patch|use)\s*\(|router\.(?:get|post|put|delete|patch|use)\s*\(|@app\.route\s*\(|@(?:Get|Post|Put|Delete)Mapping\s*\(/gi,
+    ) || []
+  ).length;
   if (
+    routeHandlerCount <= 1 &&
     /(?:\/health|\/ready|\/live|\/ping|\/status)\b/i.test(code) &&
     lineCount < 50 &&
     // Bound [^\n] to {0,200} to prevent polynomial backtracking when a line
@@ -573,7 +582,14 @@ export function isLikelyCLI(code: string): boolean {
   return (
     /^#!\/usr\/bin\/env\s/m.test(code) ||
     /\bprocess\.argv\b/.test(code) ||
-    /\b(?:commander|yargs|meow|cac|citty|clipanion)\b/i.test(code)
+    /\b(?:commander|yargs|meow|cac|citty|clipanion)\b/i.test(code) ||
+    // Go CLI: flag package, cobra, urfave/cli
+    /\bflag\.(?:String|Int|Bool|Float|Parse|Args)\b/.test(code) ||
+    /\b(?:cobra|urfave\/cli)\b/i.test(code) ||
+    // Python CLI: argparse, click, typer
+    /\b(?:argparse|@click\.|typer\.)\b/.test(code) ||
+    // Rust CLI: clap
+    /\bclap::/.test(code)
   );
 }
 

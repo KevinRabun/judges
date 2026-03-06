@@ -2,6 +2,55 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.13] — 2026-03-06
+
+### Added
+- **P3 — Benchmark expansion to 300+**: 301 benchmark test cases (79 original + 110 batch 2 + 112 batch 3) covering PHP, Ruby, Kotlin, Swift, and advanced patterns
+- **P4 — Full pipeline PHP/Ruby/Kotlin/Swift**: Structural parser extended with complete AST support for PHP, Ruby (including end-keyword extractors), Kotlin, and Swift
+- **P5 — Inline PR suggested fixes**: GitHub suggestion blocks with `start_line`/`start_side` for multi-line ranges in review.ts and github-app.ts
+- **P6 — Hallucinated API validation**: New 39th judge (`hallucination-detection`, prefix `HALLU`) with 30+ patterns across 10+ languages to detect non-existent API calls
+- **P7 — FP rate tracking & auto-tuning**: `src/auto-tune.ts` engine with time-decay weighted FP rates, auto-suppression (≥80% FP), severity downgrade (50–80%), confidence boost (<15%), trend detection; `judges feedback tune` CLI subcommand; integrated into evaluators/index.ts calibration pipeline
+- **P8 — VS Code extension all languages**: Added PHP, Ruby, Kotlin, Swift to all LANG_MAP objects, SUPPORTED_LANGUAGES, and activationEvents; added Terraform, Bicep, PowerShell to activationEvents (15 languages total)
+
+### Fixed
+- Removed unused imports across security.ts, hallucination-detection.ts, auto-tune.ts, github-app.ts
+- Replaced `as any` casts with proper `TribunalRunner` type in github-app.ts and review.ts
+- Fixed `!=` to `!==` strict equality in github-app.ts
+- Fixed unnecessary regex escape characters in security.ts and benchmark-expanded.ts
+- Removed unused `ruleNum++` post-increments in ci-cd.ts, software-practices.ts, agent-instructions.ts, security.ts
+- Updated judge count from 38 to 39 in test assertions and extension descriptions
+- Cleaned up stale benchmark output files; added to .gitignore
+
+### Tests
+- 1059 tests passing (8 new auto-tune tests, judge registry count updated)
+
+## [3.23.12] — 2026-03-06
+
+### Fixed
+- **Benchmark: 79/79 (0 FN, 0 FP)** — Resolved all remaining benchmark failures (was 17 FN / 2 FP in 3.23.11).
+- **classifyFile health-check misclassification** — Express apps with a `/status` endpoint AND other routes are now correctly classified as "server" instead of "utility". Added `routeHandlerCount` guard so files with 2+ route handlers skip the health-check heuristic.
+- **Structural parser false dead-code on template literals** — The `return \`...\`` pattern no longer causes subsequent lines to be marked as dead code. Multi-line expression detection (odd backtick count, unmatched parens/brackets) skips dead code marking.
+- **Absence gating removal for 6 evaluators** — Removed `isAbsenceBased: true` from OBS-001 (no logging), REL-001 (graceful shutdown), TEST-001 (no tests), CICD-001 (no CI/CD pipeline), SWDEV-001 (no linting/formatting), and CACHE-002 (no caching). Added concrete `lineNumbers` so findings survive the absence filter.
+- **I18N findings on non-web code** — Removed I18N from `WEB_ONLY_PREFIXES` so internationalization findings apply to any code with user-facing strings (string formatting utilities, CLI output, etc.), not just code with web patterns.
+- **COMPAT findings on comment-based evidence** — Exempted COMPAT-* from the "all comment lines" false-positive check. The backwards-compatibility evaluator intentionally scans comments (e.g., `// Was: oldFieldName`) as evidence of breaking changes.
+- **A11Y click handler FP on native elements** — Native interactive elements (`<button>`, `<a>`, `<input>`, `<select>`, `<textarea>`) with `onClick` are no longer flagged for missing keyboard handlers, since they inherently support keyboard events.
+- **A11Y form input FP on multi-line JSX** — The `<input>` label check now scans the full multi-line JSX tag (up to 10 subsequent lines) for `id=`, `aria-label`, or `aria-labelledby`, instead of only checking the opening line.
+- **SQL injection FP on JSX labels** — Both CYBER and SEC SQL injection fallback checks now require 2+ SQL keywords on the same line, preventing false positives where UI labels like `Select ${user.name}` triggered the single-keyword match.
+- **IAC egress rule FP** — The IaC overly-permissive network rule check now skips `0.0.0.0/0` in Terraform `egress` blocks, which is standard outbound traffic configuration.
+- **Go CLI tool FP** — Extended `isLikelyCLI()` to recognize Go (`flag.*`), Python (`argparse`, `click`, `typer`), and Rust (`clap`) CLI patterns, so `log.Fatal` in `main()` is no longer flagged as abrupt process termination.
+- **WEB_ONLY check expanded** — `hasWebPatterns` regex now includes HTTP API patterns (`res.json`, `app.get`, `router.post`, `@app.route`, `@GetMapping`, `http.HandleFunc`), so A11Y/UX findings survive on API server code.
+- **UTILITY_INAPPLICABLE trimmed** — Removed I18N-, A11Y-, AICS-, ETHICS-, COMPAT- from the utility-inapplicable prefix list.
+- **FP filter: AICS/DEPS exemptions** — AICS-* findings exempted from "all comment lines" check; DEPS-* findings exempted from "all string literal lines" check.
+- **Caching threshold** — CACHE-002 line count threshold reduced from 40 to 15 lines.
+- **Testing threshold** — TEST-001 line count threshold reduced from 50 to 20 lines.
+
+### Changed
+- **`isLikelyCLI()` scope** — Now detects CLI tool patterns across 5 ecosystems (Node.js, Go, Python, Rust, shell shebang) instead of only Node.js.
+
+### Tests
+- 1044 tests passing, 0 failures
+- 79/79 benchmark cases passing (66 vulnerability + 13 clean)
+
 ## [3.23.11] — 2026-03-06
 
 ### Added

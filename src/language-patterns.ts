@@ -303,7 +303,10 @@ export const MISSING_AWAIT = {
 };
 
 export const SHARED_MUTABLE = {
-  jsts: String.raw`(?:let|var)\s+\w+\s*=\s*(?:\{|\[|\d+|new\s)`,
+  jsts: String.raw`(?:let|var|const)\s+\w+\s*(?::[^=]+)?\s*=\s*(?:\{|\[|\d+|new\s)`,
+  // Note: const included because const objects/arrays are still mutable (const prevents
+  // reassignment, not mutation). The :[^=]+ handles TypeScript type annotations
+  // (e.g., `const sessions: Record<string, any> = {}`).
   python: String.raw`(?:threading\.Thread|multiprocessing\.Process).*(?:global\s|nonlocal\s)`,
   rust: String.raw`(?:static\s+mut\b|Arc<Mutex|Rc<RefCell)`,
   csharp: String.raw`(?:static\s+(?!readonly)[\w<>\[\]]+\s+\w+\s*=|volatile\s)`,

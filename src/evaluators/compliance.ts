@@ -384,7 +384,13 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
     if (isCommentLine(line)) return;
     // Skip attribute/annotation lines (e.g., [Authorize], @Authorize) — these are access control, not operations
     if (/^\s*[[@]/.test(line)) return;
-    if (/(?:transfer|payment|withdrawal|approve|certify|attest)\s*[=(]/i.test(line)) {
+    if (
+      /(?:transfer|payment|withdrawal|approve|certify|attest)\s*[=(]/i.test(line) ||
+      /DELETE\s+FROM/i.test(line) ||
+      /UPDATE\s+\w+\s+SET\s+(?:role|permission|privilege|access_level)/i.test(line) ||
+      /UPDATE\s+system_config/i.test(line) ||
+      /app\.\s*(?:delete|put)\s*\(\s*["'`][^"'`]*\/admin/i.test(line)
+    ) {
       regulatedOpLines.push(i + 1);
     }
   });

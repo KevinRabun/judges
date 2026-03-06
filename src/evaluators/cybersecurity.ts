@@ -671,8 +671,9 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
       const line = codeLines[i];
       // Skip comment lines
       if (/^\s*(?:\/\/|\/\*|\*[\s/]|\*$|#(?![![])|"""|'''|<!--)/.test(line)) continue;
-      const hasSqlKeyword = /\b(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN|INTO|VALUES|SET)\b/i.test(line);
-      if (!hasSqlKeyword) continue;
+      const sqlKeywords = line.match(/\b(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN|INTO|VALUES|SET)\b/gi) || [];
+      // Require 2+ SQL keywords to distinguish real SQL from UI labels like "Select ${user.name}"
+      if (sqlKeywords.length < 2) continue;
       const hasInterpolation =
         /\$\{/.test(line) || // JS/TS template literal interpolation
         /\$"[^"]*\{/.test(line) || // C# string interpolation ($"...{var}...")

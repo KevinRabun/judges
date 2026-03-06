@@ -392,3 +392,7 @@ export async function evaluateFilesBatch(
   await Promise.all(workers);
   return results;
 }
+
+// ─── GitHub App ──────────────────────────────────────────────────────────────
+export { handleWebhook, verifyWebhookSignature, loadAppConfig, startAppServer, runAppCommand } from "./github-app.js";
+export type { GitHubAppConfig } from "./github-app.js";

@@ -59,7 +59,8 @@ export function analyzeUx(code: string, language: string): Finding[] {
   }
 
   // Generic error messages in UI
-  const genericUiErrorPattern = /["'`](?:Error|Something went wrong|An error occurred|Oops|Server error)["'`]/gi;
+  const genericUiErrorPattern =
+    /["'`](?:Error|Something went wrong|An error occurred|Oops|Server error|Bad request)["'`]/gi;
   const codeLines = code.split("\n");
   const genericUiErrorLines = getLineNumbers(code, genericUiErrorPattern).filter((ln) => {
     const line = codeLines[ln - 1] ?? "";
@@ -68,7 +69,15 @@ export function analyzeUx(code: string, language: string): Finding[] {
     // Skip structured logging calls: logger.Error("...", "error", err)
     if (/\.\s*(?:Error|Warn|Info|Debug|Fatal|Log)\s*\(/i.test(line)) return false;
     // Skip server-side HTTP error responses (Rust HttpResponse, Go http.Error, etc.)
-    if (/HttpResponse::|http\.Error\s*\(|\.status\s*\(\s*[45]\d\d\s*\)/i.test(line)) return false;
+    // But do NOT skip .status(4xx/5xx) lines that also contain a generic error string —
+    // the user-facing error message IS the UX finding.
+    if (/HttpResponse::|http\.Error\s*\(/i.test(line)) return false;
+    if (/\.status\s*\(\s*[45]\d\d\s*\)/i.test(line)) {
+      if (/["'`](?:Error|Something went wrong|An error occurred|Oops|Server error|Bad request)["'`]/i.test(line)) {
+        return true; // Keep: generic error message shown to users via HTTP response
+      }
+      return false;
+    }
     return true;
   });
   if (genericUiErrorLines.length > 0) {

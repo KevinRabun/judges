@@ -124,7 +124,21 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
   }
 
   // ── IAC-005: Overly permissive network rules ──────────────────────────
-  const openNetLines = getLangLineNumbers(code, language, LP.IAC_OPEN_NETWORK);
+  const openNetLinesRaw = getLangLineNumbers(code, language, LP.IAC_OPEN_NETWORK);
+  // Filter out egress rules — allowing all outbound traffic (0.0.0.0/0)
+  // in egress blocks is standard practice and not a security concern.
+  const iacLines = code.split("\n");
+  const openNetLines = openNetLinesRaw.filter((ln) => {
+    // Look backwards from the flagged line for an enclosing egress block
+    for (let j = ln - 2; j >= 0 && j >= ln - 15; j--) {
+      const prev = iacLines[j]?.trim();
+      if (!prev) continue;
+      if (/^egress\s*\{/i.test(prev) || prev === "egress {") return false;
+      // Stop searching if we hit another block type
+      if (/^(?:ingress|resource|data)\s*[\s{("]/i.test(prev)) break;
+    }
+    return true;
+  });
   if (openNetLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

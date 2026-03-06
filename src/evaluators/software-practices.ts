@@ -425,5 +425,29 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
     });
   }
 
+  // Package manifest without linting/formatting configuration
+  const isPackageManifest = /json/i.test(language) && /["']name["']\s*:/.test(code) && /["']scripts["']\s*:/.test(code);
+  if (isPackageManifest) {
+    const hasLintScript = /["']lint["']\s*:/i.test(code);
+    const hasFormatScript = /["']format["']\s*:/i.test(code);
+    const hasLintTool = /eslint|prettier|biome|tslint|stylelint|standardjs|xo|rome/i.test(code);
+    if (!hasLintScript && !hasFormatScript && !hasLintTool) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        severity: "medium",
+        title: "No linting or formatting configuration",
+        description:
+          "Package manifest has no lint or format script and no references to linting tools (ESLint, Prettier, Biome). Automated code quality checks prevent style drift and catch common errors.",
+        lineNumbers: getLineNumbers(code, /["']scripts["']\s*:/gi).slice(0, 3),
+        recommendation:
+          "Add a lint script and install a linting tool. For TypeScript projects, use ESLint + Prettier or Biome.",
+        reference: "Code Quality Best Practices",
+        suggestedFix:
+          'Add to scripts: "lint": "eslint .", "format": "prettier --write .". Install: npm install -D eslint prettier.',
+        confidence: 0.7,
+      });
+    }
+  }
+
   return findings;
 }

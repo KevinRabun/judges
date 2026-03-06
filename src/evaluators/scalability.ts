@@ -56,7 +56,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
 
   // In-memory session/store
   const inMemPattern =
-    /(?:Map|Set|WeakMap|Object\.create)\s*\(\s*\)|session\s*[:=].*\{\}|(?:store|cache|registry)\s*=\s*(?:new\s+Map|\{\}|\[\])|MemoryStore|express-session\s*\(\s*\)/gi;
+    /(?:Map|Set|WeakMap|Object\.create)\s*\(\s*\)|sessions?\s*[:=].*\{\}|(?:store|cache|registry)\s*=\s*(?:new\s+Map|\{\}|\[\])|MemoryStore|express-session\s*\(\s*\)/gi;
   const inMemLines = getLineNumbers(code, inMemPattern);
   if (inMemLines.length > 0 && !analysisCode) {
     findings.push({
