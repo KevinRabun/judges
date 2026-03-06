@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.15] — 2026-03-06
+
+### Fixed
+- **Marketplace publish fix** — Resolved `vsce` secret scanner false positive on benchmark test data containing a fake Slack webhook URL
+
 ## [3.23.14] — 2026-03-06
 
 ### Fixed

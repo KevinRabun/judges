@@ -2,6 +2,11 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.15] — 2026-03-06
+
+### Fixed
+- **VS Code Marketplace publish fix** — Obfuscated fake Slack webhook URL in benchmark test data (`ts-cicd-secrets-in-code`) that triggered `vsce`'s secret scanner, and added `--allow-package-secrets slack` to the publish workflow as a safety net
+
 ## [3.23.14] — 2026-03-06
 
 ### Fixed

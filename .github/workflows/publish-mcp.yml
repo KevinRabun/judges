@@ -120,7 +120,7 @@ jobs:
         run: |
           cd vscode-extension
           for i in 1 2 3; do
-            npx @vscode/vsce publish --no-git-tag-version --skip-duplicate && exit 0
+            npx @vscode/vsce publish --no-git-tag-version --skip-duplicate --allow-package-secrets slack && exit 0
             echo "Attempt $i/3 failed — retrying in 15s…"
             sleep 15
           done

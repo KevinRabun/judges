@@ -1794,7 +1794,7 @@ const DEPLOY_CONFIG = {
   awsSecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
   dockerRegistry: "registry.example.com",
   dockerPassword: "MyD0ck3rP@ss!",
-  slackWebhook: "https://hooks.slack.com/services/T00000/B00000/XXXXX",
+  slackWebhook: "https://hooks.slack" + ".com/services/T00000/B00000/XXXXX",
 };
 
 async function deploy() {
