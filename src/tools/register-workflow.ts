@@ -9,6 +9,7 @@ import { z } from "zod";
 import { JUDGES } from "../judges/index.js";
 import { evaluateProject, evaluateDiff, analyzeDependencies, runAppBuilderWorkflow } from "../evaluators/index.js";
 import { evaluateWithTribunal } from "../evaluators/index.js";
+import { evaluateFilesBatch } from "../api.js";
 import { generatePublicRepoReport } from "../reports/public-repo-report.js";
 import { configSchema, toJudgesConfig } from "./schemas.js";
 import { benchmarkGate, formatBenchmarkReport } from "../commands/benchmark.js";
@@ -532,30 +533,34 @@ function registerEvaluateBatch(server: McpServer): void {
     },
     async (params) => {
       const config = params.config ? toJudgesConfig(params.config) : undefined;
-      const results: Array<{ path: string; score: number; findingCount: number; criticalCount: number }> = [];
-      const allFindings: string[] = [];
+      const options = config ? { config } : undefined;
 
-      for (const file of params.files) {
-        const verdict = evaluateWithTribunal(file.code, file.language, undefined, config ? { config } : undefined);
-        const criticals = verdict.findings.filter((f) => f.severity === "critical").length;
-        results.push({
-          path: file.path,
-          score: verdict.overallScore,
-          findingCount: verdict.findings.length,
+      // Use bounded-concurrency parallel evaluation instead of sequential loop
+      const batchResults = await evaluateFilesBatch(params.files, 4, options);
+
+      const results = batchResults.map((r) => {
+        const criticals = r.verdict.findings.filter((f) => f.severity === "critical").length;
+        return {
+          path: r.path,
+          score: r.verdict.overallScore,
+          findingCount: r.verdict.findings.length,
           criticalCount: criticals,
-        });
+        };
+      });
 
-        if (verdict.findings.length > 0) {
-          allFindings.push(
-            `### ${file.path} (${verdict.overallScore}/100, ${verdict.findings.length} findings)\n` +
-              verdict.findings
-                .slice(0, 10)
-                .map((f) => `- **[${f.severity.toUpperCase()}]** \`${f.ruleId}\`: ${f.title}`)
-                .join("\n") +
-              (verdict.findings.length > 10 ? `\n- ... and ${verdict.findings.length - 10} more` : ""),
+      const allFindings: string[] = batchResults
+        .filter((r) => r.verdict.findings.length > 0)
+        .map((r) => {
+          const findings = r.verdict.findings;
+          return (
+            `### ${r.path} (${r.verdict.overallScore}/100, ${findings.length} findings)\n` +
+            findings
+              .slice(0, 10)
+              .map((f) => `- **[${f.severity.toUpperCase()}]** \`${f.ruleId}\`: ${f.title}`)
+              .join("\n") +
+            (findings.length > 10 ? `\n- ... and ${findings.length - 10} more` : "")
           );
-        }
-      }
+        });
 
       const totalFindings = results.reduce((s, r) => s + r.findingCount, 0);
       const avgScore = Math.round(results.reduce((s, r) => s + r.score, 0) / results.length);

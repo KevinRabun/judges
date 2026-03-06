@@ -4,6 +4,8 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { readFileSync, existsSync } from "fs";
+import { extname } from "path";
 
 import { JUDGES, getJudge, getJudgeSummaries } from "../judges/index.js";
 import {
@@ -18,13 +20,14 @@ import { buildSingleJudgeDeepReviewSection, buildTribunalDeepReviewSection } fro
 
 /**
  * Register evaluation-focused tools: get_judges, evaluate_code,
- * evaluate_code_single_judge, and evaluate_v2.
+ * evaluate_code_single_judge, evaluate_v2, and evaluate_file.
  */
 export function registerEvaluationTools(server: McpServer): void {
   registerGetJudges(server);
   registerEvaluateCode(server);
   registerEvaluateSingleJudge(server);
   registerEvaluateV2(server);
+  registerEvaluateFile(server);
 }
 
 // ─── get_judges ──────────────────────────────────────────────────────────────
@@ -361,6 +364,103 @@ function registerEvaluateV2(server: McpServer): void {
             {
               type: "text" as const,
               text: error instanceof Error ? `Error: ${error.message}` : "Error: Failed to run V2 evaluation",
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+}
+
+// ─── evaluate_file ───────────────────────────────────────────────────────────
+
+const EXT_TO_LANG: Record<string, string> = {
+  ".ts": "typescript",
+  ".tsx": "typescript",
+  ".js": "javascript",
+  ".jsx": "javascript",
+  ".mjs": "javascript",
+  ".cjs": "javascript",
+  ".py": "python",
+  ".rs": "rust",
+  ".go": "go",
+  ".java": "java",
+  ".cs": "csharp",
+  ".cpp": "cpp",
+  ".cc": "cpp",
+  ".h": "c",
+  ".hpp": "cpp",
+  ".ps1": "powershell",
+  ".psm1": "powershell",
+  ".bicep": "bicep",
+  ".tf": "terraform",
+  ".yaml": "yaml",
+  ".yml": "yaml",
+};
+
+function detectLanguageFromPath(filePath: string): string {
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith("dockerfile") || lower.includes("dockerfile.")) return "dockerfile";
+  const ext = extname(lower);
+  return EXT_TO_LANG[ext] || "typescript";
+}
+
+function registerEvaluateFile(server: McpServer): void {
+  server.tool(
+    "evaluate_file",
+    `Read a file from disk and submit it to the full Judges Panel for evaluation. Automatically detects the programming language from the file extension. All ${JUDGES.length} judges review the code with pattern detection and deep contextual analysis.`,
+    {
+      filePath: z.string().describe("Absolute or relative path to the file to evaluate."),
+      language: z.string().optional().describe("Override the detected language (e.g., 'typescript', 'python')."),
+      context: z
+        .string()
+        .optional()
+        .describe("Optional context about the code — framework, use-case, deployment target."),
+      includeAstFindings: z.boolean().optional().describe("Include AST/code-structure findings (default: true)"),
+      minConfidence: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe("Minimum finding confidence to include (0-1, default: 0)"),
+      config: configSchema,
+    },
+    async ({ filePath, language, context, includeAstFindings, minConfidence, config }) => {
+      try {
+        if (!existsSync(filePath)) {
+          return {
+            content: [{ type: "text" as const, text: `Error: File not found: ${filePath}` }],
+            isError: true,
+          };
+        }
+
+        const code = readFileSync(filePath, "utf-8");
+        const detectedLang = language || detectLanguageFromPath(filePath);
+
+        const verdict = evaluateWithTribunal(code, detectedLang, context, {
+          includeAstFindings,
+          minConfidence,
+          config: toJudgesConfig(config),
+        });
+
+        const patternResults = formatVerdictAsMarkdown(verdict);
+        const deepReview = buildTribunalDeepReviewSection(JUDGES, detectedLang, context);
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `# Evaluation: ${filePath}\n\n` + patternResults + deepReview,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: error instanceof Error ? `Error: ${error.message}` : "Error: Failed to evaluate file",
             },
           ],
           isError: true,

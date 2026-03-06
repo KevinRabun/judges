@@ -76,23 +76,39 @@ export function clampConfidence(value: number): number {
 }
 
 export function estimateFindingConfidence(finding: Finding): number {
+  return estimateFindingConfidenceWithBasis(finding).confidence;
+}
+
+/**
+ * Estimate confidence for a finding and return both the numeric score and
+ * a human-readable explanation of the evidence signals that contributed.
+ */
+export function estimateFindingConfidenceWithBasis(finding: Finding): {
+  confidence: number;
+  evidenceBasis: string;
+} {
   const existing = typeof finding.confidence === "number" ? finding.confidence : undefined;
   if (typeof existing === "number" && Number.isFinite(existing)) {
-    return clampConfidence(existing);
+    return { confidence: clampConfidence(existing), evidenceBasis: "pre-set by evaluator" };
   }
 
   let score = 0.4;
+  const signals: string[] = [];
 
   // ── Evidence tier 1: Line-level precision ──────────────────────────────
   const lineCount = finding.lineNumbers?.length ?? 0;
   if (lineCount === 0) {
     score -= 0.15;
+    signals.push("no line numbers (-0.15)");
   } else if (lineCount <= 3) {
     score += 0.22;
+    signals.push(`line-precise: ${lineCount} line(s) (+0.22)`);
   } else if (lineCount <= 8) {
     score += 0.14;
+    signals.push(`line range: ${lineCount} lines (+0.14)`);
   } else {
     score += 0.06;
+    signals.push(`broad range: ${lineCount} lines (+0.06)`);
   }
 
   // ── Evidence tier 2: Pattern-match specificity ─────────────────────────
@@ -103,9 +119,18 @@ export function estimateFindingConfidence(finding: Finding): number {
   const hasCveReference = /CVE-\d{4}-\d+/i.test(finding.description + (finding.reference ?? ""));
   const hasCweReference = /CWE-\d+/i.test(finding.description + (finding.reference ?? ""));
 
-  if (hasExactApiMatch) score += 0.12;
-  if (hasCveReference) score += 0.08;
-  if (hasCweReference) score += 0.05;
+  if (hasExactApiMatch) {
+    score += 0.12;
+    signals.push("exact API match (+0.12)");
+  }
+  if (hasCveReference) {
+    score += 0.08;
+    signals.push("CVE reference (+0.08)");
+  }
+  if (hasCweReference) {
+    score += 0.05;
+    signals.push("CWE reference (+0.05)");
+  }
 
   // ── Evidence tier 3: Structured evidence ───────────────────────────────
   const hasReference = Boolean(finding.reference);
@@ -113,10 +138,22 @@ export function estimateFindingConfidence(finding: Finding): number {
   const hasRichDescription = finding.description.length >= 120;
   const hasRichRecommendation = finding.recommendation.length >= 90;
 
-  if (hasReference) score += 0.06;
-  if (hasSuggestedFix) score += 0.08;
-  if (hasRichDescription) score += 0.03;
-  if (hasRichRecommendation) score += 0.03;
+  if (hasReference) {
+    score += 0.06;
+    signals.push("has reference (+0.06)");
+  }
+  if (hasSuggestedFix) {
+    score += 0.08;
+    signals.push("has suggested fix (+0.08)");
+  }
+  if (hasRichDescription) {
+    score += 0.03;
+    signals.push("rich description (+0.03)");
+  }
+  if (hasRichRecommendation) {
+    score += 0.03;
+    signals.push("rich recommendation (+0.03)");
+  }
 
   // ── Evidence tier 4: Absence-based findings are inherently lower confidence
   const absenceKeywords = [
@@ -130,11 +167,10 @@ export function estimateFindingConfidence(finding: Finding): number {
   const isAbsenceLike = absenceKeywords.some((kw) => new RegExp(kw, "i").test(descLower));
   if (isAbsenceLike && lineCount === 0) {
     score -= 0.1;
+    signals.push("absence-based pattern (-0.10)");
   }
 
   // ── Evidence tier 5: Provenance-based boost ─────────────────────────
-  // AST-confirmed and taint-flow findings have structural evidence beyond
-  // LLM pattern-matching, deserving significantly higher confidence.
   const prov = (finding.provenance ?? "").toLowerCase();
   const isAstConfirmed = prov.includes("ast-confirmed") || prov.includes("tree-sitter");
   const isTaintFlow = prov.includes("taint-flow") || prov.includes("cross-file-taint");
@@ -142,26 +178,26 @@ export function estimateFindingConfidence(finding: Finding): number {
 
   if (isAstConfirmed) {
     score += 0.15;
+    signals.push("AST-confirmed (+0.15)");
   }
   if (isTaintFlow) {
     score += 0.18;
+    signals.push("taint-flow confirmed (+0.18)");
   }
   if (isRegexConfirmed && !isAstConfirmed) {
     score += 0.08;
+    signals.push("regex-pattern match (+0.08)");
   }
 
   // ── Evidence tier 6: Domain-severity alignment ────────────────────────
-  // Security judges finding critical/high issues in their core domain
-  // are more reliable than low/info advisory findings.
   const securityPrefixes = ["CYBER-", "AUTH-", "DATA-", "AICS-", "IAC-"];
   const isSecurityDomain = securityPrefixes.some((p) => finding.ruleId.startsWith(p));
   if (isSecurityDomain && (finding.severity === "critical" || finding.severity === "high")) {
     score += 0.04;
+    signals.push("security domain alignment (+0.04)");
   }
 
   // ── Noisy evaluator cap: domain-specific noise ceilings ───────────────
-  // Different evaluator domains have different baseline noise levels.
-  // Low-evidence findings from noisy domains are capped to prevent inflation.
   const richEvidenceCount = [
     hasReference,
     hasSuggestedFix,
@@ -173,31 +209,46 @@ export function estimateFindingConfidence(finding: Finding): number {
     isTaintFlow,
   ].filter(Boolean).length;
 
-  // Tiered noise caps: noisier evaluators get stricter caps
-  const noiseCapTier1 = ["COMP-", "ETHICS-", "SOV-", "COST-", "DOC-"]; // advisory domains — cap at 0.82
-  const noiseCapTier2 = ["API-", "CONC-", "DB-", "DEPS-", "LOGPRIV-", "OBS-", "PERF-"]; // moderately noisy — cap at 0.88
-  const noiseCapTier3 = ["CACHE-", "CFG-", "COMPAT-", "MAINT-", "SWDEV-", "TEST-"]; // occasional noise — cap at 0.92
+  const noiseCapTier1 = ["COMP-", "ETHICS-", "SOV-", "COST-", "DOC-"];
+  const noiseCapTier2 = ["API-", "CONC-", "DB-", "DEPS-", "LOGPRIV-", "OBS-", "PERF-"];
+  const noiseCapTier3 = ["CACHE-", "CFG-", "COMPAT-", "MAINT-", "SWDEV-", "TEST-"];
 
   if (richEvidenceCount < 4) {
     if (noiseCapTier1.some((p) => finding.ruleId.startsWith(p))) {
-      score = Math.min(score, 0.82);
+      const capped = Math.min(score, 0.82);
+      if (capped < score) {
+        signals.push("advisory domain cap (→0.82)");
+        score = capped;
+      }
     } else if (noiseCapTier2.some((p) => finding.ruleId.startsWith(p))) {
-      score = Math.min(score, 0.88);
+      const capped = Math.min(score, 0.88);
+      if (capped < score) {
+        signals.push("moderate noise cap (→0.88)");
+        score = capped;
+      }
     } else if (noiseCapTier3.some((p) => finding.ruleId.startsWith(p))) {
-      score = Math.min(score, 0.92);
+      const capped = Math.min(score, 0.92);
+      if (capped < score) {
+        signals.push("occasional noise cap (→0.92)");
+        score = capped;
+      }
     }
   }
 
-  return Number(clampConfidence(score).toFixed(2));
+  const finalConfidence = Number(clampConfidence(score).toFixed(2));
+  return {
+    confidence: finalConfidence,
+    evidenceBasis: signals.length > 0 ? signals.join(", ") : "base heuristic (0.40)",
+  };
 }
 
 export function applyConfidenceThreshold(findings: Finding[], options?: ScoringOptions): Finding[] {
   const minConfidence = clampConfidence(options?.minConfidence ?? 0);
 
-  const normalized = findings.map((finding) => ({
-    ...finding,
-    confidence: estimateFindingConfidence(finding),
-  }));
+  const normalized = findings.map((finding) => {
+    const { confidence, evidenceBasis } = estimateFindingConfidenceWithBasis(finding);
+    return { ...finding, confidence, evidenceBasis };
+  });
 
   if (minConfidence <= 0) {
     return normalized;

@@ -24,6 +24,7 @@
 import { readFileSync, existsSync, readdirSync, statSync, writeFileSync } from "fs";
 import { resolve, extname, dirname, relative, join } from "path";
 import { fileURLToPath } from "url";
+import { execSync } from "child_process";
 
 import {
   evaluateWithTribunal,
@@ -36,6 +37,7 @@ import { verdictToSarif } from "./formatters/sarif.js";
 import { verdictToHtml } from "./formatters/html.js";
 import { verdictToJUnit } from "./formatters/junit.js";
 import { verdictToCodeClimate } from "./formatters/codeclimate.js";
+import { verdictToGitHubActions } from "./formatters/github-actions.js";
 import { runReport } from "./commands/report.js";
 import { runHook } from "./commands/hook.js";
 import { runDiff } from "./commands/diff.js";
@@ -105,7 +107,7 @@ interface CliArgs {
   command: string | undefined;
   file: string | undefined;
   language: string | undefined;
-  format: "text" | "json" | "sarif" | "markdown" | "html" | "junit" | "codeclimate";
+  format: "text" | "json" | "sarif" | "markdown" | "html" | "junit" | "codeclimate" | "github-actions";
   judge: string | undefined;
   help: boolean;
   failOnFindings: boolean;
@@ -121,6 +123,7 @@ interface CliArgs {
   exclude: string[];
   include: string[];
   maxFiles: number | undefined;
+  changedOnly: boolean;
 }
 
 function parseCliArgs(argv: string[]): CliArgs {
@@ -144,6 +147,7 @@ function parseCliArgs(argv: string[]): CliArgs {
     exclude: [],
     include: [],
     maxFiles: undefined,
+    changedOnly: false,
   };
 
   // First non-flag arg is the command
@@ -209,6 +213,9 @@ function parseCliArgs(argv: string[]): CliArgs {
       case "--fix":
         args.fix = true;
         break;
+      case "--changed-only":
+        args.changedOnly = true;
+        break;
       case "--exclude":
       case "-x":
         args.exclude.push(argv[++i]);
@@ -243,7 +250,11 @@ USAGE:
   judges eval --judge <id> [file]     Evaluate with a single judge
   judges init                         Interactive project setup wizard
   judges fix <file> [--apply]         Preview / apply auto-fixes
+                                     --rule <id>  --severity <level>  --lines <start>-<end>
   judges watch <path>                 Watch files and re-evaluate on save
+  judges lsp                          Start LSP server for editor integration
+  judges trend [file]                 Show findings trend from snapshots
+  judges scaffold-plugin <name>       Generate a starter custom plugin project
   judges report <dir>                 Generate project-level report
   judges hook install                 Install pre-commit git hook
   judges diff                         Evaluate only changed lines from a diff
@@ -268,7 +279,7 @@ USAGE:
 EVAL OPTIONS:
   --file, -f <path>          File to evaluate (or pass as positional arg)
   --language, -l <lang>      Language override (auto-detected from extension)
-  --format, -o <fmt>         Output: text, json, sarif, markdown, html, junit, codeclimate
+  --format, -o <fmt>         Output: text, json, sarif, markdown, html, junit, codeclimate, github-actions
   --judge, -j <id>           Run a single judge instead of the full tribunal
   --fail-on-findings         Exit with code 1 when verdict is fail
   --baseline, -b <path>      Suppress findings already in baseline file
@@ -286,6 +297,7 @@ EVAL OPTIONS:
   --verbose                  Show detailed evaluation information
   --quiet                    Suppress non-essential output
   --fix                      Auto-fix findings after evaluation (applies patches in-place)
+  --changed-only             Only evaluate files changed since last commit (uses git diff)
   --help, -h                 Show this help
 
 FIX OPTIONS:
@@ -511,6 +523,43 @@ function isDirectory(filePath: string): boolean {
   }
 }
 
+// ─── Git Changed Files (for --changed-only) ─────────────────────────────────
+
+/**
+ * Get files changed since the last commit using git diff.
+ * Includes staged, unstaged, and untracked files.
+ */
+function getGitChangedFiles(cwd: string): string[] {
+  try {
+    const resolvedCwd = resolve(cwd);
+    // Changed files (staged + unstaged) relative to HEAD
+    const diffOutput = execSync("git diff --name-only HEAD", {
+      cwd: resolvedCwd,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+
+    // Untracked files
+    const untrackedOutput = execSync("git ls-files --others --exclude-standard", {
+      cwd: resolvedCwd,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+
+    const files = new Set<string>();
+    for (const f of diffOutput.split("\n").filter(Boolean)) {
+      files.add(resolve(resolvedCwd, f));
+    }
+    for (const f of untrackedOutput.split("\n").filter(Boolean)) {
+      files.add(resolve(resolvedCwd, f));
+    }
+    return [...files];
+  } catch {
+    // Not a git repo or git not available — return empty (evaluate nothing)
+    return [];
+  }
+}
+
 // ─── Format Output ──────────────────────────────────────────────────────────
 
 function formatTribunalOutput(
@@ -528,6 +577,8 @@ function formatTribunalOutput(
     case "html":
       // HTML is handled separately in runCli (needs async import)
       return formatTextOutput(verdict);
+    case "github-actions":
+      return verdictToGitHubActions(verdict, filePath);
     case "text":
     default:
       return formatTextOutput(verdict);
@@ -695,6 +746,13 @@ export async function runCli(argv: string[]): Promise<void> {
     return; // Watch runs indefinitely
   }
 
+  // ─── LSP Command ─────────────────────────────────────────────────────
+  if (args.command === "lsp") {
+    const { runLsp } = await import("./commands/lsp.js");
+    runLsp(argv);
+    return; // LSP server runs indefinitely
+  }
+
   // ─── Report Command ───────────────────────────────────────────────────
   if (args.command === "report") {
     runReport(argv);
@@ -810,6 +868,28 @@ export async function runCli(argv: string[]): Promise<void> {
     process.exit(0);
   }
 
+  // ─── Trend Command ───────────────────────────────────────────────────
+  if (args.command === "trend") {
+    const { loadSnapshotStore, computeTrend, formatTrendReport } = await import("./commands/snapshot.js");
+    const snapshotFile = argv[3] || ".judges-snapshots.json";
+    const store = loadSnapshotStore(snapshotFile);
+    if (store.snapshots.length === 0) {
+      console.log("No snapshot data found. Run evaluations with --snapshot to collect trend data.");
+      console.log(`  Expected file: ${snapshotFile}`);
+    } else {
+      const report = computeTrend(store);
+      console.log(formatTrendReport(report));
+    }
+    process.exit(0);
+  }
+
+  // ─── Scaffold Plugin Command ─────────────────────────────────────────
+  if (args.command === "scaffold-plugin") {
+    const { runScaffoldPlugin } = await import("./commands/scaffold-plugin.js");
+    runScaffoldPlugin(argv);
+    process.exit(0);
+  }
+
   // ─── List Command ────────────────────────────────────────────────────
   if (args.command === "list") {
     listJudges();
@@ -840,13 +920,21 @@ export async function runCli(argv: string[]): Promise<void> {
       const includePatterns = args.include.length > 0 ? args.include : (evalConfig?.include ?? []);
       const maxFilesLimit = args.maxFiles ?? evalConfig?.maxFiles;
 
-      const files = collectFiles(target, {
+      let files = collectFiles(target, {
         exclude: excludePatterns,
         include: includePatterns,
         maxFiles: maxFilesLimit,
       });
+
+      // ── --changed-only: scope to git-changed files ──
+      if (args.changedOnly) {
+        const changedFiles = getGitChangedFiles(target);
+        const changedSet = new Set(changedFiles.map((f) => resolve(f)));
+        files = files.filter((f) => changedSet.has(resolve(f)));
+      }
+
       if (files.length === 0) {
-        console.error(`No supported source files found in: ${target}`);
+        console.error(`No supported source files found in: ${target}${args.changedOnly ? " (changed-only)" : ""}`);
         process.exit(1);
       }
 
@@ -1205,6 +1293,9 @@ function loadEvalConfig(args: CliArgs): JudgesConfig | undefined {
     if (config.format && args.format === "text") {
       // Only apply config format if CLI didn't explicitly set one
       args.format = config.format;
+    }
+    if (config.failOnScoreBelow !== undefined && args.minScore === undefined) {
+      args.minScore = config.failOnScoreBelow;
     }
   }
 

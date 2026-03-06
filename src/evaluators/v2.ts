@@ -351,7 +351,7 @@ function enrichFindings(
       ...finding,
       specialtyArea: mapSpecialty(finding.ruleId),
       confidence: confidenceResult.confidence,
-      evidenceBasis: confidenceResult.evidenceBasis,
+      evidenceBasisList: confidenceResult.evidenceBasis,
     };
   });
 }
@@ -361,7 +361,8 @@ function calibrateScoreAndVerdict(findings: SpecializedFindingV2[]): {
   verdict: Verdict;
 } {
   const baseFindings: Finding[] = findings.map(
-    ({ specialtyArea: _specialtyArea, confidence: _confidence, evidenceBasis: _evidenceBasis, ...finding }) => finding,
+    ({ specialtyArea: _specialtyArea, confidence: _confidence, evidenceBasisList: _evidenceBasisList, ...finding }) =>
+      finding,
   );
   const score = calculateScore(baseFindings);
   const verdict = deriveVerdict(baseFindings, score);

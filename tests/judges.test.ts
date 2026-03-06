@@ -1238,7 +1238,7 @@ async function exportData(payload) {
       const finding = result.findings[0];
       assert.ok(typeof finding.specialtyArea === "string", "finding should have specialtyArea");
       assert.ok(typeof finding.confidence === "number", "finding should have confidence");
-      assert.ok(Array.isArray(finding.evidenceBasis), "finding should have evidenceBasis array");
+      assert.ok(Array.isArray(finding.evidenceBasisList), "finding should have evidenceBasisList array");
     }
     assert.ok(result.timestamp.length > 0);
     assert.equal(

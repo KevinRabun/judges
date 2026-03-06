@@ -88,6 +88,11 @@ import {
 import { analyzeCodeStructure } from "../src/evaluators/code-structure.js";
 import { JUDGES } from "../src/judges/index.js";
 import type { Finding, Severity } from "../src/types.js";
+import { estimateFindingConfidenceWithBasis } from "../src/scoring.js";
+import { applyOverridesForFile } from "../src/config.js";
+import { filterPatches, detectOverlaps, applyPatches, sortPatchesBottomUp } from "../src/commands/fix.js";
+import type { PatchCandidate, PatchFilter } from "../src/commands/fix.js";
+import { verdictToGitHubActions } from "../src/formatters/github-actions.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -9598,5 +9603,440 @@ describe("Tune Command — parseTuneArgs", () => {
     const { parseTuneArgs } = await import("../src/commands/tune.js");
     const args = parseTuneArgs(["node", "judges", "tune", "--max-files", "50"]);
     assert.strictEqual(args.maxFiles, 50, "Should parse max-files");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Confidence Evidence Basis
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("estimateFindingConfidenceWithBasis", () => {
+  it("returns confidence and evidenceBasis string", () => {
+    const f = makeFinding({ lineNumbers: [10], ruleId: "SQL-001" });
+    const result = estimateFindingConfidenceWithBasis(f);
+    assert.ok(typeof result.confidence === "number", "should return numeric confidence");
+    assert.ok(typeof result.evidenceBasis === "string", "should return string evidenceBasis");
+    assert.ok(result.evidenceBasis.length > 0, "evidenceBasis should not be empty");
+  });
+
+  it("includes line-precise signal when lineNumbers present", () => {
+    const f = makeFinding({ lineNumbers: [5, 10, 15], confidence: undefined as unknown as number });
+    const result = estimateFindingConfidenceWithBasis(f);
+    assert.ok(result.evidenceBasis.includes("line-precise"), "should mention line-precise");
+  });
+
+  it("includes absence-based signal when applicable", () => {
+    const f = makeFinding({
+      ruleId: "ABSENCE-001",
+      title: "Missing CSRF protection should be present",
+      description: "No evidence of CSRF token usage was found",
+    });
+    const result = estimateFindingConfidenceWithBasis(f);
+    assert.ok(result.confidence < 0.9, "absence-based findings should have lower confidence");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Config Overrides — applyOverridesForFile
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("applyOverridesForFile — path-scoped config", () => {
+  it("returns base config when no overrides defined", () => {
+    const base = defaultConfig();
+    const result = applyOverridesForFile(base, "src/app.ts");
+    assert.deepStrictEqual(result, base);
+  });
+
+  it("applies matching override", () => {
+    const base = {
+      ...defaultConfig(),
+      minSeverity: "medium" as Severity,
+      overrides: [{ files: "tests/**", minSeverity: "info" as Severity }],
+    };
+    const result = applyOverridesForFile(base, "tests/foo.test.ts");
+    assert.strictEqual(result.minSeverity, "info", "should apply test override severity");
+  });
+
+  it("does not apply non-matching override", () => {
+    const base = {
+      ...defaultConfig(),
+      minSeverity: "medium" as Severity,
+      overrides: [{ files: "tests/**", minSeverity: "info" as Severity }],
+    };
+    const result = applyOverridesForFile(base, "src/app.ts");
+    assert.strictEqual(result.minSeverity, "medium", "should keep base severity for non-matching path");
+  });
+
+  it("applies multiple matching overrides in order", () => {
+    const base = {
+      ...defaultConfig(),
+      minSeverity: "medium" as Severity,
+      overrides: [
+        { files: "**/*.ts", minSeverity: "low" as Severity },
+        { files: "src/**", minSeverity: "high" as Severity },
+      ],
+    };
+    const result = applyOverridesForFile(base, "src/app.ts");
+    assert.strictEqual(result.minSeverity, "high", "later override should win");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Config — failOnScoreBelow & judgeWeights parsing
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("parseConfig — failOnScoreBelow & judgeWeights", () => {
+  it("parses valid failOnScoreBelow", () => {
+    const cfg = parseConfig(JSON.stringify({ failOnScoreBelow: 7.5 }));
+    assert.strictEqual(cfg.failOnScoreBelow, 7.5);
+  });
+
+  it("parses valid judgeWeights", () => {
+    const cfg = parseConfig(JSON.stringify({ judgeWeights: { cyber: 2, performance: 0.5 } }));
+    assert.ok(cfg.judgeWeights);
+    assert.strictEqual(cfg.judgeWeights!.cyber, 2);
+    assert.strictEqual(cfg.judgeWeights!.performance, 0.5);
+  });
+
+  it("merges judgeWeights in mergeConfigs", () => {
+    const a = { ...defaultConfig(), judgeWeights: { cyber: 2 } };
+    const b = { ...defaultConfig(), judgeWeights: { performance: 1.5 } };
+    const merged = mergeConfigs(a, b);
+    assert.strictEqual(merged.judgeWeights?.cyber, 2);
+    assert.strictEqual(merged.judgeWeights?.performance, 1.5);
+  });
+
+  it("failOnScoreBelow leaf wins in merge", () => {
+    const a = { ...defaultConfig(), failOnScoreBelow: 5 };
+    const b = { ...defaultConfig(), failOnScoreBelow: 8 };
+    const merged = mergeConfigs(a, b);
+    assert.strictEqual(merged.failOnScoreBelow, 8);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GitHub Actions Formatter
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("verdictToGitHubActions formatter", () => {
+  it("returns only summary notice for verdict with no findings", () => {
+    const verdict = {
+      overallScore: 100,
+      criticalCount: 0,
+      highCount: 0,
+      evaluations: [{ judgeId: "test", score: 10, findings: [], notes: "" }],
+    };
+    const result = verdictToGitHubActions(verdict as any, "test.ts");
+    assert.ok(result.includes("::notice"), "should include summary notice");
+    assert.ok(!result.includes("::error"), "should not include error annotations");
+    assert.ok(!result.includes("::warning"), "should not include warning annotations");
+  });
+
+  it("formats findings as ::error annotations", () => {
+    const verdict = {
+      score: 5,
+      evaluations: [
+        {
+          judgeId: "cyber",
+          score: 5,
+          findings: [makeFinding({ severity: "high", title: "SQL Injection", lineNumbers: [42], ruleId: "SQL-001" })],
+          notes: "",
+        },
+      ],
+    };
+    const result = verdictToGitHubActions(verdict as any, "src/db.ts");
+    assert.ok(result.includes("::error"), "should produce ::error annotation");
+    assert.ok(result.includes("file=src/db.ts"), "should include file path");
+    assert.ok(result.includes("line=42"), "should include line number");
+    assert.ok(result.includes("SQL Injection"), "should include finding title");
+  });
+
+  it("uses ::warning for medium severity", () => {
+    const verdict = {
+      score: 7,
+      evaluations: [
+        {
+          judgeId: "code",
+          score: 7,
+          findings: [makeFinding({ severity: "medium", title: "Moderate issue", lineNumbers: [10] })],
+          notes: "",
+        },
+      ],
+    };
+    const result = verdictToGitHubActions(verdict as any, "app.ts");
+    assert.ok(result.includes("::warning"), "medium severity should produce ::warning");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Selective Autofix — filterPatches & detectOverlaps
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("filterPatches — selective fix filtering", () => {
+  const patches: PatchCandidate[] = [
+    {
+      ruleId: "SQL-001",
+      title: "SQL Injection",
+      severity: "critical",
+      patch: { startLine: 10, endLine: 10, oldText: "query(input)", newText: "query(escape(input))" },
+      lineNumbers: [10],
+    },
+    {
+      ruleId: "XSS-002",
+      title: "Cross-Site Scripting",
+      severity: "high",
+      patch: { startLine: 25, endLine: 25, oldText: "innerHTML = data", newText: "textContent = data" },
+      lineNumbers: [25],
+    },
+    {
+      ruleId: "LOG-003",
+      title: "Debug logging",
+      severity: "info",
+      patch: { startLine: 50, endLine: 50, oldText: "console.log(secret)", newText: "// removed" },
+      lineNumbers: [50],
+    },
+  ];
+
+  it("filters by rule substring", () => {
+    const result = filterPatches(patches, { rule: "SQL" });
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].ruleId, "SQL-001");
+  });
+
+  it("filters by severity (high and above)", () => {
+    const result = filterPatches(patches, { severity: "high" });
+    assert.strictEqual(result.length, 2, "should include critical and high");
+  });
+
+  it("filters by line range", () => {
+    const result = filterPatches(patches, { lineRange: { start: 20, end: 30 } });
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].ruleId, "XSS-002");
+  });
+
+  it("combines filters (rule + severity)", () => {
+    const result = filterPatches(patches, { rule: "XSS", severity: "high" });
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].ruleId, "XSS-002");
+  });
+
+  it("returns all when no filter specified", () => {
+    const result = filterPatches(patches, {});
+    assert.strictEqual(result.length, 3);
+  });
+});
+
+describe("detectOverlaps — overlapping patch detection", () => {
+  it("returns empty set for non-overlapping patches", () => {
+    const patches: PatchCandidate[] = [
+      {
+        ruleId: "A",
+        title: "A",
+        severity: "medium",
+        patch: { startLine: 1, endLine: 5, oldText: "a", newText: "b" },
+      },
+      {
+        ruleId: "B",
+        title: "B",
+        severity: "medium",
+        patch: { startLine: 10, endLine: 15, oldText: "c", newText: "d" },
+      },
+    ];
+    const result = detectOverlaps(patches);
+    assert.strictEqual(result.size, 0);
+  });
+
+  it("detects overlapping patches", () => {
+    const patches: PatchCandidate[] = [
+      {
+        ruleId: "A",
+        title: "A",
+        severity: "medium",
+        patch: { startLine: 1, endLine: 10, oldText: "a", newText: "b" },
+      },
+      {
+        ruleId: "B",
+        title: "B",
+        severity: "medium",
+        patch: { startLine: 8, endLine: 15, oldText: "c", newText: "d" },
+      },
+    ];
+    const result = detectOverlaps(patches);
+    assert.strictEqual(result.size, 2);
+    assert.ok(result.has(0));
+    assert.ok(result.has(1));
+  });
+
+  it("non-overlapping patch is not flagged", () => {
+    const patches: PatchCandidate[] = [
+      {
+        ruleId: "A",
+        title: "A",
+        severity: "medium",
+        patch: { startLine: 1, endLine: 5, oldText: "a", newText: "b" },
+      },
+      {
+        ruleId: "B",
+        title: "B",
+        severity: "medium",
+        patch: { startLine: 3, endLine: 7, oldText: "c", newText: "d" },
+      },
+      {
+        ruleId: "C",
+        title: "C",
+        severity: "medium",
+        patch: { startLine: 20, endLine: 25, oldText: "e", newText: "f" },
+      },
+    ];
+    const result = detectOverlaps(patches);
+    assert.ok(result.has(0), "A should be marked overlapping");
+    assert.ok(result.has(1), "B should be marked overlapping");
+    assert.ok(!result.has(2), "C should NOT be marked overlapping");
+  });
+});
+
+describe("applyPatches — with overlap skipping", () => {
+  it("applies non-overlapping patches correctly", () => {
+    const code = "line1\nline2\nline3\nline4\nline5";
+    const patches: PatchCandidate[] = [
+      {
+        ruleId: "A",
+        title: "A",
+        severity: "medium",
+        patch: { startLine: 2, endLine: 2, oldText: "line2", newText: "fixed2" },
+      },
+      {
+        ruleId: "B",
+        title: "B",
+        severity: "medium",
+        patch: { startLine: 4, endLine: 4, oldText: "line4", newText: "fixed4" },
+      },
+    ];
+    const { result, applied, skipped, overlapped } = applyPatches(code, patches);
+    assert.strictEqual(applied, 2);
+    assert.strictEqual(skipped, 0);
+    assert.strictEqual(overlapped, 0);
+    assert.ok(result.includes("fixed2"));
+    assert.ok(result.includes("fixed4"));
+  });
+
+  it("skips overlapping patches", () => {
+    const code = "line1\nline2\nline3\nline4\nline5";
+    const patches: PatchCandidate[] = [
+      {
+        ruleId: "A",
+        title: "A",
+        severity: "medium",
+        patch: { startLine: 2, endLine: 3, oldText: "line2", newText: "fixed2" },
+      },
+      {
+        ruleId: "B",
+        title: "B",
+        severity: "medium",
+        patch: { startLine: 3, endLine: 4, oldText: "line3", newText: "fixed3" },
+      },
+    ];
+    const { applied, overlapped } = applyPatches(code, patches);
+    assert.strictEqual(applied, 0, "both overlap so both should be skipped");
+    assert.strictEqual(overlapped, 2);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Fix Command — parseFixArgs with new flags
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("parseFixArgs — selective fix flags", () => {
+  it("parses --rule flag", async () => {
+    const { parseFixArgs } = await import("../src/commands/fix.js");
+    const args = parseFixArgs(["node", "judges", "fix", "src/app.ts", "--rule", "SQL"]);
+    assert.strictEqual(args.file, "src/app.ts");
+    assert.strictEqual(args.rule, "SQL");
+  });
+
+  it("parses --severity flag", async () => {
+    const { parseFixArgs } = await import("../src/commands/fix.js");
+    const args = parseFixArgs(["node", "judges", "fix", "src/app.ts", "--severity", "high"]);
+    assert.strictEqual(args.severity, "high");
+  });
+
+  it("parses --lines flag", async () => {
+    const { parseFixArgs } = await import("../src/commands/fix.js");
+    const args = parseFixArgs(["node", "judges", "fix", "src/app.ts", "--lines", "10-50"]);
+    assert.strictEqual(args.lines, "10-50");
+  });
+
+  it("parses combined flags", async () => {
+    const { parseFixArgs } = await import("../src/commands/fix.js");
+    const args = parseFixArgs([
+      "node",
+      "judges",
+      "fix",
+      "src/app.ts",
+      "--rule",
+      "XSS",
+      "--severity",
+      "high",
+      "--lines",
+      "1-100",
+      "--apply",
+    ]);
+    assert.strictEqual(args.rule, "XSS");
+    assert.strictEqual(args.severity, "high");
+    assert.strictEqual(args.lines, "1-100");
+    assert.strictEqual(args.apply, true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Scaffold Plugin — parseScaffoldArgs
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Scaffold Plugin Command", () => {
+  it("module exports runScaffoldPlugin function", async () => {
+    const mod = await import("../src/commands/scaffold-plugin.js");
+    assert.ok(typeof mod.runScaffoldPlugin === "function", "should export runScaffoldPlugin");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Disk Cache
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("DiskCache — in-memory behavior", () => {
+  it("stores and retrieves values", async () => {
+    const { DiskCache } = await import("../src/disk-cache.js");
+    const cache = new DiskCache<string>({ cacheDir: "/tmp/judges-test-cache-nonexistent" });
+    cache.set("key1", "value1");
+    assert.strictEqual(cache.get("key1"), "value1");
+  });
+
+  it("returns undefined for missing keys", async () => {
+    const { DiskCache } = await import("../src/disk-cache.js");
+    const cache = new DiskCache<string>({ cacheDir: "/tmp/judges-test-cache-nonexistent2" });
+    assert.strictEqual(cache.get("missing"), undefined);
+  });
+
+  it("respects max entries with LRU eviction", async () => {
+    const { DiskCache } = await import("../src/disk-cache.js");
+    // Create a cache with very low max for testing
+    const cache = new DiskCache<number>({ cacheDir: "/tmp/judges-test-cache-tiny", maxEntries: 3 });
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.set("c", 3);
+    cache.set("d", 4); // should evict "a"
+    assert.strictEqual(cache.get("a"), undefined, "oldest entry should be evicted");
+    assert.strictEqual(cache.get("d"), 4, "newest entry should exist");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LSP Server module
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("LSP Server module", () => {
+  it("exports runLsp function", async () => {
+    const mod = await import("../src/commands/lsp.js");
+    assert.ok(typeof mod.runLsp === "function", "should export runLsp");
   });
 });

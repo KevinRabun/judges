@@ -155,6 +155,56 @@ export function parseConfig(jsonStr: string): JudgesConfig {
     config.plugins = obj.plugins as string[];
   }
 
+  // failOnScoreBelow
+  if (obj.failOnScoreBelow !== undefined) {
+    if (typeof obj.failOnScoreBelow !== "number" || obj.failOnScoreBelow < 0 || obj.failOnScoreBelow > 10) {
+      throw new ConfigError('Invalid .judgesrc: "failOnScoreBelow" must be a number between 0 and 10');
+    }
+    config.failOnScoreBelow = obj.failOnScoreBelow;
+  }
+
+  // judgeWeights
+  if (obj.judgeWeights !== undefined) {
+    if (typeof obj.judgeWeights !== "object" || obj.judgeWeights === null || Array.isArray(obj.judgeWeights)) {
+      throw new ConfigError('Invalid .judgesrc: "judgeWeights" must be an object mapping judge IDs to numbers');
+    }
+    const weights: Record<string, number> = {};
+    for (const [key, val] of Object.entries(obj.judgeWeights as Record<string, unknown>)) {
+      if (typeof val !== "number" || val < 0) {
+        throw new ConfigError(`Invalid .judgesrc: judgeWeights["${key}"] must be a non-negative number`);
+      }
+      weights[key] = val;
+    }
+    config.judgeWeights = weights;
+  }
+
+  // overrides
+  if (obj.overrides !== undefined) {
+    if (!Array.isArray(obj.overrides)) {
+      throw new ConfigError('Invalid .judgesrc: "overrides" must be an array of override objects');
+    }
+    const parsedOverrides: JudgesConfig["overrides"] = [];
+    for (let i = 0; i < obj.overrides.length; i++) {
+      const entry = obj.overrides[i] as Record<string, unknown>;
+      if (typeof entry !== "object" || entry === null || typeof entry.files !== "string") {
+        throw new ConfigError(`Invalid .judgesrc: overrides[${i}] must have a "files" glob string`);
+      }
+      // Clone the entry, strip 'files', parse the rest as partial config
+      const { files, ...rest } = entry;
+      let partial: JudgesConfig = {};
+      if (Object.keys(rest).length > 0) {
+        try {
+          partial = parseConfig(JSON.stringify(rest));
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          throw new ConfigError(`Invalid .judgesrc: overrides[${i}]: ${msg}`);
+        }
+      }
+      parsedOverrides.push({ files: files as string, ...partial });
+    }
+    config.overrides = parsedOverrides;
+  }
+
   return config;
 }
 
@@ -246,10 +296,21 @@ export function mergeConfigs(...configs: JudgesConfig[]): JudgesConfig {
     if (cfg.failOnFindings !== undefined) merged.failOnFindings = cfg.failOnFindings;
     if (cfg.baseline !== undefined) merged.baseline = cfg.baseline;
     if (cfg.format !== undefined) merged.format = cfg.format;
+    if (cfg.failOnScoreBelow !== undefined) merged.failOnScoreBelow = cfg.failOnScoreBelow;
 
     // Deep-merge ruleOverrides
     if (cfg.ruleOverrides) {
       merged.ruleOverrides = { ...(merged.ruleOverrides ?? {}), ...cfg.ruleOverrides };
+    }
+
+    // Deep-merge judgeWeights
+    if (cfg.judgeWeights) {
+      merged.judgeWeights = { ...(merged.judgeWeights ?? {}), ...cfg.judgeWeights };
+    }
+
+    // Overrides: concatenate (later entries take precedence naturally)
+    if (cfg.overrides) {
+      merged.overrides = [...(merged.overrides ?? []), ...cfg.overrides];
     }
   }
 
@@ -398,4 +459,77 @@ export function validatePluginSpecifiers(specifiers: string[]): string[] {
   }
 
   return errors;
+}
+
+// ─── Per-File Config Overrides ──────────────────────────────────────────────
+
+/**
+ * Apply path-scoped overrides to a base config for a specific file.
+ *
+ * Each override entry carries a glob `files` pattern (e.g. `"**\/*.test.ts"`).
+ * If the file path matches, the override's partial config is merged on top
+ * of the base config. Multiple matching overrides are applied in order.
+ *
+ * @param config  - The resolved base config
+ * @param filePath - The relative file path to match against override globs
+ * @returns A new config with matching overrides applied
+ */
+export function applyOverridesForFile(config: JudgesConfig, filePath: string): JudgesConfig {
+  if (!config.overrides || config.overrides.length === 0) {
+    return config;
+  }
+
+  // Normalize path separators for glob matching
+  const normalized = filePath.replace(/\\/g, "/");
+
+  const matchingOverrides: JudgesConfig[] = [];
+  for (const override of config.overrides) {
+    if (globMatch(normalized, override.files)) {
+      // Extract config fields (everything except 'files')
+      const { files: _files, ...partial } = override;
+      matchingOverrides.push(partial as JudgesConfig);
+    }
+  }
+
+  if (matchingOverrides.length === 0) {
+    return config;
+  }
+
+  // Merge: base config first, then matching overrides in order
+  const { overrides: _overrides, ...baseWithoutOverrides } = config;
+  return mergeConfigs(baseWithoutOverrides, ...matchingOverrides);
+}
+
+/**
+ * Simple glob matcher supporting `*`, `**`, and `?`.
+ * - `*` matches any characters except `/`
+ * - `**` matches any characters including `/` (directory recursion)
+ * - `?` matches exactly one character except `/`
+ */
+function globMatch(path: string, pattern: string): boolean {
+  // Escape regex special chars except *, ?, and /
+  let regex = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "*") {
+      if (pattern[i + 1] === "*") {
+        // ** — match anything including path separators
+        regex += ".*";
+        i++; // skip second *
+        // Skip optional trailing /
+        if (pattern[i + 1] === "/") i++;
+      } else {
+        // * — match anything except /
+        regex += "[^/]*";
+      }
+    } else if (ch === "?") {
+      regex += "[^/]";
+    } else if (".+^${}()|[]\\".includes(ch)) {
+      regex += "\\" + ch;
+    } else {
+      regex += ch;
+    }
+  }
+
+  return new RegExp("^" + regex + "$", "i").test(path);
 }

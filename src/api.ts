@@ -53,6 +53,7 @@ export {
   loadPluginJudges,
   validatePluginSpecifiers,
   isValidJudgeDefinition,
+  applyOverridesForFile,
 } from "./config.js";
 
 // ─── Judge Registry ──────────────────────────────────────────────────────────
@@ -100,12 +101,14 @@ export { getCondensedCriteria } from "./tools/prompts.js";
 
 // ─── Cache Utilities ─────────────────────────────────────────────────────────
 export { LRUCache, contentHash } from "./cache.js";
+export { DiskCache, getSharedDiskCache, clearSharedDiskCache } from "./disk-cache.js";
 export { clearProjectCache } from "./evaluators/project.js";
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
 export { findingsToSarif, evaluationToSarif, verdictToSarif, validateSarifLog } from "./formatters/sarif.js";
 export type { SarifValidationError } from "./formatters/sarif.js";
 export { verdictToCsvRows, verdictsToCsv, findingsToCsv } from "./formatters/csv.js";
+export { verdictToGitHubActions } from "./formatters/github-actions.js";
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 export { runCli } from "./cli.js";
@@ -131,6 +134,7 @@ export type { AiFingerprint, AiSignal } from "./fingerprint.js";
 // ─── Confidence Calibration ─────────────────────────────────────────────────
 export { buildCalibrationProfile, calibrateFindings, autoCalibrateFindings } from "./calibration.js";
 export type { CalibrationProfile } from "./calibration.js";
+export { estimateFindingConfidence, estimateFindingConfidenceWithBasis } from "./scoring.js";
 
 // ─── Feedback ────────────────────────────────────────────────────────────────
 export {
@@ -162,6 +166,10 @@ export {
   getLowAcceptanceRules,
 } from "./fix-history.js";
 export type { FixOutcome, FixHistory, FixStats } from "./fix-history.js";
+
+// ─── Patch Application ─────────────────────────────────────────────────────
+export { applyPatches, filterPatches, detectOverlaps, sortPatchesBottomUp } from "./commands/fix.js";
+export type { PatchCandidate, PatchFilter } from "./commands/fix.js";
 
 // ─── Custom Rule Testing ────────────────────────────────────────────────────
 export {

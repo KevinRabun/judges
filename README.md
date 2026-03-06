@@ -24,7 +24,7 @@ AI code generators (Copilot, Cursor, Claude, ChatGPT, etc.) write code fast — 
 | **Scope** | Style + some bugs | Bugs + code smells | Security patterns | **37 domains**: security, cost, compliance, a11y, API design, cloud, UX, … |
 | **AI-generated code focus** | No | No | Partial | **Purpose-built** for AI output failure modes |
 | **Setup** | Config per project | Server + scanner | Cloud or local | **One command**: `npx @kevinrabun/judges eval file.ts` |
-| **Auto-fix patches** | Some | No | No | **53 deterministic patches** — instant, offline |
+| **Auto-fix patches** | Some | No | No | **114 deterministic patches** — instant, offline |
 | **Non-technical output** | No | Dashboard | No | **Plain-language findings** with What/Why/Next |
 | **MCP native** | No | No | No | **Yes** — works inside Copilot, Claude, Cursor |
 | **SARIF output** | No | Yes | Yes | **Yes** — upload to GitHub Code Scanning |

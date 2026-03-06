@@ -58,6 +58,12 @@ export interface Finding {
    * - "supplementary" — confidence < 0.6: shown on demand
    */
   confidenceTier?: "essential" | "important" | "supplementary";
+  /**
+   * Human-readable explanation of why the confidence score was assigned.
+   * Lists the positive and negative evidence signals that contributed to
+   * the final score, e.g. "AST-confirmed (+0.15), line-precise (+0.22)".
+   */
+  evidenceBasis?: string;
 }
 
 /**
@@ -170,6 +176,32 @@ export interface JudgesConfig {
   format?: "text" | "json" | "sarif" | "markdown" | "html" | "junit" | "codeclimate";
   /** Plugin module specifiers to load custom judges (npm packages or relative paths) */
   plugins?: string[];
+  /**
+   * Minimum aggregated score (0-10) required for the run to pass.
+   * When set, the CLI exits with code 1 if the score is below this threshold.
+   * Complements `failOnFindings` with a score-based gate.
+   */
+  failOnScoreBelow?: number;
+  /**
+   * Weighted importance of each judge (by ID) when computing the aggregated score.
+   * Judges not listed receive a default weight of 1.0.
+   * Example: `{ "cybersecurity": 2.0, "documentation": 0.5 }`
+   */
+  judgeWeights?: Record<string, number>;
+  /**
+   * Path- or language-scoped config overrides. Each entry uses a glob pattern
+   * (matched against the file path) and applies partial config on top of the
+   * base config for matching files.
+   *
+   * Example:
+   * ```json
+   * { "overrides": [
+   *   { "files": "src/legacy/**", "minSeverity": "high" },
+   *   { "files": "**\/*.test.ts", "disabledJudges": ["documentation"] }
+   * ]}
+   * ```
+   */
+  overrides?: Array<{ files: string } & Partial<Omit<JudgesConfig, "overrides">>>;
 }
 
 // ─── Project / Multi-file Types ──────────────────────────────────────────────
@@ -375,8 +407,8 @@ export interface SpecializedFindingV2 extends Finding {
   specialtyArea: string;
   /** Confidence score from 0.0 to 1.0 */
   confidence: number;
-  /** Primary evidence basis */
-  evidenceBasis: string[];
+  /** Primary evidence basis (array form for V2) */
+  evidenceBasisList: string[];
 }
 
 /**

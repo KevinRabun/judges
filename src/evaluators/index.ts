@@ -22,6 +22,7 @@ import { analyzeTaintFlows } from "../ast/index.js";
 import type { CodeStructure, FunctionInfo } from "../ast/types.js";
 import type { TaintFlow } from "../ast/taint-tracker.js";
 import { LRUCache, contentHash } from "../cache.js";
+import { getSharedDiskCache } from "../disk-cache.js";
 
 // ─── Shared Utilities ────────────────────────────────────────────────────────
 import {
@@ -612,10 +613,31 @@ export function evaluateWithTribunal(
   context?: string,
   options?: EvaluationOptions,
 ): TribunalVerdict {
+  // ── Disk cache: check for a previously cached result ──
+  // Include options that affect output in the cache key so different
+  // evaluations of the same code (e.g. with/without AST, different configs)
+  // are cached separately.
+  const optionsSuffix = options
+    ? JSON.stringify({
+        ast: options.includeAstFindings,
+        mc: options.minConfidence,
+        mf: options.maxFindingsPerFile,
+        dr: options.config?.disabledRules,
+        dj: options.config?.disabledJudges,
+        ms: options.config?.minSeverity,
+        jw: options.config?.judgeWeights,
+      })
+    : "";
+  const hash = contentHash(code, language + optionsSuffix);
+  const diskCache = getSharedDiskCache();
+  if (diskCache) {
+    const cached = diskCache.get(hash) as TribunalVerdict | undefined;
+    if (cached) return cached;
+  }
+
   // Compute AST once and share across all judges via options
   // Use content-hash cache to avoid re-computing for identical code
   const includeAst = options?.includeAstFindings ?? true;
-  const hash = contentHash(code, language);
 
   let astResult = options?._astCache;
   if (!astResult && includeAst) {
@@ -644,7 +666,21 @@ export function evaluateWithTribunal(
   const judges = resolveJudgeSet(enrichedOptions);
   const evaluations = judges.map((judge) => evaluateWithJudge(judge, code, language, context, enrichedOptions));
 
-  const overallScore = Math.round(evaluations.reduce((sum, e) => sum + e.score, 0) / evaluations.length);
+  // Weighted score aggregation — uses judgeWeights from config when available
+  const weights = enrichedOptions?.config?.judgeWeights;
+  let overallScore: number;
+  if (weights && Object.keys(weights).length > 0) {
+    let totalWeight = 0;
+    let weightedSum = 0;
+    for (const e of evaluations) {
+      const w = weights[e.judgeId] ?? 1.0;
+      weightedSum += e.score * w;
+      totalWeight += w;
+    }
+    overallScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
+  } else {
+    overallScore = Math.round(evaluations.reduce((sum, e) => sum + e.score, 0) / evaluations.length);
+  }
 
   const overallVerdict: Verdict = evaluations.some((e) => e.verdict === "fail")
     ? "fail"
@@ -707,7 +743,7 @@ export function evaluateWithTribunal(
   // ── Aggregate suppression audit trail across all judges ──
   const allSuppressions = evaluations.flatMap((e) => e.suppressions ?? []);
 
-  return {
+  const result: TribunalVerdict = {
     overallVerdict: effectiveVerdict,
     overallScore,
     summary,
@@ -719,6 +755,17 @@ export function evaluateWithTribunal(
     mustFixGate,
     ...(allSuppressions.length > 0 ? { suppressions: allSuppressions } : {}),
   };
+
+  // ── Disk cache: persist for future runs ──
+  if (diskCache) {
+    try {
+      diskCache.set(hash, result, options?.filePath);
+    } catch {
+      // Non-fatal — disk write failure should not break evaluation
+    }
+  }
+
+  return result;
 }
 
 // ─── Project-level Multi-file Analysis (delegated to project.ts) ─────────────
