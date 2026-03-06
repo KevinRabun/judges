@@ -626,6 +626,7 @@ export function evaluateWithTribunal(
         dj: options.config?.disabledJudges,
         ms: options.config?.minSeverity,
         jw: options.config?.judgeWeights,
+        mfg: options.mustFixGate,
       })
     : "";
   const hash = contentHash(code, language + optionsSuffix);
