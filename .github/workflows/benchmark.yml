@@ -12,7 +12,7 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   benchmark:
@@ -82,11 +82,13 @@ jobs:
             benchmark-results.json
             docs/benchmark-report.md
 
-      - name: Commit benchmark report (main branch only)
+      - name: Create benchmark report PR (main branch only)
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/benchmark-report.md
-          git diff --cached --quiet || git commit -m "docs: update benchmark report [skip ci]"
-          git push
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "docs: update benchmark report"
+          title: "docs: update benchmark report"
+          body: "Auto-generated benchmark report update from the latest run."
+          branch: docs/benchmark-report
+          delete-branch: true
+          add-paths: docs/benchmark-report.md
