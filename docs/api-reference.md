@@ -26,7 +26,7 @@ const result = evaluateCodeSingleJudge("cybersecurity", code, "typescript");
 
 ### `evaluateCode(code, language, options?)`
 
-Evaluate code against the full panel of 37 judges.
+Evaluate code against the full panel of 39 judges.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -122,7 +122,7 @@ Returns the list of available policy profiles: `default`, `startup`, `regulated`
 ## Judge Registry
 
 ### `JUDGES`
-Array of all 37 built-in `JudgeDefinition` objects.
+Array of all 39 built-in `JudgeDefinition` objects.
 
 ### `getJudge(id)`
 Look up a judge by ID. Returns `JudgeDefinition | undefined`.

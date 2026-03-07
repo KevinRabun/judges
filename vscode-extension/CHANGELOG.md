@@ -4,6 +4,26 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.17] — 2026-03-07
+
+### Changed
+- **README fully rewritten** — Adoption-focused copy with value prop, "Try in 60 seconds", noise-control guide, CI integration, and full 15-language listing
+- **Default `minSeverity` raised to `"high"`** — New installs only show critical + high findings, reducing noise for first-time users
+- **Preset dropdown** — Settings UI now shows named preset options (strict, lenient, security-only, startup, compliance, performance)
+- **Welcome view updated** — Shows 3 actions: Evaluate Current File, Evaluate Workspace, Open @judges Chat
+
+### Added
+- **First-run toast** — One-time notification after first evaluation introduces `@judges` chat and noise-control settings
+- **`Judges: Add CI Workflow` command** — Generates `.github/workflows/judges.yml` for PR-triggered evaluation
+- **"Report false positive" code action** — Quick Fix action opens a pre-filled GitHub issue for any finding
+- **Enhanced `/help`** — Verdict bands (PASS/WARN/FAIL), noise-control tips, and more natural-language examples
+- **Better command inference** — Chat participant recognizes "run judges", "evaluate", "check" as review intent
+
+### Fixed
+- **Judge count consistency** — All references updated to 39 across extension, docs, and tests
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.23.16] — 2026-03-07
 
 ### Fixed

@@ -114,7 +114,7 @@ export class JudgesDiagnosticProvider {
 
   private runEvaluation(document: vscode.TextDocument, code: string, language: string): void {
     const config = vscode.workspace.getConfiguration("judges");
-    const minSeverity = config.get<string>("minSeverity", "medium");
+    const minSeverity = config.get<string>("minSeverity", "high");
     const enabledJudges = config.get<string[]>("enabledJudges", []);
     const confidenceTier = config.get<string>("confidenceTier", "important");
 

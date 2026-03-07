@@ -144,6 +144,8 @@ function inferCommand(prompt: string): string {
   if (/\bpattern\s*(only|analysis)\b/.test(lower)) return "shallowreview";
   if (/\bsecur/.test(lower)) return "security";
   if (/\bhelp\b/.test(lower)) return "help";
+  // Recognize explicit "run judges" / "judges review" / "evaluate" / "check"
+  if (/\b(run\s+judges|judges\s+review|evaluate|check)\b/.test(lower)) return "review";
   return "review";
 }
 
@@ -233,7 +235,7 @@ async function handleShallowReview(
 
   if (token.isCancellationRequested) return;
 
-  stream.progress("Running 37 judges on the active file…");
+  stream.progress("Running 39 judges on the active file…");
 
   const code = document.getText();
   if (!code.trim()) {
@@ -518,7 +520,7 @@ async function handleWorkspaceReview(
 /**
  * Combined Layer 1 + Layer 2 analysis.
  *
- * 1. Runs all 37 deterministic evaluators (Layer 1)
+ * 1. Runs all 39 deterministic evaluators (Layer 1)
  * 2. Streams the pattern-match findings to chat
  * 3. Builds a deep-review prompt with the L1 findings + expert criteria
  * 4. Sends to the VS Code Language Model API (Layer 2)
@@ -553,7 +555,7 @@ async function handleDeepReview(
   if (token.isCancellationRequested) return;
 
   // ── Layer 1: Deterministic Evaluation ──────────────────────────────────
-  stream.progress("Layer 1 — Running 37 judges (deterministic analysis)…");
+  stream.progress("Layer 1 — Running 39 judges (deterministic analysis)…");
 
   const relativePath = vscode.workspace.asRelativePath(document.uri);
   let findings: Finding[];
@@ -871,20 +873,29 @@ function handleHelp(stream: vscode.ChatResponseStream): vscode.ChatResult | void
       `| \`@judges /security\` | Security-focused pattern review only |\n` +
       `| \`@judges /fix\` | Auto-fix findings that have patches (not all findings are auto-fixable) |\n` +
       `| \`@judges /help\` | Show this help |\n\n` +
-      `**Default behavior** runs the fast deterministic evaluators first (Layer 1), then sends the code ` +
-      `and findings to an AI model for contextual deep analysis (Layer 2) — catching semantic issues, ` +
-      `false positives, and architectural concerns that pattern matching cannot detect.\n\n` +
-      `**\`/shallowreview\`** runs only Layer 1 (pattern analysis) without the AI deep review — ` +
-      `faster, but may include more false positives.\n\n` +
-      `**Workspace review** triggers automatically when you mention ` +
-      `*codebase*, *workspace*, *project*, *all files*, *repo*, or *folder* ` +
-      `in your prompt (up to ${getMaxWorkspaceFiles()} files).\n\n` +
-      `You can also ask naturally:\n` +
+      `### Verdict Bands\n\n` +
+      `| Verdict | Score | Meaning |\n` +
+      `|---|---|---|\n` +
+      `| ✅ **PASS** | 80–100 | Code meets quality bar — safe to merge |\n` +
+      `| ⚠️ **WARN** | 50–79 | Issues found — review before merging |\n` +
+      `| 🛑 **FAIL** | 0–49 | Critical/high findings — fix before merging |\n\n` +
+      `### Noise Control\n\n` +
+      `Too many findings? Adjust these settings:\n` +
+      `- **\`judges.minSeverity\`** — default is \`"high"\` (only critical + high). ` +
+      `Lower to \`"medium"\` to see more, or raise to \`"critical"\` for fewer.\n` +
+      `- **\`judges.confidenceTier\`** — default is \`"important"\` (≥ 0.6 confidence). ` +
+      `Set to \`"essential"\` (≥ 0.8) for less noise.\n` +
+      `- **\`judges.preset\`** — try \`"security-only"\` or \`"lenient"\` for lighter reviews.\n\n` +
+      `### Examples\n\n` +
       `- *"@judges review this file for performance issues"*\n` +
       `- *"@judges review the entire codebase"*\n` +
       `- *"@judges check security across the project"*\n` +
       `- *"@judges shallow review this file"*\n` +
-      `- *"@judges fix this file"*\n`,
+      `- *"@judges fix this file"*\n` +
+      `- *"@judges evaluate this code"*\n\n` +
+      `**Workspace review** triggers automatically when you mention ` +
+      `*codebase*, *workspace*, *project*, *all files*, *repo*, or *folder* ` +
+      `in your prompt (up to ${getMaxWorkspaceFiles()} files).\n`,
   );
 }
 

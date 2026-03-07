@@ -1,87 +1,140 @@
 # Judges Panel — VS Code Extension
 
-Install one extension. Get **37 specialized judges** reviewing every file you save — inline diagnostics, quick-fix patches, **`@judges` chat participant** for Copilot, and **automatic MCP server integration** so Copilot and other LLMs can act as 37 expert reviewers with zero configuration.
+**39 specialized judges evaluate every file you save** — catching security holes, performance traps, and compliance gaps before they reach production.
 
-## Features
+- **Fewer escaped defects** — critical/high findings surface inline as you type, with one-click auto-fix patches
+- **Faster code review** — `@judges` in Copilot Chat delivers a full security + quality verdict in seconds
+- **Zero configuration** — install the extension, open a file, save. That's it.
 
-- **`@judges` chat participant** — type `@judges` in Copilot Chat to review the active file, run security checks, or auto-fix findings. Copilot also auto-routes when you mention "judges panel review", "judges evaluation", etc.
-- **Language Model tool** — `judges_evaluate` is registered as an LM tool so Copilot can automatically discover and invoke Judges evaluation even without the `@` prefix
-- **Evaluate on save** — automatically runs the full 37-judge tribunal when you save a file
-- **Inline diagnostics** — findings appear as squiggly underlines with severity-colored markers
-- **Quick-fix code actions** — click the lightbulb to apply auto-fix patches directly
-- **Auto-configured MCP server** — the 37 expert-persona LLM prompts are registered with VS Code automatically; Copilot can use them immediately
-- **Workspace evaluation** — evaluate all supported files with progress reporting
-- **Status bar** — one-click evaluation from the status bar shield icon
-- **Configurable** — choose presets, severity filters, and specific judges
-- **Deep review by default** — every review runs Layer 1 (instant pattern analysis) and Layer 2 (LLM contextual review), streaming results directly in chat or opening a markdown report
-- **AI-powered false-positive refinement** — right-click in the editor and select "Refine Findings with AI" to use the available language model to review pattern-matched findings and filter out false positives
+## Try in 60 Seconds
 
-## Chat Participant — `@judges`
+1. Install **Judges Panel** from the Extensions view (`Ctrl+Shift+X`) or run:
+   ```
+   code --install-extension kevinrabun.judges-panel
+   ```
+2. Open any supported file and save — findings appear inline immediately.
+3. Type `@judges` in Copilot Chat for a deep review with AI-powered contextual analysis.
 
-Talk to the Judges Panel directly in Copilot Chat:
+## Chat Commands — `@judges`
 
 | Command | What it does |
 |---------|-------------|
-| `@judges` | Deep review — Layer 1 (pattern analysis) + Layer 2 (AI contextual review) |
+| `@judges` | **Deep review** — Layer 1 pattern analysis + Layer 2 AI contextual review |
 | `@judges /review` | Same as above |
 | `@judges /deepreview` | Same as above |
-| `@judges /shallowreview` | Pattern analysis only (Layer 1 — no AI deep review) |
-| `@judges /security` | Security-focused pattern review only |
+| `@judges /shallowreview` | Fast pattern analysis only (no AI) |
+| `@judges /security` | Security-focused review |
 | `@judges /fix` | Auto-fix all fixable findings |
-| `@judges /help` | Show available commands |
+| `@judges /help` | Show commands and examples |
 
-You can also ask naturally — Copilot auto-routes these to `@judges`:
+Natural language works too — Copilot auto-routes these:
 
 - *"Review this file with judges"*
-- *"Run a judges panel evaluation"*
 - *"Check this code for security issues"*
+- *"Run judges on my workspace"*
+- *"Fix the judges findings"*
 
-## Supported Languages
+## Noise Control
 
-TypeScript, JavaScript, Python, Go, Rust, Java, C#, C++
+| Setting | Default | Effect |
+|---------|---------|--------|
+| `judges.minSeverity` | `"high"` | Only critical + high findings shown by default |
+| `judges.confidenceTier` | `"important"` | Suppresses low-confidence results (< 0.6) |
+| `judges.preset` | `""` | Named presets: `strict`, `lenient`, `security-only`, `startup`, `compliance`, `performance` |
+| `judges.enabledJudges` | `[]` | Restrict to specific judge IDs (empty = all 39) |
+| `judges.exclude` | `[]` | Glob patterns to skip files (e.g., `**/test/**`) |
 
-## Commands
+Start with defaults and tighten or relax as your team's workflow evolves.
+
+## CI Integration
+
+Add Judges to your GitHub Actions pipeline:
+
+```yaml
+# .github/workflows/judges.yml
+name: Judges
+on: [pull_request]
+jobs:
+  judges:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: KevinRabun/judges@v3
+        with:
+          preset: security-only
+```
+
+Or run **Judges: Add CI Workflow** from the Command Palette to generate the workflow file automatically.
+
+## All Commands
 
 | Command | Description |
 |---------|-------------|
-| `Judges: Evaluate Current File` | Run the full tribunal on the active file |
-| `Judges: Auto-Fix Current File` | Apply all available auto-fix patches |
-| `Judges: Evaluate Workspace` | Evaluate all supported files in the workspace |
-| `Judges: Clear Diagnostics` | Remove all Judges diagnostics |
-| `Judges: Show Results Panel` | Open the Judges results view |
-| `Judges: Refine Findings with AI` | Use the available language model to review findings and filter out false positives |
-| `Judges: Deep Review (Layer 1 + Layer 2)` | Run all 37 evaluators then AI contextual review — opens report as markdown tab |
-| `Judges: Configure MCP Server` | Write MCP server definition to `.vscode/mcp.json` (manual alternative to auto-config) |
+| **Judges: Evaluate Current File** | Run the full 39-judge tribunal on the active file |
+| **Judges: Auto-Fix Current File** | Apply all available auto-fix patches |
+| **Judges: Evaluate Workspace** | Evaluate all supported files with progress reporting |
+| **Judges: Deep Review (Layer 1 + Layer 2)** | Pattern analysis + AI contextual review — opens markdown report |
+| **Judges: Refine Findings with AI** | LLM-powered false-positive filtering |
+| **Judges: Clear Diagnostics** | Remove all Judges diagnostics |
+| **Judges: Show Results Panel** | Open the Judges findings tree view |
+| **Judges: Configure MCP Server** | Write `.vscode/mcp.json` for team sharing |
 
-## Configuration
+## All Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `judges.evaluateOnSave` | `true` | Automatically evaluate on file save |
-| `judges.preset` | `""` | Named preset: strict, lenient, security-only, etc. |
-| `judges.minSeverity` | `"medium"` | Minimum severity to display |
-| `judges.enabledJudges` | `[]` | Restrict to specific judge IDs |
-| `judges.debounceMs` | `1000` | Debounce delay for on-save evaluation |
+| `judges.evaluateOnSave` | `true` | Evaluate automatically on file save |
+| `judges.preset` | `""` | Named preset or comma-separated composition |
+| `judges.minSeverity` | `"high"` | Minimum severity level to display |
+| `judges.enabledJudges` | `[]` | Restrict to specific judges (empty = all 39) |
+| `judges.debounceMs` | `1000` | Debounce delay (ms) for on-save evaluation |
+| `judges.exclude` | `[]` | Glob patterns to exclude from workspace evaluation |
+| `judges.include` | `[]` | Glob patterns to include in workspace evaluation |
+| `judges.maxFiles` | `50` | Maximum files in workspace evaluation |
+| `judges.confidenceTier` | `"important"` | Minimum confidence: `essential` (≥0.8), `important` (≥0.6), `supplementary` (all) |
+
+## Supported Languages
+
+TypeScript · JavaScript · Python · Go · Rust · Java · C# · C++ · Terraform · Bicep · PowerShell · PHP · Ruby · Kotlin · Swift
+
+## How It Works
+
+### Layer 1 — Deterministic Evaluation (instant, local)
+
+Runs in the extension host with no network calls:
+
+- 400+ security, quality, and compliance rules
+- AST analysis via tree-sitter WASM for 15 languages
+- Auto-fix patches for common issues
+
+### Layer 2 — LLM-Powered Deep Review (automatic)
+
+The extension registers a **Judges MCP server** with VS Code on activation. Copilot sees all 39 expert-persona prompts immediately — no manual MCP configuration required.
+
+Ask Copilot *"review this file with the Judges cybersecurity expert"* and it works out of the box.
+
+### Copilot Integration
+
+- **`@judges` chat participant** — routes commands and natural-language requests
+- **`judges_evaluate` LM tool** — Copilot auto-discovers and invokes when you mention code review or evaluation
+
+To share MCP config with teammates who don't have the extension, run **Judges: Configure MCP Server** to write `.vscode/mcp.json`.
 
 ## Installation
 
-### From VS Code Marketplace (recommended)
+### Marketplace (recommended)
 
-Search for **"Judges Panel"** in the Extensions view (`Ctrl+Shift+X`) or run:
-
-```bash
+```
 code --install-extension kevinrabun.judges-panel
 ```
 
-That's it — Layer 1 (deterministic evaluation) and Layer 2 (MCP server for LLM-powered review) are both enabled automatically.
-
-### From Source (Development)
+### From Source
 
 ```bash
 cd vscode-extension
 npm install
 npm run compile
-# Press F5 in VS Code to launch Extension Development Host
+# Press F5 to launch Extension Development Host
 ```
 
 ### From VSIX
@@ -91,33 +144,6 @@ cd vscode-extension
 npx @vscode/vsce package
 code --install-extension judges-panel-*.vsix
 ```
-
-## How It Works
-
-The extension provides **both layers** of the Judges evaluation system with zero configuration:
-
-### Layer 1 — Deterministic Evaluation (instant, local)
-
-Runs **locally in the extension host** — no network calls, no API keys, instant results:
-
-- **Pattern matching** against 400+ security, quality, and compliance rules
-- **AST analysis** via tree-sitter WASM for 8 languages
-- **Auto-fix patches** for 53 common issues
-
-### Layer 2 — LLM-Powered Deep Review (enabled automatically)
-
-The extension **automatically registers the Judges MCP server** with VS Code on activation. Copilot and other LMs see all 37 expert-persona prompts immediately — no `.vscode/mcp.json`, no `npx` commands, no manual setup of any kind.
-
-What this means in practice: ask Copilot to "review this file with the Judges cybersecurity expert" and it can — because the MCP server is already running.
-
-### Chat Participant & LM Tool (zero-friction Copilot integration)
-
-The extension registers an **`@judges` chat participant** and a **`judges_evaluate` Language Model tool**. Together these ensure Copilot can discover and invoke the Judges Panel automatically:
-
-- **`@judges`** — users can type `@judges /review` in chat, or simply mention "judges panel review" and Copilot routes the request via VS Code's disambiguation
-- **`judges_evaluate` tool** — registered via `vscode.lm.registerTool`, Copilot may auto-invoke this tool when the user mentions "judges", "code review", or "evaluate code"
-
-If you prefer explicit workspace-level config (e.g., to share with teammates who don't have the extension), run **Judges: Configure MCP Server** to write the server definition to `.vscode/mcp.json`.
 
 ## License
 

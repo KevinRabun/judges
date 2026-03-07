@@ -186,6 +186,8 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand("judges.configureMcp", () => configureMcpManually()),
+
+    vscode.commands.registerCommand("judges.addCiWorkflow", () => addCiWorkflow()),
   );
 
   // ─── Code Action Provider ────────────────────────────────────────────
@@ -218,6 +220,30 @@ export function activate(context: vscode.ExtensionContext): void {
         { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] },
       ),
     );
+  }
+
+  // ─── First-Run Toast ──────────────────────────────────────────────────
+  // Show a one-time welcome message after the first successful evaluation.
+
+  if (!context.globalState.get<boolean>("judges.hasShownFirstRunToast")) {
+    const firstRunDisposable = diagnosticProvider.onFindingsChanged(async (e) => {
+      if (e.findings.length === 0) return; // wait for real findings
+
+      await context.globalState.update("judges.hasShownFirstRunToast", true);
+      firstRunDisposable.dispose();
+
+      const action = await vscode.window.showInformationMessage(
+        "Judges Panel found findings in your code. Type @judges in Copilot Chat for a deep review.",
+        "Open Chat",
+        "Noise too high? Adjust settings",
+      );
+      if (action === "Open Chat") {
+        vscode.commands.executeCommand("workbench.action.chat.open", "@judges");
+      } else if (action?.startsWith("Noise")) {
+        vscode.commands.executeCommand("workbench.action.openSettings", "judges.minSeverity");
+      }
+    });
+    context.subscriptions.push(firstRunDisposable);
   }
 
   // ─── On-Save Evaluation ──────────────────────────────────────────────
@@ -258,7 +284,7 @@ export function deactivate(): void {
 
 /**
  * Register the Judges MCP server via the VS Code MCP provider API.
- * This makes the 37 expert-persona prompts (Layer 2) automatically available
+ * This makes the 39 expert-persona prompts (Layer 2) automatically available
  * to Copilot and other LMs — zero manual configuration required.
  */
 function registerMcpServer(context: vscode.ExtensionContext): void {
@@ -318,4 +344,51 @@ async function configureMcpManually(): Promise<void> {
   await vscode.workspace.fs.writeFile(mcpJsonUri, content);
 
   vscode.window.showInformationMessage("Judges: MCP server configured in .vscode/mcp.json ✓");
+}
+
+// ─── CI Workflow Generation ───────────────────────────────────────────────
+
+const CI_WORKFLOW_YAML = `name: Judges
+on: [pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  judges:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: KevinRabun/judges@v3
+        with:
+          preset: security-only
+`;
+
+/**
+ * Generate a GitHub Actions workflow file at .github/workflows/judges.yml.
+ */
+async function addCiWorkflow(): Promise<void> {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders?.length) {
+    vscode.window.showWarningMessage("Judges: Open a workspace folder first.");
+    return;
+  }
+
+  const workflowUri = vscode.Uri.joinPath(workspaceFolders[0].uri, ".github", "workflows", "judges.yml");
+
+  try {
+    await vscode.workspace.fs.stat(workflowUri);
+    vscode.window.showInformationMessage("Judges: .github/workflows/judges.yml already exists.");
+    return;
+  } catch {
+    // File doesn't exist — create it
+  }
+
+  const content = Buffer.from(CI_WORKFLOW_YAML, "utf8");
+  await vscode.workspace.fs.writeFile(workflowUri, content);
+
+  const doc = await vscode.workspace.openTextDocument(workflowUri);
+  await vscode.window.showTextDocument(doc);
+
+  vscode.window.showInformationMessage("Judges: Created .github/workflows/judges.yml ✓");
 }

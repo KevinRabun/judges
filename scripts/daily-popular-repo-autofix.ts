@@ -954,7 +954,7 @@ function applySingleLineFix(clonePath: string, candidate: CandidateFix, minConfi
   if (source === after) return false;
 
   // Only evaluate the "after" content — the finding was already confirmed
-  // during discovery, so re-running all 37 judges on "before" is redundant.
+  // during discovery, so re-running all 39 judges on "before" is redundant.
   const afterFindings = flattenFindings(after, candidate.language, minConfidence);
 
   // The targeted rule must no longer fire on the fixed content.

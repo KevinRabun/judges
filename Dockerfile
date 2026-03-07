@@ -15,7 +15,7 @@ RUN npm run build
 FROM node:20-alpine
 
 LABEL org.opencontainers.image.title="Judges"
-LABEL org.opencontainers.image.description="37 specialized judges that evaluate AI-generated code for security, cost, and quality"
+LABEL org.opencontainers.image.description="39 specialized judges that evaluate AI-generated code for security, cost, and quality"
 LABEL org.opencontainers.image.source="https://github.com/KevinRabun/judges"
 LABEL org.opencontainers.image.licenses="MIT"
 

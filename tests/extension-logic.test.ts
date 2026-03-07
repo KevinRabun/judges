@@ -762,7 +762,7 @@ describe("Deep Review — Contract", () => {
 
   it("JUDGES array should be available and non-empty", () => {
     assert.ok(Array.isArray(JUDGES), "JUDGES should be an array");
-    assert.ok(JUDGES.length >= 37, `Should have at least 37 judges, got ${JUDGES.length}`);
+    assert.ok(JUDGES.length >= 39, `Should have at least 39 judges, got ${JUDGES.length}`);
     for (const j of JUDGES) {
       assert.ok(j.id, `Judge should have an id`);
       assert.ok(j.name, `Judge ${j.id} should have a name`);

@@ -62,6 +62,31 @@ export class JudgesCodeActionProvider implements vscode.CodeActionProvider {
       };
       learnAction.diagnostics = [diag];
       actions.push(learnAction);
+
+      // "Report false positive" — opens a pre-filled GitHub issue
+      const reportAction = new vscode.CodeAction(`Report false positive: ${diag.code}`, vscode.CodeActionKind.QuickFix);
+      const ruleId = String(diag.code);
+      const diagLine = diag.range.start.line + 1;
+      const issueTitle = encodeURIComponent(`False positive: ${ruleId} on line ${diagLine}`);
+      const issueBody = encodeURIComponent(
+        `**Rule:** ${ruleId}\n` +
+          `**File:** ${vscode.workspace.asRelativePath(document.uri)}\n` +
+          `**Line:** ${diagLine}\n` +
+          `**Message:** ${diag.message.split("\n")[0]}\n\n` +
+          `**Why this is a false positive:**\n\n` +
+          `<!-- Explain briefly why this finding does not apply -->\n`,
+      );
+      reportAction.command = {
+        command: "vscode.open",
+        title: "Report false positive",
+        arguments: [
+          vscode.Uri.parse(
+            `https://github.com/KevinRabun/judges/issues/new?title=${issueTitle}&body=${issueBody}&labels=false-positive`,
+          ),
+        ],
+      };
+      reportAction.diagnostics = [diag];
+      actions.push(reportAction);
     }
 
     return actions;

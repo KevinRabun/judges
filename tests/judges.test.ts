@@ -10476,7 +10476,7 @@ describe("Finding Snapshot — Rule Coverage Stability", () => {
 
   it("should maintain the expected number of judges producing findings", () => {
     const judgesWithFindings = verdict.evaluations.filter((e) => e.findings.length > 0).length;
-    // At least 30 of 37 judges should produce findings on the intentionally flawed sample
+    // At least 30 of 39 judges should produce findings on the intentionally flawed sample
     assert.ok(
       judgesWithFindings >= 30,
       `Only ${judgesWithFindings} judges produced findings — expected ≥30 on flawed sample`,

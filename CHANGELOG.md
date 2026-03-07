@@ -2,6 +2,25 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.17] — 2026-03-07
+
+### Changed
+- **Judge count updated to 39** — All references across docs, tests, HTML, action.yml, Dockerfile, and README updated from 37 to 39
+- **VS Code extension README rewritten** — New adoption-focused copy: 1-sentence value prop, "Try in 60 seconds" quick start, noise-control section, CI integration guide, full 15-language listing
+- **Default `minSeverity` raised to `"high"`** — New installs see only critical + high findings, reducing noise for first-time users
+- **Preset dropdown with enum values** — `judges.preset` now offers named choices (strict, lenient, security-only, startup, compliance, performance) in the Settings UI
+
+### Added
+- **First-run toast notification** — After the first successful evaluation, a one-time toast introduces `@judges` chat and links to noise settings
+- **`Judges: Add CI Workflow` command** — Generates `.github/workflows/judges.yml` with a PR-triggered security-only preset
+- **"Report false positive" code action** — New Quick Fix action opens a pre-filled GitHub issue for any Judges finding
+- **Enhanced `@judges /help`** — Now includes verdict bands (PASS/WARN/FAIL), noise-control tips, and more examples
+- **Improved chat command inference** — `inferCommand()` now recognizes "run judges", "judges review", "evaluate", "check" as review intent
+- **Updated welcome view** — Findings panel shows 3 quick actions: evaluate file, evaluate workspace, open @judges chat
+
+### Tests
+- 1040 tests passing (0 failures)
+
 ## [3.23.16] — 2026-03-07
 
 ### Fixed

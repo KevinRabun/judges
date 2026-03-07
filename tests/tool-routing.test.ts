@@ -39,7 +39,7 @@ const TOOLS: ToolDefinition[] = [
   {
     name: "evaluate_code",
     description:
-      "Submit code to the full Judges Panel for evaluation. Handles ALL code types including application code, infrastructure-as-code (Bicep, Terraform, ARM, CloudFormation). All 37 judges will independently review the code using both automated pattern detection and deep contextual analysis criteria. Returns a combined verdict with scores, findings, and expert review guidance for thorough evaluation.",
+      "Submit code to the full Judges Panel for evaluation. Handles ALL code types including application code, infrastructure-as-code (Bicep, Terraform, ARM, CloudFormation). All 39 judges will independently review the code using both automated pattern detection and deep contextual analysis criteria. Returns a combined verdict with scores, findings, and expert review guidance for thorough evaluation.",
     parameterHints: [
       "code source code",
       "language programming language typescript python javascript csharp java",
@@ -81,7 +81,7 @@ const TOOLS: ToolDefinition[] = [
   {
     name: "evaluate_project",
     description:
-      "Submit multiple files for project-level analysis. All 37 judges evaluate each file, plus cross-file architectural analysis detects issues like code duplication, inconsistent error handling, and dependency cycles.",
+      "Submit multiple files for project-level analysis. All 39 judges evaluate each file, plus cross-file architectural analysis detects issues like code duplication, inconsistent error handling, and dependency cycles.",
     parameterHints: [
       "files project files path content language",
       "context project context",
@@ -93,7 +93,7 @@ const TOOLS: ToolDefinition[] = [
   {
     name: "evaluate_diff",
     description:
-      "Evaluate only the changed lines in a code diff. Runs all 37 judges on the full file but filters findings to only those affecting the specified changed lines. Ideal for PR reviews and incremental analysis.",
+      "Evaluate only the changed lines in a code diff. Runs all 39 judges on the full file but filters findings to only those affecting the specified changed lines. Ideal for PR reviews and incremental analysis.",
     parameterHints: [
       "code full file content post-change",
       "language programming language",
@@ -333,7 +333,7 @@ describe("Tool routing — positive (correct tool is top-ranked)", () => {
     const expected = "evaluate_code";
 
     it("review this code with all judges", () => {
-      assert.equal(topTool("review this code with all 37 judges on the full panel"), expected);
+      assert.equal(topTool("review this code with all 39 judges on the full panel"), expected);
     });
 
     it("submit this typescript file to the full judges panel", () => {
