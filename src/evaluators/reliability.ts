@@ -18,7 +18,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
     /circuit.?breaker|opossum|cockatiel|retry|backoff|createTimeoutSignal|mergeSignalWithTimeout|createEgressAwareHttpClient|AbortController|AbortSignal\.timeout|withRetry|retryWith|exponentialBackoff/i.test(
       code,
     );
-  if (emptyCatchLines.length > 0 && !hasResilienceInfra) {
+  if (emptyCatchLines.length >= 3 && !hasResilienceInfra) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -48,7 +48,10 @@ export function analyzeReliability(code: string, language: string): Finding[] {
     // Scan ±15 lines (the enclosing function scope) for timeout/signal evidence
     const ctxStart = Math.max(0, idx - 15);
     const ctxEnd = Math.min(lines.length, idx + 15);
-    const context = lines.slice(ctxStart, ctxEnd).join("\n");
+    const context = lines
+      .slice(ctxStart, ctxEnd)
+      .filter((l) => !isCommentLine(l))
+      .join("\n");
     if (
       !/timeout|AbortController|AbortSignal|signal\s*[,:=]|deadline|Duration|TimeSpan|time\.After/i.test(context) &&
       !hasFileTimeoutPattern
@@ -56,7 +59,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       noTimeoutLines.push(ln);
     }
   });
-  if (noTimeoutLines.length > 0) {
+  if (noTimeoutLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -78,7 +81,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
     getLangLineNumbers(code, language, LP.DB_QUERY),
   );
   const hasRetry = testCode(code, /retry|retries|backoff|exponential|tenacity|Polly|resilience4j|backoff::/i);
-  if (externalCallLines.length > 2 && !hasRetry) {
+  if (externalCallLines.length >= 2 && !hasRetry) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -129,7 +132,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       unsafeAccessLines.push(i + 1);
     }
   });
-  if (unsafeAccessLines.length > 3) {
+  if (unsafeAccessLines.length > 5) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -164,7 +167,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
   }
 
   // Circuit breaker pattern missing
-  const hasMultipleExternalCalls = externalCallLines.length > 3;
+  const hasMultipleExternalCalls = externalCallLines.length > 5;
   const hasCircuitBreaker = testCode(code, /circuit.?breaker|CircuitBreaker|opossum|cockatiel|polly/i);
   if (hasMultipleExternalCalls && !hasCircuitBreaker) {
     findings.push({
@@ -194,7 +197,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       }
     }
   });
-  if (criticalCallLines.length > 0) {
+  if (criticalCallLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -219,7 +222,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
     }
   });
   const hasIdempotency = testCode(code, /idempoten|idempotency.?key|x-idempotency/i);
-  if (writeEndpointLines.length > 2 && !hasIdempotency) {
+  if (writeEndpointLines.length > 4 && !hasIdempotency) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -273,7 +276,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
       }
     }
   });
-  if (unhandledPromiseLines.length > 0) {
+  if (unhandledPromiseLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "high",

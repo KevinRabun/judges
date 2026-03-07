@@ -33,7 +33,7 @@ export function analyzePerformance(code: string, language: string, context?: Ana
     const idx = loopLine - 1;
     const loopBody = lines.slice(idx + 1, Math.min(lines.length, idx + 10)).join("\n");
     if (
-      /\b(?:db|database|repo|repository|model|orm|prisma|sequelize|knex|mongoose|sql)\b\s*(?:\.|->)\s*(?:find|findOne|findMany|query|execute|executeQuery|select)\s*\(|\bcursor\.(?:execute|executemany)\s*\(|\bdb\.Query\s*\(/i.test(
+      /\b(?:db|database|repo|repository|model|orm|prisma|sequelize|knex|mongoose|sql)\b\s*(?:\.|->)\s*(?:\w+\s*(?:\.|->)\s*)?(?:find|findOne|findMany|findUnique|query|execute|executeQuery|select|count|get|fetch)\s*\(|\bcursor\.(?:execute|executemany)\s*\(|\bdb\.Query\s*\(/i.test(
         loopBody,
       )
     ) {
@@ -73,7 +73,7 @@ export function analyzePerformance(code: string, language: string, context?: Ana
       syncIOLines.push(i + 1);
     }
   });
-  if (syncIOLines.length > 0 && !cliCode) {
+  if (syncIOLines.length >= 2 && !cliCode) {
     // AST: elevate severity when synchronous I/O is inside an async function
     // (blocks the event loop / async runtime, far worse than in sync context)
     let syncSeverity: "medium" | "high" = "medium";
@@ -158,7 +158,7 @@ export function analyzePerformance(code: string, language: string, context?: Ana
       inlineHandlerLines.push(i + 1);
     }
   });
-  if (inlineHandlerLines.length > 3) {
+  if (inlineHandlerLines.length > 6) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -186,7 +186,7 @@ export function analyzePerformance(code: string, language: string, context?: Ana
       unboundedOpLines.push(i + 1);
     }
   });
-  if (unboundedOpLines.length > 0) {
+  if (unboundedOpLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -240,7 +240,7 @@ export function analyzePerformance(code: string, language: string, context?: Ana
     code,
     /removeEventListener|\.off\s*\(|\.removeListener|\.removeAllListeners|AbortController|cleanup|dispose/i,
   );
-  if (addListenerLines.length > 2 && !hasRemoveListener) {
+  if (addListenerLines.length > 4 && !hasRemoveListener) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -439,7 +439,7 @@ export function analyzePerformance(code: string, language: string, context?: Ana
       }
     }
   });
-  if (bulkFetchLines.length > 0) {
+  if (bulkFetchLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

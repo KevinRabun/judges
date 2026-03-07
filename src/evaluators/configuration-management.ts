@@ -63,7 +63,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
     }
   }
 
-  if (secretLines.length > 0) {
+  if (secretLines.length >= 4) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
@@ -83,7 +83,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
   const hardcodedConfigPattern =
     /(?:const|let|var)\s+(?:PORT|HOST|DATABASE|REDIS|MONGO|API_URL|BASE_URL|TIMEOUT|INTERVAL)\s*=\s*(?:["'`]\w|[0-9])/gi;
   const hardcodedConfigLines = getLineNumbers(code, hardcodedConfigPattern);
-  if (hardcodedConfigLines.length > 0) {
+  if (hardcodedConfigLines.length >= 4) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -146,7 +146,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
   const _hasGitignore = testCode(code, /\.gitignore/gi);
   const hasEnvFile = testCode(code, /dotenv|\.env\b/gi);
   // This is a heuristic — can't truly check .gitignore from code alone
-  if (hasEnvFile && code.split("\n").length > 10) {
+  if (hasEnvFile && code.split("\n").length > 80) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "info",
@@ -174,7 +174,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       ? Math.min((code.match(/os\.Getenv\b/g) || []).length, (code.match(/==\s*""/g) || []).length)
       : 0;
   const envTotal = envAccessLines.length;
-  if (envTotal > 0 && envWithDefaults === 0 && goValidationCount === 0) {
+  if (envTotal >= 3 && envWithDefaults === 0 && goValidationCount === 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

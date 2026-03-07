@@ -18,7 +18,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
     /app\.(get|post|put|delete|use)|router\.(get|post)|@app\.route|@GetMapping|@PostMapping|http\.HandleFunc/i.test(
       code,
     );
-  if (hasHttpRoutes && !hasAnyLogging && !isLikelyCLI(code)) {
+  if (hasHttpRoutes && !hasAnyLogging && !isLikelyCLI(code) && lines.length > 5) {
     // Find the route handler lines to use as evidence
     const routeHandlerLines = getLineNumbers(
       code,
@@ -42,7 +42,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
 
   // Detect console.log used instead of structured logging (multi-language)
   const consoleLogLines = getLangLineNumbers(code, language, LP.CONSOLE_LOG);
-  if (consoleLogLines.length > 3 && !isLikelyCLI(code)) {
+  if (consoleLogLines.length > 5 && !isLikelyCLI(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -119,7 +119,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       concatLogLines.push(i + 1);
     }
   });
-  if (concatLogLines.length > 0) {
+  if (concatLogLines.length > 8) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -168,20 +168,31 @@ export function analyzeObservability(code: string, language: string): Finding[] 
     }
   });
   if (sensitiveLogLines.length > 0) {
-    findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
-      severity: "critical",
-      title: "Sensitive data potentially logged",
-      description:
-        "Log statements appear to include sensitive fields (password, token, API key, SSN, credit card). This violates security and compliance requirements.",
-      lineNumbers: sensitiveLogLines,
-      recommendation:
-        "Never log sensitive data. Use redaction middleware or mask sensitive fields before logging. Audit all log statements for PII/secrets.",
-      reference: "OWASP Logging Cheat Sheet / PCI DSS Requirement 3",
-      suggestedFix:
-        "Remove sensitive fields from log calls and configure redaction paths in your logger: e.g., pino({ redact: ['req.headers.authorization', 'password'] }).",
-      confidence: 0.85,
+    // Require that the log line actually passes the variable (not just mentions it in a string)
+    const confirmedSensitiveLogLines = sensitiveLogLines.filter((lineNum) => {
+      const line = lines[lineNum - 1] || "";
+      // Skip lines where the sensitive word is only in a string literal
+      const withoutStrings = line.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g, "");
+      return /\b(?:password|secret|token|apiKey|api_key|ssn|creditCard|credit_card|authorization)\b/i.test(
+        withoutStrings,
+      );
     });
+    if (confirmedSensitiveLogLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Sensitive data potentially logged",
+        description:
+          "Log statements appear to include sensitive fields (password, token, API key, SSN, credit card). This violates security and compliance requirements.",
+        lineNumbers: sensitiveLogLines,
+        recommendation:
+          "Never log sensitive data. Use redaction middleware or mask sensitive fields before logging. Audit all log statements for PII/secrets.",
+        reference: "OWASP Logging Cheat Sheet / PCI DSS Requirement 3",
+        suggestedFix:
+          "Remove sensitive fields from log calls and configure redaction paths in your logger: e.g., pino({ redact: ['req.headers.authorization', 'password'] }).",
+        confidence: 0.85,
+      });
+    }
   }
 
   // Missing metrics/instrumentation (multi-language)
@@ -189,7 +200,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
     /metrics|prometheus|statsd|datadog|newrelic|appInsights|applicationInsights|opentelemetry|otlp|micrometer|System\.Diagnostics\.Metrics/i.test(
       code,
     );
-  if (hasRoutes && !hasMetrics && lines.length > 100) {
+  if (hasRoutes && !hasMetrics && lines.length > 150) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -211,7 +222,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
     /opentelemetry|jaeger|zipkin|trace|span|@opentelemetry|dd-trace|newrelic|tracing::|Activity\.Start|opentracing/i.test(
       code,
     );
-  if (hasRoutes && !hasTracing && lines.length > 100) {
+  if (hasRoutes && !hasTracing && lines.length > 150) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -237,7 +248,13 @@ export function analyzeObservability(code: string, language: string): Finding[] 
       logLevelCounts[match[1].toLowerCase()] = (logLevelCounts[match[1].toLowerCase()] || 0) + 1;
     }
   });
-  if (logLevelCounts["error"] && logLevelCounts["error"] > 0 && !logLevelCounts["info"] && !logLevelCounts["warn"]) {
+  if (
+    logLevelCounts["error"] &&
+    logLevelCounts["error"] >= 3 &&
+    !logLevelCounts["info"] &&
+    !logLevelCounts["warn"] &&
+    lines.length > 80
+  ) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -264,7 +281,7 @@ export function analyzeObservability(code: string, language: string): Finding[] 
     }
   });
   const hasAuditLog = testCode(code, /audit|auditLog|audit_log/i);
-  if (securityOpLines.length > 0 && !hasAuditLog) {
+  if (securityOpLines.length >= 5 && !hasAuditLog) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",

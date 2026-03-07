@@ -10,7 +10,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
 
   // Weak / dynamic type usage (multi-language)
   const anyLines = getLangLineNumbers(code, language, LP.WEAK_TYPE);
-  if (anyLines.length > 0) {
+  if (anyLines.length >= 15) {
     const titles: Record<string, string> = {
       javascript: "'any' type usage",
       typescript: "'any' type usage",
@@ -37,7 +37,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
 
   // Linter / type-checker suppression (multi-language)
   const suppressLines = getLangLineNumbers(code, language, LP.LINTER_DISABLE, { skipComments: false });
-  if (suppressLines.length > 0) {
+  if (suppressLines.length >= 5) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -67,7 +67,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
     if (/^\s*(?:export\s+)?(?:const|readonly|static\s+readonly|final|#define|enum)\s+[A-Z_]/i.test(line)) return false;
     return true;
   });
-  if (filteredMagicLines.length > 0) {
+  if (filteredMagicLines.length >= 8) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -96,7 +96,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       braceDepth += (codeLines[i].match(/\{/g) || []).length;
       braceDepth -= (codeLines[i].match(/\}/g) || []).length;
       if (braceDepth === 0 && funcStart >= 0) {
-        if (i - funcStart > 50) longFunctions.push(funcStart + 1);
+        if (i - funcStart > 150) longFunctions.push(funcStart + 1);
         funcStart = -1;
       }
     }
@@ -111,16 +111,16 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
         if (l.trim() !== "" && l.search(/\S/) <= indent && !/^\s*#/.test(l)) break;
         end++;
       }
-      if (end - idx > 50) longFunctions.push(defLine);
+      if (end - idx > 150) longFunctions.push(defLine);
     }
   }
   if (longFunctions.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
-      title: "Long function detected (>50 lines)",
+      title: "Long function detected (>150 lines)",
       description:
-        "Functions exceeding 50 lines are harder to understand, test, and maintain. They often indicate the function is doing too much (violating Single Responsibility Principle).",
+        "Functions exceeding 150 lines are harder to understand, test, and maintain. They often indicate the function is doing too much (violating Single Responsibility Principle).",
       lineNumbers: longFunctions,
       recommendation:
         "Break the function into smaller, well-named helper functions. Each function should do one thing and do it well.",
@@ -132,7 +132,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
 
   // TODO/FIXME/HACK comments (multi-language)
   const todoLines = getLangLineNumbers(code, language, LP.TODO_FIXME, { skipComments: false });
-  if (todoLines.length > 0) {
+  if (todoLines.length >= 10) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "info",
@@ -150,7 +150,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
 
   // Empty catch blocks (multi-language)
   const emptyCatchLines = getLangLineNumbers(code, language, LP.EMPTY_CATCH);
-  if (emptyCatchLines.length > 0) {
+  if (emptyCatchLines.length >= 5) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -193,7 +193,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
   const debugWords =
     /(?:console\.log|print|println|fmt\.Print|System\.out\.print|puts|echo|dbg!)\s*\(\s*['"](?:debug|test|here|xxx|tmp|temp|asdf|TODO)/gi;
   const debugLines = getLineNumbers(code, debugWords);
-  if (debugLines.length > 0) {
+  if (debugLines.length >= 5) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -219,7 +219,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
       deepNestLines.push(i + 1);
     }
   });
-  if (deepNestLines.length > 3) {
+  if (deepNestLines.length >= 6) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -282,7 +282,7 @@ export function analyzeSoftwarePractices(code: string, language: string): Findin
 
   // Bare except / catch-all without logging (multi-language)
   const bareExceptLines = getLangLineNumbers(code, language, LP.GENERIC_CATCH);
-  if (bareExceptLines.length > 0) {
+  if (bareExceptLines.length >= 3) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

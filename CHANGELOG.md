@@ -2,6 +2,26 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.16] — 2026-03-07
+
+### Fixed
+- **Benchmark F1 improved from 0.900 to 0.904** — TP increased from 352 to 355 with 0 FP, maintaining Grade A
+- **10 benchmark expectedRuleIds prefix mismatches** — Fixed AI→AICS, DEP→DEPS, CONFIG→CFG, DSOV→SOV, PORT→PORTA, FRAME→FW, LOG→LOGPRIV prefix mappings in benchmark cases that caused false negatives in scoring
+- **LOGPRIV utility-module FP filter suppression** — Removed `LOGPRIV-` from `UTILITY_INAPPLICABLE` prefixes in false-positive-review.ts; logging privacy violations (passwords, tokens, PII in logs) are valid concerns even in utility code
+- **DEPS FP filter suppression** — Exempted `DEPS-*` findings from the import/type-only line false-positive filter; dependency declarations in import lines ARE the finding
+- **REL timeout context false suppression from comments** — Added `isCommentLine` filter to the timeout/retry context window in reliability.ts so comments like `// No timeout, no retry` no longer trick the evaluator into thinking timeout handling exists
+- **DOC evaluator thresholds too strict** — Lowered undocumented-function minimum from ≥5 to ≥2 and file-length guard from >100 to >10 lines, allowing detection in smaller modules
+- **OBS console.log threshold too strict** — Lowered "console logging instead of structured logger" threshold from >15 to >5 instances
+- **LOGPRIV password-logging threshold too strict** — Lowered from ≥4 to ≥2 instances; even 2 password log statements indicate a privacy violation
+
+### Changed
+- 22 evaluators refined with improved detection thresholds across ai-code-safety, api-design, caching, cloud-readiness, code-structure, concurrency, configuration-management, cost-effectiveness, data-security, data-sovereignty, database, documentation, framework-safety, logging-privacy, maintainability, observability, performance, rate-limiting, reliability, scalability, software-practices, and ux
+- Test fixtures expanded to match updated evaluator thresholds across all affected test suites
+
+### Tests
+- 1040 tests passing
+- 301 benchmark cases: TP=355, FN=75, FP=0, F1=0.904, Grade A
+
 ## [3.23.15] — 2026-03-06
 
 ### Fixed

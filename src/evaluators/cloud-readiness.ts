@@ -37,7 +37,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
     const ctx = getContextWindow(codeLines, ln, 2);
     return !defaultCtxPattern.test(ctx);
   });
-  if (hardcodedLines.length > 0) {
+  if (hardcodedLines.length >= 5) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -102,7 +102,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
     );
   const consoleLogLines = getLangLineNumbers(code, language, LP.CONSOLE_LOG);
   const hasConsoleLog = consoleLogLines.length > 0;
-  if (hasConsoleLog && !hasStructuredLog) {
+  if (hasConsoleLog && !hasStructuredLog && consoleLogLines.length >= 3) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

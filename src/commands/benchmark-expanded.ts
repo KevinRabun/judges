@@ -1447,7 +1447,7 @@ app.delete("/api/users/:id", async (req, res) => {
 });
 
 app.listen(3000);`,
-    expectedRuleIds: ["LOG-001", "OBS-001"],
+    expectedRuleIds: ["LOGPRIV-001", "OBS-001"],
     category: "observability",
     difficulty: "medium",
   },
@@ -1599,7 +1599,7 @@ app.use((err, req, res, next) => {
     query: req.query,
   });
 });`,
-    expectedRuleIds: ["CONFIG-001", "SEC-001"],
+    expectedRuleIds: ["CFG-001", "SEC-001"],
     category: "configuration",
     difficulty: "easy",
   },
@@ -1616,7 +1616,7 @@ import _ from "underscore"; // Largely superseded by lodash/native
 const response = request.get("https://api.example.com/data");
 const formattedDate = moment().format("YYYY-MM-DD");
 const filtered = _.filter(items, (item) => item.active);`,
-    expectedRuleIds: ["DEP-001"],
+    expectedRuleIds: ["DEPS-001"],
     category: "dependency-health",
     difficulty: "easy",
   },
@@ -1641,7 +1641,7 @@ const filtered = _.filter(items, (item) => item.active);`,
     }),
   });
 }`,
-    expectedRuleIds: ["DSOV-001", "DATA-001"],
+    expectedRuleIds: ["SOV-001", "DATA-001"],
     category: "data-sovereignty",
     difficulty: "medium",
   },
@@ -1661,7 +1661,7 @@ app.post("/register", (req, res) => {
   db.users.insert({ name, email, ssn, creditCard, dateOfBirth, createdAt: new Date() });
   res.json({ ok: true });
 });`,
-    expectedRuleIds: ["COMP-001", "DATA-001", "LOG-001"],
+    expectedRuleIds: ["COMP-001", "DATA-001", "LOGPRIV-001"],
     category: "compliance",
     difficulty: "medium",
   },
@@ -1846,7 +1846,7 @@ app.post("/api/admin/delete-all", (req, res) => {
 });
 
 app.listen(3000, () => console.log("Running on 3000"));`,
-    expectedRuleIds: ["FRAME-001", "SEC-001"],
+    expectedRuleIds: ["FW-001", "SEC-001"],
     category: "framework-safety",
     difficulty: "medium",
   },
@@ -1928,7 +1928,7 @@ async function runAgentAction(action: string): Promise<void> {
   // AI agent can execute arbitrary shell commands
   execSync(action, { shell: true });
 }`,
-    expectedRuleIds: ["AI-001", "CYBER-001"],
+    expectedRuleIds: ["AICS-001", "CYBER-001"],
     category: "ai-code-safety",
     difficulty: "hard",
   },
@@ -1954,7 +1954,7 @@ def chat_with_data(user_query: str, documents: list) -> str:
         messages=[{"role": "user", "content": prompt}]
     )
     return response.choices[0].message.content`,
-    expectedRuleIds: ["AI-001"],
+    expectedRuleIds: ["AICS-001"],
     category: "ai-code-safety",
     difficulty: "medium",
   },
@@ -1976,7 +1976,7 @@ def chat_with_data(user_query: str, documents: list) -> str:
   ],
   systemPrompt: "You are a data analyst. Help users analyze CSV files.",
 };`,
-    expectedRuleIds: ["AGENT-001", "AI-001"],
+    expectedRuleIds: ["AGENT-001", "AICS-001"],
     category: "agent-instructions",
     difficulty: "medium",
   },
@@ -2027,7 +2027,7 @@ function getSystemInfo(): string {
 
   return hostname;
 }`,
-    expectedRuleIds: ["PORT-001"],
+    expectedRuleIds: ["PORTA-001"],
     category: "portability",
     difficulty: "easy",
   },
@@ -2049,7 +2049,7 @@ def process_payment(card_number, cvv, expiry, amount):
 
 def register_user(name, email, ssn, password):
     logger.info(f"Registering user: name={name}, email={email}, ssn={ssn}, password={password}")`,
-    expectedRuleIds: ["LOG-001", "COMP-001", "DATA-001"],
+    expectedRuleIds: ["LOGPRIV-001", "COMP-001", "DATA-001"],
     category: "logging-privacy",
     difficulty: "easy",
   },
@@ -2354,7 +2354,7 @@ function processInput(input: string): string {
   const encrypted = encrypt(clean, "AES-256");
   return encrypted;
 }`,
-    expectedRuleIds: ["AI-001"],
+    expectedRuleIds: ["AICS-001"],
     category: "ai-code-safety",
     difficulty: "medium",
   },
@@ -2370,7 +2370,7 @@ form = cgi.FieldStorage()
 username = form.getfirst("username")
 
 module = imp.load_source("config", "/etc/app/config.py")`,
-    expectedRuleIds: ["AI-001", "DEP-001"],
+    expectedRuleIds: ["AICS-001", "DEPS-001"],
     category: "ai-code-safety",
     difficulty: "medium",
   },

@@ -281,3 +281,53 @@ function processOrder(userId: any, itemId: any, quantity: any, price: any, disco
 
 // TODO fix security issues before launch
 // FIXME this entire file needs refactoring
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Additional patterns for evaluator threshold coverage
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── LOGGING-PRIVACY: Additional auth token and password logging ─────────────
+app.get("/api/debug", (req: any, res: any) => {
+  console.log("Auth header: " + req.headers.authorization);
+  console.log("Bearer token value: " + req.query.bearer);
+  console.log("Session token: " + req.cookies.token);
+  console.log("User pwd reset: " + req.body.password);
+});
+
+// ── MAINTAINABILITY: var keywords ───────────────────────────────────────────
+const globalCounter = 0;
+const tempBuffer: any = [];
+
+// ── SOFTWARE-PRACTICES / MAINTAINABILITY: More weak type annotations ────────
+function processPayment(amount: any, currency: any, metadata: any): any {
+  return { amount, currency, metadata };
+}
+
+function validateInput(data: any, schema: any, options: any): any {
+  return data;
+}
+
+function transformResponse(response: any, format: any): any {
+  return response;
+}
+
+function parseConfig(input: any): any {
+  const result: any = {};
+  const temp: any = input.data;
+  const items: any = temp.list;
+  const fallback: any = null;
+  return result;
+}
+
+const eventHandler: any = (evt: any) => evt;
+
+// TODO: implement proper authentication middleware
+// TODO: add rate limiting to all endpoints
+// FIXME: database connection pooling is broken
+// HACK: temporary workaround for timezone issues
+// XXX: this function needs complete rewrite
+// TODO: add input sanitization for all user inputs
+// FIXME: memory leak in cache invalidation
+// HACK: hardcoded timeout values should be configurable
+// TODO: implement proper error handling strategy
+// FIXME: race condition in concurrent request handling

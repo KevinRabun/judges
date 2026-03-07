@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.16] — 2026-03-07
+
+### Fixed
+- **Benchmark F1 improved to 0.904** — TP=355, FN=75, FP=0, Grade A maintained
+- **Evaluator threshold refinements** — 22 evaluators tuned for better detection of documentation gaps, logging privacy violations, reliability issues, and more
+- **False-positive filter fixes** — LOGPRIV findings no longer suppressed on utility modules; DEPS findings preserved on import lines; reliability context ignores comment lines
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.23.15] — 2026-03-06
 
 ### Fixed

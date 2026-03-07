@@ -11,7 +11,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
   // Unbounded in-memory cache
   const inMemoryCachePattern = /(?:const|let|var)\s+\w*[Cc]ache\w*\s*[:=]\s*(?:new\s+Map|\{\}|\[\])/gi;
   const inMemoryCacheLines = getLineNumbers(code, inMemoryCachePattern);
-  if (inMemoryCacheLines.length > 0) {
+  if (inMemoryCacheLines.length >= 8) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -36,7 +36,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
     code,
   );
   const iacTemplate = isIaCTemplate(code);
-  if (expensiveOpLines.length > 0 && !hasCaching && !iacTemplate && code.split("\n").length > 15) {
+  if (expensiveOpLines.length >= 3 && !hasCaching && !iacTemplate && code.split("\n").length > 100) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -59,7 +59,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
     code,
     /Cache-Control|ETag|Last-Modified|Expires|max-age|s-maxage|must-revalidate|no-cache|no-store/gi,
   );
-  if (hasHttpResponse && !hasCacheHeaders && code.split("\n").length > 20) {
+  if (hasHttpResponse && !hasCacheHeaders && code.split("\n").length > 50) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -202,7 +202,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
   // No cache warming strategy
   const hasStartup = testCode(code, /listen\s*\(|bootstrap|main\s*\(|init\s*\(/gi);
   const hasCacheWarm = testCode(code, /warm|preheat|preload|seed.*cache|cache.*seed|cache.*warm/gi);
-  if (hasStartup && hasCacheRead && !hasCacheWarm && code.split("\n").length > 50) {
+  if (hasStartup && hasCacheRead && !hasCacheWarm && code.split("\n").length > 100) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "info",

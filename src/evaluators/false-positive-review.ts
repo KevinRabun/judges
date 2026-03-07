@@ -696,7 +696,6 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
       "CLOUD-", // not a cloud service
       "UX-", // no user interface
       "OBS-", // no production observability need
-      "LOGPRIV-", // no user data logging
       "AGENT-", // not an AI agent
       "FW-", // framework rules target app code
       "API-", // not an API service
@@ -750,20 +749,24 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
 
   // ── 5. Import / type-only line ──
   if (finding.lineNumbers && finding.lineNumbers.length > 0) {
-    const allImportsOrTypes = finding.lineNumbers.every((ln) => {
-      const line = lines[ln - 1];
-      if (!line) return false;
-      const trimmed = line.trim();
-      return (
-        /^import\s/.test(trimmed) ||
-        /^from\s/.test(trimmed) ||
-        /^export\s+(?:type|interface|abstract)\s/.test(trimmed) ||
-        /^(?:type|interface)\s+\w+/.test(trimmed) ||
-        /^using\s/.test(trimmed)
-      );
-    });
-    if (allImportsOrTypes) {
-      return "Finding targets import/type declarations — no runtime behavior to evaluate.";
+    // DEPS-* rules specifically target import declarations of deprecated/risky packages —
+    // import lines ARE the finding, so skip this filter for them.
+    if (!finding.ruleId.startsWith("DEPS-")) {
+      const allImportsOrTypes = finding.lineNumbers.every((ln) => {
+        const line = lines[ln - 1];
+        if (!line) return false;
+        const trimmed = line.trim();
+        return (
+          /^import\s/.test(trimmed) ||
+          /^from\s/.test(trimmed) ||
+          /^export\s+(?:type|interface|abstract)\s/.test(trimmed) ||
+          /^(?:type|interface)\s+\w+/.test(trimmed) ||
+          /^using\s/.test(trimmed)
+        );
+      });
+      if (allImportsOrTypes) {
+        return "Finding targets import/type declarations — no runtime behavior to evaluate.";
+      }
     }
   }
 

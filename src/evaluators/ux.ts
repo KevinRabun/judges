@@ -16,7 +16,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
     );
   const inlineHandlerPattern = /\bon[A-Z]\w+\s*=\s*["'`]/gi;
   const inlineHandlerLines = isReactOrJsx ? [] : getLineNumbers(code, inlineHandlerPattern);
-  if (inlineHandlerLines.length > 0) {
+  if (inlineHandlerLines.length > 10) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -42,7 +42,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
     code,
     /loading|isLoading|submitting|isSubmitting|disabled|pending|spinner|skeleton/gi,
   );
-  if (hasForm && !hasLoadingState && code.split("\n").length > 15) {
+  if (hasForm && !hasLoadingState && code.split("\n").length > 50) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -99,7 +99,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
   // Raw JSON/data dump in responses
   const rawJsonDump = /res\.json\s*\(\s*(?:data|results|rows|records|items)\s*\)/gi;
   const rawDumpLines = getLineNumbers(code, rawJsonDump);
-  if (rawDumpLines.length > 0) {
+  if (rawDumpLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "info",
@@ -141,7 +141,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
   const _destructivePattern = /delete|remove|destroy|drop|purge|erase/gi;
   const hasConfirmation = testCode(code, /confirm|modal|dialog|are you sure|confirmation/gi);
   const hasDestructiveEndpoint = testCode(code, /app\.(delete|post)\s*\([^)]*(?:delete|remove|destroy)/gi);
-  if (hasDestructiveEndpoint && !hasConfirmation) {
+  if (hasDestructiveEndpoint && !hasConfirmation && code.split("\n").length > 50) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -190,7 +190,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
     testCode(code, /<[a-z][a-z0-9]*[\s>]/i) || // HTML/JSX tags
     testCode(code, /innerHTML|appendChild|createElement|document\.|window\.|\$\(|v-for|ngFor|template\s*:/i) ||
     testCode(code, /from\s+['"](?:vue|@angular|svelte|lit|preact|solid)/i);
-  if (hasListRendering && hasUIRenderingContext && !hasEmptyCheck && code.split("\n").length > 30) {
+  if (hasListRendering && hasUIRenderingContext && !hasEmptyCheck && code.split("\n").length > 80) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -215,7 +215,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
     /toast|snackbar|notification|alert\s*\(\s*['"].*(?:success|saved|created|updated|deleted)|showMessage|showSuccess|feedback/gi.test(
       code,
     );
-  if (hasMutation && !hasSuccessFeedback && code.split("\n").length > 30) {
+  if (hasMutation && !hasSuccessFeedback && code.split("\n").length > 80) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

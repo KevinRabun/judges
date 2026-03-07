@@ -56,7 +56,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       code,
     );
 
-  if (hardcodedGlobalOrForeignLines.length > 0 && !hasRegionPolicy && !iacTemplate) {
+  if (hardcodedGlobalOrForeignLines.length >= 5 && !hasRegionPolicy && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -100,7 +100,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     /(?:user|customer|patient|email|phone|ssn|passport|payment|credit.?card|personal.?data|\bpii\b|sensitive|address|profile|account|identity|subscriber)/i.test(
       code,
     );
-  if (crossBorderEgressLines.length > 0 && !hasEgressGate && handlesPersonalData) {
+  if (crossBorderEgressLines.length >= 5 && !hasEgressGate && handlesPersonalData) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -336,7 +336,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     /(?:\.(?:save|create|insertOne|insertMany|updateOne|updateMany|deleteOne|deleteMany|bulkWrite|persist|upsert)\s*\(|(?:INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b|cursor\.execute|\.execute\s*\(\s*["'`](?:INSERT|UPDATE|DELETE))/i;
   const hasDbOps = testCode(code, dbOpsPattern);
 
-  if (hasPiiFields && hasDbOps && !hasGeoPartitioning && code.split("\n").length > 20) {
+  if (hasPiiFields && hasDbOps && !hasGeoPartitioning && code.split("\n").length > 80) {
     // Collect line numbers where DB operations with PII occur
     const piiDbLines: number[] = [];
     const codeLines = code.split("\n");
@@ -535,7 +535,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       code,
     );
 
-  if (externalCallLines.length > 2 && !hasResiliencePattern && code.split("\n").length > 20) {
+  if (externalCallLines.length >= 5 && !hasResiliencePattern && code.split("\n").length > 80) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -585,7 +585,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       code,
     );
 
-  if (adminOpLines.length > 0 && !hasAuditPattern && code.split("\n").length > 15) {
+  if (adminOpLines.length >= 2 && !hasAuditPattern && code.split("\n").length > 80) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

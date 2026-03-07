@@ -48,7 +48,7 @@ export function analyzeCodeStructure(code: string, language: string): Finding[] 
 
   // ─── STRUCT-002: Deep nesting (>4 levels, AST-detected) ──────────────────
   const deeplyNestedFunctions = structure.functions.filter((f) => f.maxNestingDepth > 4);
-  if (structure.deepNestLines.length > 0 || deeplyNestedFunctions.length > 0) {
+  if (structure.deepNestLines.length >= 8 || deeplyNestedFunctions.length >= 4) {
     const lineNumbers = [
       ...new Set([...structure.deepNestLines, ...deeplyNestedFunctions.map((f) => f.startLine)]),
     ].sort((a, b) => a - b);
@@ -134,7 +134,7 @@ export function analyzeCodeStructure(code: string, language: string): Finding[] 
   }
 
   // ─── STRUCT-006: Weak / dynamic type usage (AST-detected) ────────────────
-  if (structure.typeAnyLines.length > 0) {
+  if (structure.typeAnyLines.length >= 8) {
     findings.push({
       ruleId: `${prefix}-006`,
       severity: "medium",

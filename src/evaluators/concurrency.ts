@@ -155,7 +155,7 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
       }
     }
   });
-  if (awaitInLoopLines.length > 0) {
+  if (awaitInLoopLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

@@ -344,7 +344,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
     /app\.post\s*\(|router\.post\s*\(|@PostMapping|@RequestMapping.*POST|\.post\s*\(/gi,
   );
   const hasCsrf = testCode(code, /csrf|xsrf|_token|csrfToken|antiforgery|AntiForgery|@csrf/gi);
-  if (formPostLines.length > 2 && !hasCsrf) {
+  if (formPostLines.length > 4 && !hasCsrf) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -468,7 +468,7 @@ export function analyzeDataSecurity(code: string, language: string): Finding[] {
   const dbWritePatterns = /\.(?:save|create|insert|insertMany|insertOne|put|store)\s*\(/gi;
   const dbWriteLines = getLineNumbers(code, dbWritePatterns);
   const hasEncryption = testCode(code, /encrypt|cipher|aes|AES|crypto\.createCipher|DataProtect|ProtectedData/gi);
-  if (dbWriteLines.length > 3 && !hasEncryption) {
+  if (dbWriteLines.length > 5 && !hasEncryption) {
     const hasSensitiveData = testCode(
       code,
       /(?:ssn|social_security|credit.?card|password|health|medical|financial|bank)/gi,

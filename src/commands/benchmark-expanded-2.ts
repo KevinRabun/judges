@@ -5364,7 +5364,7 @@ async def dashboard():
     "request": "2.79.0"
   }
 }`,
-    expectedRuleIds: ["DEP-001"],
+    expectedRuleIds: ["DEPS-001"],
     category: "dependencies",
     difficulty: "easy",
   },

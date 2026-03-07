@@ -37,7 +37,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
       globalStateLines.push(lineNum);
     }
   }
-  if (globalStateLines.length > 0) {
+  if (globalStateLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -58,7 +58,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   const inMemPattern =
     /(?:Map|Set|WeakMap|Object\.create)\s*\(\s*\)|sessions?\s*[:=].*\{\}|(?:store|cache|registry)\s*=\s*(?:new\s+Map|\{\}|\[\])|MemoryStore|express-session\s*\(\s*\)/gi;
   const inMemLines = getLineNumbers(code, inMemPattern);
-  if (inMemLines.length > 0 && !analysisCode) {
+  if (inMemLines.length >= 4 && !analysisCode) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -149,7 +149,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
   // No rate limiting detected
   const hasRateLimit = testCode(code, /rate.?limit|throttle|limiter|RateLimit/gi);
   const iacTemplate = isIaCTemplate(code);
-  if (!hasRateLimit && fetchLines.length > 0 && !iacTemplate) {
+  if (!hasRateLimit && fetchLines.length > 5 && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "info",
@@ -232,7 +232,7 @@ export function analyzeScalability(code: string, language: string): Finding[] {
     code,
     /circuit.?breaker|opossum|cockatiel|polly|resilience4j|hystrix|CircuitBreaker/gi,
   );
-  const hasMultipleExternalCalls = fetchLines.length > 2;
+  const hasMultipleExternalCalls = fetchLines.length > 4;
   if (hasMultipleExternalCalls && !hasCircuitBreaker && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

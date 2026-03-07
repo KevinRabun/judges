@@ -239,7 +239,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
           bodyParserNoLimitLines.push(i + 1);
         }
       }
-      if (bodyParserNoLimitLines.length > 0) {
+      if (bodyParserNoLimitLines.length >= 2) {
         findings.push({
           ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
           severity: "medium",
@@ -279,7 +279,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
       // Missing helmet() or security headers middleware
       const hasHelmet = testCode(code, /helmet\s*\(|require\s*\(\s*["']helmet["']\)|from\s+["']helmet["']/i);
       const hasRoutes = testCode(code, /app\.(?:get|post|put|patch|delete)\s*\(\s*["']/i);
-      if (!hasHelmet && hasRoutes) {
+      if (!hasHelmet && hasRoutes && lines.length > 50) {
         findings.push({
           ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
           severity: "medium",
@@ -299,7 +299,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
       const hasTrustProxy = testCode(code, /app\.set\s*\(\s*["']trust proxy["']|trustProxy|trust_proxy/i);
       const hasRateLimit = testCode(code, /rateLimit|rate-limit|express-rate-limit/i);
       const hasProxy = testCode(code, /nginx|reverse.?proxy|load.?balanc|X-Forwarded/i);
-      if (!hasTrustProxy && (hasRateLimit || hasProxy)) {
+      if (!hasTrustProxy && (hasRateLimit || hasProxy) && lines.length > 80) {
         findings.push({
           ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
           severity: "medium",
@@ -437,7 +437,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
         inlineHandlerLines.push(i + 1);
       }
     }
-    if (inlineHandlerLines.length > 3) {
+    if (inlineHandlerLines.length > 6) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "low",
@@ -829,7 +829,7 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
           requestMappingNoMethodLines.push(i + 1);
         }
       }
-      if (requestMappingNoMethodLines.length > 0) {
+      if (requestMappingNoMethodLines.length >= 2) {
         findings.push({
           ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
           severity: "medium",

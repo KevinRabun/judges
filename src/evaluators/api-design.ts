@@ -17,7 +17,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       verbInUrlLines.push(i + 1);
     }
   });
-  if (verbInUrlLines.length > 0) {
+  if (verbInUrlLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -101,7 +101,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       }
     }
   });
-  if (listEndpointLines.length > 0) {
+  if (listEndpointLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -120,7 +120,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
   // Detect missing API versioning (multi-language route detection)
   const routeRegLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
   const hasVersioning = /\/v\d+\//i.test(code) || testCode(code, /api-version|x-api-version/i);
-  if (routeRegLines.length > 2 && !hasVersioning) {
+  if (routeRegLines.length > 4 && !hasVersioning) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -226,7 +226,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
     /rate.?limit|throttle|express-rate-limit|rateLimit|slowDown|@RateLimiter|Bucket4j|x-ratelimit|golang\.org\/x\/time\/rate/i.test(
       code,
     );
-  if (hasRoutes2 && !hasRateLimit && routeRegLines.length > 3) {
+  if (hasRoutes2 && !hasRateLimit && routeRegLines.length > 5) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -264,7 +264,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
 
   // Missing CORS configuration
   const hasCors = testCode(code, /cors|Access-Control-Allow-Origin|allowedOrigins/i);
-  if (hasRoutes2 && !hasCors && routeRegLines.length > 2) {
+  if (hasRoutes2 && !hasCors && routeRegLines.length > 4) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -283,7 +283,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
 
   // Missing request ID in responses
   const hasRequestId = testCode(code, /x-request-id|requestId|correlationId|traceId/i);
-  if (hasRoutes2 && !hasRequestId && routeRegLines.length > 3) {
+  if (hasRoutes2 && !hasRequestId && routeRegLines.length > 5) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "low",

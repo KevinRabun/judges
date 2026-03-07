@@ -15,7 +15,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
     );
   const routeLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
   const hasServerCode = routeLines.length > 0 || testCode(code, /createServer|express\(\)|new\s+Hono/gi);
-  if (hasServerCode && !hasRateLimit && code.split("\n").length > 20) {
+  if (hasServerCode && !hasRateLimit && code.split("\n").length > 80) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -98,7 +98,7 @@ export function analyzeRateLimiting(code: string, language: string): Finding[] {
     /backoff|retry|exponential|setTimeout.*retry|p-retry|cockatiel|polly|tenacity|retrying|Polly\.Handle|@Retry/gi.test(
       code,
     );
-  if (externalCallLines.length > 0 && !hasBackoff) {
+  if (externalCallLines.length >= 3 && !hasBackoff) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

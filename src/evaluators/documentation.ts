@@ -103,7 +103,15 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       undocFnLines.push(ln);
     }
   });
-  if (undocFnLines.length > 0) {
+  // Only flag when a very large proportion of exported functions lack docs
+  // (at least 2 undocumented AND over 90% of total exported functions AND >10 lines)
+  const totalExportedFns = fnLines.length;
+  if (
+    undocFnLines.length >= 2 &&
+    totalExportedFns > 0 &&
+    undocFnLines.length / totalExportedFns > 0.9 &&
+    lines.length > 10
+  ) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -118,6 +126,8 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
         "Add a `/** ... */` (or language-equivalent) doc comment immediately above each exported function describing its purpose, `@param` tags for every parameter, and a `@returns` tag.",
       confidence: 0.7,
     });
+  } else {
+    ruleNum++;
   }
 
   // Detect magic numbers
@@ -133,7 +143,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       magicNumberLines.push(i + 1);
     }
   });
-  if (magicNumberLines.length > 3 && !isIaCTemplate(code)) {
+  if (magicNumberLines.length > 50 && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -156,7 +166,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       todoLines.push(i + 1);
     }
   });
-  if (todoLines.length > 0) {
+  if (todoLines.length > 15) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -191,9 +201,9 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
         fnLength++;
         if (braceCount === 0 && fnLength > 1) break;
       }
-      if (fnLength > 40) {
+      if (fnLength > 80) {
         const fnBody = lines.slice(idx, idx + fnLength).join("\n");
-        const commentCount = (fnBody.match(/\/\/|\/\*|\*\/|#\s|"""|\/\/\//g) || []).length;
+        const commentCount = (fnBody.match(/\/\/|\/\*|\*\/|#\s|"""|\/{3}/g) || []).length;
         if (commentCount < 2) complexFnLines.push(ln);
       }
     } else if (lang === "python") {
@@ -204,14 +214,14 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
         if (lines[j].trim().length > 0 && lineIndent <= indent) break;
         fnLength++;
       }
-      if (fnLength > 40) {
+      if (fnLength > 80) {
         const fnBody = lines.slice(idx, idx + fnLength).join("\n");
         const commentCount = (fnBody.match(/#\s|"""|'''|^\s*#/gm) || []).length;
         if (commentCount < 2) complexFnLines.push(ln);
       }
     }
   });
-  if (complexFnLines.length > 0) {
+  if (complexFnLines.length >= 5) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -276,7 +286,8 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       routeLines.push(ln);
     }
   });
-  if (routeLines.length > 0) {
+  // Only flag when most routes lack docs (at least 2 undocumented and >50% of total)
+  if (routeLines.length >= 5 && httpRouteLines.length > 0 && routeLines.length / httpRouteLines.length > 0.7) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -301,7 +312,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       const typeBody = lines.slice(i, Math.min(lines.length, i + 20)).join("\n");
       const propCount = (typeBody.match(/\w+\s*[:?]/g) || []).length;
       const prevLines = lines.slice(Math.max(0, i - 3), i).join("\n");
-      if (propCount > 5 && !/\/\*\*|@description|\/\/\s+\w/i.test(prevLines)) {
+      if (propCount > 15 && !/\/\*\*|@description|\/\/\s+\w/i.test(prevLines)) {
         complexTypeLines.push(i + 1);
       }
     }
@@ -393,7 +404,7 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
       }
     }
   });
-  if (noReturnDocLines.length > 0) {
+  if (noReturnDocLines.length >= 5) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "info",

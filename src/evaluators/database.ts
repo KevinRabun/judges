@@ -54,7 +54,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   // SELECT * usage
   const selectStarPattern = /SELECT\s+\*/gi;
   const selectStarLines = getLineNumbers(code, selectStarPattern);
-  if (selectStarLines.length > 0) {
+  if (selectStarLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -135,7 +135,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       code,
     );
   const hasPooling = testCode(code, /pool|Pool|connectionPool|poolSize|max_connections|maxPoolSize|connectionLimit/gi);
-  if (hasDbConnection && !hasPooling) {
+  if (hasDbConnection && !hasPooling && code.split("\n").length > 50) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -154,7 +154,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   // Raw SQL queries (no ORM/query builder)
   const rawSqlPattern = /(?:execute|query)\s*\(\s*["'`]\s*(?:SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)\b/gi;
   const rawSqlLines = getLineNumbers(code, rawSqlPattern);
-  if (rawSqlLines.length > 2) {
+  if (rawSqlLines.length > 3) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -186,8 +186,8 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   const hasTransactions = testCode(code, /transaction|BEGIN|COMMIT|ROLLBACK|startTransaction|withTransaction/gi);
   // Count distinct mutation SQL statements — single-statement CRUD repos don't need explicit transactions
   const mutationCount = (code.match(/\b(?:INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b/gi) || []).length;
-  const hasManyMutations = mutationCount >= 2;
-  if (hasMutations && hasManyMutations && !hasTransactions && hasDbSignals && code.split("\n").length > 30) {
+  const hasManyMutations = mutationCount >= 4;
+  if (hasMutations && hasManyMutations && !hasTransactions && hasDbSignals && code.split("\n").length > 50) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -248,7 +248,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
       code,
     );
   const hasSchemaChanges = testCode(code, /CREATE\s+TABLE|ALTER\s+TABLE|ADD\s+COLUMN|DROP\s+COLUMN/gi);
-  if (hasSchemaChanges && !hasMigrations) {
+  if (hasSchemaChanges && !hasMigrations && code.split("\n").length > 50) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -267,7 +267,7 @@ export function analyzeDatabase(code: string, language: string): Finding[] {
   // Missing database indexes heuristic
   const hasWhereClause = testCode(code, /WHERE\s+\w+\s*(?:=|IN\s*\(|LIKE|>|<|BETWEEN)/gi);
   const hasIndexHint = testCode(code, /CREATE\s+INDEX|ADD\s+INDEX|ensureIndex|createIndex|\.index\s*\(/gi);
-  if (hasWhereClause && !hasIndexHint && rawSqlLines.length > 2) {
+  if (hasWhereClause && !hasIndexHint && rawSqlLines.length > 3) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

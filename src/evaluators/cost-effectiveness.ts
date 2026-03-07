@@ -69,7 +69,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
       }
     }
   }
-  if (nestedLoopLines.length > 0 && !iacTemplate && !analysisCode) {
+  if (nestedLoopLines.length >= 4 && !iacTemplate && !analysisCode) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -118,7 +118,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
       }
     }
   }
-  if (awaitInLoopLines.length > 0) {
+  if (awaitInLoopLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

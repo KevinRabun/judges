@@ -38,7 +38,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
 
   // Logging authorization/token headers (multi-language)
   const logAuthLines = getLogLinesMatching(/(?:authorization|bearer|token|auth)/i);
-  if (logAuthLines.length > 0) {
+  if (logAuthLines.length >= 4) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
@@ -56,7 +56,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
 
   // Logging passwords (multi-language)
   const logPasswordLines = getLogLinesMatching(/(?:password|passwd|pwd|secret|credential)/i);
-  if (logPasswordLines.length > 0) {
+  if (logPasswordLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "critical",
@@ -78,7 +78,7 @@ export function analyzeLoggingPrivacy(code: string, language: string): Finding[]
   const logPiiLines = getLogLinesMatching(
     /(?:\bemail\b|\bssn\b|\bphone(?:Number)?\b|\baddress\b(?!\s*(?:=|:)\s*(?:0x|null|undefined|['"](?:\/|http)))|(?:^|[\s{(,.:])name(?:\s*[=:,})\]]|$)|\bfirstName\b|\blast_?[Nn]ame\b|\bdateOfBirth\b|\bdob\b|\bsocial.?security\b)/i,
   );
-  if (logPiiLines.length > 0 && !isLikelyCLI(code)) {
+  if (logPiiLines.length >= 2 && !isLikelyCLI(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

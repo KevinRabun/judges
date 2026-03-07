@@ -10,7 +10,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
 
   // Weak / unsafe type usage (any, object, dynamic, interface{}, unsafe)
   const anyLines = getLangLineNumbers(code, language, LP.WEAK_TYPE);
-  if (anyLines.length > 0) {
+  if (anyLines.length >= 10) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -51,7 +51,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       magicLines.push(i + 1);
     }
   }
-  if (magicLines.length > 0) {
+  if (magicLines.length >= 10) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -84,7 +84,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       decimalMagicLines.push(i + 1);
     }
   }
-  if (decimalMagicLines.length > 0) {
+  if (decimalMagicLines.length >= 3) {
     // Merge with existing magic number finding or create new one
     if (magicLines.length > 0) {
       // Already reported magic numbers — add decimal lines to existing finding
@@ -115,7 +115,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
 
   // TODO / FIXME / HACK / XXX comments (multi-language comment styles)
   const todoLines = getLangLineNumbers(code, language, LP.TODO_FIXME, { skipComments: false });
-  if (todoLines.length > 0) {
+  if (todoLines.length >= 8) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -160,7 +160,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   const funcDefLines = getLangLineNumbers(code, language, LP.FUNCTION_DEF);
   const funcCount = funcDefLines.length;
   const totalLines = lines.length;
-  if (funcCount > 0 && totalLines / funcCount > 60) {
+  if (funcCount > 0 && totalLines / funcCount > 150) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -187,7 +187,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       }
     }
   }
-  if (deepNestLines.length > 0) {
+  if (deepNestLines.length >= 15) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -207,7 +207,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   const commentedCodePattern =
     /\/\/\s*(?:const|let|var|function|class|import|export|if|for|while|return|app\.|router\.)\s/g;
   const commentedCodeLines = getLineNumbers(code, commentedCodePattern, { skipComments: false });
-  if (commentedCodeLines.length > 2) {
+  if (commentedCodeLines.length > 10) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -226,7 +226,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   // IaC templates (Bicep/Terraform/ARM) typically define multiple resources,
   // parameters, and outputs in a single file — 500+ lines is common and
   // expected.  Use a higher threshold to avoid false positives.
-  const fileLengthLimit = isIaCTemplate(code) ? 600 : 300;
+  const fileLengthLimit = isIaCTemplate(code) ? 600 : 800;
   if (totalLines > fileLengthLimit) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -294,7 +294,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       singleLetterLines.push(i + 1);
     }
   }
-  if (singleLetterLines.length > 2) {
+  if (singleLetterLines.length > 10) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -338,7 +338,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       }
     }
   }
-  if (unusedImportLines.length > 0) {
+  if (unusedImportLines.length >= 5) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "info",
@@ -372,7 +372,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
       stringLiterals[val] = (stringLiterals[val] || 0) + 1;
     }
     const duplicateStrings = Object.entries(stringLiterals).filter(([, count]) => count >= 3);
-    if (duplicateStrings.length > 0) {
+    if (duplicateStrings.length >= 3) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "low",

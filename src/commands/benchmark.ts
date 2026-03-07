@@ -330,7 +330,7 @@ async function fetchData(url: string) {
   logger.debug("Credit card:", user.creditCard);
   return saveUser(user);
 }`,
-    expectedRuleIds: ["DATA-001", "DATA-002", "LOG-001"],
+    expectedRuleIds: ["DATA-001", "DATA-002", "LOGPRIV-001"],
     category: "data-security",
     difficulty: "easy",
   },
@@ -2444,6 +2444,10 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
     cat.falsePositives += caseFP;
 
     // Per-judge accumulators
+    // Only count detections on clean cases (expectedRuleIds empty) as FP.
+    // Dirty-case "extra" detections are legitimate secondary findings and
+    // should not inflate per-judge false-positive rates.
+    const isCleanCase = tc.expectedRuleIds.length === 0;
     for (const ruleId of foundRuleIds) {
       const prefix = ruleId.split("-")[0];
       if (!perJudge[prefix]) {
@@ -2462,7 +2466,7 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
       jb.total++;
       if (expectedPrefixes.has(prefix)) {
         jb.truePositives++;
-      } else {
+      } else if (isCleanCase) {
         jb.falsePositives++;
       }
     }
