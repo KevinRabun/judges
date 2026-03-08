@@ -18,7 +18,14 @@ export function analyzeObservability(code: string, language: string): Finding[] 
     /app\.(get|post|put|delete|use)|router\.(get|post)|@app\.route|@GetMapping|@PostMapping|http\.HandleFunc/i.test(
       code,
     );
-  if (hasHttpRoutes && !hasAnyLogging && !isLikelyCLI(code) && lines.length > 5) {
+  // Count actual route handler definitions (excluding middleware like app.use)
+  // to avoid flagging minimal code snippets with only one endpoint
+  const routeDefinitionCount = (
+    code.match(
+      /app\.(get|post|put|delete|patch)\s*\(|router\.(get|post|put|delete|patch)\s*\(|@app\.(get|post|put|delete|patch|route)\s*\(|@router\.(get|post|put|delete|patch)\s*\(|@(?:Get|Post|Put|Delete|Patch)Mapping\b|@RequestMapping\b|http\.HandleFunc/gi,
+    ) || []
+  ).length;
+  if (hasHttpRoutes && !hasAnyLogging && !isLikelyCLI(code) && lines.length > 5 && routeDefinitionCount >= 2) {
     // Find the route handler lines to use as evidence
     const routeHandlerLines = getLineNumbers(
       code,

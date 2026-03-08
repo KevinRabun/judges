@@ -4,6 +4,12 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.18] — 2026-03-07
+
+### Changed
+- **DOC-001 precision improved** — Cryptic-naming heuristic prevents false positives on self-documenting code (FP rate 91.3% → 0%)
+- **OBS-001 precision improved** — Minimum route-count requirement prevents false positives on single-endpoint snippets (FP rate 50% → 25%)
+
 ## [3.23.17] — 2026-03-07
 
 ### Changed

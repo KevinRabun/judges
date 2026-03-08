@@ -3922,8 +3922,9 @@ describe("Documentation Judge Dedicated Tests", () => {
     assert.ok(judge, "documentation judge should exist");
 
     const noDocCode = `
-export function calculateTax(amount: number, rate: number): number {
-  return amount * rate;
+export function calculateTax(a: number, b: string, c: boolean): number {
+  const rates: Record<string, number> = { US: 0.08, UK: 0.20 };
+  return c ? a * (rates[b] || 0.15) * 0.5 : a * (rates[b] || 0.15);
 }
 
 export function formatCurrency(value: number): string {
@@ -10864,10 +10865,10 @@ def get_articles(
 
   it("should still flag functions without any docstring", () => {
     const pyCode = `
-def process_data(data):
-    for item in data:
+def process_data(d, m):
+    for item in d:
         item.clean()
-    return data
+    return d
 
 def validate_input(value):
     if not value:

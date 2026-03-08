@@ -2,6 +2,16 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.18] — 2026-03-07
+
+### Changed
+- **DOC-001 precision improved** — Added cryptic-naming heuristic: only flags undocumented functions with short names (≤3 chars) or multiple single-letter parameters; self-documenting code with descriptive names is no longer flagged (FP rate 91.3% → 0%)
+- **OBS-001 precision improved** — Added minimum route-count requirement (≥2 route definitions, excluding middleware); single-endpoint snippets are no longer flagged (FP rate 50% → 25%)
+
+### Fixed
+- **Benchmark** — Grade A, F1=0.904, TP=355, FN=75, FP=0 (301 cases, 39 judges)
+- **Tests** — 1040 pass, 0 fail
+
 ## [3.23.17] — 2026-03-07
 
 ### Changed

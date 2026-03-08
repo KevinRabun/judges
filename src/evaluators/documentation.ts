@@ -105,12 +105,29 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
   });
   // Only flag when a very large proportion of exported functions lack docs
   // (at least 2 undocumented AND over 90% of total exported functions AND >10 lines)
+  // AND at least one function exhibits cryptic naming (very short name or
+  // single-letter parameters). Self-documenting code with descriptive multi-word
+  // names and well-named parameters does not necessarily need JSDoc/docstrings.
   const totalExportedFns = fnLines.length;
+  const hasCrypticNaming = undocFnLines.some((ln) => {
+    const fnLine = lines[ln - 1] || "";
+    // Very short function name (≤3 chars, e.g. calc, fmt, p, fn)
+    const nameMatch = fnLine.match(/(?:function\s+|def\s+|func\s+(?:\([^)]*\)\s+)?)([a-zA-Z_$][\w$]*)\s*[(<]/);
+    if (nameMatch && nameMatch[1].length <= 3) return true;
+    // ≥2 single-letter parameters (e.g. (a: number, b: string))
+    const parenContent = fnLine.match(/\(([^)]*)\)/)?.[1];
+    if (parenContent) {
+      const singleLetterParams = parenContent.match(/\b[a-zA-Z]\b/g) || [];
+      if (singleLetterParams.length >= 2) return true;
+    }
+    return false;
+  });
   if (
     undocFnLines.length >= 2 &&
     totalExportedFns > 0 &&
     undocFnLines.length / totalExportedFns > 0.9 &&
-    lines.length > 10
+    lines.length > 10 &&
+    hasCrypticNaming
   ) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
