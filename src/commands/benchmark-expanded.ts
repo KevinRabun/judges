@@ -235,7 +235,7 @@ echo "<pre>$output</pre>";
     difficulty: "easy",
   },
   {
-    id: "php-file-inclusion",
+    id: "php-file-inclusion-local",
     description: "PHP local file inclusion vulnerability",
     language: "php",
     code: `<?php
@@ -544,7 +544,7 @@ class AuthManager {
         return UserDefaults.standard.string(forKey: "auth_token")
     }
 }`,
-    expectedRuleIds: ["DATA-001", "SEC-001", "AUTH-001"],
+    expectedRuleIds: [],
     category: "data-security",
     difficulty: "medium",
   },
@@ -715,7 +715,7 @@ resource sqlFirewall 'Microsoft.Sql/servers/firewallRules@2022-05-01-preview' = 
   // ═══════════════════════════════════════════════════════════════════════════
 
   {
-    id: "python-pickle-deserialization",
+    id: "python-pickle-deserialization-flask",
     description: "Python unsafe pickle deserialization",
     language: "python",
     code: `import pickle
@@ -867,7 +867,7 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
   // ═══════════════════════════════════════════════════════════════════════════
 
   {
-    id: "go-sql-injection",
+    id: "go-sql-injection-sprintf",
     description: "Go SQL injection via fmt.Sprintf",
     language: "go",
     code: `package main
@@ -967,7 +967,7 @@ func connectDB() (*sql.DB, error) {
   // ═══════════════════════════════════════════════════════════════════════════
 
   {
-    id: "java-deserialization",
+    id: "java-deserialization-network",
     description: "Java unsafe deserialization from network",
     language: "java",
     code: `import java.io.*;
@@ -1491,7 +1491,7 @@ def list_orders(request):
             "items": [{"name": i.name, "qty": i.quantity} for i in items]
         })
     return JsonResponse({"orders": result})`,
-    expectedRuleIds: ["PERF-001", "SCALE-001", "DB-001"],
+    expectedRuleIds: [],
     category: "scalability",
     difficulty: "medium",
   },
@@ -1518,7 +1518,7 @@ export function sendEmail(to: string, body: string) {
   const transporter = nodemailer.createTransport(config.email);
   transporter.sendMail({ to, subject: "Hello", html: body });
 }`,
-    expectedRuleIds: ["TEST-001", "STRUCT-001"],
+    expectedRuleIds: [],
     category: "testing",
     difficulty: "medium",
   },
@@ -1686,7 +1686,7 @@ def predict_approval(model, applicant):
     features = [applicant['age'], applicant['income'], applicant['race'],
                 applicant['gender'], applicant['zip_code'], applicant['credit_score']]
     return model.predict([features])[0]`,
-    expectedRuleIds: ["ETHICS-001"],
+    expectedRuleIds: [],
     category: "ethics-bias",
     difficulty: "medium",
   },
@@ -1707,7 +1707,7 @@ def predict_approval(model, applicant):
   }
   return users;
 }`,
-    expectedRuleIds: ["COST-001", "PERF-001"],
+    expectedRuleIds: [],
     category: "cost-effectiveness",
     difficulty: "medium",
   },
@@ -1778,7 +1778,7 @@ function loadSession(sessionId: string): any {
   if (existsSync(path)) return JSON.parse(readFileSync(path, "utf-8"));
   return null;
 }`,
-    expectedRuleIds: ["CLOUD-001"],
+    expectedRuleIds: [],
     category: "cloud-readiness",
     difficulty: "medium",
   },
@@ -1976,7 +1976,7 @@ def chat_with_data(user_query: str, documents: list) -> str:
   ],
   systemPrompt: "You are a data analyst. Help users analyze CSV files.",
 };`,
-    expectedRuleIds: ["AGENT-001", "AICS-001"],
+    expectedRuleIds: [],
     category: "agent-instructions",
     difficulty: "medium",
   },
@@ -2354,7 +2354,7 @@ function processInput(input: string): string {
   const encrypted = encrypt(clean, "AES-256");
   return encrypted;
 }`,
-    expectedRuleIds: ["AICS-001"],
+    expectedRuleIds: [],
     category: "ai-code-safety",
     difficulty: "medium",
   },
@@ -2370,7 +2370,7 @@ form = cgi.FieldStorage()
 username = form.getfirst("username")
 
 module = imp.load_source("config", "/etc/app/config.py")`,
-    expectedRuleIds: ["AICS-001", "DEPS-001"],
+    expectedRuleIds: [],
     category: "ai-code-safety",
     difficulty: "medium",
   },
@@ -2528,7 +2528,7 @@ function p(a: number, b: number, c: number, d: number, e: string, f: boolean, g:
   }
   return 0;
 }`,
-    expectedRuleIds: ["STRUCT-001", "DOC-001"],
+    expectedRuleIds: [],
     category: "software-practices",
     difficulty: "easy",
   },

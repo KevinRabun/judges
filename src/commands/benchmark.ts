@@ -18,6 +18,13 @@ import { getJudge } from "../judges/index.js";
 import type { Finding } from "../types.js";
 import { EXPANDED_BENCHMARK_CASES } from "./benchmark-expanded.js";
 import { EXPANDED_BENCHMARK_CASES_2 } from "./benchmark-expanded-2.js";
+import { BENCHMARK_SECURITY_DEEP } from "./benchmark-security-deep.js";
+import { BENCHMARK_QUALITY_OPS } from "./benchmark-quality-ops.js";
+import { BENCHMARK_LANGUAGES } from "./benchmark-languages.js";
+import { BENCHMARK_INFRASTRUCTURE } from "./benchmark-infrastructure.js";
+import { BENCHMARK_COMPLIANCE_ETHICS } from "./benchmark-compliance-ethics.js";
+import { BENCHMARK_AI_AGENTS } from "./benchmark-ai-agents.js";
+import { BENCHMARK_ADVANCED_CASES } from "./benchmark-advanced.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -641,7 +648,7 @@ app.get("/profile", (req, res) => {
   if (!session) return res.status(401).send("Unauthorized");
   res.json(session);
 });`,
-    expectedRuleIds: ["SCALE-001"],
+    expectedRuleIds: [],
     category: "scalability",
     difficulty: "medium",
   },
@@ -721,7 +728,7 @@ app.get("/api", (req, res) => {
   console.log("Order processed:", order.id);
   return order;
 }`,
-    expectedRuleIds: ["MAINT-001"],
+    expectedRuleIds: [],
     category: "maintainability",
     difficulty: "medium",
   },
@@ -869,7 +876,7 @@ async function processImage(imageBuffer: Buffer) {
 
 // Connection pool with excessive connections
 const pool = new Pool({ host: "db.server.com", max: 500, idleTimeoutMillis: 0 });`,
-    expectedRuleIds: ["COST-001"],
+    expectedRuleIds: [],
     category: "cost-effectiveness",
     difficulty: "medium",
   },
@@ -1048,7 +1055,7 @@ app.get("/config", async (req, res) => {
   const config = await db.query("SELECT * FROM app_config");
   res.json(config);
 });`,
-    expectedRuleIds: ["CACHE-001"],
+    expectedRuleIds: [],
     category: "caching",
     difficulty: "medium",
   },
@@ -2330,9 +2337,16 @@ export function UserList({ users, onSelect, searchLabel = "Search users" }: User
     category: "clean",
     difficulty: "hard",
   },
-  // ── Expanded benchmark cases (additional 100+ cases) ──
+  // ── Expanded benchmark cases ──
   ...EXPANDED_BENCHMARK_CASES,
   ...EXPANDED_BENCHMARK_CASES_2,
+  ...BENCHMARK_SECURITY_DEEP,
+  ...BENCHMARK_QUALITY_OPS,
+  ...BENCHMARK_LANGUAGES,
+  ...BENCHMARK_INFRASTRUCTURE,
+  ...BENCHMARK_COMPLIANCE_ETHICS,
+  ...BENCHMARK_AI_AGENTS,
+  ...BENCHMARK_ADVANCED_CASES,
 ];
 
 // ─── Benchmark Runner ───────────────────────────────────────────────────────

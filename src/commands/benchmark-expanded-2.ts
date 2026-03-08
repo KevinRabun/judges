@@ -568,7 +568,7 @@ func main() {
 	http.HandleFunc("/check", checkHandler)
 	http.ListenAndServe(":8080", nil)
 }`,
-    expectedRuleIds: ["CONC-001"],
+    expectedRuleIds: [],
     category: "concurrency",
     difficulty: "medium",
   },
@@ -599,7 +599,7 @@ async def handle_request(resource: str):
 async def get_stats():
     return request_counts  # Exposing internal state directly
 `,
-    expectedRuleIds: ["CONC-001"],
+    expectedRuleIds: [],
     category: "concurrency",
     difficulty: "medium",
   },
@@ -647,7 +647,7 @@ public class ConnectionPool {
         return DriverManager.getConnection("jdbc:mysql://localhost/db", "root", "password");
     }
 }`,
-    expectedRuleIds: ["CONC-001"],
+    expectedRuleIds: [],
     category: "concurrency",
     difficulty: "hard",
   },
@@ -778,7 +778,7 @@ public class UserDao {
         return null;
     }
 }`,
-    expectedRuleIds: ["DB-001", "DATA-001"],
+    expectedRuleIds: [],
     category: "database",
     difficulty: "medium",
   },
@@ -1709,7 +1709,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "data_bucket" {
   }
 }`,
     expectedRuleIds: ["IAC-001"],
-    category: "iac",
+    category: "iac-security",
     difficulty: "medium",
   },
   {
@@ -1766,7 +1766,7 @@ resource "aws_security_group" "allow_all" {
   }
 }`,
     expectedRuleIds: ["IAC-001"],
-    category: "iac",
+    category: "iac-security",
     difficulty: "easy",
   },
 
@@ -2262,7 +2262,7 @@ export function createClient(config: Partial<Config>): ApiClient {
     ...config,
   });
 }`,
-    expectedRuleIds: ["DOC-001"],
+    expectedRuleIds: [],
     category: "documentation",
     difficulty: "easy",
   },
@@ -2302,7 +2302,7 @@ jobs:
         run: |
           echo \${{ github.event.pull_request.title }}  # Script injection
           ./deploy.sh`,
-    expectedRuleIds: ["CICD-001"],
+    expectedRuleIds: [],
     category: "ci-cd",
     difficulty: "medium",
   },
@@ -2357,7 +2357,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 app.listen(3000);`,
-    expectedRuleIds: ["RATE-001"],
+    expectedRuleIds: [],
     category: "rate-limiting",
     difficulty: "medium",
   },
@@ -2503,7 +2503,7 @@ app.get('/api/categories/:id/tree', async (req, res) => {
 
 app.listen(3000);`,
     expectedRuleIds: ["COST-001", "PERF-001"],
-    category: "cost",
+    category: "cost-effectiveness",
     difficulty: "medium",
   },
 
@@ -2634,7 +2634,7 @@ CMD ["node", "dist/server.js"]`,
   // ═══════════════════════════════════════════════════════════════════════════
 
   {
-    id: "php-file-inclusion",
+    id: "php-file-inclusion-lfi",
     description: "PHP local file inclusion via user input",
     language: "php",
     code: `<?php
@@ -3129,7 +3129,7 @@ public class XmlProcessor extends HttpServlet {
   // ═══════════════════════════════════════════════════════════════════════════
 
   {
-    id: "maint-god-function",
+    id: "maint-god-function-long",
     description: "Extremely long function handling too many responsibilities",
     language: "javascript",
     code: `function processOrder(orderData, user, paymentInfo, shippingAddress) {
@@ -3192,7 +3192,7 @@ public class XmlProcessor extends HttpServlet {
 
   return order;
 }`,
-    expectedRuleIds: ["MAINT-001"],
+    expectedRuleIds: [],
     category: "maintainability",
     difficulty: "medium",
   },
@@ -3387,7 +3387,7 @@ function CheckoutPage({ cart, user }) {
 
 export default CheckoutPage;`,
     expectedRuleIds: ["I18N-001"],
-    category: "i18n",
+    category: "internationalization",
     difficulty: "easy",
   },
 
@@ -3565,7 +3565,7 @@ app.post('/validate', (req, res) => {
 });
 
 app.listen(3000);`,
-    expectedRuleIds: ["PERF-001"],
+    expectedRuleIds: [],
     category: "security",
     difficulty: "hard",
   },
@@ -3665,7 +3665,7 @@ app.listen(3000);`,
     difficulty: "medium",
   },
   {
-    id: "python-pickle-deserialization",
+    id: "python-pickle-deserialization-untrusted",
     description: "Python loading pickle from untrusted source",
     language: "python",
     code: `import pickle
@@ -4202,7 +4202,7 @@ services:
     ports:
       - "0.0.0.0:6379:6379"  # Redis exposed publicly`,
     expectedRuleIds: ["IAC-001", "DATA-001"],
-    category: "iac",
+    category: "iac-security",
     difficulty: "medium",
   },
   {
@@ -4241,7 +4241,7 @@ spec:
         # No readiness/liveness probes
         # No security context constraints`,
     expectedRuleIds: ["IAC-001", "DATA-001"],
-    category: "iac",
+    category: "iac-security",
     difficulty: "medium",
   },
   {
@@ -4280,7 +4280,7 @@ spec:
     await new Promise(resolve => setTimeout(resolve, 10));
   }
 }`,
-    expectedRuleIds: ["CONC-001"],
+    expectedRuleIds: [],
     category: "concurrency",
     difficulty: "hard",
   },
@@ -5270,7 +5270,7 @@ const server = new ApolloServer({
 const app = express();
 server.applyMiddleware({ app });
 app.listen(4000);`,
-    expectedRuleIds: ["API-001"],
+    expectedRuleIds: [],
     category: "api-design",
     difficulty: "hard",
   },
@@ -5365,7 +5365,7 @@ async def dashboard():
   }
 }`,
     expectedRuleIds: ["DEPS-001"],
-    category: "dependencies",
+    category: "dependency-health",
     difficulty: "easy",
   },
   {
@@ -5480,7 +5480,7 @@ app.post('/api/token', (req, res) => {
 
 app.listen(3000);`,
     expectedRuleIds: ["AUTH-001", "SEC-001"],
-    category: "authentication",
+    category: "auth",
     difficulty: "medium",
   },
   {

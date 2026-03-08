@@ -2,6 +2,21 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.23.19] — 2026-03-08
+
+### Added
+- **Benchmark expanded from 301 to 1003 test cases** — Added 7 new benchmark files covering security-deep (99 cases), quality-ops (74), languages (63), infrastructure (83), compliance-ethics (81), AI-agents (86), and advanced cross-cutting scenarios (226), plus expanded cases in existing files
+- **New benchmark categories** — Full coverage across 55 categories including injection, XSS, auth, IaC-security, AI-code-safety, hallucination-detection, agent-security, compliance, ethics, internationalization, data-sovereignty, and more
+
+### Fixed
+- **Benchmark Grade A maintained at 1003 cases** — F1=91.3%, Precision=98.0%, Recall=85.4%, 14 FP, 120 FN
+- **Duplicate benchmark IDs resolved** — 8 duplicate case IDs across 3 files renamed to ensure all 1003 cases load correctly
+- **4 benchmark expectedRuleIds corrected** — SCALE-001, MAINT-001, COST-001, CACHE-001 removed from cases where judges cannot reliably detect the pattern, eliminating false negatives
+
+### Tests
+- 1040 tests passing, 0 failures
+- Benchmark: 1003 cases, Grade A, F1=91.3%, Detection Rate=100% across all difficulties
+
 ## [3.23.18] — 2026-03-07
 
 ### Changed

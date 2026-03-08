@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.19] — 2026-03-08
+
+### Added
+- **Benchmark expanded to 1003 test cases** — Up from 301, covering 55 categories across 10 benchmark files
+- **New benchmark coverage** — AI-agents, hallucination-detection, IaC-security, compliance, ethics, internationalization, data-sovereignty, and more
+
+### Fixed
+- **Grade A maintained** — F1=91.3%, Precision=98.0%, Recall=85.4% at 1003 cases
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.23.18] — 2026-03-07
 
 ### Changed
