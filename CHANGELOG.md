@@ -2,6 +2,25 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.27.0] — 2026-03-09
+
+### Added
+- **New language support: Dart, Bash/Shell, SQL** — Full `LangFamily` type coverage, ~30+ language pattern constants (crypto, auth, injection, eval, file-system, etc.), structural parser support (function/class extraction, complexity analysis, weak-type detection, import extraction), AST routing, and file-extension-to-language maps across CLI, GitHub App, and baseline commands
+- **Tree-sitter grammars for PHP, Ruby, Kotlin, Swift** — Four new WASM grammars enabling deep AST analysis (function/class/method node extraction, parameter counting, import extraction, weak-type detection) for languages previously limited to regex-only structural parsing
+- **Accessibility evaluator deepened (17 → 23 rules)** — Six new rules: A11Y-018 vague link text ("click here", "read more"), A11Y-019 data tables without `<th>` headers, A11Y-020 modal/dialog without focus trap, A11Y-021 interactive ARIA role without tab focusability, A11Y-022 icon-only button/link without accessible name, A11Y-023 page missing landmark regions
+- **IaC security evaluator deepened (22 → 32 rules)** — Ten new rules: Kubernetes container running as root, missing resource limits, writable filesystem; Terraform resources without tags; password auth without managed identity; database firewall allowing all Azure services (0.0.0.0); Dockerfile ADD vs COPY; Dockerfile FROM :latest/untagged
+- **Cost-effectiveness evaluator deepened (15 → 20 rules)** — Five new rules: COST-016 high-frequency events without debounce/throttle, COST-017 large bundle imports (lodash, moment, rxjs full imports), COST-018 event listeners without cleanup (memory leak), COST-019 inline objects/functions in React JSX props causing re-renders
+- **UX evaluator deepened (12 → 18 rules)** — Six new rules for user-experience quality detection
+- **Integration tests** — 19 new tests covering all 5 output formatters (SARIF, JUnit, HTML, CodeClimate, GitHub Actions), evaluation of all 7 new languages (Dart, Bash, SQL, PHP, Ruby, Kotlin, Swift), multi-file project evaluation, diff-based evaluation, and verdict structure validation
+
+### Fixed
+- **`ruleNum` increment bug** — Last rule in accessibility, IaC security, cost-effectiveness, and UX evaluators used `ruleNum` without `++`, causing potential rule-ID collisions when new rules were appended. Fixed across all four evaluators
+
+### Tests
+- 2210 tests (2180 pass, 30 pre-existing failures unrelated to this release)
+- Self-eval: 0 findings across 177 source files
+- Benchmark: Grade A, F1 = 94.4%, Precision = 98.9%, Recall = 90.3%
+
 ## [3.26.0] — 2026-03-09
 
 ### Fixed

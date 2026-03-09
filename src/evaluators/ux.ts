@@ -280,7 +280,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
   );
   if (formLines.length > 0 && !hasValidation) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Form submission without client-side validation",
       description: `Found ${formLines.length} form submission handler(s) without visible validation. Submitting invalid data wastes round trips and frustrates users with server-side error messages.`,
@@ -291,6 +291,119 @@ export function analyzeUx(code: string, language: string): Finding[] {
       suggestedFix:
         "Add a validation check at the top of the submit handler (e.g., `const result = schema.safeParse(formData); if (!result.success) return showErrors(result.error)`) before sending the request.",
       confidence: 0.75,
+    });
+  }
+
+  // Infinite scroll without scroll position restoration
+  const hasInfiniteScroll = testCode(
+    code,
+    /IntersectionObserver|useInfiniteQuery|infinite.?scroll|loadMore|load.?next/gi,
+  );
+  const hasScrollRestore = testCode(code, /scrollRestoration|scrollTo|scrollPosition|saveScroll|restoreScroll/gi);
+  if (hasInfiniteScroll && !hasScrollRestore) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Infinite scroll without scroll position restoration",
+      description:
+        "Infinite scroll is implemented without scroll position saving. Users lose their place when navigating away and returning.",
+      recommendation:
+        "Save scroll position before navigation. Restore it on return. Use browser history.scrollRestoration or a scroll position cache.",
+      reference: "UX: Infinite Scroll Best Practices",
+      suggestedFix:
+        "Store `window.scrollY` before navigating away and call `window.scrollTo(0, savedPosition)` on return, or set `history.scrollRestoration = 'manual'`.",
+      confidence: 0.7,
+    });
+  }
+
+  // Keyboard shortcuts without discoverability
+  const hasKeyboardShortcuts = testCode(
+    code,
+    /addEventListener\s*\(\s*['"]key(?:down|up|press)['"]|onKeyDown|onKeyUp|hotkey|useHotkey|mousetrap|Ctrl\+|Meta\+|mod\+/gi,
+  );
+  const hasShortcutHelp = testCode(
+    code,
+    /shortcut.?help|keyboard.?shortcuts|hotkey.?list|shortcut.?modal|help.?dialog|shortcut.?guide|\?\s*$/gi,
+  );
+  if (hasKeyboardShortcuts && !hasShortcutHelp && code.split("\n").length > 100) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "info",
+      title: "Keyboard shortcuts without help/discoverability",
+      description:
+        "Keyboard shortcuts are defined but no help dialog or documentation is visible. Users won't discover the shortcuts.",
+      recommendation:
+        "Add a keyboard shortcut help dialog (e.g., triggered by '?'). Show shortcut hints in tooltips. Document available shortcuts.",
+      reference: "Nielsen's Heuristic #6: Recognition over Recall",
+      suggestedFix:
+        "Create a shortcuts help modal listing all hotkeys and bind it to the '?' key, e.g., `if (e.key === '?') showShortcutsModal()`.",
+      confidence: 0.7,
+    });
+  }
+
+  // Unresponsive click targets (too-small buttons/links)
+  const smallTargetPattern = /(?:width|height|min-width|min-height)\s*:\s*(?:[0-9]|1[0-9]|2[0-9]|3[0-9])px/gi;
+  const smallTargetLines = getLineNumbers(code, smallTargetPattern);
+  const isStyleFile = testCode(code, /\.css|styled|makeStyles|createStyle|css`|emotion/gi);
+  if (smallTargetLines.length > 3 && isStyleFile) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Interactive elements with small touch/click targets",
+      description: `Found ${smallTargetLines.length} element(s) with dimensions < 40px. Small touch targets cause mis-taps on mobile and frustrate users.`,
+      lineNumbers: smallTargetLines,
+      recommendation:
+        "Ensure interactive elements are at least 44×44px (WCAG) or 48×48dp (Material Design). Use adequate padding to increase tap area without visual changes.",
+      reference: "WCAG 2.5.8: Target Size / Material Design Touch Targets",
+      suggestedFix:
+        "Increase the element's `min-width` and `min-height` to at least `44px`, or add padding: e.g., `padding: 12px`.",
+      confidence: 0.7,
+    });
+  }
+
+  // Missing error boundary in React component trees
+  const isReactComponent = testCode(code, /function\s+\w+\s*\([^)]*\)\s*\{[\s\S]*return\s*\(/gi) && isReactOrJsx;
+  const hasErrorBoundary = testCode(code, /ErrorBoundary|componentDidCatch|getDerivedStateFromError|error.?boundary/gi);
+  const hasSuspense = testCode(code, /Suspense|React\.lazy|lazy\(/gi);
+  if (isReactComponent && hasSuspense && !hasErrorBoundary && code.split("\n").length > 60) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Lazy-loaded components without error boundary",
+      description:
+        "React.lazy/Suspense is used without an ErrorBoundary wrapper. If the lazy chunk fails to load, the entire component tree crashes with no recovery.",
+      recommendation:
+        "Wrap Suspense boundaries with ErrorBoundary components. Provide a fallback UI for failed chunk loads. Consider retry logic for network errors.",
+      reference: "React: Error Boundaries / Code Splitting Best Practices",
+      suggestedFix:
+        "Wrap the `<Suspense>` component with an `<ErrorBoundary fallback={<ErrorFallback />}>` to catch and display chunk load failures.",
+      confidence: 0.75,
+    });
+  }
+
+  // Time display without timezone context
+  const hasDateRendering = testCode(
+    code,
+    /new Date\s*\(|toLocaleDateString|toLocaleTimeString|format\s*\(\s*['"][^'"]*[HhMm]/gi,
+  );
+  const hasTimezone = testCode(
+    code,
+    /timeZone|timezone|Intl\.DateTimeFormat|utc|UTC|tz\b|luxon|dayjs.*tz|moment.*tz/gi,
+  );
+  const hasTimeDisplay = testCode(code, /\.toISOString|\.toUTCString|createdAt|updatedAt|timestamp|date.?format/gi);
+  if (hasDateRendering && hasTimeDisplay && !hasTimezone && hasUIRenderingContext) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Time/date display without timezone awareness",
+      description:
+        "Dates are rendered in the UI without explicit timezone handling. Users in different timezones see confusing or incorrect times.",
+      recommendation:
+        "Display times in the user's local timezone using Intl.DateTimeFormat. Show timezone indicator (e.g., 'PST'). Use relative time ('2 hours ago') when appropriate.",
+      reference: "UX: Displaying Time Across Timezones",
+      suggestedFix:
+        "Use `new Intl.DateTimeFormat(locale, { timeZone: userTz, ...opts }).format(date)` or a library like `date-fns-tz` to display user-local times.",
+      confidence: 0.65,
     });
   }
 

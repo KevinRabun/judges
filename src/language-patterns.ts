@@ -56,6 +56,17 @@ const LANG_ALIAS_MAP: Record<string, LangFamily> = {
   kt: "kotlin",
   kts: "kotlin",
   swift: "swift",
+  dart: "dart",
+  flutter: "dart",
+  bash: "bash",
+  sh: "bash",
+  shell: "bash",
+  zsh: "bash",
+  sql: "sql",
+  plsql: "sql",
+  tsql: "sql",
+  mysql: "sql",
+  postgresql: "sql",
   dockerfile: "dockerfile",
   docker: "dockerfile",
   containerfile: "dockerfile",
@@ -83,6 +94,8 @@ export function isBraceLang(lang: LangFamily): boolean {
   return (
     lang !== "python" &&
     lang !== "ruby" &&
+    lang !== "bash" &&
+    lang !== "sql" &&
     lang !== "unknown" &&
     lang !== "terraform" &&
     lang !== "bicep" &&
@@ -175,6 +188,8 @@ export const ENV_ACCESS = {
   ruby: String.raw`ENV\[|ENV\.fetch\s*\(`,
   kotlin: String.raw`System\.getenv\s*\(`,
   swift: String.raw`ProcessInfo\.processInfo\.environment\[`,
+  dart: String.raw`Platform\.environment\[|String\.fromEnvironment\s*\(`,
+  bash: String.raw`\$\{?\w+\}?|\$\(printenv\s`,
 };
 
 export const HARDCODED_ENV = {
@@ -185,6 +200,8 @@ export const HARDCODED_ENV = {
   java: String.raw`getenv\s*\(.*\)\s*(?:!=\s*null\s*\?|==\s*null)`,
   go: String.raw`os\.Getenv\s*\(.*\)\s*==\s*["']`,
   powershell: String.raw`\$env:\w+\s*=\s*["'][^"']+["']`,
+  dart: String.raw`String\.fromEnvironment\s*\(\s*["'][^"']+["']\s*,\s*defaultValue:\s*["'][^"']+["']\)`,
+  bash: String.raw`\w+=\s*["'][^"']+["']\s*$`,
 };
 
 // ── Function Definitions ─────────────────────────────────────────────────────
@@ -201,6 +218,9 @@ export const FUNCTION_DEF = {
   ruby: String.raw`def\s+\w+`,
   kotlin: String.raw`(?:fun|suspend\s+fun)\s+\w+\s*\(`,
   swift: String.raw`(?:func|class\s+func|static\s+func)\s+\w+\s*\(`,
+  dart: String.raw`(?:void|Future|Stream|int|double|String|bool|dynamic|\w+)\s+\w+\s*\(|\w+\s+\w+\s*\(`,
+  bash: String.raw`(?:function\s+\w+|\w+\s*\(\s*\))\s*\{`,
+  sql: String.raw`CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\s+\w+`,
 };
 
 // ── Error Handling ───────────────────────────────────────────────────────────
@@ -217,6 +237,8 @@ export const TRY_CATCH = {
   ruby: String.raw`begin\s*$|rescue\b`,
   kotlin: String.raw`try\s*\{`,
   swift: String.raw`do\s*\{.*catch`,
+  dart: String.raw`try\s*\{`,
+  bash: String.raw`trap\s|\|\|\s`,
 };
 
 export const EMPTY_CATCH = {
@@ -231,6 +253,8 @@ export const EMPTY_CATCH = {
   ruby: String.raw`rescue\s*(?:=>\s*\w+)?\s*$`,
   kotlin: String.raw`catch\s*\([^)]*\)\s*\{\s*(?:\/\/[^\n]*)?\s*\}`,
   swift: String.raw`catch\s*\{\s*(?:\/\/[^\n]*)?\s*\}`,
+  dart: String.raw`catch\s*\([^)]*\)\s*\{\s*(?:\/\/[^\n]*)?\s*\}`,
+  bash: String.raw`\|\|\s*true|\|\|\s*:`,
 };
 
 export const GENERIC_CATCH = {
@@ -244,6 +268,8 @@ export const GENERIC_CATCH = {
   ruby: String.raw`rescue\s*$|rescue\s+(?:Exception|StandardError)\b`,
   kotlin: String.raw`catch\s*\(\s*\w+\s*:\s*(?:Exception|Throwable)\s*\)`,
   swift: String.raw`catch\s*\{|catch\s+let\s+\w+\s*\{`,
+  dart: String.raw`catch\s*\(\s*e\s*\)`,
+  bash: String.raw`trap\s+['"]-?['"']`,
 };
 
 export const PANIC_UNWRAP = {
@@ -258,6 +284,8 @@ export const PANIC_UNWRAP = {
   ruby: String.raw`exit\s*\(!?|abort\s*\(|Kernel\.exit`,
   kotlin: String.raw`exitProcess\s*\(|(?<![.\w])error\s*\(`,
   swift: String.raw`fatalError\s*\(|preconditionFailure\s*\(|exit\s*\(`,
+  dart: String.raw`exit\s*\(|throw\s+StateError`,
+  bash: String.raw`exit\s+\d|kill\s`,
 };
 
 // ── Weak / Dynamic Types ────────────────────────────────────────────────────
@@ -276,6 +304,7 @@ export const WEAK_TYPE = {
   php: String.raw`mixed\b|\$\w+\s*\/\*\*.*@var\s+mixed`,
   kotlin: String.raw`:\s*Any\??\b|as\??\s+Any\b`,
   swift: String.raw`:\s*Any\b|as!\s|unsafeBitCast\s*\(`,
+  dart: String.raw`\bdynamic\b`,
 };
 
 // ── Async / Concurrency ─────────────────────────────────────────────────────
@@ -292,6 +321,8 @@ export const ASYNC_FUNCTION = {
   ruby: String.raw`Async\b|Thread\.new|Concurrent::`,
   kotlin: String.raw`suspend\s+fun|launch\s*\{|async\s*\{|withContext\s*\(`,
   swift: String.raw`async\s+func|Task\s*\{|TaskGroup`,
+  dart: String.raw`async\s+\{|Future<|Stream<|async\*`,
+  bash: String.raw`&\s*$|\bwait\b|\bnohup\b`,
 };
 
 export const MISSING_AWAIT = {
@@ -300,6 +331,7 @@ export const MISSING_AWAIT = {
   rust: String.raw`(?:^|\s)(?!\.await)tokio::`,
   csharp: String.raw`(?:^|\s)(?!await\s)(?:HttpClient|Task\.Run)`,
   java: String.raw`(?:^|\s)(?!\.get\(\))CompletableFuture`,
+  dart: String.raw`(?:^|\s)(?!await\s)(?:http\.get|http\.post|dio\.get)`,
 };
 
 export const SHARED_MUTABLE = {
@@ -316,6 +348,7 @@ export const SHARED_MUTABLE = {
   ruby: String.raw`(?:@@\w+\s*=|\$\w+\s*=)`,
   kotlin: String.raw`(?:companion\s+object.*var\b|@Volatile)`,
   swift: String.raw`(?:static\s+var\b|class\s+var\b)`,
+  dart: String.raw`(?:static\s+(?!final|const)\w+\s+\w+\s*=)`,
 };
 
 // ── Imports / Dependencies ───────────────────────────────────────────────────
@@ -327,6 +360,7 @@ export const WILDCARD_IMPORT = {
   csharp: String.raw`using\s+static\s+[\w.]+\.\*`,
   php: String.raw`use\s+[\w\\]+\\\{[^}]*\}`,
   kotlin: String.raw`import\s+[\w.]+\.\*\s*$`,
+  dart: String.raw`import\s+['"][^'"]+['"]\s+show\s`,
 };
 
 export const DEPRECATED_IMPORT = {
@@ -349,6 +383,8 @@ export const SQL_INJECTION = {
   ruby: String.raw`(?:ActiveRecord|\w+\.(?:where|find_by_sql|execute))\s*\(\s*(?:["'].*#\{|["'].*\+)`,
   kotlin: String.raw`(?:executeQuery|createQuery|nativeQuery|createStatement)\s*\(\s*(?:["'].*\+|\$?["'].*\$\w+)`,
   swift: String.raw`(?:execute|prepare)\s*\(\s*(?:["'].*\\\(|["'].*\+)`,
+  dart: String.raw`(?:rawQuery|execute|rawInsert)\s*\(\s*(?:["'].*\$|["'].*\+)`,
+  sql: String.raw`EXECUTE\s*\(\s*@|EXEC\s*\(\s*@|\+\s*@\w+`,
 };
 
 // ── Security: Command Injection ──────────────────────────────────────────────
@@ -365,6 +401,8 @@ export const COMMAND_INJECTION = {
   ruby: String.raw`(?:system|exec|\x60|%x).*#\{|Kernel\.system\s*\(.*\+`,
   kotlin: String.raw`Runtime\.getRuntime\(\)\.exec\s*\(.*\+|ProcessBuilder\s*\(.*\+`,
   swift: String.raw`Process\(\).*arguments.*\+|NSTask\b`,
+  dart: String.raw`Process\.(?:run|start)\s*\(.*(?:\+|\$)`,
+  bash: String.raw`eval\s+\$|\$\(.*\$\{`,
 };
 
 // ── Security: Hardcoded Secrets ──────────────────────────────────────────────
@@ -395,6 +433,7 @@ export const WEAK_HASH = {
   ruby: String.raw`Digest::(?:MD5|SHA1)`,
   kotlin: String.raw`MessageDigest\.getInstance\s*\(\s*["'](?:MD5|SHA-?1)["']\)`,
   swift: String.raw`CC_MD5|CC_SHA1|Insecure\.(?:MD5|SHA1)`,
+  dart: String.raw`md5\.convert|sha1\.convert|Digest\.(?:md5|sha1)`,
 };
 
 // ── Security: Eval / Dynamic Execution ───────────────────────────────────────
@@ -411,6 +450,8 @@ export const EVAL_USAGE = {
   ruby: String.raw`\beval\s*\(|\bsend\s*\(|\binstance_eval\s*\(|\bclass_eval\s*\(`,
   kotlin: String.raw`ScriptEngine\.eval\s*\(`,
   swift: String.raw`NSExpression\b|JSContext\b.*evaluateScript`,
+  dart: String.raw`(?!)`,
+  bash: String.raw`\beval\s|source\s`,
 };
 
 // ── Security: TLS / Certificate ──────────────────────────────────────────────
@@ -427,6 +468,7 @@ export const TLS_DISABLED = {
   ruby: String.raw`verify_mode\s*=\s*OpenSSL::SSL::VERIFY_NONE|ssl_verify_mode.*VERIFY_NONE`,
   kotlin: String.raw`TrustAllCerts|X509TrustManager|trustAllCerts`,
   swift: String.raw`ServerTrustPolicy\.disableEvaluation|allowsSelfSignedCertificates\s*=\s*true`,
+  dart: String.raw`badCertificateCallback.*true|allowBadCertificates\s*=\s*true`,
 };
 
 // ── Security: CORS ───────────────────────────────────────────────────────────
@@ -441,6 +483,7 @@ export const CORS_WILDCARD = {
   ruby: String.raw`allow_origin\s+["']\*["']|origins\s+["']\*["']`,
   kotlin: String.raw`@CrossOrigin\s*$|allowedOrigins\s*=.*\*`,
   swift: String.raw`Access-Control-Allow-Origin.*\*`,
+  dart: String.raw`Access-Control-Allow-Origin.*\*|allowedOrigins.*\*`,
 };
 
 // ── Web Framework Routes ─────────────────────────────────────────────────────
@@ -456,6 +499,7 @@ export const HTTP_ROUTE = {
   ruby: String.raw`(?:get|post|put|delete|patch)\s+["']/|resources?\s+:\w+`,
   kotlin: String.raw`@(?:Get|Post|Put|Delete|Patch)Mapping|routing\s*\{`,
   swift: String.raw`\.(?:get|post|put|delete|patch)\s*\(|@(?:GET|POST|PUT|DELETE)`,
+  dart: String.raw`@(?:Route|Get|Post|Put|Delete)\s*\(|app\.(?:get|post|put|delete)\s*\(`,
 };
 
 // ── Logging ──────────────────────────────────────────────────────────────────
@@ -472,6 +516,8 @@ export const CONSOLE_LOG = {
   ruby: String.raw`(?:puts|p|pp|print|warn)\s`,
   kotlin: String.raw`println\s*\(|print\s*\(`,
   swift: String.raw`print\s*\(|debugPrint\s*\(|dump\s*\(`,
+  dart: String.raw`print\s*\(|debugPrint\s*\(`,
+  bash: String.raw`echo\s|printf\s`,
 };
 
 export const STRUCTURED_LOG = {
@@ -485,6 +531,7 @@ export const STRUCTURED_LOG = {
   ruby: String.raw`(?:Rails\.logger|Logger\.new|logger)\.\w+\s*\(`,
   kotlin: String.raw`(?:Logger|log|logger)\.\w+\s*\(|LoggerFactory\.getLogger`,
   swift: String.raw`(?:Logger|os_log|OSLog)\.\w+\s*\(|Logger\(`,
+  dart: String.raw`(?:Logger|log|logger)\.\w+\s*\(|logging\.Logger`,
 };
 
 // ── Testing ──────────────────────────────────────────────────────────────────
@@ -501,6 +548,8 @@ export const TEST_FUNCTION = {
   ruby: String.raw`(?:describe|it|context|before|after)\s+["']|def\s+test_`,
   kotlin: String.raw`@Test\b|@BeforeEach|@AfterEach`,
   swift: String.raw`func\s+test\w+\s*\(|XCTAssert`,
+  dart: String.raw`(?:test|testWidgets|group)\s*\(|void\s+main\s*\(\)\s*\{`,
+  bash: String.raw`@test\b|assert\s|bats\b`,
 };
 
 export const ASSERTION = {
@@ -515,6 +564,8 @@ export const ASSERTION = {
   ruby: String.raw`(?:expect\(|assert_|should\b|must_)`,
   kotlin: String.raw`assert(?:Equals|True|False|NotNull|Throws)\s*\(|assertEquals\s*\(`,
   swift: String.raw`XCTAssert\w*\s*\(|#expect\s*\(`,
+  dart: String.raw`expect\s*\(|assert\s*\(`,
+  bash: String.raw`\[\s+-(?:eq|ne|lt|gt|le|ge)\s|assert\b`,
 };
 
 // ── Documentation ────────────────────────────────────────────────────────────
@@ -531,6 +582,8 @@ export const DOC_COMMENT = {
   ruby: String.raw`#\s+@(?:param|return|note|example)|=begin[\s\S]*?=end`,
   kotlin: String.raw`/\*\*[\s\S]*?\*/|///\s`,
   swift: String.raw`///\s|/\*\*[\s\S]*?\*/`,
+  dart: String.raw`///\s|/\*\*[\s\S]*?\*/`,
+  sql: String.raw`--\s|/\*\*[\s\S]*?\*/`,
 };
 
 // ── Loop Constructs ──────────────────────────────────────────────────────────
@@ -547,6 +600,9 @@ export const FOR_LOOP = {
   ruby: String.raw`\.each\b|\.map\b|\.select\b|\.inject\b|for\s+\w+\s+in\b`,
   kotlin: String.raw`for\s*\(|\.forEach\s*\{|\.map\s*\{`,
   swift: String.raw`for\s+\w+\s+in\s|\.forEach\s*\{|\.map\s*\{`,
+  dart: String.raw`for\s*\(|\.forEach\s*\(|\.map\s*\(`,
+  bash: String.raw`for\s+\w+\s+in\s|while\s+`,
+  sql: String.raw`CURSOR\s+\w+|WHILE\s+|LOOP\b`,
 };
 
 // ── Type / Class Definitions ─────────────────────────────────────────────────
@@ -563,6 +619,7 @@ export const CLASS_DEF = {
   ruby: String.raw`(?:class|module)\s+\w+`,
   kotlin: String.raw`(?:class|data\s+class|object|interface|sealed\s+class|enum\s+class)\s+\w+`,
   swift: String.raw`(?:class|struct|enum|protocol|actor)\s+\w+`,
+  dart: String.raw`(?:class|abstract\s+class|mixin|extension)\s+\w+`,
 };
 
 // ── Package Manifests ────────────────────────────────────────────────────────
@@ -584,6 +641,9 @@ export const MANIFEST_FILES: Record<LangFamily, string[]> = {
   ruby: ["Gemfile", "Gemfile.lock", "*.gemspec"],
   kotlin: ["build.gradle.kts", "build.gradle", "pom.xml"],
   swift: ["Package.swift", "*.xcodeproj", "Podfile"],
+  dart: ["pubspec.yaml", "pubspec.lock"],
+  bash: [],
+  sql: [],
   dockerfile: ["Dockerfile", "Containerfile", ".dockerignore"],
   unknown: [],
 };
@@ -602,6 +662,7 @@ export const INPUT_VALIDATION = {
   ruby: String.raw`params\[|params\.(?:require|permit)\s*\(`,
   kotlin: String.raw`@RequestParam|@PathVariable|@RequestBody|call\.receive\b`,
   swift: String.raw`request\.(?:content|query|parameters)\b|req\.(?:content|query)\b`,
+  dart: String.raw`request\.(?:body|params|query|uri)\b`,
 };
 
 // ── Mutex / Lock ─────────────────────────────────────────────────────────────
@@ -617,6 +678,7 @@ export const MUTEX = {
   ruby: String.raw`Mutex\.new|Monitor\.new|\bsynchronize\b`,
   kotlin: String.raw`(?:synchronized\b|Mutex|ReentrantLock|Semaphore)`,
   swift: String.raw`NSLock|NSRecursiveLock|DispatchSemaphore|os_unfair_lock`,
+  dart: String.raw`Lock\b|Completer\b|synchronized\b`,
 };
 
 // ── Database Access ──────────────────────────────────────────────────────────
@@ -633,6 +695,8 @@ export const DB_QUERY = {
   ruby: String.raw`ActiveRecord|\w+\.(?:where|find|find_by|select|pluck)\s*\(`,
   kotlin: String.raw`\.(?:executeQuery|createQuery|persist|find)\s*\(|transaction\s*\{`,
   swift: String.raw`\.(?:execute|prepare|query)\s*\(|NSFetchRequest`,
+  dart: String.raw`\.(?:rawQuery|rawInsert|rawUpdate|rawDelete|query|execute)\s*\(`,
+  sql: String.raw`SELECT\s+|INSERT\s+|UPDATE\s+|DELETE\s+|EXEC(?:UTE)?\s+`,
 };
 
 // ── HTTP Client ──────────────────────────────────────────────────────────────
@@ -649,6 +713,8 @@ export const HTTP_CLIENT = {
   ruby: String.raw`Net::HTTP|HTTParty|Faraday|RestClient`,
   kotlin: String.raw`HttpClient\.\w+\s*\(|OkHttpClient|Fuel\.\w+\s*\(|ktor.*client`,
   swift: String.raw`URLSession\.\w+\s*\(|URLRequest\s*\(|Alamofire`,
+  dart: String.raw`http\.(?:get|post|put|delete)\s*\(|Dio\(|HttpClient\(`,
+  bash: String.raw`curl\s|wget\s`,
 };
 
 // ── Config / Constants ───────────────────────────────────────────────────────
@@ -661,6 +727,8 @@ export const MAGIC_NUMBER = {
   java: String.raw`(?:==|!=|<=?|>=?|&&|\|\|)\s*\d{2,}|(?:TIMEOUT|DELAY|LIMIT|MAX|MIN|SIZE|COUNT|PORT)\s*=\s*\d{3,}`,
   go: String.raw`(?:==|!=|<=?|>=?|&&|\|\|)\s*\d{2,}|(?:timeout|delay|limit|max|min|size|count|port)\s*[:=]\s*\d{3,}`,
   powershell: String.raw`(?:-eq|-ne|-lt|-le|-gt|-ge)\s*\d{2,}|(?:Timeout|Delay|Limit|Max|Min|Size|Count|Port)\s*=\s*\d{3,}`,
+  dart: String.raw`(?:==|!=|<=?|>=?|&&|\|\|)\s*\d{2,}|(?:timeout|delay|limit|max|min|size|count|port)\s*[:=]\s*\d{3,}`,
+  bash: String.raw`(?:-eq|-ne|-lt|-le|-gt|-ge)\s*\d{2,}|(?:TIMEOUT|DELAY|LIMIT|MAX|MIN|SIZE|COUNT|PORT)=\s*\d{3,}`,
 };
 
 // ── TODO / FIXME ─────────────────────────────────────────────────────────────
@@ -683,6 +751,9 @@ export const LINTER_DISABLE = {
   ruby: String.raw`rubocop:disable|# :nocov:|# :reek:`,
   kotlin: String.raw`@Suppress\(|@SuppressWarnings|detekt:`,
   swift: String.raw`swiftlint:disable|nolint`,
+  dart: String.raw`// ignore:|// ignore_for_file:`,
+  bash: String.raw`# shellcheck\s+disable`,
+  sql: String.raw`-- noqa|-- noinspection`,
 };
 
 // ── Serialization ────────────────────────────────────────────────────────────
@@ -699,6 +770,8 @@ export const UNSAFE_DESERIALIZATION = {
   ruby: String.raw`Marshal\.load|YAML\.load(?!_safe)|Oj\.load`,
   kotlin: String.raw`ObjectInputStream\.readObject|readObject\s*\(`,
   swift: String.raw`NSKeyedUnarchiver\.unarchiveObject|JSONDecoder\(\)\.decode.*(?:request|input)`,
+  dart: String.raw`jsonDecode\s*\(.*(?:request|body|input)`,
+  bash: String.raw`eval\s+\$\(cat\s`,
 };
 
 // ── Memory / Resource ────────────────────────────────────────────────────────
@@ -715,6 +788,8 @@ export const RESOURCE_LEAK = {
   ruby: String.raw`File\.open\s*\((?!.*\bdo\b)|IO\.(?:popen|sysopen)\s*\(`,
   kotlin: String.raw`FileInputStream\s*\(|FileOutputStream\s*\(|Socket\s*\(`,
   swift: String.raw`FileHandle\(|InputStream\(|OutputStream\(`,
+  dart: String.raw`File\(|HttpClient\(|Socket\.connect`,
+  bash: String.raw`exec\s+\d+>|mkfifo\s`,
 };
 
 // ── Deprecated APIs ──────────────────────────────────────────────────────────
@@ -730,6 +805,7 @@ export const DEPRECATED_API = {
   ruby: String.raw`File\.exists\?|URI\.escape|Fixnum\b|Bignum\b`,
   kotlin: String.raw`\.newInstance\s*\(\s*\)|Date\s*\(\s*\)`,
   swift: String.raw`URLRequest.*HTTPBody|NSURLConnection\b`,
+  dart: String.raw`\.then\s*\(.*\.catchError|new\s+HttpClient\(`,
 };
 
 // ── Framework-Specific Security Patterns ─────────────────────────────────────
@@ -745,6 +821,7 @@ export const FRAMEWORK_DEBUG_MODE = {
   ruby: String.raw`config\.consider_all_requests_local\s*=\s*true`,
   kotlin: String.raw`server\.error\.include-stacktrace\s*=\s*always`,
   swift: String.raw`\.environment\s*=\s*\.development`,
+  dart: String.raw`kDebugMode|kReleaseMode\s*==\s*false`,
 };
 
 /** Missing HTTPS / security middleware in frameworks */
@@ -757,6 +834,7 @@ export const FRAMEWORK_MISSING_SECURITY = {
   php: String.raw`Route::(?:get|post)\s*\((?!.*middleware|.*auth)`,
   ruby: String.raw`skip_before_action\s*:\s*(?:authenticate|verify)`,
   swift: String.raw`app\.http\.server\.configuration\.hostname\s*=\s*["']0\.0\.0\.0`,
+  dart: String.raw`app\.listen\s*\(\s*(?:80|3000)\b`,
 };
 
 /** Framework-specific secret key / session misconfigurations */

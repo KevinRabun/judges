@@ -33,7 +33,20 @@ export type { CrossFileTaintFlow } from "./cross-file-taint.js";
 // Pre-initialize tree-sitter on module load so it's ready when needed.
 // This is fire-and-forget; if it fails, analyzeStructure falls back silently.
 
-const TREE_SITTER_LANGS = ["typescript", "javascript", "python", "rust", "go", "java", "csharp", "cpp"] as const;
+const TREE_SITTER_LANGS = [
+  "typescript",
+  "javascript",
+  "python",
+  "rust",
+  "go",
+  "java",
+  "csharp",
+  "cpp",
+  "php",
+  "ruby",
+  "kotlin",
+  "swift",
+] as const;
 const treeSitterReady = new Map<string, Promise<boolean>>();
 
 for (const lang of TREE_SITTER_LANGS) {
@@ -60,6 +73,10 @@ export function analyzeStructure(code: string, language: string): CodeStructure 
     case "java":
     case "csharp":
     case "cpp":
+    case "php":
+    case "ruby":
+    case "kotlin":
+    case "swift":
       // Use tree-sitter (real AST) if WASM runtime + grammar already loaded,
       // otherwise fall back to the lightweight structural parser.
       // parser.parse() is synchronous in web-tree-sitter once initialized.
@@ -73,7 +90,10 @@ export function analyzeStructure(code: string, language: string): CodeStructure 
       return analyzeStructurally(code, lang);
 
     case "powershell":
-      // No tree-sitter grammar for PowerShell — use structural parser directly
+    case "dart":
+    case "bash":
+    case "sql":
+      // No tree-sitter grammar — use structural parser directly
       return analyzeStructurally(code, lang);
 
     default:
@@ -111,7 +131,11 @@ export async function analyzeStructureAsync(code: string, language: string): Pro
     case "go":
     case "java":
     case "csharp":
-    case "cpp": {
+    case "cpp":
+    case "php":
+    case "ruby":
+    case "kotlin":
+    case "swift": {
       // Try tree-sitter first (real AST), fall back to structural parser
       const available = await (treeSitterReady.get(lang) ?? Promise.resolve(false));
       if (available) {
@@ -125,7 +149,10 @@ export async function analyzeStructureAsync(code: string, language: string): Pro
     }
 
     case "powershell":
-      // No tree-sitter grammar for PowerShell — use structural parser directly
+    case "dart":
+    case "bash":
+    case "sql":
+      // No tree-sitter grammar — use structural parser directly
       return analyzeStructurally(code, lang);
 
     default:

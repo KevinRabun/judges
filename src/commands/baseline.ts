@@ -47,6 +47,9 @@ const EXT_TO_LANG: Record<string, string> = {
   ".bash": "bash",
   ".ps1": "powershell",
   ".psm1": "powershell",
+  ".dart": "dart",
+  ".sql": "sql",
+  ".bicep": "bicep",
 };
 
 function detectLanguage(filePath: string): string | undefined {

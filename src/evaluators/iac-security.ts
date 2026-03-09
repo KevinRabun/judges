@@ -578,7 +578,7 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
 
     if (yamlSecretLines.length > 0) {
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "critical",
         title: "Hardcoded secrets in YAML infrastructure code",
         description:
@@ -590,6 +590,236 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
         suggestedFix:
           "Replace plaintext values with secret references: use Docker secrets, K8s external-secrets, or environment variable injection from a vault.",
         confidence: 0.9,
+      });
+    }
+
+    // K8s: runAsNonRoot not set or runAsRoot
+    const k8sRootLines: number[] = [];
+    for (let i = 0; i < yamlLines.length; i++) {
+      const line = yamlLines[i];
+      if (/^\s*runAsNonRoot\s*:\s*false/i.test(line)) {
+        k8sRootLines.push(i + 1);
+      }
+      if (/^\s*runAsUser\s*:\s*0\b/i.test(line)) {
+        k8sRootLines.push(i + 1);
+      }
+    }
+    if (k8sRootLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Kubernetes container running as root user",
+        description:
+          "Container security context allows running as root (runAsNonRoot: false or runAsUser: 0). A compromised container running as root increases the blast radius.",
+        lineNumbers: k8sRootLines,
+        recommendation:
+          "Set runAsNonRoot: true and specify a non-zero runAsUser in the pod or container securityContext.",
+        reference: "CIS Kubernetes Benchmark: Pod Security",
+        suggestedFix: "Add to securityContext: runAsNonRoot: true, runAsUser: 1000, readOnlyRootFilesystem: true.",
+        confidence: 0.9,
+      });
+    }
+
+    // K8s: missing resource limits
+    const hasContainers = /^\s*containers\s*:/m.test(code);
+    const hasLimits = /^\s*limits\s*:/m.test(code);
+    if (hasContainers && !hasLimits) {
+      const containerLineNums: number[] = [];
+      for (let i = 0; i < yamlLines.length; i++) {
+        if (
+          /^\s*-\s*name\s*:/i.test(yamlLines[i]) &&
+          /containers/i.test(yamlLines.slice(Math.max(0, i - 5), i).join("\n"))
+        ) {
+          containerLineNums.push(i + 1);
+        }
+      }
+      if (containerLineNums.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "medium",
+          title: "Kubernetes container without resource limits",
+          description:
+            "Containers do not specify resource limits (CPU/memory). Without limits, a runaway container can starve other workloads and cause node instability.",
+          lineNumbers: containerLineNums.slice(0, 5),
+          recommendation:
+            "Set resources.limits.cpu and resources.limits.memory for every container to prevent resource exhaustion.",
+          reference: "CIS Kubernetes Benchmark: Resource Management",
+          suggestedFix:
+            "Add resources: { limits: { cpu: '500m', memory: '256Mi' }, requests: { cpu: '100m', memory: '128Mi' } }.",
+          confidence: 0.75,
+        });
+      }
+    }
+
+    // K8s: readOnlyRootFilesystem not set
+    const hasReadOnly = /readOnlyRootFilesystem\s*:\s*true/m.test(code);
+    if (hasContainers && !hasReadOnly) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Container filesystem is writable",
+        description:
+          "Kubernetes containers do not set readOnlyRootFilesystem: true. A writable filesystem allows attackers to install malicious tools or modify binaries.",
+        recommendation:
+          "Set securityContext.readOnlyRootFilesystem: true and use emptyDir volumes for paths that need writes.",
+        reference: "CIS Kubernetes Benchmark: Container Security",
+        suggestedFix:
+          "Add to container securityContext: readOnlyRootFilesystem: true. Mount emptyDir for /tmp and other writable paths.",
+        confidence: 0.7,
+        isAbsenceBased: true,
+      });
+    }
+  }
+
+  // ── IAC: Missing resource tags ────────────────────────────────────────
+  if (lang === "terraform") {
+    const hasResources = /resource\s+"[^"]+"\s+"[^"]+"\s*\{/i.test(code);
+    const hasTags = /tags\s*=\s*\{/i.test(code) || /tags\s*=\s*merge\(/i.test(code);
+    if (hasResources && !hasTags) {
+      const resourceDefLines: number[] = [];
+      const tfLines2 = code.split("\n");
+      for (let i = 0; i < tfLines2.length; i++) {
+        if (/resource\s+"[^"]+"\s+"[^"]+"\s*\{/i.test(tfLines2[i])) {
+          resourceDefLines.push(i + 1);
+        }
+      }
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Resources without tags",
+        description:
+          "Terraform resources are defined without tags. Tags are essential for cost tracking, ownership, environment identification, and automated governance.",
+        lineNumbers: resourceDefLines.slice(0, 5),
+        recommendation:
+          "Add a tags block to all resources. Use a common set of tags (environment, owner, project, cost-center) and consider using default_tags in the provider block.",
+        reference: "Cloud Best Practices: Resource Tagging",
+        suggestedFix:
+          'Add tags = { Environment = var.environment, Project = var.project, Owner = var.owner, ManagedBy = "Terraform" } to each resource.',
+        confidence: 0.7,
+      });
+    }
+  }
+
+  // ── IAC: Managed identity not used (password-based auth in IaC) ─────
+  if (lang === "terraform" || lang === "bicep" || lang === "arm") {
+    const passwordAuthLines: number[] = [];
+    const lines = code.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (/admin_username\s*=|administratorLogin\s*[:=]/i.test(line)) {
+        const ctx = lines.slice(i, Math.min(lines.length, i + 10)).join("\n");
+        if (/admin_password\s*=|administratorLoginPassword\s*[:=]/i.test(ctx) && !/identity\s*[:={]/i.test(ctx)) {
+          passwordAuthLines.push(i + 1);
+        }
+      }
+    }
+    if (passwordAuthLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Password-based authentication without managed identity",
+        description:
+          "Resources use admin username/password authentication without a managed identity configured. Managed identities eliminate the need for credential management and rotation.",
+        lineNumbers: passwordAuthLines,
+        recommendation:
+          "Configure a system-assigned or user-assigned managed identity and use Azure AD/Entra ID authentication where supported.",
+        reference: "Azure Well-Architected Framework: Identity",
+        suggestedFix:
+          lang === "terraform"
+            ? 'Add identity { type = "SystemAssigned" } to the resource and use Azure AD authentication.'
+            : "Add identity: { type: 'SystemAssigned' } and configure Azure AD authentication.",
+        confidence: 0.75,
+      });
+    }
+  }
+
+  // ── IAC: Database firewall allows all Azure services ──────────────────
+  if (lang === "terraform" || lang === "bicep" || lang === "arm") {
+    const allAzureLines: number[] = [];
+    const lines = code.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // "Allow all Azure services" firewall rule: start=0.0.0.0 end=0.0.0.0
+      if (/start_ip_address\s*=\s*["']0\.0\.0\.0/i.test(line) || /startIpAddress\s*[:=]\s*['"]0\.0\.0\.0/i.test(line)) {
+        const ctx = lines.slice(i, Math.min(lines.length, i + 5)).join("\n");
+        if (/end_ip_address\s*=\s*["']0\.0\.0\.0/i.test(ctx) || /endIpAddress\s*[:=]\s*['"]0\.0\.0\.0/i.test(ctx)) {
+          allAzureLines.push(i + 1);
+        }
+      }
+    }
+    if (allAzureLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "Database firewall allows all Azure services",
+        description:
+          "A firewall rule with start and end IP of 0.0.0.0 allows any Azure service (including other tenants) to access the database. This is overly permissive.",
+        lineNumbers: allAzureLines,
+        recommendation:
+          "Remove the 'Allow Azure services' rule and use private endpoints or VNet service endpoints for secure connectivity.",
+        reference: "CIS Azure Benchmark: Database Security",
+        suggestedFix:
+          "Remove the 0.0.0.0-0.0.0.0 firewall rule and configure a private endpoint for the database instead.",
+        confidence: 0.85,
+      });
+    }
+  }
+
+  // ── IAC: Dockerfile ADD instead of COPY ───────────────────────────────
+  if (lang === "dockerfile") {
+    const addLines: number[] = [];
+    const dockerLines2 = code.split("\n");
+    for (let i = 0; i < dockerLines2.length; i++) {
+      const line = dockerLines2[i];
+      if (
+        /^\s*ADD\s+/i.test(line) &&
+        !/^\s*ADD\s+https?:\/\//i.test(line) &&
+        !/\.tar|\.gz|\.tgz|\.bz2|\.xz/i.test(line)
+      ) {
+        addLines.push(i + 1);
+      }
+    }
+    if (addLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Dockerfile uses ADD instead of COPY",
+        description:
+          "The ADD instruction has implicit tar extraction and remote URL fetching that can introduce unexpected behavior. COPY is more explicit and predictable.",
+        lineNumbers: addLines,
+        recommendation:
+          "Use COPY instead of ADD for local file copies. Only use ADD when you specifically need tar auto-extraction or remote URL downloading.",
+        reference: "Dockerfile Best Practices: COPY vs ADD",
+        suggestedFix: "Replace ADD with COPY for simple file copies: COPY ./app /app instead of ADD ./app /app.",
+        confidence: 0.8,
+      });
+    }
+
+    // Dockerfile: latest tag in FROM
+    const latestTagLines: number[] = [];
+    for (let i = 0; i < dockerLines2.length; i++) {
+      const line = dockerLines2[i];
+      if (
+        /^\s*FROM\s+\S+:latest\b/i.test(line) ||
+        (/^\s*FROM\s+\S+\s/i.test(line) && !/:/i.test(line.split(/\s+/)[1] ?? ""))
+      ) {
+        latestTagLines.push(i + 1);
+      }
+    }
+    if (latestTagLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Dockerfile FROM uses latest or untagged image",
+        description:
+          "Using :latest or untagged base images leads to non-reproducible builds. The image content can change unexpectedly between builds.",
+        lineNumbers: latestTagLines,
+        recommendation:
+          "Pin base images to a specific version tag or digest: FROM node:20-alpine instead of FROM node:latest.",
+        reference: "Dockerfile Best Practices: Image Pinning",
+        suggestedFix:
+          "Pin the image version: FROM node:20-alpine or FROM node@sha256:abc123... for maximum reproducibility.",
+        confidence: 0.85,
       });
     }
   }

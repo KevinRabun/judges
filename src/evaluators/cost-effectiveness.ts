@@ -7,6 +7,7 @@ import {
   testCode,
   isLikelyAnalysisCode,
   isLikelyCLI,
+  isCommentLine,
 } from "./shared.js";
 import * as LP from "../language-patterns.js";
 
@@ -382,7 +383,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
   );
   if (heavyImportLines.length > 3) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Heavy SDK imports may increase cold-start costs",
       description: `Found ${heavyImportLines.length} heavy SDK imports. In serverless environments, large imports increase cold-start duration and cost.`,
@@ -393,6 +394,123 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
       suggestedFix:
         "Replace broad imports with targeted ones, e.g. `import { S3Client } from '@aws-sdk/client-s3';` instead of `import AWS from 'aws-sdk';`.",
       confidence: 0.85,
+    });
+  }
+
+  // Missing debounce/throttle on frequent event handlers
+  const frequentEventLines: number[] = [];
+  lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
+    if (
+      /(?:onScroll|onResize|onMouseMove|onInput|onKeyUp|addEventListener\s*\(\s*['"](?:scroll|resize|mousemove|input|keyup)['"])/i.test(
+        line,
+      )
+    ) {
+      const context = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 5)).join("\n");
+      if (!/debounce|throttle|requestAnimationFrame|useDebounce|useThrottle/i.test(context)) {
+        frequentEventLines.push(i + 1);
+      }
+    }
+  });
+  if (frequentEventLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "High-frequency event handler without debounce/throttle",
+      description:
+        "Event handlers for scroll, resize, or mousemove fire dozens of times per second. Without debounce/throttle, this wastes CPU and can cause jank.",
+      lineNumbers: frequentEventLines,
+      recommendation:
+        "Wrap the handler in debounce (for final value) or throttle (for periodic updates). Use requestAnimationFrame for visual updates.",
+      reference: "Event Handling Performance",
+      suggestedFix:
+        "Debounce the handler: `const handleScroll = debounce(() => { /* logic */ }, 150);` or use `requestAnimationFrame` for visual updates.",
+      confidence: 0.8,
+    });
+  }
+
+  // Large bundle imports (importing entire library when submodule suffices)
+  const largeBundleLines: number[] = [];
+  lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
+    if (
+      /import\s+(?:\*\s+as\s+\w+|_)\s+from\s+['"](?:lodash|moment|rxjs|date-fns|@material-ui\/core|@mui\/material|antd|chart\.js)['"]/i.test(
+        line,
+      )
+    ) {
+      largeBundleLines.push(i + 1);
+    }
+  });
+  if (largeBundleLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Importing entire library increases bundle size",
+      description:
+        "Importing an entire library (lodash, moment, etc.) pulls in all modules even if only a few functions are used, increasing bundle size and load time.",
+      lineNumbers: largeBundleLines,
+      recommendation:
+        "Import specific submodules or functions. Use tree-shakeable alternatives (lodash-es, date-fns, dayjs instead of moment).",
+      reference: "Bundle Size Optimization",
+      suggestedFix:
+        "Replace `import * as _ from 'lodash'` with `import debounce from 'lodash/debounce'` or switch to `lodash-es` for tree shaking.",
+      confidence: 0.85,
+    });
+  }
+
+  // Memory leak: event listeners without cleanup
+  const addListenerLines: number[] = [];
+  lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
+    if (/addEventListener\s*\(/i.test(line)) {
+      addListenerLines.push(i + 1);
+    }
+  });
+  const hasRemoveListener = testCode(code, /removeEventListener|AbortController|\.unsubscribe|cleanup|dispose/i);
+  if (addListenerLines.length > 0 && !hasRemoveListener && !cliCode) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Event listeners without cleanup (potential memory leak)",
+      description:
+        "Event listeners are added but no corresponding removeEventListener or AbortController cleanup is visible. This can cause memory leaks in long-running applications.",
+      lineNumbers: addListenerLines.slice(0, 5),
+      recommendation:
+        "Remove event listeners during cleanup (useEffect return, componentWillUnmount, or AbortController signal). Store handler references for removal.",
+      reference: "Memory Leak Prevention",
+      suggestedFix:
+        "Use AbortController: `const ac = new AbortController(); el.addEventListener('click', handler, { signal: ac.signal }); // cleanup: ac.abort();`.",
+      confidence: 0.75,
+    });
+  }
+
+  // Unnecessary re-renders in React (missing useMemo/useCallback)
+  const inlineObjLines: number[] = [];
+  lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
+    // Detect inline object/array literals or arrow functions passed as JSX props
+    if (
+      (/\w+\s*=\s*\{\s*\{/i.test(line) && /<\w/i.test(line)) || // style={{ ... }} in JSX
+      /\w+\s*=\s*\{\s*\(\s*\)\s*=>/i.test(line) || // onClick={() => ...} in JSX
+      (/\w+\s*=\s*\{\s*\[/i.test(line) && /<\w/i.test(line)) // items={[...]} in JSX
+    ) {
+      inlineObjLines.push(i + 1);
+    }
+  });
+  const isReactFile = testCode(code, /import\s+.*(?:React|useState|useEffect)\s+from|from\s+['"]react['"]/i);
+  if (inlineObjLines.length > 5 && isReactFile) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "low",
+      title: "Inline objects/functions in JSX props cause re-renders",
+      description: `Found ${inlineObjLines.length} inline object or function expressions in JSX props. Each creates a new reference on every render, defeating React.memo and causing unnecessary child re-renders.`,
+      lineNumbers: inlineObjLines.slice(0, 5),
+      recommendation:
+        "Extract inline objects to useMemo and inline functions to useCallback. Move static objects outside the component.",
+      reference: "React Performance Optimization",
+      suggestedFix:
+        "Extract: `const style = useMemo(() => ({ color: 'red' }), []);` and `const handleClick = useCallback(() => { ... }, [deps]);`.",
+      confidence: 0.7,
     });
   }
 

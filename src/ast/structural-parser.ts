@@ -67,6 +67,8 @@ const FUNC_PATTERNS: Record<string, RegExp> = {
     /^\s*(?:(?:public|private|internal|open|fileprivate|static|class|override|mutating|@\w+\s*)\s+)*func\s+(\w+)\s*\(([^)]*)\)/,
   typescript: /^\s*(?:(?:export|default|async)\s+)*function\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)/,
   javascript: /^\s*(?:(?:export|default|async)\s+)*function\s+(\w+)\s*\(([^)]*)\)/,
+  dart: /^\s*(?:(?:static|abstract|override|Future|Stream|void|int|double|String|bool|dynamic|\w+)\s+)*(\w+)\s*\(([^)]*)\)\s*(?:async)?\s*\{/,
+  bash: /^\s*(?:function\s+(\w+)|([\w]+)\s*\(\s*\))\s*\{/,
 };
 
 function extractBraceFunctions(lines: string[], language: string): FunctionInfo[] {
@@ -79,9 +81,9 @@ function extractBraceFunctions(lines: string[], language: string): FunctionInfo[
   while (i < lines.length) {
     const match = lines[i].match(pattern);
     if (match) {
-      const name = match[1];
-      const params = (match[2] ?? "").trim();
-      let paramCount = params.length === 0 ? 0 : params.split(",").length;
+      const name = match[1] ?? match[2];
+      const params = (match[language === "bash" ? 0 : 2] ?? "").trim();
+      let paramCount = language === "bash" ? 0 : params.length === 0 ? 0 : params.split(",").length;
       const startLine = i + 1;
 
       // Find the opening brace (may be on this line or next)
@@ -407,6 +409,7 @@ const CLASS_PATTERNS: Record<string, RegExp> = {
   php: /^\s*(?:(?:abstract|final)\s+)?class\s+(\w+)/,
   kotlin: /^\s*(?:(?:data|sealed|open|abstract|internal|private)\s+)*class\s+(\w+)/,
   swift: /^\s*(?:(?:public|private|internal|open|fileprivate|final)\s+)*class\s+(\w+)/,
+  dart: /^\s*(?:(?:abstract|mixin)\s+)*class\s+(\w+)/,
 };
 
 function extractBraceClassNames(lines: string[], language: string): string[] {
@@ -435,6 +438,8 @@ const DECISION_POINTS: Record<string, RegExp> = {
   swift: /\b(?:if|else\s+if|for|while|repeat|switch|case|catch)\b|\?(?![.?])|&&|\|\|/g,
   typescript: /\b(?:if|else\s+if|for|while|do|case|catch)\b|\?(?![.?])|&&|\|\|/g,
   javascript: /\b(?:if|else\s+if|for|while|do|case|catch)\b|\?(?![.?])|&&|\|\|/g,
+  dart: /\b(?:if|else\s+if|for|while|do|case|catch)\b|\?(?![.?])|&&|\|\|/g,
+  bash: /\b(?:if|elif|for|while|until|case)\b|&&|\|\|/g,
 };
 
 function computeComplexityFromLines(lines: string[], language: string): number {
@@ -664,6 +669,7 @@ function detectWeakTypes(lines: string[], language: string): number[] {
     php: /\bmixed\b/,
     kotlin: /\bAny\b|\bAny\?\b/,
     swift: /\bAny\b|\bAnyObject\b/,
+    dart: /\bdynamic\b/,
   };
 
   const pattern = patterns[language];
@@ -752,6 +758,13 @@ function extractImports(lines: string[], language: string): string[] {
     ],
     swift: [
       /^\s*import\s+(\w+)/, // import Foundation
+    ],
+    dart: [
+      /^\s*import\s+['"]package:([\w\/]+)/, // import 'package:flutter/material.dart'
+      /^\s*import\s+['"]([^'"]+)/, // import 'src/helper.dart'
+    ],
+    bash: [
+      /^\s*(?:source|\.)\s+['"]?([^'"\s]+)/, // source ./utils.sh or . ./utils.sh
     ],
   };
 

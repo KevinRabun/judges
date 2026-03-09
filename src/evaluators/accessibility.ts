@@ -450,7 +450,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
   }
   if (errorMsgLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
       title: "Form error not associated with input via ARIA",
       description:
@@ -463,6 +463,170 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
         'Associate errors with inputs: <input id="email" aria-describedby="email-error" aria-invalid="true"><span id="email-error">Invalid email</span>.',
       confidence: 0.75,
     });
+  }
+
+  // Links with vague text (click here, read more, etc.)
+  const vagueLinkLines: number[] = [];
+  lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
+    if (/<a\b/i.test(line) && />\s*(?:click\s+here|read\s+more|here|more|learn\s+more|link)\s*</i.test(line)) {
+      vagueLinkLines.push(i + 1);
+    }
+  });
+  if (vagueLinkLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Link with vague or non-descriptive text",
+      description:
+        "Links with text like 'click here' or 'read more' are meaningless when listed out of context by screen readers.",
+      lineNumbers: vagueLinkLines,
+      recommendation: "Use descriptive link text that conveys the purpose of the link even when read out of context.",
+      reference: "WCAG 2.1 SC 2.4.4 Link Purpose (In Context)",
+      suggestedFix:
+        'Replace <a href="...">click here</a> with <a href="...">View the accessibility guidelines</a> to convey link purpose.',
+      confidence: 0.8,
+    });
+  }
+
+  // Tables without headers (th) or scope attributes
+  const tableLines: number[] = [];
+  lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
+    if (/<table\b/i.test(line)) {
+      const context = lines.slice(i, Math.min(lines.length, i + 20)).join("\n");
+      if (!/<th\b/i.test(context) && !/role\s*=\s*["']presentation/i.test(line)) {
+        tableLines.push(i + 1);
+      }
+    }
+  });
+  if (tableLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Data table without header cells",
+      description:
+        "Data tables must use <th> elements with scope attributes so screen readers can associate data cells with their headers.",
+      lineNumbers: tableLines,
+      recommendation: "Add <th scope='col'> for column headers and <th scope='row'> for row headers in data tables.",
+      reference: "WCAG 2.1 SC 1.3.1 Info and Relationships",
+      suggestedFix:
+        'Add table headers: <thead><tr><th scope="col">Name</th><th scope="col">Email</th></tr></thead> to associate data cells with headers.',
+      confidence: 0.8,
+    });
+  }
+
+  // Modal/dialog without focus trap
+  const modalLines: number[] = [];
+  lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
+    if (/(?:modal|dialog|overlay|popup)\b/i.test(line) && /(?:open|show|visible|isOpen)/i.test(line)) {
+      const context = lines.slice(i, Math.min(lines.length, i + 15)).join("\n");
+      if (!/focusTrap|focus-trap|FocusLock|inert\b|aria-modal/i.test(context)) {
+        modalLines.push(i + 1);
+      }
+    }
+  });
+  if (modalLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Modal/dialog without focus trap",
+      description:
+        "Modals and dialogs must trap focus inside them so keyboard users cannot tab behind the overlay to invisible content.",
+      lineNumbers: modalLines.slice(0, 5),
+      recommendation:
+        "Implement a focus trap in modals using a library like focus-trap-react, or use the native <dialog> element with showModal().",
+      reference: "WCAG 2.1 SC 2.4.3 Focus Order",
+      suggestedFix:
+        "Use native dialog: <dialog ref={dialogRef}> with dialogRef.current.showModal(), or add a focus-trap library to keep focus within the modal.",
+      confidence: 0.75,
+    });
+  }
+
+  // ARIA role conflicts — interactive role on non-focusable element without tabIndex
+  const roleNoFocusLines: number[] = [];
+  lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
+    if (
+      /role\s*=\s*["'](?:button|link|checkbox|tab|menuitem|option|switch|slider|textbox)\b/i.test(line) &&
+      /<(?:div|span|li|p)\b/i.test(line) &&
+      !/tabIndex|tabindex/i.test(line)
+    ) {
+      roleNoFocusLines.push(i + 1);
+    }
+  });
+  if (roleNoFocusLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Interactive ARIA role without focusability",
+      description:
+        "Elements with interactive ARIA roles (button, link, etc.) must be focusable via tabIndex so keyboard users can reach them.",
+      lineNumbers: roleNoFocusLines,
+      recommendation:
+        "Add tabIndex={0} to elements with interactive ARIA roles, or use the corresponding native element instead.",
+      reference: "WCAG 2.1 SC 4.1.2 Name, Role, Value",
+      suggestedFix:
+        'Add focusability: <div role="button" tabIndex={0} onKeyDown={handler}> or preferably replace with <button>.',
+      confidence: 0.85,
+    });
+  }
+
+  // Inline event handlers without accessible name
+  const noAccessNameLines: number[] = [];
+  lines.forEach((line, i) => {
+    if (isCommentLine(line)) return;
+    if (
+      /<(?:button|a)\b/i.test(line) &&
+      /(?:onClick|href)/i.test(line) &&
+      !/aria-label|aria-labelledby|title\s*=/i.test(line) &&
+      />\s*<\s*(?:svg|img|i|icon|span\s*\/>)/i.test(line)
+    ) {
+      noAccessNameLines.push(i + 1);
+    }
+  });
+  if (noAccessNameLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "high",
+      title: "Icon-only interactive element without accessible name",
+      description:
+        "Buttons or links containing only icons (SVG, img, or icon font) have no accessible name for screen readers.",
+      lineNumbers: noAccessNameLines,
+      recommendation:
+        "Add aria-label or visually hidden text to provide an accessible name for icon-only interactive elements.",
+      reference: "WCAG 2.1 SC 4.1.2 Name, Role, Value",
+      suggestedFix:
+        'Add accessible name: <button aria-label="Close"><svg>...</svg></button> or <button><span className="sr-only">Close</span><CloseIcon /></button>.',
+      confidence: 0.85,
+    });
+  }
+
+  // Missing landmark regions (no main, nav, or banner in page-level files)
+  const isPageFile = /page|layout|app\.(tsx?|jsx?)|index\.(tsx?|jsx?|html)/i.test(language);
+  if (isPageFile) {
+    const hasMain = testCode(code, /<main\b|role\s*=\s*["']main/i);
+    const hasLandmarks = testCode(
+      code,
+      /<nav\b|<header\b|<footer\b|<aside\b|role\s*=\s*["'](?:navigation|banner|contentinfo|complementary)/i,
+    );
+    if (!hasMain && !hasLandmarks && lines.length > 20) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Page lacks landmark regions",
+        description:
+          "Page-level components should use landmark elements (main, nav, header, footer) so screen reader users can navigate efficiently.",
+        recommendation:
+          "Wrap primary content in <main>, navigation in <nav>, and page header/footer in <header>/<footer> elements.",
+        reference: "WCAG 2.1 SC 1.3.1 Info and Relationships",
+        suggestedFix:
+          "Add landmarks: <header>...</header><nav>...</nav><main>...</main><footer>...</footer> to provide page structure for assistive technology.",
+        confidence: 0.65,
+        isAbsenceBased: true,
+      });
+    }
   }
 
   return findings;

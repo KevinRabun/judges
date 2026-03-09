@@ -83,6 +83,10 @@ const GRAMMAR_FILES: Record<string, string> = {
   java: "tree-sitter-java.wasm",
   csharp: "tree-sitter-c_sharp.wasm",
   cpp: "tree-sitter-cpp.wasm",
+  php: "tree-sitter-php.wasm",
+  ruby: "tree-sitter-ruby.wasm",
+  kotlin: "tree-sitter-kotlin.wasm",
+  swift: "tree-sitter-swift.wasm",
 };
 
 // Cached language instances
@@ -246,6 +250,10 @@ const FUNCTION_NODE_TYPES: Record<string, string[]> = {
   java: ["method_declaration", "constructor_declaration"],
   csharp: ["method_declaration", "constructor_declaration", "local_function_statement"],
   cpp: ["function_definition"],
+  php: ["function_definition", "method_declaration"],
+  ruby: ["method", "singleton_method"],
+  kotlin: ["function_declaration"],
+  swift: ["function_declaration", "init_declaration"],
 };
 
 function extractFunctions(root: SyntaxNode, language: string): FunctionInfo[] {
@@ -442,6 +450,27 @@ function countParameters(funcNode: SyntaxNode, language: string): number {
       ).length;
     }
 
+    case "php":
+      paramsNode = funcNode.childForFieldName("parameters");
+      if (!paramsNode) return 0;
+      return paramsNode.namedChildren.filter((c) => c.type === "simple_parameter" || c.type === "variadic_parameter")
+        .length;
+
+    case "ruby":
+      paramsNode = funcNode.childForFieldName("parameters");
+      if (!paramsNode) return 0;
+      return paramsNode.namedChildren.length;
+
+    case "kotlin":
+      paramsNode = funcNode.childForFieldName("parameters") ?? funcNode.childForFieldName("value_parameters");
+      if (!paramsNode) return 0;
+      return paramsNode.namedChildren.filter((c) => c.type === "parameter").length;
+
+    case "swift":
+      paramsNode = funcNode.childForFieldName("parameters");
+      if (!paramsNode) return 0;
+      return paramsNode.namedChildren.filter((c) => c.type === "parameter").length;
+
     default:
       return 0;
   }
@@ -513,6 +542,34 @@ const DECISION_NODE_TYPES: Record<string, Set<string>> = {
     "case_statement",
     "catch_clause",
     "conditional_expression",
+  ]),
+  php: new Set([
+    "if_statement",
+    "for_statement",
+    "foreach_statement",
+    "while_statement",
+    "do_statement",
+    "catch_clause",
+    "switch_case",
+    "conditional_expression",
+  ]),
+  ruby: new Set(["if", "elsif", "unless", "for", "while", "until", "case", "when", "rescue", "conditional"]),
+  kotlin: new Set([
+    "if_expression",
+    "for_statement",
+    "while_statement",
+    "do_while_statement",
+    "catch_block",
+    "when_entry",
+  ]),
+  swift: new Set([
+    "if_statement",
+    "for_in_statement",
+    "while_statement",
+    "repeat_while_statement",
+    "catch_clause",
+    "switch_case",
+    "ternary_expression",
   ]),
 };
 
@@ -616,6 +673,34 @@ const NESTING_NODE_TYPES: Record<string, Set<string>> = {
     "switch_statement",
     "lambda_expression",
   ]),
+  php: new Set([
+    "if_statement",
+    "for_statement",
+    "foreach_statement",
+    "while_statement",
+    "do_statement",
+    "try_statement",
+    "switch_statement",
+  ]),
+  ruby: new Set(["if", "unless", "for", "while", "until", "begin", "case", "block", "do_block"]),
+  kotlin: new Set([
+    "if_expression",
+    "for_statement",
+    "while_statement",
+    "do_while_statement",
+    "try_expression",
+    "when_expression",
+    "lambda_literal",
+  ]),
+  swift: new Set([
+    "if_statement",
+    "for_in_statement",
+    "while_statement",
+    "repeat_while_statement",
+    "do_statement",
+    "switch_statement",
+    "closure_expression",
+  ]),
 };
 
 function computeMaxNesting(node: SyntaxNode, language: string, currentDepth: number): number {
@@ -647,6 +732,10 @@ const TERMINAL_TYPES: Record<string, Set<string>> = {
   java: new Set(["return_statement", "throw_statement", "break_statement", "continue_statement"]),
   csharp: new Set(["return_statement", "throw_statement", "break_statement", "continue_statement"]),
   cpp: new Set(["return_statement", "throw_statement", "break_statement", "continue_statement"]),
+  php: new Set(["return_statement", "throw_expression", "break_statement", "continue_statement"]),
+  ruby: new Set(["return", "raise", "break", "next"]),
+  kotlin: new Set(["return_expression", "throw_expression", "break_expression", "continue_expression"]),
+  swift: new Set(["return_statement", "throw_statement", "break_statement", "continue_statement"]),
 };
 
 /** Node types that represent blocks containing sequential statements */
@@ -659,6 +748,10 @@ const BLOCK_TYPES: Record<string, Set<string>> = {
   java: new Set(["block"]),
   csharp: new Set(["block"]),
   cpp: new Set(["compound_statement"]),
+  php: new Set(["compound_statement"]),
+  ruby: new Set(["body_statement", "do"]),
+  kotlin: new Set(["function_body", "control_structure_body"]),
+  swift: new Set(["code_block"]),
 };
 
 function detectDeadCode(root: SyntaxNode, language: string): number[] {
@@ -780,6 +873,21 @@ const WEAK_TYPE_PATTERNS: Record<string, (node: SyntaxNode) => boolean> = {
     if (node.type === "auto" || (node.type === "primitive_type" && node.text === "auto")) return true;
     return false;
   },
+  php: (node) => {
+    // mixed type
+    if (node.type === "named_type" && node.text === "mixed") return true;
+    return false;
+  },
+  kotlin: (node) => {
+    // Any, Any?
+    if (node.type === "user_type" && (node.text === "Any" || node.text === "Any?")) return true;
+    return false;
+  },
+  swift: (node) => {
+    // Any, AnyObject
+    if (node.type === "type_identifier" && (node.text === "Any" || node.text === "AnyObject")) return true;
+    return false;
+  },
 };
 
 function detectWeakTypes(root: SyntaxNode, language: string): number[] {
@@ -807,6 +915,10 @@ const IMPORT_NODE_TYPES: Record<string, string[]> = {
   java: ["import_declaration"],
   csharp: ["using_directive"],
   cpp: ["preproc_include"],
+  php: ["namespace_use_declaration"],
+  ruby: ["call"],
+  kotlin: ["import_header"],
+  swift: ["import_declaration"],
 };
 
 function extractImports(root: SyntaxNode, language: string): string[] {
@@ -902,6 +1014,45 @@ function extractImports(root: SyntaxNode, language: string): string[] {
           }
         }
         break;
+
+      case "php":
+        // use App\Models\User;
+        {
+          const nameNode = node.namedChildren.find((c) => c.type === "qualified_name" || c.type === "name");
+          if (nameNode) imports.push(nameNode.text);
+        }
+        break;
+
+      case "ruby":
+        // require 'json' — Ruby imports are method calls
+        if (node.type === "call" && node.text.match(/^(?:require|require_relative|gem)\b/)) {
+          const argNode = node.namedChildren.find((c) => c.type === "argument_list");
+          if (argNode) {
+            const strNode = argNode.namedChildren.find((c) => c.type === "string");
+            if (strNode) imports.push(strNode.text.replace(/['"]/g, ""));
+          }
+        }
+        break;
+
+      case "kotlin":
+        // import kotlin.coroutines.flow
+        {
+          const identifier = node.namedChildren.find((c) => c.type === "identifier" || c.type === "type_identifier");
+          if (identifier) imports.push(identifier.text);
+          else if (node.text) {
+            const m = node.text.match(/import\s+([\w.]+)/);
+            if (m) imports.push(m[1]);
+          }
+        }
+        break;
+
+      case "swift":
+        // import Foundation
+        {
+          const nameNode = node.namedChildren.find((c) => c.type === "identifier");
+          if (nameNode) imports.push(nameNode.text);
+        }
+        break;
     }
   });
 
@@ -934,6 +1085,10 @@ const CLASS_NODE_TYPES: Record<string, string[]> = {
   java: ["class_declaration", "interface_declaration", "enum_declaration"],
   csharp: ["class_declaration", "struct_declaration", "interface_declaration", "enum_declaration"],
   cpp: ["class_specifier", "struct_specifier"],
+  php: ["class_declaration", "interface_declaration", "trait_declaration"],
+  ruby: ["class", "module"],
+  kotlin: ["class_declaration", "object_declaration"],
+  swift: ["class_declaration", "struct_declaration", "protocol_declaration"],
 };
 
 function extractClasses(root: SyntaxNode, language: string): string[] {

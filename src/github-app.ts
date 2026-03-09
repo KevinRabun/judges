@@ -126,6 +126,8 @@ const EXT_TO_LANG: Record<string, string> = {
   ".cpp": "cpp",
   ".h": "c",
   ".hpp": "cpp",
+  ".dart": "dart",
+  ".sql": "sql",
 };
 
 function detectLanguage(filePath: string): string | undefined {

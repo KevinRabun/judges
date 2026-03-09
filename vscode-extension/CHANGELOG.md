@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.27.0] — 2026-03-09
+
+### Added
+- **New language support** — Dart, Bash/Shell, and SQL files now receive full evaluation with inline diagnostics
+- **Deeper evaluator coverage** — Accessibility (23 rules), IaC Security (32 rules), Cost-Effectiveness (20 rules), and UX (18 rules) evaluators significantly expanded
+- **Tree-sitter AST for PHP, Ruby, Kotlin, Swift** — Deep structural analysis (function/class extraction, complexity, imports) now available for four additional languages
+
+### Fixed
+- **Rule numbering bug** — Fixed `ruleNum` increment issue in four evaluators that could cause rule-ID collisions
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.26.0] — 2026-03-09
 
 ### Fixed
