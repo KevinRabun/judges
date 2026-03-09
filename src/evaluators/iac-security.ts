@@ -410,7 +410,6 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
   if (lang === "dockerfile") {
     const dockerLines = code.split("\n");
     const privilegedLines: number[] = [];
-    const runAsRootLines: number[] = [];
     const dockerSecretEnvLines: number[] = [];
     let hasUserDirective = false;
 
@@ -579,7 +578,7 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
 
     if (yamlSecretLines.length > 0) {
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "critical",
         title: "Hardcoded secrets in YAML infrastructure code",
         description:

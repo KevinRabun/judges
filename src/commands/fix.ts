@@ -11,7 +11,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "fs";
-import { resolve, extname, relative } from "path";
+import { resolve, extname } from "path";
 
 import { evaluateWithTribunal, evaluateWithJudge } from "../evaluators/index.js";
 import { getJudge } from "../judges/index.js";

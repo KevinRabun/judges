@@ -205,6 +205,7 @@ export function updateFindings(
   // NOT auto-marked as fixed — their triage decision is preserved.
   const triageStatuses = new Set(["accepted-risk", "deferred", "wont-fix", "false-positive"]);
   for (const tracked of store.findings) {
+    if (triageStatuses.has(tracked.status)) continue;
     if (tracked.status === "open" && !currentMap.has(tracked.fingerprint)) {
       tracked.status = "fixed";
       tracked.fixedAt = now;
