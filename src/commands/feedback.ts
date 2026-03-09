@@ -40,6 +40,13 @@ export interface FeedbackEntry {
   severity?: string;
   /** Contributor identifier (username, email, etc.) for team aggregation */
   contributor?: string;
+  /**
+   * Origin of this feedback entry:
+   * - "manual"       — developer submitted via CLI or UI
+   * - "l2-dismissal" — LLM deep review dismissed an L1 finding as FP
+   * - "pr-review"    — captured from PR review interaction
+   */
+  source?: "manual" | "l2-dismissal" | "pr-review";
 }
 
 export interface FeedbackStore {
@@ -528,6 +535,94 @@ function formatStatsOutput(stats: FeedbackStats): string {
   }
 
   return lines.join("\n");
+}
+
+// ─── L2 Closed-Loop Feedback ─────────────────────────────────────────────────
+// Parse "Dismissed Findings" from LLM deep-review responses and record them
+// automatically as FP feedback, closing the loop between L2 analysis and
+// the confidence calibration system.
+
+/**
+ * A finding dismissed by the LLM during deep contextual review (L2).
+ */
+export interface DismissedFinding {
+  /** Rule ID of the dismissed finding (e.g. SEC-001) */
+  ruleId: string;
+  /** LLM's explanation of why it was dismissed */
+  reason: string;
+}
+
+/**
+ * Parse dismissed findings from an LLM deep-review response.
+ *
+ * The deep-review prompt instructs the LLM to list dismissed findings in a
+ * "Dismissed Findings" section, each with a rule ID and explanation. This
+ * function extracts those entries from the markdown.
+ *
+ * Accepted formats:
+ *   - `SEC-001` — reason text
+ *   - `**SEC-001**` — reason text
+ *   - `SEC-001: reason text`
+ *   - `- SEC-001 — reason text`
+ *   - `- **SEC-001**: reason text`
+ */
+export function parseDismissedFindings(llmResponse: string): DismissedFinding[] {
+  const dismissed: DismissedFinding[] = [];
+
+  // Find the "Dismissed Findings" section
+  const sectionPattern = /#+\s*(?:\*{1,2})?Dismissed Findings(?:\*{1,2})?\s*\n([\s\S]*?)(?=\n#|\n={3,}|\n-{3,}|$)/gi;
+  let sectionMatch: RegExpExecArray | null;
+
+  while ((sectionMatch = sectionPattern.exec(llmResponse)) !== null) {
+    const sectionBody = sectionMatch[1];
+
+    // Match rule IDs followed by explanations on each line
+    // Supports: - SEC-001 — reason, - **SEC-001**: reason, SEC-001: reason
+    const linePattern = /[-*]?\s*\*{0,2}([A-Z]{2,10}-\d{1,4})\*{0,2}\s*[—:–-]\s*(.+)/g;
+    let lineMatch: RegExpExecArray | null;
+
+    while ((lineMatch = linePattern.exec(sectionBody)) !== null) {
+      const ruleId = lineMatch[1].trim();
+      const reason = lineMatch[2].trim();
+      if (ruleId && reason) {
+        dismissed.push({ ruleId, reason });
+      }
+    }
+  }
+
+  return dismissed;
+}
+
+/**
+ * Record L2 deep-review dismissals as FP feedback entries.
+ *
+ * This closes the feedback loop: when the LLM's deep contextual review
+ * dismisses L1 pattern findings as false positives, those dismissals are
+ * persisted to the feedback store and feed into the confidence calibration
+ * system (auto-tune, FP rate tracking).
+ *
+ * Returns the number of new entries recorded.
+ */
+export function recordL2Feedback(llmResponse: string, feedbackPath?: string, filePath?: string): number {
+  const dismissed = parseDismissedFindings(llmResponse);
+  if (dismissed.length === 0) return 0;
+
+  const store = loadFeedbackStore(feedbackPath);
+  const now = new Date().toISOString();
+
+  for (const d of dismissed) {
+    addFeedback(store, {
+      ruleId: d.ruleId,
+      verdict: "fp",
+      comment: `L2 deep review dismissal: ${d.reason}`,
+      filePath,
+      timestamp: now,
+      source: "l2-dismissal",
+    });
+  }
+
+  saveFeedbackStore(store, feedbackPath);
+  return dismissed.length;
 }
 
 export function runFeedback(argv: string[]): void {

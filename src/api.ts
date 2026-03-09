@@ -95,9 +95,33 @@ export {
   DEEP_REVIEW_PROMPT_INTRO,
   DEEP_REVIEW_IDENTITY,
 } from "./tools/deep-review.js";
+export type { RelatedFileSnippet } from "./tools/deep-review.js";
 
 // ─── Prompt Utilities ────────────────────────────────────────────────────────
 export { getCondensedCriteria } from "./tools/prompts.js";
+
+// ─── Feedback & Calibration ─────────────────────────────────────────────────
+export {
+  parseDismissedFindings,
+  recordL2Feedback,
+  loadFeedbackStore,
+  saveFeedbackStore,
+  addFeedback,
+  computeFeedbackStats,
+  getFpRateByRule,
+  mergeFeedbackStores,
+  computeTeamFeedbackStats,
+  formatTeamStatsOutput,
+} from "./commands/feedback.js";
+export type {
+  FeedbackVerdict,
+  FeedbackEntry,
+  FeedbackStore,
+  FeedbackStats,
+  DismissedFinding,
+  TeamFeedbackStats,
+  RuleTeamStats,
+} from "./commands/feedback.js";
 
 // ─── Cache Utilities ─────────────────────────────────────────────────────────
 export { LRUCache, contentHash } from "./cache.js";
@@ -135,25 +159,6 @@ export type { AiFingerprint, AiSignal } from "./fingerprint.js";
 export { buildCalibrationProfile, calibrateFindings, autoCalibrateFindings } from "./calibration.js";
 export type { CalibrationProfile } from "./calibration.js";
 export { estimateFindingConfidence, estimateFindingConfidenceWithBasis } from "./scoring.js";
-
-// ─── Feedback ────────────────────────────────────────────────────────────────
-export {
-  loadFeedbackStore,
-  saveFeedbackStore,
-  computeFeedbackStats,
-  getFpRateByRule,
-  mergeFeedbackStores,
-  computeTeamFeedbackStats,
-  formatTeamStatsOutput,
-} from "./commands/feedback.js";
-export type {
-  FeedbackEntry,
-  FeedbackStore,
-  FeedbackVerdict,
-  FeedbackStats,
-  TeamFeedbackStats,
-  RuleTeamStats,
-} from "./commands/feedback.js";
 
 // ─── Fix History / Learning ──────────────────────────────────────────────────
 export {
@@ -214,8 +219,30 @@ export {
   benchmarkGate,
   formatBenchmarkReport,
   formatBenchmarkMarkdown,
+  analyzeL2Coverage,
+  formatL2CoverageReport,
+  ingestFindingsAsBenchmarkCases,
+  deduplicateIngestCases,
 } from "./commands/benchmark.js";
-export type { BenchmarkResult, BenchmarkGateOptions, BenchmarkGateResult } from "./commands/benchmark.js";
+export type {
+  BenchmarkResult,
+  BenchmarkGateOptions,
+  BenchmarkGateResult,
+  L2CoverageAnalysis,
+  L2JudgeCoverage,
+  L2CategoryCoverage,
+} from "./commands/benchmark.js";
+
+// ─── Config Sharing & Policy ─────────────────────────────────────────────────
+export {
+  exportTeamConfig,
+  importTeamConfig,
+  pullRemoteConfig,
+  writePolicyLock,
+  readPolicyLock,
+  validatePolicyCompliance,
+} from "./commands/config-share.js";
+export type { TeamConfig, PolicyLock, PolicyValidationResult } from "./commands/config-share.js";
 
 // ─── Language Packs ──────────────────────────────────────────────────────────
 export { getLanguagePack, listLanguagePacks, suggestPack, LANGUAGE_PACKS } from "./commands/language-packs.js";

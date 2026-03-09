@@ -33,10 +33,24 @@ export interface TrackedFinding {
   lastSeen: string;
   /** Number of consecutive runs this finding has appeared */
   runCount: number;
-  /** Whether this finding is currently active */
-  status: "open" | "fixed";
+  /**
+   * Finding status:
+   * - "open"          — actively flagged, not yet addressed
+   * - "fixed"         — finding no longer detected in code
+   * - "accepted-risk" — acknowledged but intentionally retained
+   * - "deferred"      — will be addressed later
+   * - "wont-fix"      — team decided not to address
+   * - "false-positive" — confirmed FP (feeds back into calibration)
+   */
+  status: "open" | "fixed" | "accepted-risk" | "deferred" | "wont-fix" | "false-positive";
   /** When the finding was resolved */
   fixedAt?: string;
+  /** When the finding was triaged (for non-open/fixed states) */
+  triagedAt?: string;
+  /** Who triaged this finding */
+  triagedBy?: string;
+  /** Reason for the triage decision */
+  triageReason?: string;
 }
 
 export interface FindingStore {
@@ -187,6 +201,9 @@ export function updateFindings(
   }
 
   // Detect fixed findings (were open, no longer present)
+  // Triaged findings (accepted-risk, deferred, wont-fix, false-positive) are
+  // NOT auto-marked as fixed — their triage decision is preserved.
+  const triageStatuses = new Set(["accepted-risk", "deferred", "wont-fix", "false-positive"]);
   for (const tracked of store.findings) {
     if (tracked.status === "open" && !currentMap.has(tracked.fingerprint)) {
       tracked.status = "fixed";
@@ -216,7 +233,10 @@ export function updateFindings(
 
   // Prune very old fixed findings (> 30 days)
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  store.findings = store.findings.filter((f) => f.status === "open" || (f.fixedAt && f.fixedAt > thirtyDaysAgo));
+  const triageStatusSet = new Set(["accepted-risk", "deferred", "wont-fix", "false-positive"]);
+  store.findings = store.findings.filter(
+    (f) => f.status === "open" || triageStatusSet.has(f.status) || (f.fixedAt && f.fixedAt > thirtyDaysAgo),
+  );
 
   if (!inMemory) {
     saveFindingStore(store, dirOrStore as string);
@@ -230,6 +250,8 @@ export function updateFindings(
 export function getFindingStats(dirOrStore: string | FindingStore = "."): {
   totalOpen: number;
   totalFixed: number;
+  totalTriaged: number;
+  byTriageStatus: Record<string, number>;
   oldestOpen: string | undefined;
   bySeverity: Record<string, number>;
   byRule: Record<string, number>;
@@ -239,9 +261,12 @@ export function getFindingStats(dirOrStore: string | FindingStore = "."): {
   const store = typeof dirOrStore === "string" ? loadFindingStore(dirOrStore) : dirOrStore;
   const openFindings = store.findings.filter((f) => f.status === "open");
   const fixedFindings = store.findings.filter((f) => f.status === "fixed");
+  const triageStatuses = new Set(["accepted-risk", "deferred", "wont-fix", "false-positive"]);
+  const triagedFindings = store.findings.filter((f) => triageStatuses.has(f.status));
 
   const bySeverity: Record<string, number> = {};
   const byRule: Record<string, number> = {};
+  const byTriageStatus: Record<string, number> = {};
   let totalAgeDays = 0;
 
   for (const f of openFindings) {
@@ -251,6 +276,10 @@ export function getFindingStats(dirOrStore: string | FindingStore = "."): {
     totalAgeDays += age;
   }
 
+  for (const f of triagedFindings) {
+    byTriageStatus[f.status] = (byTriageStatus[f.status] || 0) + 1;
+  }
+
   const sortedOpen = [...openFindings].sort(
     (a, b) => new Date(a.firstSeen).getTime() - new Date(b.firstSeen).getTime(),
   );
@@ -258,6 +287,8 @@ export function getFindingStats(dirOrStore: string | FindingStore = "."): {
   return {
     totalOpen: openFindings.length,
     totalFixed: fixedFindings.length,
+    totalTriaged: triagedFindings.length,
+    byTriageStatus,
     oldestOpen: sortedOpen[0]?.firstSeen,
     bySeverity,
     byRule,
@@ -298,6 +329,104 @@ export function formatDelta(delta: FindingDelta): string {
 
   if (delta.stats.recurring > 0) {
     lines.push(`  🔄 Recurring: ${delta.stats.recurring}`);
+  }
+
+  return lines.join("\n");
+}
+
+// ─── Triage Operations ──────────────────────────────────────────────────────
+
+export type TriageStatus = "accepted-risk" | "deferred" | "wont-fix" | "false-positive";
+
+/**
+ * Triage a finding by its fingerprint or ruleId+filePath.
+ * Returns the triaged finding, or null if not found.
+ */
+export function triageFinding(
+  dirOrStore: string | FindingStore,
+  match: { fingerprint?: string; ruleId?: string; filePath?: string },
+  status: TriageStatus,
+  reason?: string,
+  triagedBy?: string,
+): TrackedFinding | null {
+  const inMemory = typeof dirOrStore !== "string";
+  const store = inMemory ? dirOrStore : loadFindingStore(dirOrStore);
+  const now = new Date().toISOString();
+
+  let target: TrackedFinding | undefined;
+
+  if (match.fingerprint) {
+    target = store.findings.find((f) => f.fingerprint === match.fingerprint && f.status === "open");
+  } else if (match.ruleId) {
+    target = store.findings.find(
+      (f) => f.ruleId === match.ruleId && f.status === "open" && (!match.filePath || f.filePath === match.filePath),
+    );
+  }
+
+  if (!target) return null;
+
+  target.status = status;
+  target.triagedAt = now;
+  target.triagedBy = triagedBy;
+  target.triageReason = reason;
+
+  if (!inMemory) {
+    saveFindingStore(store, dirOrStore as string);
+  }
+
+  return target;
+}
+
+/**
+ * List all findings with a specific triage status.
+ */
+export function getTriagedFindings(dirOrStore: string | FindingStore, status?: TriageStatus): TrackedFinding[] {
+  const store = typeof dirOrStore === "string" ? loadFindingStore(dirOrStore) : dirOrStore;
+  const triageStatuses = new Set<string>(["accepted-risk", "deferred", "wont-fix", "false-positive"]);
+
+  return store.findings.filter((f) => (status ? f.status === status : triageStatuses.has(f.status)));
+}
+
+/**
+ * Format triaged findings as a human-readable summary.
+ */
+export function formatTriageSummary(dirOrStore: string | FindingStore): string {
+  const store = typeof dirOrStore === "string" ? loadFindingStore(dirOrStore) : dirOrStore;
+  const triageStatuses = new Set<string>(["accepted-risk", "deferred", "wont-fix", "false-positive"]);
+  const triaged = store.findings.filter((f) => triageStatuses.has(f.status));
+
+  if (triaged.length === 0) {
+    return "  No triaged findings.";
+  }
+
+  const lines: string[] = [`  Triaged Findings: ${triaged.length}`, ""];
+
+  const grouped = new Map<string, TrackedFinding[]>();
+  for (const f of triaged) {
+    const list = grouped.get(f.status) || [];
+    list.push(f);
+    grouped.set(f.status, list);
+  }
+
+  const statusLabels: Record<string, string> = {
+    "accepted-risk": "⚠️  Accepted Risk",
+    deferred: "⏳ Deferred",
+    "wont-fix": "🚫 Won't Fix",
+    "false-positive": "❌ False Positive",
+  };
+
+  for (const [status, findings] of grouped) {
+    lines.push(`  ${statusLabels[status] || status} (${findings.length}):`);
+    for (const f of findings.slice(0, 10)) {
+      lines.push(`    [${f.severity.toUpperCase()}] ${f.ruleId}: ${f.title}`);
+      if (f.triageReason) {
+        lines.push(`      Reason: ${f.triageReason}`);
+      }
+    }
+    if (findings.length > 10) {
+      lines.push(`    ... and ${findings.length - 10} more`);
+    }
+    lines.push("");
   }
 
   return lines.join("\n");

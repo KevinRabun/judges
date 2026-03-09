@@ -17,6 +17,7 @@ import {
 import { evaluateCodeV2, evaluateProjectV2, getSupportedPolicyProfiles } from "../evaluators/v2.js";
 import { configSchema, toJudgesConfig } from "./schemas.js";
 import { buildSingleJudgeDeepReviewSection, buildTribunalDeepReviewSection } from "./deep-review.js";
+import type { RelatedFileSnippet } from "./deep-review.js";
 
 /**
  * Register evaluation-focused tools: get_judges, evaluate_code,
@@ -81,9 +82,24 @@ function registerEvaluateCode(server: McpServer): void {
         .max(1)
         .optional()
         .describe("Minimum finding confidence to include (0-1, default: 0)"),
+      relatedFiles: z
+        .array(
+          z.object({
+            path: z.string().describe("Relative file path"),
+            snippet: z.string().describe("Relevant code excerpt from the file"),
+            relationship: z
+              .string()
+              .optional()
+              .describe("Why this file is relevant (e.g. 'imported by target', 'shared type')"),
+          }),
+        )
+        .optional()
+        .describe(
+          "Related files that provide cross-file context for deeper analysis (imports, shared types, call sites)",
+        ),
       config: configSchema,
     },
-    async ({ code, language, context, includeAstFindings, minConfidence, config }) => {
+    async ({ code, language, context, includeAstFindings, minConfidence, relatedFiles, config }) => {
       try {
         const verdict = evaluateWithTribunal(code, language, context, {
           includeAstFindings,
@@ -92,7 +108,7 @@ function registerEvaluateCode(server: McpServer): void {
         });
 
         const patternResults = formatVerdictAsMarkdown(verdict);
-        const deepReview = buildTribunalDeepReviewSection(JUDGES, language, context);
+        const deepReview = buildTribunalDeepReviewSection(JUDGES, language, context, relatedFiles);
 
         return {
           content: [
@@ -145,9 +161,19 @@ function registerEvaluateSingleJudge(server: McpServer): void {
         .max(1)
         .optional()
         .describe("Minimum finding confidence to include (0-1, default: 0)"),
+      relatedFiles: z
+        .array(
+          z.object({
+            path: z.string().describe("Relative file path"),
+            snippet: z.string().describe("Relevant code excerpt from the file"),
+            relationship: z.string().optional().describe("Why this file is relevant"),
+          }),
+        )
+        .optional()
+        .describe("Related files that provide cross-file context for deeper analysis"),
       config: configSchema,
     },
-    async ({ code, language, judgeId, context, minConfidence, config }) => {
+    async ({ code, language, judgeId, context, minConfidence, relatedFiles, config }) => {
       try {
         const judge = getJudge(judgeId);
         if (!judge) {
@@ -168,7 +194,7 @@ function registerEvaluateSingleJudge(server: McpServer): void {
         });
 
         const patternResults = formatEvaluationAsMarkdown(evaluation);
-        const deepReview = buildSingleJudgeDeepReviewSection(judge, language, context);
+        const deepReview = buildSingleJudgeDeepReviewSection(judge, language, context, relatedFiles);
 
         return {
           content: [

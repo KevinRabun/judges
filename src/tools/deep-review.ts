@@ -67,9 +67,50 @@ export const DEEP_REVIEW_IDENTITY =
   `strengthen code quality, security defenses, and engineering standards. ` +
   `This is NOT a penetration test or adversarial security assessment.`;
 
+// ─── Related Files Context ───────────────────────────────────────────────────
+
+export interface RelatedFileSnippet {
+  /** Relative file path */
+  path: string;
+  /** Relevant code excerpt (truncated to keep prompt size manageable) */
+  snippet: string;
+  /** Why this file is relevant (e.g. "imported by target", "shared type") */
+  relationship?: string;
+}
+
+/**
+ * Format related files into a prompt section that gives the LLM cross-file
+ * visibility for deeper analysis.
+ */
+function formatRelatedFilesSection(relatedFiles: RelatedFileSnippet[]): string {
+  if (relatedFiles.length === 0) return "";
+
+  let md = `### Related Files\n\n`;
+  md += `> The following files are related to the code under review. Use them to `;
+  md += `understand cross-file data flow, shared types, imports, and call sites. `;
+  md += `These provide context only — focus your findings on the primary code above.\n\n`;
+
+  for (const f of relatedFiles) {
+    md += `<details>\n<summary><code>${f.path}</code>`;
+    if (f.relationship) md += ` — ${f.relationship}`;
+    md += `</summary>\n\n`;
+    // Limit snippet size to prevent prompt explosion
+    const truncated = f.snippet.length > 3000 ? f.snippet.slice(0, 3000) + "\n// ... truncated" : f.snippet;
+    md += `\`\`\`\n${truncated}\n\`\`\`\n`;
+    md += `</details>\n\n`;
+  }
+
+  return md;
+}
+
 // ─── Single-Judge Deep Review ────────────────────────────────────────────────
 
-export function buildSingleJudgeDeepReviewSection(judge: JudgeDefinition, language: string, context?: string): string {
+export function buildSingleJudgeDeepReviewSection(
+  judge: JudgeDefinition,
+  language: string,
+  context?: string,
+  relatedFiles?: RelatedFileSnippet[],
+): string {
   let md = `\n\n---\n\n`;
   md += `## 🔍 Deep Contextual Review Required\n\n`;
   md += DEFENSIVE_PREAMBLE;
@@ -81,6 +122,10 @@ export function buildSingleJudgeDeepReviewSection(judge: JudgeDefinition, langua
 
   if (context) {
     md += `**Context provided:** ${context}\n\n`;
+  }
+
+  if (relatedFiles && relatedFiles.length > 0) {
+    md += formatRelatedFilesSection(relatedFiles);
   }
 
   md += `### ${judge.name} — ${judge.domain}\n\n`;
@@ -119,7 +164,12 @@ export function buildSingleJudgeDeepReviewSection(judge: JudgeDefinition, langua
 
 // ─── Tribunal Deep Review (full) ─────────────────────────────────────────────
 
-export function buildTribunalDeepReviewSection(judges: JudgeDefinition[], language: string, context?: string): string {
+export function buildTribunalDeepReviewSection(
+  judges: JudgeDefinition[],
+  language: string,
+  context?: string,
+  relatedFiles?: RelatedFileSnippet[],
+): string {
   let md = `\n\n---\n\n`;
   md += `## 🔍 Deep Contextual Review Required\n\n`;
   md += DEFENSIVE_PREAMBLE;
@@ -132,6 +182,10 @@ export function buildTribunalDeepReviewSection(judges: JudgeDefinition[], langua
 
   if (context) {
     md += `**Context provided:** ${context}\n\n`;
+  }
+
+  if (relatedFiles && relatedFiles.length > 0) {
+    md += formatRelatedFilesSection(relatedFiles);
   }
 
   for (const judge of judges) {

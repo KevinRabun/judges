@@ -37,6 +37,7 @@ const cliCommands = new Set([
   "completions",
   "docs",
   "feedback",
+  "triage",
   "benchmark",
   "rule",
   "pack",

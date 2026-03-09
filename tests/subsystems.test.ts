@@ -9419,6 +9419,317 @@ describe("Finding Lifecycle — getFindingStats", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// L2 Closed-Loop Feedback — parseDismissedFindings & recordL2Feedback
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("L2 Closed-Loop Feedback — parseDismissedFindings", () => {
+  it("should extract dismissed findings from a standard Dismissed Findings section", async () => {
+    const { parseDismissedFindings } = await import("../src/commands/feedback.js");
+    const response = `## Findings
+Some findings here.
+
+### Dismissed Findings
+- SEC-001 — String literal in error message, not executable code
+- AUTH-003 — Test file with intentional bad credentials
+`;
+    const dismissed = parseDismissedFindings(response);
+    assert.strictEqual(dismissed.length, 2, "Should extract 2 dismissed findings");
+    assert.strictEqual(dismissed[0].ruleId, "SEC-001");
+    assert.ok(dismissed[0].reason.includes("String literal"));
+    assert.strictEqual(dismissed[1].ruleId, "AUTH-003");
+  });
+
+  it("should handle bold-formatted rule IDs", async () => {
+    const { parseDismissedFindings } = await import("../src/commands/feedback.js");
+    const response = `### Dismissed Findings
+- **SEC-002**: Variable name contains keyword, not dangerous operation
+- **DATA-001**: Logging for debugging only, data stays internal
+`;
+    const dismissed = parseDismissedFindings(response);
+    assert.strictEqual(dismissed.length, 2, "Should extract bold-formatted rule IDs");
+    assert.strictEqual(dismissed[0].ruleId, "SEC-002");
+    assert.strictEqual(dismissed[1].ruleId, "DATA-001");
+  });
+
+  it("should return empty array when no Dismissed Findings section exists", async () => {
+    const { parseDismissedFindings } = await import("../src/commands/feedback.js");
+    const response = `## Findings
+- SEC-001: SQL Injection detected
+Overall score: 65/100
+`;
+    const dismissed = parseDismissedFindings(response);
+    assert.strictEqual(dismissed.length, 0, "Should return empty when no section");
+  });
+
+  it("should handle multiple Dismissed Findings sections (tribunal grouped by judge)", async () => {
+    const { parseDismissedFindings } = await import("../src/commands/feedback.js");
+    const response = `### Cybersecurity Judge
+
+#### Dismissed Findings
+- SEC-001 — Comment context, not code
+
+### Data Sovereignty Judge
+
+#### Dismissed Findings
+- DATA-002 — Test fixture data
+`;
+    const dismissed = parseDismissedFindings(response);
+    assert.strictEqual(dismissed.length, 2, "Should extract from multiple sections");
+    assert.strictEqual(dismissed[0].ruleId, "SEC-001");
+    assert.strictEqual(dismissed[1].ruleId, "DATA-002");
+  });
+
+  it("should handle colon separator format", async () => {
+    const { parseDismissedFindings } = await import("../src/commands/feedback.js");
+    const response = `## Dismissed Findings
+PERF-003: Not a performance issue in this context
+COST-001: Intentional design choice
+`;
+    const dismissed = parseDismissedFindings(response);
+    assert.strictEqual(dismissed.length, 2);
+    assert.strictEqual(dismissed[0].ruleId, "PERF-003");
+    assert.strictEqual(dismissed[1].ruleId, "COST-001");
+  });
+});
+
+describe("L2 Closed-Loop Feedback — recordL2Feedback", () => {
+  it("should record dismissed findings to a feedback store (in-memory test)", async () => {
+    const { parseDismissedFindings, loadFeedbackStore, addFeedback } = await import("../src/commands/feedback.js");
+    const response = `### Dismissed Findings
+- SEC-001 — String literal context
+- AUTH-002 — Test file
+`;
+    const dismissed = parseDismissedFindings(response);
+    assert.strictEqual(dismissed.length, 2);
+
+    // Simulate what recordL2Feedback does without writing to disk
+    const store = loadFeedbackStore("/nonexistent/path/that/creates/empty/store");
+    for (const d of dismissed) {
+      addFeedback(store, {
+        ruleId: d.ruleId,
+        verdict: "fp",
+        comment: `L2 deep review dismissal: ${d.reason}`,
+        timestamp: new Date().toISOString(),
+        source: "l2-dismissal",
+      });
+    }
+
+    assert.strictEqual(store.entries.length, 2);
+    assert.strictEqual(store.entries[0].ruleId, "SEC-001");
+    assert.strictEqual(store.entries[0].verdict, "fp");
+    assert.strictEqual(store.entries[0].source, "l2-dismissal");
+    assert.strictEqual(store.entries[1].ruleId, "AUTH-002");
+    assert.strictEqual(store.entries[1].source, "l2-dismissal");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Finding Triage Workflow
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Finding Triage — triageFinding", () => {
+  it("should triage an open finding by ruleId", async () => {
+    const { updateFindings, triageFinding } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    const entries = [
+      { finding: makeFinding({ ruleId: "SEC-001", title: "SQL Injection", lineNumbers: [10] }), filePath: "src/db.ts" },
+    ];
+    updateFindings(entries, store);
+    const result = triageFinding(store, { ruleId: "SEC-001" }, "accepted-risk", "Mitigated by WAF", "kevin");
+    assert.ok(result, "Should return the triaged finding");
+    assert.strictEqual(result!.status, "accepted-risk");
+    assert.strictEqual(result!.triageReason, "Mitigated by WAF");
+    assert.strictEqual(result!.triagedBy, "kevin");
+    assert.ok(result!.triagedAt, "Should have triagedAt timestamp");
+  });
+
+  it("should triage by ruleId + filePath for disambiguation", async () => {
+    const { updateFindings, triageFinding } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    const entries = [
+      { finding: makeFinding({ ruleId: "SEC-001", title: "SQL Injection", lineNumbers: [10] }), filePath: "src/a.ts" },
+      { finding: makeFinding({ ruleId: "SEC-001", title: "SQL Injection", lineNumbers: [10] }), filePath: "src/b.ts" },
+    ];
+    updateFindings(entries, store);
+    const result = triageFinding(store, { ruleId: "SEC-001", filePath: "src/b.ts" }, "deferred");
+    assert.ok(result, "Should find the specific file's finding");
+    assert.strictEqual(result!.filePath, "src/b.ts");
+    assert.strictEqual(result!.status, "deferred");
+    // The other finding should remain open
+    const other = store.findings.find((f: any) => f.filePath === "src/a.ts");
+    assert.strictEqual(other!.status, "open");
+  });
+
+  it("should return null for nonexistent finding", async () => {
+    const { triageFinding } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    const result = triageFinding(store, { ruleId: "NOPE-999" }, "wont-fix");
+    assert.strictEqual(result, null, "Should return null when no matching finding");
+  });
+});
+
+describe("Finding Triage — getTriagedFindings", () => {
+  it("should return all triaged findings", async () => {
+    const { updateFindings, triageFinding, getTriagedFindings } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    updateFindings(
+      [
+        { finding: makeFinding({ ruleId: "SEC-001", title: "A", lineNumbers: [10] }), filePath: "a.ts" },
+        { finding: makeFinding({ ruleId: "SEC-002", title: "B", lineNumbers: [20] }), filePath: "b.ts" },
+        { finding: makeFinding({ ruleId: "SEC-003", title: "C", lineNumbers: [30] }), filePath: "c.ts" },
+      ],
+      store,
+    );
+    triageFinding(store, { ruleId: "SEC-001" }, "accepted-risk");
+    triageFinding(store, { ruleId: "SEC-002" }, "false-positive");
+
+    const allTriaged = getTriagedFindings(store);
+    assert.strictEqual(allTriaged.length, 2, "Should have 2 triaged findings");
+
+    const fpOnly = getTriagedFindings(store, "false-positive");
+    assert.strictEqual(fpOnly.length, 1, "Should have 1 false-positive");
+    assert.strictEqual(fpOnly[0].ruleId, "SEC-002");
+  });
+});
+
+describe("Finding Triage — triage status preserved across runs", () => {
+  it("should NOT auto-fix triaged findings when they disappear from code", async () => {
+    const { updateFindings, triageFinding } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    const entries = [
+      { finding: makeFinding({ ruleId: "SEC-001", title: "A", lineNumbers: [10] }), filePath: "a.ts" },
+      { finding: makeFinding({ ruleId: "SEC-002", title: "B", lineNumbers: [20] }), filePath: "b.ts" },
+    ];
+
+    // Run 1: both findings detected
+    updateFindings(entries, store);
+
+    // Triage SEC-001 as accepted-risk
+    triageFinding(store, { ruleId: "SEC-001" }, "accepted-risk", "By design");
+
+    // Run 2: neither finding appears in code anymore
+    const delta = updateFindings([], store);
+
+    // SEC-002 (open) should be marked as fixed
+    const sec002 = store.findings.find((f: any) => f.ruleId === "SEC-002");
+    assert.strictEqual(sec002!.status, "fixed", "Un-triaged finding should be auto-fixed");
+
+    // SEC-001 (triaged) should RETAIN its accepted-risk status
+    const sec001 = store.findings.find((f: any) => f.ruleId === "SEC-001");
+    assert.strictEqual(sec001!.status, "accepted-risk", "Triaged finding should keep its triage status");
+  });
+});
+
+describe("Finding Triage — formatTriageSummary", () => {
+  it("should format empty triage summary", async () => {
+    const { formatTriageSummary } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    const summary = formatTriageSummary(store);
+    assert.ok(summary.includes("No triaged findings"), "Should indicate no triaged findings");
+  });
+
+  it("should group findings by triage status", async () => {
+    const { updateFindings, triageFinding, formatTriageSummary } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    updateFindings(
+      [
+        { finding: makeFinding({ ruleId: "SEC-001", title: "A", lineNumbers: [10] }), filePath: "a.ts" },
+        { finding: makeFinding({ ruleId: "SEC-002", title: "B", lineNumbers: [20] }), filePath: "b.ts" },
+      ],
+      store,
+    );
+    triageFinding(store, { ruleId: "SEC-001" }, "accepted-risk", "OK");
+    triageFinding(store, { ruleId: "SEC-002" }, "deferred", "Next sprint");
+    const summary = formatTriageSummary(store);
+    assert.ok(summary.includes("Triaged Findings: 2"), "Should count triaged findings");
+    assert.ok(summary.includes("Accepted Risk"), "Should show accepted risk category");
+    assert.ok(summary.includes("Deferred"), "Should show deferred category");
+  });
+});
+
+describe("Finding Triage — getFindingStats includes triage counts", () => {
+  it("should include totalTriaged and byTriageStatus", async () => {
+    const { updateFindings, triageFinding, getFindingStats } = await import("../src/finding-lifecycle.js");
+    const store = { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] as any[] };
+    updateFindings(
+      [
+        { finding: makeFinding({ ruleId: "SEC-001", title: "A", lineNumbers: [10] }), filePath: "a.ts" },
+        { finding: makeFinding({ ruleId: "SEC-002", title: "B", lineNumbers: [20] }), filePath: "b.ts" },
+        { finding: makeFinding({ ruleId: "SEC-003", title: "C", lineNumbers: [30] }), filePath: "c.ts" },
+      ],
+      store,
+    );
+    triageFinding(store, { ruleId: "SEC-001" }, "accepted-risk");
+    triageFinding(store, { ruleId: "SEC-002" }, "false-positive");
+
+    const stats = getFindingStats(store);
+    assert.strictEqual(stats.totalTriaged, 2, "Should have 2 triaged findings");
+    assert.strictEqual(stats.byTriageStatus["accepted-risk"], 1);
+    assert.strictEqual(stats.byTriageStatus["false-positive"], 1);
+    assert.strictEqual(stats.totalOpen, 1, "Only SEC-003 is open");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Multi-File Context in L2 Prompts
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Multi-File Context — buildSingleJudgeDeepReviewSection with relatedFiles", () => {
+  it("should include related files section when relatedFiles are provided", async () => {
+    const { buildSingleJudgeDeepReviewSection } = await import("../src/tools/deep-review.js");
+    const judge = JUDGES[0]; // any judge
+    const relatedFiles = [
+      {
+        path: "src/auth.ts",
+        snippet: "export function verifyToken(t: string) { ... }",
+        relationship: "imported by target",
+      },
+      {
+        path: "src/types.ts",
+        snippet: "export interface User { id: string; role: string; }",
+        relationship: "shared type",
+      },
+    ];
+    const section = buildSingleJudgeDeepReviewSection(judge, "typescript", "API handler", relatedFiles);
+    assert.ok(section.includes("Related Files"), "Should include Related Files heading");
+    assert.ok(section.includes("src/auth.ts"), "Should include first related file path");
+    assert.ok(section.includes("src/types.ts"), "Should include second related file path");
+    assert.ok(section.includes("imported by target"), "Should include relationship text");
+    assert.ok(section.includes("verifyToken"), "Should include code snippet");
+  });
+
+  it("should NOT include related files section when relatedFiles is empty or absent", async () => {
+    const { buildSingleJudgeDeepReviewSection } = await import("../src/tools/deep-review.js");
+    const judge = JUDGES[0];
+    const withEmpty = buildSingleJudgeDeepReviewSection(judge, "typescript", undefined, []);
+    assert.ok(!withEmpty.includes("Related Files"), "Empty array should not produce Related Files section");
+    const withoutArg = buildSingleJudgeDeepReviewSection(judge, "typescript");
+    assert.ok(!withoutArg.includes("Related Files"), "No arg should not produce Related Files section");
+  });
+});
+
+describe("Multi-File Context — buildTribunalDeepReviewSection with relatedFiles", () => {
+  it("should include related files section when provided", async () => {
+    const { buildTribunalDeepReviewSection } = await import("../src/tools/deep-review.js");
+    const relatedFiles = [{ path: "lib/db.ts", snippet: "export const pool = new Pool(config);" }];
+    const section = buildTribunalDeepReviewSection(JUDGES, "typescript", "Database module", relatedFiles);
+    assert.ok(section.includes("Related Files"), "Should include Related Files heading");
+    assert.ok(section.includes("lib/db.ts"), "Should include file path");
+    assert.ok(section.includes("new Pool"), "Should include code snippet");
+  });
+
+  it("should truncate very long snippets", async () => {
+    const { buildSingleJudgeDeepReviewSection } = await import("../src/tools/deep-review.js");
+    const judge = JUDGES[0];
+    const longSnippet = "x".repeat(5000);
+    const relatedFiles = [{ path: "big.ts", snippet: longSnippet }];
+    const section = buildSingleJudgeDeepReviewSection(judge, "typescript", undefined, relatedFiles);
+    assert.ok(section.includes("// ... truncated"), "Should truncate long snippets");
+    assert.ok(!section.includes("x".repeat(5000)), "Should NOT include full 5000-char snippet");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // New Language Patches — enrichWithPatches
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -10038,5 +10349,421 @@ describe("LSP Server module", () => {
   it("exports runLsp function", async () => {
     const mod = await import("../src/commands/lsp.js");
     assert.ok(typeof mod.runLsp === "function", "should export runLsp");
+  });
+});
+// ═══════════════════════════════════════════════════════════════════════════
+// L2 Coverage Analysis (Gap 4)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("L2 Coverage Analysis — analyzeL2Coverage", () => {
+  it("should compute coverage for a result with false negatives", async () => {
+    const { analyzeL2Coverage } = await import("../src/commands/benchmark.js");
+    const mockResult = {
+      timestamp: "2024-01-01",
+      version: "1.0.0",
+      totalCases: 3,
+      detected: 1,
+      missed: 2,
+      totalExpected: 4,
+      truePositives: 1,
+      falseNegatives: 3,
+      falsePositives: 0,
+      precision: 1,
+      recall: 0.25,
+      f1Score: 0.4,
+      detectionRate: 0.33,
+      strictTruePositives: 1,
+      strictFalseNegatives: 3,
+      strictPrecision: 1,
+      strictRecall: 0.25,
+      strictF1Score: 0.4,
+      perCategory: {},
+      perJudge: {},
+      perDifficulty: {},
+      cases: [
+        {
+          caseId: "test-1",
+          category: "injection",
+          difficulty: "easy",
+          passed: true,
+          expectedRuleIds: ["CYBER-001"],
+          detectedRuleIds: ["CYBER-001"],
+          missedRuleIds: [],
+          falsePositiveRuleIds: [],
+        },
+        {
+          caseId: "test-2",
+          category: "auth",
+          difficulty: "medium",
+          passed: false,
+          expectedRuleIds: ["AUTH-001", "SEC-001"],
+          detectedRuleIds: [],
+          missedRuleIds: ["AUTH-001", "SEC-001"],
+          falsePositiveRuleIds: [],
+        },
+        {
+          caseId: "test-3",
+          category: "injection",
+          difficulty: "hard",
+          passed: false,
+          expectedRuleIds: ["CYBER-002"],
+          detectedRuleIds: [],
+          missedRuleIds: ["CYBER-002"],
+          falsePositiveRuleIds: [],
+        },
+      ],
+    };
+
+    const analysis = analyzeL2Coverage(mockResult as any);
+    assert.strictEqual(analysis.totalFalseNegatives, 3, "Should have 3 total FNs");
+    assert.ok(analysis.l2CoverageRate >= 0 && analysis.l2CoverageRate <= 1, "Coverage rate should be 0-1");
+    assert.ok(analysis.perCategory["auth"], "Should have auth category");
+    assert.ok(analysis.perCategory["injection"], "Should have injection category");
+    assert.strictEqual(analysis.perCategory["auth"].falseNegatives, 2, "Auth should have 2 FNs");
+    assert.strictEqual(analysis.perCategory["injection"].falseNegatives, 1, "Injection should have 1 FN");
+  });
+
+  it("should return zero coverage for result with no false negatives", async () => {
+    const { analyzeL2Coverage } = await import("../src/commands/benchmark.js");
+    const mockResult = {
+      timestamp: "2024-01-01",
+      version: "1.0.0",
+      totalCases: 1,
+      detected: 1,
+      missed: 0,
+      totalExpected: 1,
+      truePositives: 1,
+      falseNegatives: 0,
+      falsePositives: 0,
+      precision: 1,
+      recall: 1,
+      f1Score: 1,
+      detectionRate: 1,
+      strictTruePositives: 1,
+      strictFalseNegatives: 0,
+      strictPrecision: 1,
+      strictRecall: 1,
+      strictF1Score: 1,
+      perCategory: {},
+      perJudge: {},
+      perDifficulty: {},
+      cases: [
+        {
+          caseId: "test-clean",
+          category: "clean",
+          difficulty: "easy",
+          passed: true,
+          expectedRuleIds: ["CYBER-001"],
+          detectedRuleIds: ["CYBER-001"],
+          missedRuleIds: [],
+          falsePositiveRuleIds: [],
+        },
+      ],
+    };
+
+    const analysis = analyzeL2Coverage(mockResult as any);
+    assert.strictEqual(analysis.totalFalseNegatives, 0);
+    assert.strictEqual(analysis.l2Coverable, 0);
+    assert.strictEqual(analysis.l2CoverageRate, 0);
+  });
+});
+
+describe("L2 Coverage Analysis — formatL2CoverageReport", () => {
+  it("should produce markdown report with expected sections", async () => {
+    const { formatL2CoverageReport } = await import("../src/commands/benchmark.js");
+    const analysis = {
+      totalFalseNegatives: 5,
+      l2Coverable: 3,
+      l2CoverageRate: 0.6,
+      perJudge: {
+        CYBER: {
+          judgeId: "cybersecurity",
+          judgeName: "Cybersecurity",
+          falseNegatives: 3,
+          hasL2Prompt: true,
+          promptLength: 500,
+        },
+        AUTH: {
+          judgeId: "authentication",
+          judgeName: "Authentication",
+          falseNegatives: 2,
+          hasL2Prompt: false,
+          promptLength: 0,
+        },
+      },
+      perCategory: {
+        injection: { category: "injection", falseNegatives: 3, l2Coverable: 3, coverageRate: 1 },
+        auth: { category: "auth", falseNegatives: 2, l2Coverable: 0, coverageRate: 0 },
+      },
+      perDifficulty: {
+        easy: { difficulty: "easy", falseNegatives: 2, l2Coverable: 2 },
+        hard: { difficulty: "hard", falseNegatives: 3, l2Coverable: 1 },
+      },
+      missedCasesByJudge: { CYBER: ["test-1", "test-2"] },
+    };
+
+    const report = formatL2CoverageReport(analysis as any);
+    assert.ok(report.includes("L2 (LLM Deep Review) Coverage Analysis"), "Should have title");
+    assert.ok(report.includes("L1 Misses by Judge"), "Should have per-judge section");
+    assert.ok(report.includes("L2 Coverage by Category"), "Should have per-category section");
+    assert.ok(report.includes("L2 Coverage by Difficulty"), "Should have per-difficulty section");
+    assert.ok(report.includes("Cybersecurity"), "Should mention judge name");
+    assert.ok(report.includes("60.0%"), "Should include coverage rate");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Benchmark Case Ingestion (Gap 5)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Benchmark Ingestion — ingestFindingsAsBenchmarkCases", () => {
+  it("should convert findings to benchmark cases", async () => {
+    const { ingestFindingsAsBenchmarkCases } = await import("../src/commands/benchmark.js");
+    const inputs = [
+      {
+        code: "const x = eval(userInput);",
+        language: "javascript",
+        findings: [{ ruleId: "SEC-001" }, { ruleId: "CYBER-003" }],
+      },
+      {
+        code: "db.query('SELECT * FROM users WHERE id=' + id)",
+        language: "typescript",
+        findings: [{ ruleId: "CYBER-001" }],
+      },
+    ];
+
+    const cases = ingestFindingsAsBenchmarkCases(inputs);
+    assert.strictEqual(cases.length, 2, "Should produce 2 cases");
+    assert.ok(cases[0].id.startsWith("ingested-1-"), "Case 1 ID should start with ingested-1-");
+    assert.ok(cases[0].expectedRuleIds.includes("SEC-001"), "Should include SEC-001");
+    assert.ok(cases[0].expectedRuleIds.includes("CYBER-003"), "Should include CYBER-003");
+    assert.strictEqual(cases[1].language, "typescript");
+    assert.strictEqual(cases[1].difficulty, "medium");
+  });
+
+  it("should skip entries with no code or findings", async () => {
+    const { ingestFindingsAsBenchmarkCases } = await import("../src/commands/benchmark.js");
+    const inputs = [
+      { code: "", language: "js", findings: [{ ruleId: "X-001" }] },
+      { code: "const x = 1;", language: "js", findings: [] },
+      { code: "const x = 1;", language: "js", findings: [{ ruleId: "SEC-001" }] },
+    ];
+
+    const cases = ingestFindingsAsBenchmarkCases(inputs);
+    assert.strictEqual(cases.length, 1, "Should only produce 1 valid case");
+  });
+
+  it("should truncate long code snippets", async () => {
+    const { ingestFindingsAsBenchmarkCases } = await import("../src/commands/benchmark.js");
+    const longCode = "x".repeat(3000);
+    const inputs = [{ code: longCode, language: "ts", findings: [{ ruleId: "SEC-001" }] }];
+    const cases = ingestFindingsAsBenchmarkCases(inputs);
+    assert.ok(cases[0].code.length < 3000, "Should truncate long code");
+    assert.ok(cases[0].code.includes("truncated"), "Should include truncation marker");
+  });
+});
+
+describe("Benchmark Ingestion — deduplicateIngestCases", () => {
+  it("should remove cases with duplicate code", async () => {
+    const { deduplicateIngestCases } = await import("../src/commands/benchmark.js");
+    const existing = [
+      {
+        id: "existing-1",
+        description: "test",
+        language: "ts",
+        code: "const x = 1;",
+        expectedRuleIds: ["SEC-001"],
+        category: "sec",
+        difficulty: "easy" as const,
+      },
+    ];
+    const candidates = [
+      {
+        id: "new-1",
+        description: "dup",
+        language: "ts",
+        code: "const x = 1;",
+        expectedRuleIds: ["SEC-001"],
+        category: "sec",
+        difficulty: "easy" as const,
+      },
+      {
+        id: "new-2",
+        description: "novel",
+        language: "ts",
+        code: "const y = 2;",
+        expectedRuleIds: ["SEC-002"],
+        category: "sec",
+        difficulty: "easy" as const,
+      },
+    ];
+
+    const result = deduplicateIngestCases(existing, candidates);
+    assert.strictEqual(result.length, 1, "Should keep only the novel case");
+    assert.strictEqual(result[0].id, "new-2");
+  });
+
+  it("should normalize whitespace for dedup comparison", async () => {
+    const { deduplicateIngestCases } = await import("../src/commands/benchmark.js");
+    const existing = [
+      {
+        id: "e1",
+        description: "",
+        language: "ts",
+        code: "const  x = 1;  ",
+        expectedRuleIds: [],
+        category: "c",
+        difficulty: "easy" as const,
+      },
+    ];
+    const candidates = [
+      {
+        id: "c1",
+        description: "",
+        language: "ts",
+        code: "const x = 1;",
+        expectedRuleIds: [],
+        category: "c",
+        difficulty: "easy" as const,
+      },
+    ];
+
+    const result = deduplicateIngestCases(existing, candidates);
+    assert.strictEqual(result.length, 0, "Should detect whitespace-normalized duplicates");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Org Policy Management (Gap 6)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Policy Lock — validatePolicyCompliance", () => {
+  it("should pass when config complies with empty policy", async () => {
+    const { validatePolicyCompliance } = await import("../src/commands/config-share.js");
+    const config = { minSeverity: "medium" as const };
+    const lock = { version: "1.0.0", createdAt: "2024-01-01" };
+    const result = validatePolicyCompliance(config, lock);
+    assert.strictEqual(result.valid, true);
+    assert.strictEqual(result.violations.length, 0);
+  });
+
+  it("should fail when required judge is disabled", async () => {
+    const { validatePolicyCompliance } = await import("../src/commands/config-share.js");
+    const config = { disabledJudges: ["cybersecurity", "authentication"] };
+    const lock = {
+      version: "1.0.0",
+      createdAt: "2024-01-01",
+      requiredJudges: ["cybersecurity"],
+    };
+    const result = validatePolicyCompliance(config, lock);
+    assert.strictEqual(result.valid, false);
+    assert.ok(result.violations.some((v: string) => v.includes("cybersecurity")));
+  });
+
+  it("should fail when required rule is disabled", async () => {
+    const { validatePolicyCompliance } = await import("../src/commands/config-share.js");
+    const config = { disabledRules: ["CYBER-001"] };
+    const lock = {
+      version: "1.0.0",
+      createdAt: "2024-01-01",
+      requiredRules: ["CYBER-001"],
+    };
+    const result = validatePolicyCompliance(config, lock);
+    assert.strictEqual(result.valid, false);
+    assert.ok(result.violations.some((v: string) => v.includes("CYBER-001")));
+  });
+
+  it("should fail when severity exceeds policy maximum", async () => {
+    const { validatePolicyCompliance } = await import("../src/commands/config-share.js");
+    const config = { minSeverity: "low" as const };
+    const lock = {
+      version: "1.0.0",
+      createdAt: "2024-01-01",
+      maxMinSeverity: "medium",
+    };
+    const result = validatePolicyCompliance(config, lock);
+    assert.strictEqual(result.valid, false);
+    assert.ok(result.violations.some((v: string) => v.includes("minSeverity")));
+  });
+
+  it("should pass when severity is within policy", async () => {
+    const { validatePolicyCompliance } = await import("../src/commands/config-share.js");
+    const config = { minSeverity: "high" as const };
+    const lock = {
+      version: "1.0.0",
+      createdAt: "2024-01-01",
+      maxMinSeverity: "medium",
+    };
+    const result = validatePolicyCompliance(config, lock);
+    assert.strictEqual(result.valid, true);
+  });
+
+  it("should fail when project disables judges not in baseline", async () => {
+    const { validatePolicyCompliance } = await import("../src/commands/config-share.js");
+    const config = { disabledJudges: ["documentation", "testing"] };
+    const lock = {
+      version: "1.0.0",
+      createdAt: "2024-01-01",
+      baselineConfig: { disabledJudges: ["documentation"] },
+    };
+    const result = validatePolicyCompliance(config, lock);
+    assert.strictEqual(result.valid, false);
+    assert.ok(result.violations.some((v: string) => v.includes("testing")));
+    // "documentation" is allowed since it's in the baseline
+    assert.ok(!result.violations.some((v: string) => v.includes("documentation")));
+  });
+});
+
+describe("Policy Lock — pullRemoteConfig validation", () => {
+  it("should reject non-HTTPS URLs", async () => {
+    const { pullRemoteConfig } = await import("../src/commands/config-share.js");
+    await assert.rejects(
+      () => pullRemoteConfig("http://example.com/config.json"),
+      (err: Error) => err.message.includes("Only HTTPS"),
+    );
+  });
+
+  it("should reject private/internal URLs", async () => {
+    const { pullRemoteConfig } = await import("../src/commands/config-share.js");
+    await assert.rejects(
+      () => pullRemoteConfig("https://localhost/config.json"),
+      (err: Error) => err.message.includes("private/internal"),
+    );
+    await assert.rejects(
+      () => pullRemoteConfig("https://127.0.0.1/config.json"),
+      (err: Error) => err.message.includes("private/internal"),
+    );
+    await assert.rejects(
+      () => pullRemoteConfig("https://192.168.1.1/config.json"),
+      (err: Error) => err.message.includes("private/internal"),
+    );
+  });
+
+  it("should reject invalid URLs", async () => {
+    const { pullRemoteConfig } = await import("../src/commands/config-share.js");
+    await assert.rejects(
+      () => pullRemoteConfig("not-a-url"),
+      (err: Error) => err.message.includes("Invalid URL"),
+    );
+  });
+});
+
+describe("Config Merge — mergeConfigs", () => {
+  it("should merge disabled judges as union", async () => {
+    const { mergeConfigs } = await import("../src/commands/config-share.js");
+    const base = { disabledJudges: ["documentation"] };
+    const overlay = { disabledJudges: ["testing", "documentation"] };
+    const merged = mergeConfigs(base, overlay);
+    assert.ok(merged.disabledJudges!.includes("documentation"));
+    assert.ok(merged.disabledJudges!.includes("testing"));
+    assert.strictEqual(merged.disabledJudges!.length, 2, "Should deduplicate");
+  });
+
+  it("should override minSeverity", async () => {
+    const { mergeConfigs } = await import("../src/commands/config-share.js");
+    const base = { minSeverity: "low" as const };
+    const overlay = { minSeverity: "high" as const };
+    const merged = mergeConfigs(base, overlay);
+    assert.strictEqual(merged.minSeverity, "high");
   });
 });

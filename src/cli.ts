@@ -56,6 +56,7 @@ import { runRule } from "./commands/rule.js";
 import { runPack } from "./commands/language-packs.js";
 import { runConfig } from "./commands/config-share.js";
 import { runDoctor } from "./commands/doctor.js";
+import { runTriage } from "./commands/triage.js";
 import { formatComparisonReport, formatFullComparisonMatrix, TOOL_PROFILES } from "./comparison.js";
 
 // ─── Language Detection from Extension ──────────────────────────────────────
@@ -811,6 +812,12 @@ export async function runCli(argv: string[]): Promise<void> {
   // ─── Feedback Command ─────────────────────────────────────────────────
   if (args.command === "feedback") {
     runFeedback(argv);
+    return;
+  }
+
+  // ─── Triage Command ───────────────────────────────────────────────────
+  if (args.command === "triage") {
+    runTriage(argv);
     return;
   }
 

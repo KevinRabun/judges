@@ -14,7 +14,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { resolve, dirname } from "path";
 import { evaluateWithTribunal, evaluateWithJudge } from "../evaluators/index.js";
-import { getJudge } from "../judges/index.js";
+import { getJudge, JUDGES } from "../judges/index.js";
 import type { Finding } from "../types.js";
 import { EXPANDED_BENCHMARK_CASES } from "./benchmark-expanded.js";
 import { EXPANDED_BENCHMARK_CASES_2 } from "./benchmark-expanded-2.js";
@@ -2895,6 +2895,8 @@ USAGE:
   judges benchmark run [--judge <id>]     Run benchmark suite
   judges benchmark report                  Generate markdown benchmark report
   judges benchmark compare <a.json> <b.json>  Compare two runs
+  judges benchmark l2-coverage             Analyze L2 prompt coverage of L1 gaps
+  judges benchmark ingest <file.json>      Ingest findings as benchmark cases
 
 OPTIONS:
   --judge, -j <id>     Benchmark a single judge
@@ -3108,6 +3110,332 @@ CI GATE OPTIONS:
     process.exit(0);
   }
 
+  if (subcommand === "l2-coverage") {
+    const result = runBenchmarkSuite(undefined, judgeId);
+    const analysis = analyzeL2Coverage(result);
+    const report = formatL2CoverageReport(analysis);
+    if (outputPath) {
+      const dir = dirname(resolve(outputPath));
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      writeFileSync(resolve(outputPath), format === "json" ? JSON.stringify(analysis, null, 2) : report, "utf-8");
+      console.log(`\n  L2 coverage report saved to: ${outputPath}`);
+    } else if (format === "json") {
+      console.log(JSON.stringify(analysis, null, 2));
+    } else {
+      console.log(report);
+    }
+    process.exit(0);
+  }
+
+  if (subcommand === "ingest") {
+    const findingsFile = argv[4];
+    if (!findingsFile) {
+      console.error("Error: Specify a findings JSON file to ingest.");
+      console.error("Usage: judges benchmark ingest <findings.json> [--output cases.json]");
+      process.exit(1);
+    }
+    try {
+      const raw = JSON.parse(readFileSync(resolve(findingsFile), "utf-8"));
+      const findings: Array<{ code: string; language: string; findings: Array<{ ruleId: string }> }> = Array.isArray(
+        raw,
+      )
+        ? raw
+        : [raw];
+      const candidates = ingestFindingsAsBenchmarkCases(findings);
+      const deduped = deduplicateIngestCases(BENCHMARK_CASES, candidates);
+      const outPath = outputPath || "ingested-benchmark-cases.json";
+      writeFileSync(resolve(outPath), JSON.stringify(deduped, null, 2), "utf-8");
+      console.log(`\n  ✅ Ingested ${deduped.length} new benchmark cases (from ${candidates.length} candidates)`);
+      console.log(`  Saved to: ${outPath}`);
+      console.log(`  Review and add to a benchmark case array to include in the suite.`);
+    } catch (err: unknown) {
+      console.error(`Error ingesting findings: ${(err as Error).message}`);
+      process.exit(1);
+    }
+    process.exit(0);
+  }
+
   console.error(`Unknown benchmark subcommand: ${subcommand}`);
   process.exit(1);
+}
+
+// ─── L2 Coverage Analysis ───────────────────────────────────────────────────
+// Analyzes which L1 false negatives would be addressable by L2 (LLM-based)
+// deep review prompts, providing visibility into the value L2 adds.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface L2CoverageAnalysis {
+  /** Total false negatives from L1-only benchmark */
+  totalFalseNegatives: number;
+  /** False negatives whose rule prefix maps to a judge with an L2 systemPrompt */
+  l2Coverable: number;
+  /** L2 coverage ratio: l2Coverable / totalFalseNegatives */
+  l2CoverageRate: number;
+  /** Per-judge breakdown of L1 misses that L2 could address */
+  perJudge: Record<string, L2JudgeCoverage>;
+  /** Per-category breakdown */
+  perCategory: Record<string, L2CategoryCoverage>;
+  /** Per-difficulty breakdown */
+  perDifficulty: Record<string, { difficulty: string; falseNegatives: number; l2Coverable: number }>;
+  /** Missed case IDs grouped by responsible judge prefix */
+  missedCasesByJudge: Record<string, string[]>;
+}
+
+export interface L2JudgeCoverage {
+  judgeId: string;
+  judgeName: string;
+  /** Number of L1 false negatives mapping to this judge */
+  falseNegatives: number;
+  /** Whether this judge has an L2 systemPrompt */
+  hasL2Prompt: boolean;
+  /** Length of the L2 systemPrompt (0 if none) */
+  promptLength: number;
+}
+
+export interface L2CategoryCoverage {
+  category: string;
+  falseNegatives: number;
+  l2Coverable: number;
+  coverageRate: number;
+}
+
+/**
+ * Analyze which L1 false negatives are coverable by L2 prompts.
+ *
+ * Maps each missed rule ID back to its judge (via rule prefix) and checks
+ * whether that judge has an L2 systemPrompt. This reveals the theoretical
+ * value L2 adds on top of L1 pattern matching.
+ */
+export function analyzeL2Coverage(result: BenchmarkResult): L2CoverageAnalysis {
+  const judgesByPrefix: Record<string, { id: string; name: string; systemPrompt: string }> = {};
+  for (const j of JUDGES) {
+    judgesByPrefix[j.rulePrefix] = { id: j.id, name: j.name, systemPrompt: j.systemPrompt };
+  }
+
+  const perJudge: Record<string, L2JudgeCoverage> = {};
+  const perCategory: Record<string, L2CategoryCoverage> = {};
+  const perDifficulty: Record<string, { difficulty: string; falseNegatives: number; l2Coverable: number }> = {};
+  const missedCasesByJudge: Record<string, string[]> = {};
+
+  let totalFN = 0;
+  let l2Coverable = 0;
+
+  for (const c of result.cases) {
+    if (c.missedRuleIds.length === 0) continue;
+
+    for (const missedRule of c.missedRuleIds) {
+      totalFN++;
+      const prefix = missedRule.split("-")[0];
+      const judge = judgesByPrefix[prefix];
+
+      // Initialize per-judge
+      if (!perJudge[prefix]) {
+        perJudge[prefix] = {
+          judgeId: judge?.id ?? prefix,
+          judgeName: judge?.name ?? prefix,
+          falseNegatives: 0,
+          hasL2Prompt: !!(judge?.systemPrompt && judge.systemPrompt.length > 0),
+          promptLength: judge?.systemPrompt?.length ?? 0,
+        };
+      }
+      perJudge[prefix].falseNegatives++;
+
+      // Track by judge prefix
+      if (!missedCasesByJudge[prefix]) missedCasesByJudge[prefix] = [];
+      if (!missedCasesByJudge[prefix].includes(c.caseId)) {
+        missedCasesByJudge[prefix].push(c.caseId);
+      }
+
+      // L2 coverable?
+      const coverable = !!(judge?.systemPrompt && judge.systemPrompt.length > 0);
+      if (coverable) l2Coverable++;
+
+      // Per-category
+      if (!perCategory[c.category]) {
+        perCategory[c.category] = { category: c.category, falseNegatives: 0, l2Coverable: 0, coverageRate: 0 };
+      }
+      perCategory[c.category].falseNegatives++;
+      if (coverable) perCategory[c.category].l2Coverable++;
+
+      // Per-difficulty
+      if (!perDifficulty[c.difficulty]) {
+        perDifficulty[c.difficulty] = { difficulty: c.difficulty, falseNegatives: 0, l2Coverable: 0 };
+      }
+      perDifficulty[c.difficulty].falseNegatives++;
+      if (coverable) perDifficulty[c.difficulty].l2Coverable++;
+    }
+  }
+
+  // Compute coverage rates
+  for (const cat of Object.values(perCategory)) {
+    cat.coverageRate = cat.falseNegatives > 0 ? cat.l2Coverable / cat.falseNegatives : 0;
+  }
+
+  return {
+    totalFalseNegatives: totalFN,
+    l2Coverable,
+    l2CoverageRate: totalFN > 0 ? l2Coverable / totalFN : 0,
+    perJudge,
+    perCategory,
+    perDifficulty,
+    missedCasesByJudge,
+  };
+}
+
+/**
+ * Format an L2 coverage analysis as a markdown report.
+ */
+export function formatL2CoverageReport(analysis: L2CoverageAnalysis): string {
+  const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+  const lines: string[] = [];
+
+  lines.push("# L2 (LLM Deep Review) Coverage Analysis");
+  lines.push("");
+  lines.push("This report analyzes which L1 (pattern-based) false negatives are");
+  lines.push("theoretically coverable by L2 (LLM deep review) prompts.");
+  lines.push("");
+  lines.push("## Summary");
+  lines.push("");
+  lines.push(`| Metric | Value |`);
+  lines.push(`|--------|-------|`);
+  lines.push(`| Total L1 False Negatives | ${analysis.totalFalseNegatives} |`);
+  lines.push(`| L2-Coverable | ${analysis.l2Coverable} |`);
+  lines.push(`| L2 Coverage Rate | ${pct(analysis.l2CoverageRate)} |`);
+  lines.push("");
+
+  // Per-judge breakdown
+  const judges = Object.values(analysis.perJudge).sort((a, b) => b.falseNegatives - a.falseNegatives);
+  if (judges.length > 0) {
+    lines.push("## L1 Misses by Judge");
+    lines.push("");
+    lines.push("| Judge | FN Count | Has L2 Prompt | Prompt Size |");
+    lines.push("|-------|----------|---------------|-------------|");
+    for (const j of judges) {
+      lines.push(
+        `| ${j.judgeName} (${j.judgeId}) | ${j.falseNegatives} | ${j.hasL2Prompt ? "✅" : "❌"} | ${j.promptLength > 0 ? `${j.promptLength} chars` : "—"} |`,
+      );
+    }
+    lines.push("");
+  }
+
+  // Per-category breakdown
+  const categories = Object.values(analysis.perCategory).sort((a, b) => b.falseNegatives - a.falseNegatives);
+  if (categories.length > 0) {
+    lines.push("## L2 Coverage by Category");
+    lines.push("");
+    lines.push("| Category | L1 Misses | L2-Coverable | Coverage |");
+    lines.push("|----------|-----------|--------------|----------|");
+    for (const cat of categories) {
+      lines.push(`| ${cat.category} | ${cat.falseNegatives} | ${cat.l2Coverable} | ${pct(cat.coverageRate)} |`);
+    }
+    lines.push("");
+  }
+
+  // Per-difficulty breakdown
+  const difficulties = Object.values(analysis.perDifficulty);
+  if (difficulties.length > 0) {
+    lines.push("## L2 Coverage by Difficulty");
+    lines.push("");
+    lines.push("| Difficulty | L1 Misses | L2-Coverable |");
+    lines.push("|------------|-----------|--------------|");
+    for (const d of difficulties) {
+      lines.push(`| ${d.difficulty} | ${d.falseNegatives} | ${d.l2Coverable} |`);
+    }
+    lines.push("");
+  }
+
+  // Top missed cases by judge
+  const topJudges = judges.slice(0, 5);
+  if (topJudges.length > 0) {
+    lines.push("## Top Missed Cases by Judge");
+    lines.push("");
+    for (const j of topJudges) {
+      const prefix = Object.keys(analysis.missedCasesByJudge).find((k) => analysis.perJudge[k]?.judgeId === j.judgeId);
+      const cases = prefix ? analysis.missedCasesByJudge[prefix] : [];
+      if (cases.length > 0) {
+        lines.push(`### ${j.judgeName}`);
+        lines.push("");
+        for (const caseId of cases.slice(0, 10)) {
+          lines.push(`- ${caseId}`);
+        }
+        if (cases.length > 10) {
+          lines.push(`- ... and ${cases.length - 10} more`);
+        }
+        lines.push("");
+      }
+    }
+  }
+
+  lines.push("---");
+  lines.push("");
+  lines.push("*Generated by [Judges Panel](https://github.com/KevinRabun/judges) L2 coverage analysis.*");
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+// ─── Benchmark Case Ingestion ───────────────────────────────────────────────
+// Convert real-world findings (from daily-popular-repo-autofix or manual
+// evaluations) into candidate BenchmarkCase entries.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface IngestFindingsInput {
+  /** Source code that was evaluated */
+  code: string;
+  /** Language of the code */
+  language: string;
+  /** Findings produced by the evaluation */
+  findings: Array<{ ruleId: string }>;
+}
+
+/**
+ * Convert real-world evaluation results into candidate benchmark cases.
+ *
+ * Each input becomes a BenchmarkCase whose expectedRuleIds come from the
+ * actual findings produced. This lets operators take real-world detections
+ * and "pin" them as regression tests.
+ */
+export function ingestFindingsAsBenchmarkCases(inputs: IngestFindingsInput[]): BenchmarkCase[] {
+  const cases: BenchmarkCase[] = [];
+
+  for (let i = 0; i < inputs.length; i++) {
+    const inp = inputs[i];
+    if (!inp.code || !inp.language || !inp.findings?.length) continue;
+
+    const ruleIds = [...new Set(inp.findings.map((f) => f.ruleId))];
+    // Infer category from the dominant rule prefix
+    const prefixCounts: Record<string, number> = {};
+    for (const rid of ruleIds) {
+      const prefix = rid.split("-")[0];
+      prefixCounts[prefix] = (prefixCounts[prefix] || 0) + 1;
+    }
+    const dominantPrefix = Object.entries(prefixCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "unknown";
+    const category = dominantPrefix.toLowerCase();
+
+    cases.push({
+      id: `ingested-${i + 1}-${category}`,
+      description: `Ingested finding: ${ruleIds.join(", ")}`,
+      language: inp.language,
+      code: inp.code.length > 2000 ? inp.code.slice(0, 2000) + "\n// ... truncated" : inp.code,
+      expectedRuleIds: ruleIds,
+      category,
+      difficulty: "medium",
+    });
+  }
+
+  return cases;
+}
+
+/**
+ * Deduplicate ingested cases against existing benchmark cases.
+ *
+ * Uses code fingerprinting (normalized whitespace hash) to detect
+ * near-duplicate test cases. Returns only novel candidates.
+ */
+export function deduplicateIngestCases(existing: BenchmarkCase[], candidates: BenchmarkCase[]): BenchmarkCase[] {
+  // Build a set of normalized code fingerprints from existing cases
+  const normalize = (code: string) => code.replace(/\s+/g, " ").trim().toLowerCase();
+  const existingFingerprints = new Set(existing.map((c) => normalize(c.code)));
+
+  return candidates.filter((c) => !existingFingerprints.has(normalize(c.code)));
 }

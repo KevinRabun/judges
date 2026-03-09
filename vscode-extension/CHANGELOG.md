@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.24.0] — 2026-03-09
+
+### Added
+- **Finding triage workflow** — New `triage set|list|summary` CLI commands for marking findings as accepted-risk, deferred, wont-fix, or false-positive
+- **Multi-file context in L2 prompts** — Deep-review now accepts related file snippets for cross-file analysis
+- **L2 coverage benchmark** — `benchmark l2-coverage` subcommand analyzes which L1 misses are coverable by L2 prompts
+- **Benchmark ingestion** — `benchmark ingest` converts real-world findings into benchmark cases
+- **Org policy management** — `config pull|lock|validate` for centralized team configuration and compliance checking
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.23.20] — 2026-03-08
 
 ### Fixed

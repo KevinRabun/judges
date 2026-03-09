@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.24.0] — 2026-03-09
+
+### Added
+- **Closed-loop L2 feedback capture** — L2 (LLM deep-review) dismissals are now automatically parsed and recorded as feedback via `parseDismissedFindings()` and `recordL2Feedback()`. `FeedbackEntry.source` tracks origin (`manual`, `l2-dismissal`, `pr-review`)
+- **Finding triage workflow** — Findings can now be triaged as `accepted-risk`, `deferred`, `wont-fix`, or `false-positive` via `triageFinding()`. New CLI command `judges triage set|list|summary` for interactive triage. Triaged findings are preserved across scans
+- **Multi-file context in L2 prompts** — Deep-review builders accept optional `relatedFiles` parameter to include cross-file snippets (imports, callers, config) in L2 prompts. MCP tool schemas updated with `relatedFiles` input
+- **L2 coverage benchmark** — `analyzeL2Coverage()` maps L1 false negatives to judges and checks L2 prompt availability. `formatL2CoverageReport()` generates markdown with per-judge, per-category, and per-difficulty breakdowns. CLI: `judges benchmark l2-coverage`
+- **Benchmark case ingestion pipeline** — `ingestFindingsAsBenchmarkCases()` converts real-world findings into benchmark cases with category inference and code truncation. `deduplicateIngestCases()` prevents duplicates via normalized-whitespace fingerprinting. CLI: `judges benchmark ingest <file>`
+- **Centralized org policy management** — `PolicyLock` for locking org-wide configuration baselines. `validatePolicyCompliance()` checks required judges, rules, severity thresholds, and baseline compliance. `pullRemoteConfig()` fetches team configs over HTTPS (with SSRF protection). CLI: `judges config pull|lock|validate`
+
+### Tests
+- 1824 tests passing (784 subsystems + 1040 judges), 13 pre-existing failures unrelated to this release
+
 ## [3.23.20] — 2026-03-08
 
 ### Fixed
