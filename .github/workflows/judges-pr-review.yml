@@ -38,7 +38,7 @@ jobs:
             --min-severity medium \
             --max-comments 25 \
             --calibrate \
-            --format json > judges-review-result.json 2>&1 || true
+            --format json > judges-review-result.json || true
 
       - name: Read review result
         id: review_result

@@ -882,6 +882,12 @@ export function parseReviewArgs(argv: string[]): ReviewArgs {
 export function runReview(argv: string[]): void {
   const args = parseReviewArgs(argv);
 
+  // In JSON mode, redirect informational output to stderr so stdout is pure JSON
+  const _stdoutLog = console.log.bind(console);
+  if (args.format === "json") {
+    console.log = (...a: unknown[]) => console.error(...a);
+  }
+
   if (args.pr === 0) {
     console.log(`
 Judges Panel — Pull Request Review
@@ -1006,7 +1012,23 @@ AUTHENTICATION:
   );
 
   if (args.format === "json") {
-    console.log(JSON.stringify(result, null, 2));
+    // Post review to GitHub before outputting JSON
+    if (!args.dryRun && (result.comments.length > 0 || args.approve)) {
+      const reviewEvent = result.approved && args.approve ? "APPROVE" : result.approved ? "COMMENT" : "REQUEST_CHANGES";
+      const reviewBody = {
+        body: buildPRReviewNarrative(result),
+        event: reviewEvent,
+        comments: result.comments,
+      };
+      const reviewResp = apiRequest("POST", `/repos/${repo}/pulls/${args.pr}/reviews`, args.token, reviewBody);
+      if (reviewResp.status !== 200 && reviewResp.status !== 422) {
+        // Fallback: post summary as a plain comment
+        apiRequest("POST", `/repos/${repo}/issues/${args.pr}/comments`, args.token, {
+          body: buildPRReviewNarrative(result),
+        });
+      }
+    }
+    _stdoutLog(JSON.stringify(result, null, 2));
     process.exit(result.approved ? 0 : 1);
   }
 
