@@ -318,8 +318,7 @@ function parseInlineSuppressions(code: string): {
   const activeBlocks = new Map<string, { commentLine: number; reason?: string }>();
 
   // Pattern: // judges-ignore[-next-line|-block] RULE-ID [, RULE-ID ...] [-- reason]
-  const suppressPattern =
-    /(?:\/\/|#|\/\*)\s*judges-ignore(?:-(next-line|block))?\s+([\w*,-]+(?:\s+(?!--)[\w*,-]+)*)(?:\s+--\s+(.+?))?(?:\s*\*\/)?$/gi;
+  const suppressPattern = /(?:\/\/|#|\/\*)\s*judges-ignore(?:-(next-line|block))?\s+([^\n]*?)(?:\s*\*\/)?$/gi;
   const endBlockPattern = /(?:\/\/|#|\/\*)\s*judges-end-block/i;
 
   for (let i = 0; i < lines.length; i++) {
@@ -343,8 +342,10 @@ function parseInlineSuppressions(code: string): {
     suppressPattern.lastIndex = 0;
     while ((match = suppressPattern.exec(line)) !== null) {
       const modifier = match[1]?.toLowerCase(); // "next-line", "block", or undefined
-      const ruleIds = match[2].split(/[,\s]+/).filter(Boolean);
-      const reason = match[3]?.trim() || undefined;
+      const rawContent = match[2];
+      const dashSplit = rawContent.split(/\s+--\s+/);
+      const ruleIds = dashSplit[0].split(/[,\s]+/).filter(Boolean);
+      const reason = dashSplit[1]?.trim() || undefined;
 
       const kind: SuppressionDirective["kind"] =
         modifier === "next-line" ? "next-line" : modifier === "block" ? "block" : "line";
@@ -365,13 +366,14 @@ function parseInlineSuppressions(code: string): {
     }
 
     // File-level suppression: // judges-file-ignore RULE-ID [-- reason]
-    const filePattern =
-      /(?:\/\/|#|\/\*)\s*judges-file-ignore\s+([\w*,-]+(?:\s+(?!--)[\w*,-]+)*)(?:\s+--\s+(.+?))?(?:\s*\*\/)?$/gi;
+    const filePattern = /(?:\/\/|#|\/\*)\s*judges-file-ignore\s+([^\n]*?)(?:\s*\*\/)?$/gi;
     let fileMatch;
     filePattern.lastIndex = 0;
     while ((fileMatch = filePattern.exec(line)) !== null) {
-      const ruleIds = fileMatch[1].split(/[,\s]+/).filter(Boolean);
-      const reason = fileMatch[2]?.trim() || undefined;
+      const rawFileContent = fileMatch[1];
+      const fileDashSplit = rawFileContent.split(/\s+--\s+/);
+      const ruleIds = fileDashSplit[0].split(/[,\s]+/).filter(Boolean);
+      const reason = fileDashSplit[1]?.trim() || undefined;
       for (const rawId of ruleIds) {
         const ruleId = rawId === "*" ? "*" : rawId.toUpperCase();
         globalSuppressed.push({ ruleId, kind: "file", commentLine: lineNum, reason });

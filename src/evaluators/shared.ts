@@ -175,7 +175,10 @@ export function classifyFile(code: string, language: string, filePath?: string):
   }
 
   // Content-based VS Code detection: imports from 'vscode' package
-  if (/import\s.*from\s+['"]vscode['"]/i.test(code) || /require\s*\(\s*['"]vscode['"]\s*\)/i.test(code)) {
+  if (
+    (code.includes("vscode") && /\bimport\b/.test(code) && /\bfrom\s+['"]vscode['"]/.test(code)) ||
+    /require\s*\(\s*['"]vscode['"]\s*\)/i.test(code)
+  ) {
     return "vscode-extension";
   }
 

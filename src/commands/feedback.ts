@@ -568,22 +568,28 @@ export interface DismissedFinding {
  */
 export function parseDismissedFindings(llmResponse: string): DismissedFinding[] {
   const dismissed: DismissedFinding[] = [];
+  const lines = llmResponse.split("\n");
+  let inSection = false;
 
-  // Find the "Dismissed Findings" section
-  const sectionPattern = /#+\s*(?:\*{1,2})?Dismissed Findings(?:\*{1,2})?\s*\n([\s\S]*?)(?=\n#|\n={3,}|\n-{3,}|$)/gi;
-  let sectionMatch: RegExpExecArray | null;
-
-  while ((sectionMatch = sectionPattern.exec(llmResponse)) !== null) {
-    const sectionBody = sectionMatch[1];
+  for (const line of lines) {
+    // Detect "Dismissed Findings" section header
+    if (/^#+\s*\*{0,2}Dismissed Findings\*{0,2}/i.test(line)) {
+      inSection = true;
+      continue;
+    }
+    // Detect section end (next heading or horizontal rule)
+    if (inSection && /^(?:#+\s|={3,}$|-{3,}$)/.test(line)) {
+      inSection = false;
+      continue;
+    }
+    if (!inSection) continue;
 
     // Match rule IDs followed by explanations on each line
     // Supports: - SEC-001 — reason, - **SEC-001**: reason, SEC-001: reason
-    const linePattern = /[-*]?\s*\*{0,2}([A-Z]{2,10}-\d{1,4})\*{0,2}\s*[—:–-]\s*(.+)/g;
-    let lineMatch: RegExpExecArray | null;
-
-    while ((lineMatch = linePattern.exec(sectionBody)) !== null) {
-      const ruleId = lineMatch[1].trim();
-      const reason = lineMatch[2].trim();
+    const match = line.match(/\*{0,2}([A-Z]{2,10}-\d{1,4})\*{0,2}\s*[—:–-]\s*(.+)/);
+    if (match) {
+      const ruleId = match[1].trim();
+      const reason = match[2].trim();
       if (ruleId && reason) {
         dismissed.push({ ruleId, reason });
       }

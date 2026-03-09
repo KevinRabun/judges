@@ -62,8 +62,7 @@ const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 function uriToFilePath(uri: string): string {
   if (uri.startsWith("file:///")) {
     // Windows: file:///c%3A/... → c:/...
-    const decoded = decodeURIComponent(uri.slice(8));
-    return decoded.replace(/\//g, "/");
+    return decodeURIComponent(uri.slice(8));
   }
   return uri;
 }

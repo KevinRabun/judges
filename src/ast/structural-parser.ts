@@ -58,7 +58,7 @@ const FUNC_PATTERNS: Record<string, RegExp> = {
   go: /^\s*func\s+(?:\([^)]*\)\s*)?(\w+)\s*\(([^)]*)\)/,
   java: /^\s*(?:(?:public|private|protected|static|final|abstract|synchronized)\s+)*\w[\w<>,\s[\]]*\s+(\w+)\s*\(([^)]*)\)/,
   csharp:
-    /^\s*(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|sealed)\s+)*\w[\w<>,\s[\]?]*\s+(\w+)\s*\(([^)]*)\)/,
+    /^\s*(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|sealed)\s+)*\w[\w<>,[\]?]*(?:\s[\w<>,[\]?]+)*\s+(\w+)\s*\(([^)]*)\)/,
   powershell: /^\s*function\s+([\w-]+)\s*(?:\(([^)]*)\))?/,
   php: /^\s*(?:(?:public|private|protected|static|abstract|final)\s+)*function\s+(\w+)\s*\(([^)]*)\)/,
   kotlin:
@@ -297,7 +297,7 @@ function extractPythonClassNames(lines: string[]): string[] {
 const RUBY_FUNC = /^\s*def\s+((?:self\.)?\w+[?!=]?)\s*(?:\(([^)]*)\))?/;
 const RUBY_CLASS_RE = /^\s*(?:class|module)\s+(\w+)/;
 const RUBY_LINE_OPENER = /^(def|class|module|if|unless|while|until|for|case|begin)\b/;
-const RUBY_DO_OPENER = /\bdo\s*(?:\|[^|]*\|)?\s*$/;
+const RUBY_DO_OPENER = /\bdo(?:\s*\|[^|]*\|)?\s*$/;
 const RUBY_END = /^end\b/;
 
 function rubyBlockOpens(trimmed: string): number {

@@ -14,8 +14,8 @@
  * Requires: GITHUB_TOKEN environment variable (or gh CLI authenticated).
  */
 
-import { execSync } from "child_process";
-import { readFileSync, writeFileSync } from "fs";
+import { execFileSync, execSync } from "child_process";
+import { readFileSync, writeFileSync, unlinkSync } from "fs";
 import { resolve, extname } from "path";
 import { evaluateDiff, evaluateWithTribunal } from "../evaluators/index.js";
 import { evaluateProject, type TribunalRunner } from "../evaluators/project.js";
@@ -186,43 +186,42 @@ function ghApiRequest(
 ): { status: number; data: unknown } {
   const url = endpoint.startsWith("https://") ? endpoint : `https://api.github.com${endpoint}`;
 
-  const args = [
-    "curl",
+  const curlArgs = [
     "-s",
     "-X",
     method,
     "-H",
-    `"Authorization: Bearer ${token}"`,
+    `Authorization: Bearer ${token}`,
     "-H",
-    '"Accept: application/vnd.github.v3+json"',
+    "Accept: application/vnd.github.v3+json",
     "-H",
-    '"Content-Type: application/json"',
+    "Content-Type: application/json",
     "-w",
-    '"\\n%{http_code}"',
+    "\n%{http_code}",
   ];
 
   if (body) {
     // Write body to temp file to avoid shell escaping issues
     const tmpFile = resolve(".judges-review-tmp.json");
     writeFileSync(tmpFile, JSON.stringify(body), "utf-8");
-    args.push("-d", `@${tmpFile}`);
-    args.push(`"${url}"`);
+    curlArgs.push("-d", `@${tmpFile}`);
+    curlArgs.push(url);
 
     try {
-      const output = execSync(args.join(" "), { encoding: "utf-8", shell: "cmd.exe" }).trim();
+      const output = execFileSync("curl", curlArgs, { encoding: "utf-8" }).trim();
       const lastNewline = output.lastIndexOf("\n");
       const responseBody = lastNewline >= 0 ? output.slice(0, lastNewline) : "";
       const statusCode = parseInt(lastNewline >= 0 ? output.slice(lastNewline + 1) : output, 10);
       try {
         // Clean up temp file
-        execSync(`del "${tmpFile}"`, { stdio: "ignore", shell: "cmd.exe" });
+        unlinkSync(tmpFile);
       } catch {
         // ignore cleanup errors
       }
       return { status: statusCode, data: responseBody ? JSON.parse(responseBody) : null };
     } catch {
       try {
-        execSync(`del "${tmpFile}"`, { stdio: "ignore", shell: "cmd.exe" });
+        unlinkSync(tmpFile);
       } catch {
         // ignore
       }
@@ -230,9 +229,9 @@ function ghApiRequest(
     }
   }
 
-  args.push(`"${url}"`);
+  curlArgs.push(url);
   try {
-    const output = execSync(args.join(" "), { encoding: "utf-8", shell: "cmd.exe" }).trim();
+    const output = execFileSync("curl", curlArgs, { encoding: "utf-8" }).trim();
     const lastNewline = output.lastIndexOf("\n");
     const responseBody = lastNewline >= 0 ? output.slice(0, lastNewline) : "";
     const statusCode = parseInt(lastNewline >= 0 ? output.slice(lastNewline + 1) : output, 10);
@@ -247,7 +246,7 @@ function ghApiRequest(
  */
 function ghCliAvailable(): boolean {
   try {
-    execSync("gh --version", { stdio: "ignore" });
+    execFileSync("gh", ["--version"], { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -255,22 +254,21 @@ function ghCliAvailable(): boolean {
 }
 
 function ghCliRequest(method: string, endpoint: string, body?: unknown): { status: number; data: unknown } {
-  const args = ["gh", "api", "-X", method, "--jq", "."];
+  const ghArgs = ["api", "-X", method, "--jq", "."];
 
+  const tmpFile = resolve(".judges-review-tmp.json");
   if (body) {
-    const tmpFile = resolve(".judges-review-tmp.json");
     writeFileSync(tmpFile, JSON.stringify(body), "utf-8");
-    args.push("--input", tmpFile);
+    ghArgs.push("--input", tmpFile);
   }
 
-  args.push(endpoint);
+  ghArgs.push(endpoint);
 
   try {
-    const output = execSync(args.join(" "), { encoding: "utf-8" }).trim();
+    const output = execFileSync("gh", ghArgs, { encoding: "utf-8" }).trim();
     if (body) {
       try {
-        const tmpFile = resolve(".judges-review-tmp.json");
-        execSync(process.platform === "win32" ? `del "${tmpFile}"` : `rm -f "${tmpFile}"`, { stdio: "ignore" });
+        unlinkSync(tmpFile);
       } catch {
         // ignore
       }
@@ -279,8 +277,7 @@ function ghCliRequest(method: string, endpoint: string, body?: unknown): { statu
   } catch {
     if (body) {
       try {
-        const tmpFile = resolve(".judges-review-tmp.json");
-        execSync(process.platform === "win32" ? `del "${tmpFile}"` : `rm -f "${tmpFile}"`, { stdio: "ignore" });
+        unlinkSync(tmpFile);
       } catch {
         // ignore
       }
@@ -529,7 +526,7 @@ function reviewPrFiles(
   };
 }
 
-function buildReviewSummary(result: ReviewResult): string {
+function _buildReviewSummary(result: ReviewResult): string {
   const emoji = result.approved ? "✅" : "❌";
   const lines = [
     `## ${emoji} Judges Panel Review`,
@@ -584,11 +581,11 @@ interface CommentMeta {
 
 function parseCommentMeta(comment: ReviewComment): CommentMeta | undefined {
   // Body format: `🔴 **CRITICAL** — Title here (\`RULE-001\`)`
-  const match = comment.body.match(/\*\*(\w+)\*\*\s*—\s*(.+?)\s*\(`([^`]+)`\)/);
+  const match = comment.body.match(/\*\*(\w+)\*\*\s*—\s*([^(`]+)\(`([^`]+)`\)/);
   if (!match) return undefined;
   return {
     severity: match[1].toLowerCase(),
-    title: match[2],
+    title: match[2].trim(),
     ruleId: match[3],
     path: comment.path,
     line: comment.line,
