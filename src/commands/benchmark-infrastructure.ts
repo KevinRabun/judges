@@ -208,7 +208,7 @@ spec:
     }
   ]
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DEPS-001"],
     category: "cloud",
     difficulty: "easy",
   },
@@ -297,7 +297,7 @@ const stripeConfig = {
   secretKey: "sk_test_abc123",
   webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
 };`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "REL-001", "DB-001", "PORTA-001", "SEC-001"],
     category: "configuration",
     difficulty: "medium",
   },
@@ -333,7 +333,7 @@ app.get("/api/dashboard", async (req, res) => {
     recentActivity: recentActivity.rows,
   });
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "cost-effectiveness",
     difficulty: "medium",
   },
@@ -364,7 +364,7 @@ export const handler = async (event: any) => {
 
   return { statusCode: 200, body: JSON.stringify({ message: "OK" }) };
 };`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "DEPS-001", "PORTA-001", "AICS-001"],
     category: "cost-effectiveness",
     difficulty: "medium",
   },
@@ -409,7 +409,19 @@ setInterval(() => {
     if (now - session.createdAt > 3600000) sessions.delete(id);
   }
 }, 60000);`,
-    expectedRuleIds: [],
+    expectedRuleIds: [
+      "DATA-001",
+      "RATE-001",
+      "CYBER-001",
+      "API-001",
+      "PERF-001",
+      "COMP-001",
+      "CONC-001",
+      "ERR-001",
+      "AUTH-001",
+      "AICS-001",
+      "SEC-001",
+    ],
     category: "scalability",
     difficulty: "medium",
   },
@@ -484,7 +496,7 @@ app.get("/api/product/:id", async (req, res) => {
     stock: await inventory.json(),
   });
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "REL-001", "SCALE-001", "API-001", "DB-001", "AICS-001", "SEC-001"],
     category: "caching",
     difficulty: "medium",
   },
@@ -656,7 +668,7 @@ app.post("/api/webhook", async (req, res) => {
 });
 
 app.listen(3000);`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "API-001", "REL-001", "OBS-001", "DOC-001", "CONC-001", "COMPAT-001", "SEC-001"],
     category: "rate-limiting",
     difficulty: "easy",
   },
@@ -717,7 +729,7 @@ jobs:
           username: root
           password: \${{ secrets.PASSWORD }}
           script: docker pull myapp:latest && docker run -d myapp:latest`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "cicd",
     difficulty: "medium",
   },
@@ -879,7 +891,7 @@ Resources:
           exports.handler = async (event) => {
             return { statusCode: 200, body: 'OK' };
           };`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AICS-001"],
     category: "iac-security",
     difficulty: "medium",
   },
@@ -1175,7 +1187,7 @@ jobs:
           curl -X POST -H "Authorization: Bearer $DEPLOY_TOKEN" \\
             -d '{"ref": "\${{ github.event.pull_request.head.sha }}"}' \\
             https://api.deploy.example.com/preview`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "cicd",
     difficulty: "hard",
   },
@@ -1203,7 +1215,7 @@ jobs:
           export KUBECONFIG_DATA="\${{ secrets.KUBECONFIG }}"
           echo "$KUBECONFIG_DATA" | base64 -d > kubeconfig
           kubectl --kubeconfig=kubeconfig apply -f k8s/`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "SOV-001"],
     category: "cicd",
     difficulty: "easy",
   },
@@ -1295,7 +1307,7 @@ resource "azurerm_storage_container" "public" {
   storage_account_name  = azurerm_storage_account.uploads.name
   container_access_type = "blob"
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AICS-001", "IAC-001"],
     category: "cloud",
     difficulty: "medium",
   },
@@ -1439,7 +1451,7 @@ export async function processOrder(order: Order) {
     body: JSON.stringify({ userId: order.userId, message: "Order placed" }),
   });
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "REL-001", "SCALE-001", "COMP-001", "SOV-001", "MAINT-001", "RATE-001"],
     category: "configuration",
     difficulty: "medium",
   },
@@ -1470,7 +1482,7 @@ external_apis:
   stripe_key: sk_live_51HxxxxBxxxxDxxxxAxxxxK
   sendgrid_key: SG.xxxxxxxxxxxxxxxx
   twilio_auth_token: abcdef1234567890`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "DB-001"],
     category: "configuration",
     difficulty: "easy",
   },
@@ -1498,7 +1510,7 @@ export function startServer() {
 
   console.log(\`Starting on \${host}:\${port}\`);
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "COST-001"],
     category: "configuration",
     difficulty: "medium",
   },
@@ -1528,7 +1540,7 @@ export function startServer() {
 
   return legacyPaymentProcessor(order);
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["TEST-001"],
     category: "configuration",
     difficulty: "medium",
   },
@@ -1626,7 +1638,7 @@ app.post("/api/orders", async (req, res) => {
   // Response delayed by all sequential operations
   res.json({ orderId: order.id, status: "completed" });
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["API-001", "COMP-001", "SEC-001"],
     category: "scalability",
     difficulty: "medium",
   },
@@ -1697,7 +1709,7 @@ export async function query(sql: string, params: any[]) {
 }
 
 // Under load with 100 concurrent requests, 95 will queue behind 5 connections`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "PERF-001", "DB-001", "CFG-001"],
     category: "scalability",
     difficulty: "medium",
   },
@@ -1764,7 +1776,7 @@ export function getCachedUser(userId: string) {
 // After processing millions of users, cache grows to gigabytes
 // No eviction policy, no max size, no TTL
 // Process eventually crashes with ENOMEM`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AICS-001"],
     category: "caching",
     difficulty: "medium",
   },
@@ -1844,7 +1856,7 @@ async function processMessages() {
     }
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001", "TEST-001", "CONC-001"],
     category: "reliability",
     difficulty: "hard",
   },

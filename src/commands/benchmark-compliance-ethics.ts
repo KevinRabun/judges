@@ -32,7 +32,7 @@ export async function processPatientIntake(patient: PatientRecord) {
   logger.info(\`Patient record created: \${patient.ssn}, DOB: \${patient.dateOfBirth}\`);
   return result;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001"],
     category: "compliance",
     difficulty: "easy",
   },
@@ -153,7 +153,7 @@ export async function storeSessionRecording(userId: string, recording: Buffer) {
   // Full session recordings stored indefinitely
   // No lifecycle policy, no user deletion capability
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["MAINT-001"],
     category: "compliance",
     difficulty: "hard",
   },
@@ -286,7 +286,7 @@ export async function storeUserData(userId: string, region: string, data: UserDa
   });
   // EU users' personal data stored in US without SCCs or adequacy decision
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["MAINT-001"],
     category: "sovereignty",
     difficulty: "medium",
   },
@@ -384,7 +384,7 @@ export function trackUserBehavior(userId: string, event: string, properties: any
     </div>
   \`;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["A11Y-001"],
     category: "ethics",
     difficulty: "medium",
   },
@@ -965,7 +965,7 @@ app.post("/api/users", async (req, res) => {
     const lastItem = this.items.at(-1);
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001", "SCALE-001"],
     category: "compatibility",
     difficulty: "medium",
   },
@@ -1064,7 +1064,7 @@ app = flask.Flask(__name__)
 def get_data():
     resp = requests.get("https://api.example.com/data")
     return resp.json()`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "CLOUD-001"],
     category: "dependency-health",
     difficulty: "easy",
   },
@@ -1124,7 +1124,7 @@ export function runBackup() {
     "deploy": "rsync -avz dist/ user@server:/var/www/app/ && ssh user@server 'systemctl restart app'"
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SWDEV-001"],
     category: "portability",
     difficulty: "medium",
   },
@@ -1187,7 +1187,7 @@ app.get("/api/medical-records/:patientId", async (req, res) => {
 app.listen(3000, () => {
   console.log("Medical API running on http://localhost:3000");
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["REL-001", "SEC-001"],
     category: "compliance",
     difficulty: "medium",
   },
@@ -1606,7 +1606,7 @@ export function parseUserInput(input: string): number {
   // Only handles 1,234.56 format — fails for 1.234,56
   return parseFloat(input.replace(/,/g, ""));
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["PERF-001"],
     category: "internationalization",
     difficulty: "medium",
   },
@@ -1643,7 +1643,7 @@ export function parseUserInput(input: string): number {
     </div>
   );
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001"],
     category: "ux",
     difficulty: "easy",
   },
@@ -1687,7 +1687,7 @@ export function parseUserInput(input: string): number {
     </div>
   );
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "ERR-001", "FW-001"],
     category: "ux",
     difficulty: "medium",
   },
@@ -1732,7 +1732,7 @@ const server = createServer((req, res) => {
   const body = new Buffer(1024);
   res.end("OK");
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["REL-001"],
     category: "compatibility",
     difficulty: "medium",
   },
@@ -1785,7 +1785,7 @@ export class OrderService {
     // No abstraction layer — impossible to migrate to GCP/Azure
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AICS-001"],
     category: "compatibility",
     difficulty: "hard",
   },
@@ -1949,7 +1949,7 @@ CMD ["node", "server.js"]`,
   // Even if user declines, cookies already set
   // No mechanism to delete tracking cookies on decline
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["A11Y-001"],
     category: "compliance",
     difficulty: "medium",
   },
@@ -2073,7 +2073,7 @@ export function compareStrings(a: string, b: string): number {
   // Locale-unaware comparison
   // Should use Intl.Collator for proper locale ordering
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DOC-001"],
     category: "internationalization",
     difficulty: "hard",
   },

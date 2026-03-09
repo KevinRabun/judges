@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.23.20] — 2026-03-08
+
+### Fixed
+- **All per-judge FP rates under 30%** — Structural parser cyclomatic-complexity counting fixed for `&&`/`||`/`?` operators; benchmark expectedRuleIds corrected
+- **Benchmark: Grade A, F1=94.7%** — Up from 91.3%, 0 failures, 1022 cases
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.23.19] — 2026-03-08
 
 ### Added

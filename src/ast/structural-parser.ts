@@ -50,7 +50,7 @@ export function analyzeStructurally(code: string, language: string): CodeStructu
   };
 }
 
-// ─── Brace-Language Function Extraction (Rust, Go, Java, C#, PHP, Kotlin, Swift) ──
+// ─── Brace-Language Function Extraction (Rust, Go, Java, C#, PHP, Kotlin, Swift, TS, JS) ──
 
 // Patterns that identify function/method declarations per language
 const FUNC_PATTERNS: Record<string, RegExp> = {
@@ -65,6 +65,8 @@ const FUNC_PATTERNS: Record<string, RegExp> = {
     /^\s*(?:(?:public|private|protected|internal|open|override|abstract|suspend|inline)\s+)*fun\s+(?:<[^>]*>\s*)?(\w+)\s*\(([^)]*)\)/,
   swift:
     /^\s*(?:(?:public|private|internal|open|fileprivate|static|class|override|mutating|@\w+\s*)\s+)*func\s+(\w+)\s*\(([^)]*)\)/,
+  typescript: /^\s*(?:(?:export|default|async)\s+)*function\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)/,
+  javascript: /^\s*(?:(?:export|default|async)\s+)*function\s+(\w+)\s*\(([^)]*)\)/,
 };
 
 function extractBraceFunctions(lines: string[], language: string): FunctionInfo[] {
@@ -422,15 +424,17 @@ function extractBraceClassNames(lines: string[], language: string): string[] {
 
 const DECISION_POINTS: Record<string, RegExp> = {
   python: /\b(if|elif|for|while|except|and|or|assert)\b|\bif\b.*\belse\b|\bfor\b.*\bin\b.*\bif\b/g,
-  rust: /\b(if|else\s+if|for|while|loop|match|=>|&&|\|\||\.unwrap_or|\.map_or)\b/g,
-  go: /\b(if|else\s+if|for|switch|case|select|&&|\|\|)\b/g,
-  java: /\b(if|else\s+if|for|while|do|case|catch|\?|&&|\|\|)\b/g,
-  csharp: /\b(if|else\s+if|for|foreach|while|do|case|catch|\?|&&|\|\|)\b/g,
+  rust: /\b(?:if|else\s+if|for|while|loop|match|\.unwrap_or|\.map_or)\b|=>|&&|\|\|/g,
+  go: /\b(?:if|else\s+if|for|switch|case|select)\b|&&|\|\|/g,
+  java: /\b(?:if|else\s+if|for|while|do|case|catch)\b|\?(?![.?])|&&|\|\|/g,
+  csharp: /\b(?:if|else\s+if|for|foreach|while|do|case|catch)\b|\?(?![.?])|&&|\|\|/g,
   powershell: /\b(if|elseif|foreach|for|while|do|switch|catch|-and|-or)\b/g,
-  php: /\b(if|elseif|else\s+if|for|foreach|while|do|case|catch|\?|&&|\|\|)\b/g,
-  ruby: /\b(if|elsif|unless|case|when|for|while|until|rescue|&&|\|\|)\b/g,
-  kotlin: /\b(if|else\s+if|for|while|do|when|catch|\?|&&|\|\|)\b/g,
-  swift: /\b(if|else\s+if|for|while|repeat|switch|case|catch|\?|&&|\|\|)\b/g,
+  php: /\b(?:if|elseif|else\s+if|for|foreach|while|do|case|catch)\b|\?(?![.?])|&&|\|\|/g,
+  ruby: /\b(?:if|elsif|unless|case|when|for|while|until|rescue)\b|&&|\|\|/g,
+  kotlin: /\b(?:if|else\s+if|for|while|do|when|catch)\b|\?(?![.?])|&&|\|\|/g,
+  swift: /\b(?:if|else\s+if|for|while|repeat|switch|case|catch)\b|\?(?![.?])|&&|\|\|/g,
+  typescript: /\b(?:if|else\s+if|for|while|do|case|catch)\b|\?(?![.?])|&&|\|\|/g,
+  javascript: /\b(?:if|else\s+if|for|while|do|case|catch)\b|\?(?![.?])|&&|\|\|/g,
 };
 
 function computeComplexityFromLines(lines: string[], language: string): number {

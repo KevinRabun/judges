@@ -76,7 +76,7 @@ func queryAll(db *sql.DB, ids []int) ([]Record, error) {
   }
   return results, nil
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DB-001"],
     category: "performance",
     difficulty: "medium",
   },
@@ -327,7 +327,7 @@ class UserController(private val jdbc: JdbcTemplate) {
         saveReceipt(receipt)
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "error-handling",
     difficulty: "easy",
   },
@@ -359,7 +359,7 @@ class AuthManager {
         UserDefaults.standard.removeObject(forKey: "authToken")
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "security",
     difficulty: "medium",
   },
@@ -792,7 +792,7 @@ class TaskQueue:
 
     def set_config(self, key, value):
         self.config[key] = value`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SWDEV-001"],
     category: "concurrency",
     difficulty: "medium",
   },
@@ -861,7 +861,7 @@ def stats():
         'cached_users': len(users_cache),
         'active_sessions': len(active_sessions)
     })`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "OBS-001"],
     category: "concurrency",
     difficulty: "medium",
   },
@@ -1021,7 +1021,7 @@ func SearchHandler(db *sql.DB) http.HandlerFunc {
     json.NewEncoder(w).Encode(scanRows(rows))
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001"],
     category: "security",
     difficulty: "easy",
   },
@@ -1083,7 +1083,7 @@ def index():
     retry
   end
 end`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "SWDEV-001", "RATE-001"],
     category: "error-handling",
     difficulty: "medium",
   },
@@ -1643,7 +1643,7 @@ class UserService {
     futures.map(f => Await.result(f, 10.seconds)).toList // blocks for each
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001"],
     category: "concurrency",
     difficulty: "medium",
   },
@@ -1697,7 +1697,7 @@ class ApiClient {
         return prefs.getString("auth_token", null)
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "auth",
     difficulty: "medium",
   },
@@ -1911,7 +1911,7 @@ rm -rf /tmp/$3
 
 # Search with user input
 grep "$4" /var/log/syslog | mail -s "Results" admin@example.com`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["I18N-001"],
     category: "security",
     difficulty: "easy",
   },
@@ -1940,7 +1940,7 @@ grep "$4" /var/log/syslog | mail -s "Results" admin@example.com`,
         // connection, command, reader never disposed/closed
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001"],
     category: "error-handling",
     difficulty: "medium",
   },

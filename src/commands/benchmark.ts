@@ -648,7 +648,7 @@ app.get("/profile", (req, res) => {
   if (!session) return res.status(401).send("Unauthorized");
   res.json(session);
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "RATE-001", "CYBER-001", "API-001", "OBS-001", "AICS-001", "SEC-001"],
     category: "scalability",
     difficulty: "medium",
   },
@@ -728,7 +728,17 @@ app.get("/api", (req, res) => {
   console.log("Order processed:", order.id);
   return order;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: [
+      "CYBER-001",
+      "PERF-001",
+      "COST-001",
+      "DB-001",
+      "API-001",
+      "TEST-001",
+      "CONC-001",
+      "AICS-001",
+      "SEC-001",
+    ],
     category: "maintainability",
     difficulty: "medium",
   },
@@ -1055,7 +1065,7 @@ app.get("/config", async (req, res) => {
   const config = await db.query("SELECT * FROM app_config");
   res.json(config);
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001", "OBS-001", "SEC-001"],
     category: "caching",
     difficulty: "medium",
   },

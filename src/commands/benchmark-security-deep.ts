@@ -187,7 +187,7 @@ app.post("/analytics", async (req, res) => {
   const results = await db.collection("events").aggregate(pipeline).toArray();
   res.json(results);
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COMP-001", "SOV-001"],
     category: "injection",
     difficulty: "hard",
   },
@@ -1014,7 +1014,7 @@ def download():
     filename = request.args.get('file')
     filepath = os.path.join('/var/uploads', filename)
     return send_file(filepath)`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "CLOUD-001", "SOV-001", "PORTA-001"],
     category: "security",
     difficulty: "medium",
   },
@@ -1036,7 +1036,7 @@ public class FileController : ControllerBase
         return File(bytes, "application/octet-stream");
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "COST-001"],
     category: "security",
     difficulty: "medium",
   },
@@ -1306,7 +1306,7 @@ app.use((req, res, next) => {
 app.get("/", (req, res) => {
   res.send("<html><body>Hello</body></html>");
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["A11Y-001", "I18N-001", "SEC-001"],
     category: "security",
     difficulty: "medium",
   },

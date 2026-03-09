@@ -29,7 +29,7 @@ app.post("/api/users", validateSchema(userSchema), async (req, res) => {
   await user.save();
   res.json({ id: user.id });
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "PERF-001", "COST-001", "API-001", "COMP-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -59,7 +59,7 @@ app.post("/api/users", validateSchema(userSchema), async (req, res) => {
 
   return { formatted, config, serialized };
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "CONC-001", "CACHE-001", "SEC-001"],
     category: "hallucination",
     difficulty: "easy",
   },
@@ -100,7 +100,7 @@ export function createServer() {
   });
   return app;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "AUTH-001", "CYBER-001", "REL-001", "PORTA-001", "UX-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -134,7 +134,7 @@ const db = autoMigrate({
   autoDetectChanges: true,
   rollbackOnError: true,
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "hallucination",
     difficulty: "easy",
   },
@@ -275,7 +275,7 @@ export function SearchComponent() {
     <div>Fallback content</div>
   );
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "I18N-001"],
     category: "hallucination",
     difficulty: "easy",
   },
@@ -305,7 +305,7 @@ export function SearchComponent() {
 
   return result.rows;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COMP-001"],
     category: "hallucination",
     difficulty: "hard",
   },
@@ -342,7 +342,7 @@ func main() {
 
 	fmt.Println(hash, data, m)
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ERR-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -378,7 +378,7 @@ func main() {
     return { url: "https://example.com/invoice.pdf" }; // Hardcoded URL
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COMP-001"],
     category: "hallucination",
     difficulty: "easy",
   },
@@ -412,7 +412,7 @@ export async function chatWithAssistant(userMessage: string, context: string) {
 
   return response.choices[0].message.content;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AICS-001"],
     category: "agent-security",
     difficulty: "easy",
   },
@@ -449,7 +449,7 @@ export async function chatWithAssistant(userMessage: string, context: string) {
   // No input sanitization on retrieved documents
   // No instruction hierarchy enforcement
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AICS-001"],
     category: "agent-security",
     difficulty: "hard",
   },
@@ -496,7 +496,7 @@ export async function agentLoop(userMessage: string) {
   const result = await agent.run(userMessage, { tools, maxIterations: 50 });
   return result;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "COST-001", "PORTA-001"],
     category: "agent-security",
     difficulty: "easy",
   },
@@ -538,7 +538,7 @@ export async function agentLoop(userMessage: string) {
     return reply;
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AICS-001"],
     category: "agent-security",
     difficulty: "medium",
   },
@@ -576,7 +576,7 @@ export async function handleUserRequest(userMessage: string) {
   });
   return response;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "REL-001", "SCALE-001", "ERR-001", "RATE-001", "SEC-001"],
     category: "agent-security",
     difficulty: "hard",
   },
@@ -619,7 +619,7 @@ export async function handleUserRequest(userMessage: string) {
     return response.choices[0].message.content!;
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AICS-001"],
     category: "agent-security",
     difficulty: "hard",
   },
@@ -654,7 +654,7 @@ export function validateApiKey(apiKey: string): boolean {
   // TODO: Check against database
   return apiKey.length > 0; // Any non-empty string is valid
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "COMP-001"],
     category: "ai-code-safety",
     difficulty: "easy",
   },
@@ -688,7 +688,7 @@ export function verifySignature(data: string, signature: string, key: string): b
   // Always returns true — no actual verification
   return signature.length > 0;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "COST-001", "PERF-001", "MAINT-001", "SEC-001"],
     category: "ai-code-safety",
     difficulty: "easy",
   },
@@ -722,7 +722,7 @@ export function calculate(expression: string): number {
 export function renderTemplate(template: string, data: Record<string, any>): string {
   return new Function("data", \`with(data) { return \\\`\${template}\\\`; }\`)(data);
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "COST-001", "PERF-001", "TEST-001", "SEC-001"],
     category: "ai-code-safety",
     difficulty: "medium",
   },
@@ -754,7 +754,7 @@ export async function createUser(req: Request, res: Response) {
   // Returns password in response
   return res.json(user);
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "ERR-001"],
     category: "ai-code-safety",
     difficulty: "easy",
   },
@@ -793,7 +793,7 @@ app.listen(process.env.PORT || 3000, "0.0.0.0", () => {
   console.log("Database:", process.env.DATABASE_URL);
   console.log("API Key:", process.env.API_KEY);
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "CYBER-001", "CLOUD-001", "REL-001", "OBS-001", "COMP-001", "ERR-001", "SEC-001"],
     category: "ai-code-safety",
     difficulty: "easy",
   },
@@ -834,7 +834,7 @@ def process_request(data):
     import marshal
     code = marshal.loads(data)
     exec(code)`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "CYBER-001", "PORTA-001", "SEC-001"],
     category: "ai-code-safety",
     difficulty: "medium",
   },
@@ -864,7 +864,7 @@ def process_request(data):
     </div>
   );
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "framework-safety",
     difficulty: "easy",
   },
@@ -902,7 +902,7 @@ app.post("/api/login", async (req, res) => {
 });
 
 app.listen(3000);`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "API-001", "REL-001", "SEC-001"],
     category: "framework-safety",
     difficulty: "easy",
   },
@@ -947,7 +947,7 @@ export default function SearchPage({ searchQuery, userAgent }: PageProps) {
     </html>
   );
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "A11Y-001"],
     category: "framework-safety",
     difficulty: "hard",
   },
@@ -1024,7 +1024,7 @@ def delete_user(request):
   async auditLog(action: string) { /* 30 lines */ }
   // 2000+ lines, 50+ methods, handles everything
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SOV-001"],
     category: "software-development",
     difficulty: "medium",
   },
@@ -1062,7 +1062,7 @@ def delete_user(request):
   // - No rollback, no compensation, no retry
   // - No logging of failures
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001", "CYBER-001"],
     category: "software-development",
     difficulty: "medium",
   },
@@ -1102,7 +1102,7 @@ export function shouldRetry(statusCode: number, attempt: number): boolean {
     && attempt < 5
     && Math.random() > 0.3;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["TEST-001", "MAINT-001"],
     category: "software-development",
     difficulty: "easy",
   },
@@ -1209,7 +1209,7 @@ function applyConfig(config: ValidatedConfig): void {
   // Element.animate().finished is real, but Element.transition() is not
   await element.transition({ opacity: [0, 1] }, 300);
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ETHICS-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -1249,7 +1249,7 @@ function applyConfig(config: ValidatedConfig): void {
     return response.choices[0].message.content!;
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AICS-001"],
     category: "agent-security",
     difficulty: "medium",
   },
@@ -1289,7 +1289,7 @@ function applyConfig(config: ValidatedConfig): void {
     return response.choices[0].message.content!;
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AICS-001"],
     category: "agent-security",
     difficulty: "hard",
   },
@@ -1394,7 +1394,7 @@ public class DataProcessor {
     next();
   });
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ETHICS-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -1440,7 +1440,7 @@ spec:
           limits:
             cpu: 500m
             gpu: 1                  # Not standard (need nvidia.com/gpu)`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["IAC-001"],
     category: "hallucination",
     difficulty: "hard",
   },
@@ -1477,7 +1477,7 @@ export async function POST(request: Request) {
   const data = await request.formData().validate(schema);
   return Response.json({ received: true });
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "PERF-001", "SOV-001", "DOC-001"],
     category: "hallucination",
     difficulty: "hard",
   },
@@ -1547,7 +1547,7 @@ services:
       mode: streaming
       replicas: 2
     encryption_at_rest: true       # Doesn't exist`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "SOV-001", "IAC-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -1613,7 +1613,7 @@ services:
     await executeFn(fnCall.name, args);
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AICS-001", "STRUCT-001"],
     category: "agent-security",
     difficulty: "hard",
   },
@@ -1659,7 +1659,7 @@ export class MultiTenantBot {
     return reply;
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CONC-001", "AICS-001"],
     category: "agent-security",
     difficulty: "hard",
   },
@@ -1713,7 +1713,7 @@ export class SessionManager {
     return sessionId.startsWith("session_");
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["PERF-001"],
     category: "ai-code-safety",
     difficulty: "easy",
   },
@@ -1758,7 +1758,7 @@ export async function handleUpload(req: Request, res: Response) {
 
   res.json({ url: "/uploads/" + file.originalname });
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "RATE-001"],
     category: "ai-code-safety",
     difficulty: "medium",
   },
@@ -1801,7 +1801,7 @@ export class ContentRendererComponent {
     return this.sanitizer.bypassSecurityTrustHtml(html);
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "AICS-001"],
     category: "framework-safety",
     difficulty: "medium",
   },
@@ -1886,7 +1886,7 @@ public class UserController {
         // No authorization check — any user can delete any user
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["OBS-001", "COMP-001", "AICS-001"],
     category: "framework-safety",
     difficulty: "medium",
   },
@@ -1928,7 +1928,7 @@ public class UserController {
     } else { return error("Wrong content type"); }
   } else { return error("Wrong method"); }
 }`,
-    expectedRuleIds: ["SWDEV-001"],
+    expectedRuleIds: ["SWDEV-001", "STRUCT-001"],
     category: "software-development",
     difficulty: "easy",
   },
@@ -2067,7 +2067,7 @@ export function corsMiddleware(req: Request, res: Response, next: NextFunction) 
   res.setHeader("Access-Control-Allow-Methods", "*");
   next();
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "AUTH-001", "CYBER-001", "MAINT-001", "ERR-001", "SEC-001"],
     category: "ai-code-safety",
     difficulty: "medium",
   },
@@ -2188,7 +2188,7 @@ type Mutation {
   createUser(input: CreateUserInput!): User! @transactional @audit
   deleteUser(id: ID!): Boolean! @softDelete @notifyAdmins
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "PERF-001"],
     category: "hallucination",
     difficulty: "hard",
   },
@@ -2322,7 +2322,7 @@ export async function initServer() {
 
   return result;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "AICS-001"],
     category: "agent-security",
     difficulty: "easy",
   },
@@ -2367,7 +2367,7 @@ export async function initServer() {
   // No message length validation
   // No cost tracking
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AICS-001"],
     category: "agent-security",
     difficulty: "medium",
   },
@@ -2407,7 +2407,7 @@ export function parseMarkdown(text: string): string {
       return \`<h\${h.length}>\${t}</h\${h.length}>\`;
     });
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "ai-code-safety",
     difficulty: "medium",
   },
@@ -2502,7 +2502,7 @@ onMounted(async () => {
   userCustomCss.value = data.post.customCss; // User-controlled CSS
 });
 </script>`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "SCALE-001", "SEC-001"],
     category: "framework-safety",
     difficulty: "medium",
   },
@@ -2552,7 +2552,7 @@ class UserController extends Controller
         return response()->json(['path' => $path, 'name' => $name]);
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "CYBER-001", "API-001", "PERF-001"],
     category: "framework-safety",
     difficulty: "medium",
   },
@@ -2598,7 +2598,7 @@ class UserController extends Controller
     return this.createOrder(cart, user, total);
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COMPAT-001"],
     category: "software-development",
     difficulty: "easy",
   },
@@ -2640,7 +2640,7 @@ function getOrderStatus(order: any): string {
   if (order.cancelled) return "cancled"; // Typo never caught
   return "pending";
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["TEST-001"],
     category: "software-development",
     difficulty: "medium",
   },
@@ -2680,7 +2680,7 @@ const server = Deno.serve({
 
   return new Response(data);
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "hallucination",
     difficulty: "hard",
   },
@@ -2858,7 +2858,7 @@ export class PaymentService {
     return 1000000;
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["I18N-001"],
     category: "ai-code-safety",
     difficulty: "easy",
   },
@@ -2903,7 +2903,7 @@ const UserSchema = z.object({
 });
 
 export const validate = (data: unknown) => UserSchema.parseAsync(data);`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "hallucination",
     difficulty: "medium",
   },

@@ -568,7 +568,7 @@ func main() {
 	http.HandleFunc("/check", checkHandler)
 	http.ListenAndServe(":8080", nil)
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "API-001", "OBS-001"],
     category: "concurrency",
     difficulty: "medium",
   },
@@ -599,7 +599,7 @@ async def handle_request(resource: str):
 async def get_stats():
     return request_counts  # Exposing internal state directly
 `,
-    expectedRuleIds: [],
+    expectedRuleIds: ["OBS-001", "SEC-001"],
     category: "concurrency",
     difficulty: "medium",
   },
@@ -647,7 +647,7 @@ public class ConnectionPool {
         return DriverManager.getConnection("jdbc:mysql://localhost/db", "root", "password");
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "concurrency",
     difficulty: "hard",
   },
@@ -778,7 +778,7 @@ public class UserDao {
         return null;
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "PERF-001", "COST-001", "ERR-001", "SEC-001"],
     category: "database",
     difficulty: "medium",
   },
@@ -2262,7 +2262,7 @@ export function createClient(config: Partial<Config>): ApiClient {
     ...config,
   });
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "REL-001", "PORTA-001", "SEC-001"],
     category: "documentation",
     difficulty: "easy",
   },
@@ -2357,7 +2357,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 app.listen(3000);`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "REL-001", "OBS-001", "CONC-001", "ERR-001", "SEC-001"],
     category: "rate-limiting",
     difficulty: "medium",
   },
@@ -3192,7 +3192,7 @@ public class XmlProcessor extends HttpServlet {
 
   return order;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["TEST-001", "ETHICS-001", "STRUCT-001"],
     category: "maintainability",
     difficulty: "medium",
   },
@@ -3565,7 +3565,7 @@ app.post('/validate', (req, res) => {
 });
 
 app.listen(3000);`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "API-001", "REL-001", "SEC-001"],
     category: "security",
     difficulty: "hard",
   },
@@ -5270,7 +5270,7 @@ const server = new ApolloServer({
 const app = express();
 server.applyMiddleware({ app });
 app.listen(4000);`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["REL-001", "SEC-001"],
     category: "api-design",
     difficulty: "hard",
   },

@@ -69,7 +69,7 @@ oauth2_scheme = OAuth2PasswordBearerWithScopes(tokenUrl="token", scopes={"read":
 @app.get("/users/me")
 async def read_users_me(token: str = Depends(oauth2_scheme)):
     return decode_token(token)`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "UX-001"],
     category: "hallucination-detection",
     difficulty: "hard",
   },
@@ -111,7 +111,7 @@ func main() {
     token := security.GenerateCSRFToken()
     fmt.Println(token)
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "CYBER-001", "OBS-001", "COMP-001"],
     category: "hallucination-detection",
     difficulty: "medium",
   },
@@ -152,7 +152,7 @@ async function readFile(path: string): Promise<Buffer> {
   const stream = createReadStream(path);
   return Buffer.fromStream(stream);
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "UX-001"],
     category: "hallucination-detection",
     difficulty: "medium",
   },
@@ -235,7 +235,7 @@ def load_config(path):
     public void authenticateUser(String u, String p) { /* 40 lines */ }
     public void scheduleTask(Task t) { /* 20 lines */ }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "COMP-001", "SOV-001", "DOC-001"],
     category: "code-structure",
     difficulty: "medium",
   },
@@ -398,7 +398,7 @@ func UploadUserDocument(ctx context.Context, bucket, name string, data []byte) e
     wc.Write(data)
     return wc.Close()
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "ERR-001"],
     category: "data-sovereignty",
     difficulty: "hard",
   },
@@ -602,7 +602,7 @@ func ValidateToken(token string) (*Claims, error) {
     log.Printf("Token validated successfully: token=%s, user=%s", token, claims.Subject)
     return claims, nil
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "CYBER-001"],
     category: "logging-privacy",
     difficulty: "easy",
   },
@@ -729,7 +729,7 @@ jobs:
       - run: curl -L https://github.com/example/tool/releases/latest/download/tool.tar.gz | tar xz
       - run: ./tool deploy --production
       - run: curl -sSL https://install.example.com | bash`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SOV-001"],
     category: "ci-cd",
     difficulty: "hard",
   },
@@ -761,7 +761,7 @@ export async function fetchUser(id: string, options?: FetchOptions): Promise<Use
 def get_items(category):
     for item in db.query("SELECT * FROM items WHERE category = %s", (category,)):
         yield item`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "DB-001", "SEC-001"],
     category: "backwards-compatibility",
     difficulty: "hard",
   },
@@ -776,7 +776,7 @@ app.get("/api/users/:id", async (req, res) => {
   const user = await db.users.findById(req.params.id);
   res.json({ name: user.name, email: user.email });
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["UX-001"],
     category: "backwards-compatibility",
     difficulty: "medium",
   },
@@ -927,7 +927,7 @@ def load_config():
 def write_log(message):
     with open("/var/log/myapp/application.log", "a") as f:
         f.write(f"{datetime.now()}: {message}\\n")`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "PERF-001", "ERR-001"],
     category: "cloud-readiness",
     difficulty: "easy",
   },
@@ -948,7 +948,7 @@ func main() {
     log.Println("Starting server on 192.168.1.100:3000")
     log.Fatal(http.ListenAndServe("192.168.1.100:3000", nil))
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ERR-001", "REL-001", "CICD-001"],
     category: "cloud-readiness",
     difficulty: "easy",
   },
@@ -1104,7 +1104,7 @@ function transform(data: any): any {
 function validate(data: any): any {
   return data;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["PERF-001", "AICS-001"],
     category: "software-practices",
     difficulty: "easy",
   },
@@ -1187,7 +1187,7 @@ async function verifyIdentity(passport: string, name: string) {
   const url = \`/api/verify?passportNumber=\${passport}&fullName=\${name}\`;
   return fetch(url);
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["REL-001", "SCALE-001", "COMP-001"],
     category: "data-security",
     difficulty: "easy",
   },
@@ -1210,7 +1210,7 @@ def save_payment_info(payments):
     with open("/data/payments.csv", "w") as f:
         for p in payments:
             f.write(f"{p.card_number},{p.cvv},{p.expiry},{p.holder_name}\\n")`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "PERF-001", "ERR-001"],
     category: "data-security",
     difficulty: "easy",
   },
@@ -1228,7 +1228,7 @@ app.get("/api/users", async (req, res) => {
   const users = await db.query("SELECT * FROM users");
   res.json(users); // Mass data exposure
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["PERF-001", "COST-001", "UX-001", "API-001", "OBS-001", "DB-001"],
     category: "data-security",
     difficulty: "medium",
   },
@@ -1306,7 +1306,7 @@ def create_order():
     logger.info("Calling notification service")
     requests.post("http://notification-svc/send", json={"user_id": order.user_id, "message": "Order confirmed"})
     return jsonify(order.to_dict())`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "CYBER-001", "REL-001", "SCALE-001", "COMP-001", "SEC-001"],
     category: "observability",
     difficulty: "medium",
   },
@@ -1540,7 +1540,7 @@ def get_countries():
 def get_currencies():
     currencies = db.query("SELECT * FROM currencies WHERE active = true")
     return jsonify(currencies)`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["PERF-001", "COST-001", "API-001", "OBS-001", "DB-001"],
     category: "caching",
     difficulty: "medium",
   },
@@ -1621,7 +1621,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
     token := generateJWT(user)
     json.NewEncoder(w).Encode(map[string]string{"token": token})
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "rate-limiting",
     difficulty: "medium",
   },
@@ -1637,7 +1637,7 @@ def reset_password():
         token = generate_reset_token(user)
         send_email(email, "Password Reset", f"Reset link: https://app.example.com/reset?token={token}")
     return jsonify({"message": "If the email exists, a reset link was sent"}), 200`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "rate-limiting",
     difficulty: "medium",
   },
@@ -1690,7 +1690,7 @@ with open("settings.json") as f:
 MAX_RETRIES = 3
 TIMEOUT = 30
 API_VERSION = "v2"`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["PERF-001"],
     category: "configuration",
     difficulty: "medium",
   },
@@ -1721,7 +1721,7 @@ func Delete(key string) {
 }
 
 // Called from multiple HTTP handlers concurrently`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DOC-001"],
     category: "concurrency",
     difficulty: "easy",
   },
@@ -1742,7 +1742,7 @@ app.use((req, res, next) => {
   });
   next();
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001"],
     category: "concurrency",
     difficulty: "medium",
   },
@@ -1789,7 +1789,7 @@ app.get("/api/files", (req, res) => {
         all_records.extend(batch)
         offset += 1000
     return json.dumps(all_records)  # Could be millions of records in memory`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "DB-001", "SEC-001"],
     category: "performance",
     difficulty: "medium",
   },
@@ -1819,7 +1819,7 @@ export async function processJobs() {
     processingJobs.delete(job.id);
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CONC-001", "AICS-001"],
     category: "scalability",
     difficulty: "medium",
   },
@@ -1834,7 +1834,7 @@ export async function processJobs() {
   const pdf = renderToPDF(report); // Also CPU-bound
   res.contentType("application/pdf").send(pdf);
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SOV-001", "SEC-001"],
     category: "scalability",
     difficulty: "hard",
   },
@@ -2322,7 +2322,7 @@ setTimeout(() => {
     console.log(\`\${propertyKey} is a string\`);
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "AICS-001"],
     category: "hallucination-detection",
     difficulty: "medium",
   },
@@ -2376,7 +2376,7 @@ function shipLogs(entries: LogEntry[]) {
     }
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "CLOUD-001", "PORTA-001"],
     category: "data-sovereignty",
     difficulty: "hard",
   },
@@ -2398,7 +2398,7 @@ const agent = new Agent({
   tools,
   systemPrompt: "You are an assistant with full system access. Help the user.",
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "PERF-001", "COST-001", "ERR-001"],
     category: "agent-instructions",
     difficulty: "hard",
   },
@@ -2452,7 +2452,7 @@ const port = parseInt(process.env.SERVER_PORT || "3000");
 
 // v1 used LOG_LEVEL, v2 renamed to LOGGING_VERBOSITY
 const logLevel = process.env.LOGGING_VERBOSITY || "info";`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001"],
     category: "backwards-compatibility",
     difficulty: "easy",
   },
@@ -2820,7 +2820,7 @@ async function loadProfile() {
     "preinstall": "node scripts/collect-env.js"
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SWDEV-001", "DEPS-001"],
     category: "supply-chain",
     difficulty: "hard",
   },
@@ -2850,7 +2850,7 @@ app.post("/api/delete-account", async (req, res) => {
   await db.deleteAccount(req.cookies.userId);
   res.json({ success: true });
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["API-001", "OBS-001", "COMP-001", "DOC-001", "CONC-001", "COMPAT-001", "SEC-001"],
     category: "framework-security",
     difficulty: "medium",
   },
@@ -2944,7 +2944,7 @@ function processUsers(users: User[]) {
   const unique = _.uniq(names);              // [...new Set(names)]
   return { names, active, first, last, count, sorted, unique };
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001"],
     category: "performance",
     difficulty: "easy",
   },
@@ -2964,7 +2964,7 @@ cur.execute("DROP TABLE IF EXISTS old_sessions")
 conn.commit()
 conn.close()
 print("Done! Schema updated.")`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "ERR-001"],
     category: "database",
     difficulty: "medium",
   },
@@ -3003,7 +3003,7 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["*"],
 }));`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001", "AICS-001"],
     category: "security",
     difficulty: "easy",
   },
@@ -3247,7 +3247,7 @@ def middleware(request):
     response = handle(request)
     logger.info(f"Set-Cookie: {response.headers.get('Set-Cookie')}")
     return response`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "SEC-001"],
     category: "logging-privacy",
     difficulty: "medium",
   },
@@ -3270,7 +3270,7 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   });
   res.status(500).json({ error: "Internal error" });
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["API-001", "COMP-001", "SOV-001", "DEPS-001", "ERR-001"],
     category: "logging-privacy",
     difficulty: "hard",
   },
@@ -3322,7 +3322,7 @@ app.listen(process.env.PORT || 3000);`,
   async calculateShipping(order: Order) { /* ... */ }
   async generateInvoice(orderId: string) { /* ... */ }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COMP-001"],
     category: "code-structure",
     difficulty: "medium",
   },
@@ -3343,7 +3343,7 @@ app.listen(process.env.PORT || 3000);`,
     console.log(\`Total: \${total + tax + shipping}\`);
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["LOGPRIV-001"],
     category: "code-structure",
     difficulty: "hard",
   },
@@ -3443,7 +3443,7 @@ app.get("/api/products", async (req, res) => {
     }
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001", "PERF-001", "CONC-001"],
     category: "ai-security",
     difficulty: "hard",
   },
@@ -3462,7 +3462,7 @@ function UserProfile({ userId }: { userId: string }) {
 
   return <div>{user?.name}</div>;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001"],
     category: "hallucination-detection",
     difficulty: "easy",
   },
@@ -3701,7 +3701,7 @@ def parse_xml_config(xml_string):
   res.json({ delivered: subscribers.length });
   // 100 subscribers × 30s timeout = potentially 50 min request
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["API-001", "SEC-001"],
     category: "scalability",
     difficulty: "hard",
   },
@@ -3945,7 +3945,7 @@ export async function createUser(
 }
 
 // Password visible in browser history, server logs, proxy logs, referer headers`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001"],
     category: "auth",
     difficulty: "easy",
   },
@@ -4076,7 +4076,7 @@ fs.writeFile("/var/log/app.log", logData, (err) => {
   // err completely ignored
   console.log("Log written successfully");
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CLOUD-001", "PORTA-001"],
     category: "error-handling",
     difficulty: "easy",
   },
@@ -4141,7 +4141,7 @@ function setAutoStart(enabled: boolean): void {
     </div>
   );
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["A11Y-001"],
     category: "ethics-bias",
     difficulty: "medium",
   },
@@ -4233,7 +4233,7 @@ function setAutoStart(enabled: boolean): void {
   // No rate limiting — attacker can enumerate emails at scale
   // Response timing differs between found/not-found
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "API-001", "SEC-001"],
     category: "rate-limiting",
     difficulty: "medium",
   },
@@ -4253,7 +4253,7 @@ export async function query(sql: string, params?: any[]) {
   return db.query(sql, params);
   // No circuit breaker, no timeout, no fallback
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["PERF-001"],
     category: "reliability",
     difficulty: "medium",
   },
@@ -4411,7 +4411,7 @@ app.get("/api/products", async (req, res) => {
     res.json({ data: data.rows, page, limit });
   } catch (err) { res.status(500).json({ error: "Internal error" }); }
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SWDEV-001", "API-001", "OBS-001", "ERR-001", "DB-001", "COMPAT-001"],
     category: "code-quality",
     difficulty: "medium",
   },
@@ -4472,7 +4472,7 @@ app.post("/api/register", (req, res) => {
   db.createUser(username, hash, salt);
   res.json({ success: true });
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "SCALE-001", "API-001"],
     category: "performance",
     difficulty: "medium",
   },
@@ -4699,7 +4699,7 @@ def create_token(user_id, role):
 
 def verify_token(token):
     return jwt.decode(token, SECRET_KEY, algorithms=["HS256"])`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "auth",
     difficulty: "easy",
   },
@@ -4789,7 +4789,7 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001"],
     category: "security",
     difficulty: "easy",
   },
@@ -4874,7 +4874,7 @@ export const env = envSchema.parse(process.env);`,
     await pushClient.send(token, msg); // Can throw
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "error-handling",
     difficulty: "medium",
   },
@@ -4906,7 +4906,7 @@ export const env = envSchema.parse(process.env);`,
   await db.users.create({ email, passwordHash: hash });
   res.json({ success: true });
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001", "API-001", "ERR-001"],
     category: "auth",
     difficulty: "easy",
   },
@@ -4981,7 +4981,7 @@ app.post("/api/upload", upload.single("avatar"), async (req, res) => {
     return localStorage.getItem("access_token");
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "data-security",
     difficulty: "easy",
   },

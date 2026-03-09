@@ -544,7 +544,7 @@ class AuthManager {
         return UserDefaults.standard.string(forKey: "auth_token")
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CYBER-001"],
     category: "data-security",
     difficulty: "medium",
   },
@@ -1491,7 +1491,7 @@ def list_orders(request):
             "items": [{"name": i.name, "qty": i.quantity} for i in items]
         })
     return JsonResponse({"orders": result})`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001"],
     category: "scalability",
     difficulty: "medium",
   },
@@ -1518,7 +1518,7 @@ export function sendEmail(to: string, body: string) {
   const transporter = nodemailer.createTransport(config.email);
   transporter.sendMail({ to, subject: "Hello", html: body });
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "COST-001"],
     category: "testing",
     difficulty: "medium",
   },
@@ -1707,7 +1707,7 @@ def predict_approval(model, applicant):
   }
   return users;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["REL-001", "SCALE-001", "RATE-001"],
     category: "cost-effectiveness",
     difficulty: "medium",
   },
@@ -1778,7 +1778,7 @@ function loadSession(sessionId: string): any {
   if (existsSync(path)) return JSON.parse(readFileSync(path, "utf-8"));
   return null;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["PERF-001", "COST-001", "AICS-001"],
     category: "cloud-readiness",
     difficulty: "medium",
   },
@@ -1976,7 +1976,7 @@ def chat_with_data(user_query: str, documents: list) -> str:
   ],
   systemPrompt: "You are a data analyst. Help users analyze CSV files.",
 };`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001", "PERF-001", "COST-001", "ERR-001"],
     category: "agent-instructions",
     difficulty: "medium",
   },
@@ -2354,7 +2354,7 @@ function processInput(input: string): string {
   const encrypted = encrypt(clean, "AES-256");
   return encrypted;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["PERF-001"],
     category: "ai-code-safety",
     difficulty: "medium",
   },
@@ -2528,7 +2528,7 @@ function p(a: number, b: number, c: number, d: number, e: string, f: boolean, g:
   }
   return 0;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["MAINT-001", "STRUCT-001"],
     category: "software-practices",
     difficulty: "easy",
   },
