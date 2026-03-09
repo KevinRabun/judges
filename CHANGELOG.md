@@ -2,6 +2,12 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.27.1] — 2026-03-09
+
+### Fixed
+- **CI `npm ci` failure** — Removed tree-sitter native grammar devDependencies (tree-sitter-c-sharp, tree-sitter-cpp, tree-sitter-go, tree-sitter-java, tree-sitter-kotlin, tree-sitter-php, tree-sitter-python, tree-sitter-ruby, tree-sitter-rust, tree-sitter-swift, tree-sitter-typescript, tree-sitter-cli) that caused `ERESOLVE` peer dependency conflicts during `npm ci` in CI. These packages were only needed for one-time WASM grammar generation; the pre-built WASM files in `grammars/` are committed and used at runtime via `web-tree-sitter`
+- **Added `.npmrc`** — Sets `legacy-peer-deps=true` as a safety net for any remaining transitive peer conflicts
+
 ## [3.27.0] — 2026-03-09
 
 ### Added

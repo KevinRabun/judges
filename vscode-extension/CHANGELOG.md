@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.27.1] — 2026-03-09
+
+### Fixed
+- **CI build fix** — Resolved `npm ci` peer dependency conflicts from tree-sitter native grammar packages
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.27.0] — 2026-03-09
 
 ### Added
