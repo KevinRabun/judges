@@ -46,6 +46,14 @@ coverage/
 *.tgz
 package-lock.json.bak
 
+# Generated LinkedIn content
+content/linkedin/
+
+# Temporary output files
+benchmark-err.txt
+benchmark-out.txt
+self-eval-output.txt
+
 # MCP Publisher
 mcp-publisher
 mcp-publisher.exe

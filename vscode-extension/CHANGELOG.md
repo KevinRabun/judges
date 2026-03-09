@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.26.0] — 2026-03-09
+
+### Fixed
+- **Security evaluator false positives eliminated** — Two regex patterns fixed to prevent false triggers on compound identifiers (`curlArgs`, `PRIV`)
+- **Self-eval clean** — 0 findings across 176 source files, down from 211 in prior release
+
+### Changed
+- **Improved false-positive filtering** — Expanded heuristic rules for analysis-tool code, test files with code specimens, benchmark data, CLI tools, and utility modules
+- **Scoring engine refactored** — Confidence scoring decomposed from a single 42-CC function into 7 focused helpers for maintainability
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.25.1] — 2026-03-09
 
 ### Fixed

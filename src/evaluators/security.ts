@@ -115,7 +115,7 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
         // Check if user input is involved (exclude compound identifiers like InputDir, userHome)
         const ctx = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 2)).join("\n");
         if (
-          /(?:req\.|request\.|params\.|query\.|body\.|args\.|argv|\binput\s*[=:[(.]|\buser\s*[=:[(.])/i.test(ctx) &&
+          /(?:req\.|request\.|params\.|query\.|body\.|\bargs\.|argv|\binput\s*[=:[(.]|\buser\s*[=:[(.])/i.test(ctx) &&
           /(?:\+|`[^`]*\$\{|\.format|path\.join|Path\.Combine|filepath\.Join|os\.path\.join)/i.test(ctx)
         ) {
           fsAccessLines.push(i + 1);
@@ -834,7 +834,7 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       // Static/hardcoded IV
-      if (/(?:static\s*IV|(?:iv|IV)\s*[:=]\s*(?:\[\]byte\s*\(|["'\[])|var\s+\w*[Ii][Vv]\s*=)/i.test(line)) {
+      if (/(?:static\s*IV|\b(?:iv|IV)\b\s*[:=]\s*(?:\[\]byte\s*\(|["'\[])|var\s+\w*[Ii][Vv]\s*=)/i.test(line)) {
         cryptoMiscLines.push(i + 1);
       }
       // ECB-like mode: manual block-by-block encryption without chain/GCM

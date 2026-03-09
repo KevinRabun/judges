@@ -79,6 +79,166 @@ export function estimateFindingConfidence(finding: Finding): number {
   return estimateFindingConfidenceWithBasis(finding).confidence;
 }
 
+/** Score line-level precision (Tier 1) */
+function scoreLinePrecision(lineCount: number, signals: string[]): number {
+  if (lineCount === 0) {
+    signals.push("no line numbers (-0.15)");
+    return -0.15;
+  }
+  if (lineCount <= 3) {
+    signals.push(`line-precise: ${lineCount} line(s) (+0.22)`);
+    return 0.22;
+  }
+  if (lineCount <= 8) {
+    signals.push(`line range: ${lineCount} lines (+0.14)`);
+    return 0.14;
+  }
+  signals.push(`broad range: ${lineCount} lines (+0.06)`);
+  return 0.06;
+}
+
+/** Score pattern-match specificity (Tier 2) */
+function scorePatternSpecificity(
+  description: string,
+  reference: string | undefined,
+  signals: string[],
+): { delta: number; hasExactApiMatch: boolean } {
+  let delta = 0;
+  const hasExactApiMatch =
+    /\b(?:eval|exec|innerHTML|dangerouslySetInnerHTML|createConnection|query)\b/i.test(description) ||
+    /\b(?:document\.write|child_process|\.exec\(|\.execSync)\b/i.test(description);
+  const combined = description + (reference ?? "");
+  const hasCveReference = /CVE-\d{4}-\d+/i.test(combined);
+  const hasCweReference = /CWE-\d+/i.test(combined);
+
+  if (hasExactApiMatch) {
+    delta += 0.12;
+    signals.push("exact API match (+0.12)");
+  }
+  if (hasCveReference) {
+    delta += 0.08;
+    signals.push("CVE reference (+0.08)");
+  }
+  if (hasCweReference) {
+    delta += 0.05;
+    signals.push("CWE reference (+0.05)");
+  }
+  return { delta, hasExactApiMatch };
+}
+
+/** Score structured evidence presence (Tier 3) */
+function scoreStructuredEvidence(
+  finding: Finding,
+  signals: string[],
+): {
+  delta: number;
+  hasReference: boolean;
+  hasSuggestedFix: boolean;
+  hasRichDescription: boolean;
+  hasRichRecommendation: boolean;
+} {
+  let delta = 0;
+  const hasReference = Boolean(finding.reference);
+  const hasSuggestedFix = Boolean(finding.suggestedFix);
+  const hasRichDescription = finding.description.length >= 120;
+  const hasRichRecommendation = finding.recommendation.length >= 90;
+
+  if (hasReference) {
+    delta += 0.06;
+    signals.push("has reference (+0.06)");
+  }
+  if (hasSuggestedFix) {
+    delta += 0.08;
+    signals.push("has suggested fix (+0.08)");
+  }
+  if (hasRichDescription) {
+    delta += 0.03;
+    signals.push("rich description (+0.03)");
+  }
+  if (hasRichRecommendation) {
+    delta += 0.03;
+    signals.push("rich recommendation (+0.03)");
+  }
+  return { delta, hasReference, hasSuggestedFix, hasRichDescription, hasRichRecommendation };
+}
+
+/** Score absence-based findings (Tier 4) */
+function scoreAbsencePattern(descLower: string, lineCount: number, signals: string[]): number {
+  const absenceKeywords = [
+    "no .* found",
+    "missing",
+    "absent",
+    "not detected",
+    "should (?:have|include|implement)",
+    "consider (?:adding|implementing)",
+  ];
+  const isAbsenceLike = absenceKeywords.some((kw) => new RegExp(kw, "i").test(descLower));
+  if (isAbsenceLike && lineCount === 0) {
+    signals.push("absence-based pattern (-0.10)");
+    return -0.1;
+  }
+  return 0;
+}
+
+/** Score provenance signals (Tier 5) */
+function scoreProvenance(
+  provenance: string | undefined,
+  signals: string[],
+): { delta: number; isAstConfirmed: boolean; isTaintFlow: boolean } {
+  let delta = 0;
+  const prov = (provenance ?? "").toLowerCase();
+  const isAstConfirmed = prov.includes("ast-confirmed") || prov.includes("tree-sitter");
+  const isTaintFlow = prov.includes("taint-flow") || prov.includes("cross-file-taint");
+  const isRegexConfirmed = prov.includes("regex-pattern-match");
+
+  if (isAstConfirmed) {
+    delta += 0.15;
+    signals.push("AST-confirmed (+0.15)");
+  }
+  if (isTaintFlow) {
+    delta += 0.18;
+    signals.push("taint-flow confirmed (+0.18)");
+  }
+  if (isRegexConfirmed && !isAstConfirmed) {
+    delta += 0.08;
+    signals.push("regex-pattern match (+0.08)");
+  }
+  return { delta, isAstConfirmed, isTaintFlow };
+}
+
+/** Score domain-severity alignment (Tier 6) */
+function scoreDomainAlignment(ruleId: string, severity: string, signals: string[]): number {
+  const securityPrefixes = ["CYBER-", "AUTH-", "DATA-", "AICS-", "IAC-"];
+  if (securityPrefixes.some((p) => ruleId.startsWith(p)) && (severity === "critical" || severity === "high")) {
+    signals.push("security domain alignment (+0.04)");
+    return 0.04;
+  }
+  return 0;
+}
+
+/** Apply noise cap for noisy evaluator domains */
+function applyNoiseCap(score: number, ruleId: string, richEvidenceCount: number, signals: string[]): number {
+  if (richEvidenceCount >= 4) return score;
+
+  const tiers: [string[], number, string][] = [
+    [["COMP-", "ETHICS-", "SOV-", "COST-", "DOC-"], 0.82, "advisory domain cap (→0.82)"],
+    [["API-", "CONC-", "DB-", "DEPS-", "LOGPRIV-", "OBS-", "PERF-"], 0.88, "moderate noise cap (→0.88)"],
+    [["CACHE-", "CFG-", "COMPAT-", "MAINT-", "SWDEV-", "TEST-"], 0.92, "occasional noise cap (→0.92)"],
+  ];
+
+  for (const [prefixes, cap, label] of tiers) {
+    if (prefixes.some((p) => ruleId.startsWith(p))) {
+      const capped = Math.min(score, cap);
+      if (capped < score) {
+        signals.push(label);
+        return capped;
+      }
+      return score;
+    }
+  }
+  return score;
+}
+
 /**
  * Estimate confidence for a finding and return both the numeric score and
  * a human-readable explanation of the evidence signals that contributed.
@@ -94,110 +254,33 @@ export function estimateFindingConfidenceWithBasis(finding: Finding): {
 
   let score = 0.4;
   const signals: string[] = [];
-
-  // ── Evidence tier 1: Line-level precision ──────────────────────────────
   const lineCount = finding.lineNumbers?.length ?? 0;
-  if (lineCount === 0) {
-    score -= 0.15;
-    signals.push("no line numbers (-0.15)");
-  } else if (lineCount <= 3) {
-    score += 0.22;
-    signals.push(`line-precise: ${lineCount} line(s) (+0.22)`);
-  } else if (lineCount <= 8) {
-    score += 0.14;
-    signals.push(`line range: ${lineCount} lines (+0.14)`);
-  } else {
-    score += 0.06;
-    signals.push(`broad range: ${lineCount} lines (+0.06)`);
-  }
 
-  // ── Evidence tier 2: Pattern-match specificity ─────────────────────────
-  const descLower = finding.description.toLowerCase();
-  const hasExactApiMatch =
-    /\b(?:eval|exec|innerHTML|dangerouslySetInnerHTML|createConnection|query)\b/i.test(finding.description) ||
-    /\b(?:document\.write|child_process|\.exec\(|\.execSync)\b/i.test(finding.description);
-  const hasCveReference = /CVE-\d{4}-\d+/i.test(finding.description + (finding.reference ?? ""));
-  const hasCweReference = /CWE-\d+/i.test(finding.description + (finding.reference ?? ""));
+  score += scoreLinePrecision(lineCount, signals);
 
-  if (hasExactApiMatch) {
-    score += 0.12;
-    signals.push("exact API match (+0.12)");
-  }
-  if (hasCveReference) {
-    score += 0.08;
-    signals.push("CVE reference (+0.08)");
-  }
-  if (hasCweReference) {
-    score += 0.05;
-    signals.push("CWE reference (+0.05)");
-  }
+  const { delta: patternDelta, hasExactApiMatch } = scorePatternSpecificity(
+    finding.description,
+    finding.reference,
+    signals,
+  );
+  score += patternDelta;
 
-  // ── Evidence tier 3: Structured evidence ───────────────────────────────
-  const hasReference = Boolean(finding.reference);
-  const hasSuggestedFix = Boolean(finding.suggestedFix);
-  const hasRichDescription = finding.description.length >= 120;
-  const hasRichRecommendation = finding.recommendation.length >= 90;
+  const {
+    delta: evidenceDelta,
+    hasReference,
+    hasSuggestedFix,
+    hasRichDescription,
+    hasRichRecommendation,
+  } = scoreStructuredEvidence(finding, signals);
+  score += evidenceDelta;
 
-  if (hasReference) {
-    score += 0.06;
-    signals.push("has reference (+0.06)");
-  }
-  if (hasSuggestedFix) {
-    score += 0.08;
-    signals.push("has suggested fix (+0.08)");
-  }
-  if (hasRichDescription) {
-    score += 0.03;
-    signals.push("rich description (+0.03)");
-  }
-  if (hasRichRecommendation) {
-    score += 0.03;
-    signals.push("rich recommendation (+0.03)");
-  }
+  score += scoreAbsencePattern(finding.description.toLowerCase(), lineCount, signals);
 
-  // ── Evidence tier 4: Absence-based findings are inherently lower confidence
-  const absenceKeywords = [
-    "no .* found",
-    "missing",
-    "absent",
-    "not detected",
-    "should (?:have|include|implement)",
-    "consider (?:adding|implementing)",
-  ];
-  const isAbsenceLike = absenceKeywords.some((kw) => new RegExp(kw, "i").test(descLower));
-  if (isAbsenceLike && lineCount === 0) {
-    score -= 0.1;
-    signals.push("absence-based pattern (-0.10)");
-  }
+  const { delta: provDelta, isAstConfirmed, isTaintFlow } = scoreProvenance(finding.provenance, signals);
+  score += provDelta;
 
-  // ── Evidence tier 5: Provenance-based boost ─────────────────────────
-  const prov = (finding.provenance ?? "").toLowerCase();
-  const isAstConfirmed = prov.includes("ast-confirmed") || prov.includes("tree-sitter");
-  const isTaintFlow = prov.includes("taint-flow") || prov.includes("cross-file-taint");
-  const isRegexConfirmed = prov.includes("regex-pattern-match");
+  score += scoreDomainAlignment(finding.ruleId, finding.severity, signals);
 
-  if (isAstConfirmed) {
-    score += 0.15;
-    signals.push("AST-confirmed (+0.15)");
-  }
-  if (isTaintFlow) {
-    score += 0.18;
-    signals.push("taint-flow confirmed (+0.18)");
-  }
-  if (isRegexConfirmed && !isAstConfirmed) {
-    score += 0.08;
-    signals.push("regex-pattern match (+0.08)");
-  }
-
-  // ── Evidence tier 6: Domain-severity alignment ────────────────────────
-  const securityPrefixes = ["CYBER-", "AUTH-", "DATA-", "AICS-", "IAC-"];
-  const isSecurityDomain = securityPrefixes.some((p) => finding.ruleId.startsWith(p));
-  if (isSecurityDomain && (finding.severity === "critical" || finding.severity === "high")) {
-    score += 0.04;
-    signals.push("security domain alignment (+0.04)");
-  }
-
-  // ── Noisy evaluator cap: domain-specific noise ceilings ───────────────
   const richEvidenceCount = [
     hasReference,
     hasSuggestedFix,
@@ -209,31 +292,7 @@ export function estimateFindingConfidenceWithBasis(finding: Finding): {
     isTaintFlow,
   ].filter(Boolean).length;
 
-  const noiseCapTier1 = ["COMP-", "ETHICS-", "SOV-", "COST-", "DOC-"];
-  const noiseCapTier2 = ["API-", "CONC-", "DB-", "DEPS-", "LOGPRIV-", "OBS-", "PERF-"];
-  const noiseCapTier3 = ["CACHE-", "CFG-", "COMPAT-", "MAINT-", "SWDEV-", "TEST-"];
-
-  if (richEvidenceCount < 4) {
-    if (noiseCapTier1.some((p) => finding.ruleId.startsWith(p))) {
-      const capped = Math.min(score, 0.82);
-      if (capped < score) {
-        signals.push("advisory domain cap (→0.82)");
-        score = capped;
-      }
-    } else if (noiseCapTier2.some((p) => finding.ruleId.startsWith(p))) {
-      const capped = Math.min(score, 0.88);
-      if (capped < score) {
-        signals.push("moderate noise cap (→0.88)");
-        score = capped;
-      }
-    } else if (noiseCapTier3.some((p) => finding.ruleId.startsWith(p))) {
-      const capped = Math.min(score, 0.92);
-      if (capped < score) {
-        signals.push("occasional noise cap (→0.92)");
-        score = capped;
-      }
-    }
-  }
+  score = applyNoiseCap(score, finding.ruleId, richEvidenceCount, signals);
 
   const finalConfidence = Number(clampConfidence(score).toFixed(2));
   return {

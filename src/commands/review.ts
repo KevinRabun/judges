@@ -16,7 +16,8 @@
 
 import { execFileSync, execSync } from "child_process";
 import { readFileSync, writeFileSync, unlinkSync } from "fs";
-import { resolve, extname } from "path";
+import { tmpdir } from "os";
+import { resolve, join, extname } from "path";
 import { evaluateDiff, evaluateWithTribunal } from "../evaluators/index.js";
 import { evaluateProject, type TribunalRunner } from "../evaluators/project.js";
 import type { EvaluationOptions } from "../evaluators/index.js";
@@ -202,7 +203,7 @@ function ghApiRequest(
 
   if (body) {
     // Write body to temp file to avoid shell escaping issues
-    const tmpFile = resolve(".judges-review-tmp.json");
+    const tmpFile = join(tmpdir(), `.judges-review-tmp-${process.pid}.json`);
     writeFileSync(tmpFile, JSON.stringify(body), "utf-8");
     curlArgs.push("-d", `@${tmpFile}`);
     curlArgs.push(url);

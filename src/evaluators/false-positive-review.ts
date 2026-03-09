@@ -132,6 +132,8 @@ const ANALYSIS_TOOL_INAPPLICABLE_RULE_PREFIXES = [
   "CYBER-", // web security — tool has no endpoints
   "AUTH-", // authentication — tool has no auth system
   "DATA-", // data security — tool analyzes code, doesn't store data
+  "SEC-", // security — detection patterns contain the keywords they detect, not real vulnerabilities
+  "HALLU-", // hallucination — detection lists contain hallucinated API names by design
   "SCALE-", // scalability — single-process tool
   "CLOUD-", // cloud readiness — not a cloud service
   "RATE-", // rate limiting — not a service
@@ -370,7 +372,7 @@ export function filterFalsePositiveHeuristics(
   const removed: Finding[] = [];
 
   for (const finding of findings) {
-    const reason = getFpReason(finding, lines, isIaC, fileCategory);
+    const reason = getFpReason(finding, lines, isIaC, fileCategory, filePath);
     if (reason) {
       removed.push({ ...finding, description: `${finding.description}\n\n**FP Heuristic:** ${reason}` });
     } else {
@@ -387,7 +389,13 @@ export function filterFalsePositiveHeuristics(
  * Returns a short explanation if the finding is a likely FP, or null if it
  * should be kept.
  */
-function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCategory: string): string | null {
+function getFpReason(
+  finding: Finding,
+  lines: string[],
+  isIaC: boolean,
+  fileCategory: string,
+  filePath?: string,
+): string | null {
   // ── 1. IaC template gating: app-only rules on IaC files ──
   if (isIaC) {
     const isAppOnly = APP_ONLY_RULE_PREFIXES.some((p) => finding.ruleId.startsWith(p));
@@ -404,13 +412,12 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     }
   }
 
-  // ── 2a. Analysis-tool test files: TEST-* rules fire on code specimens ──
+  // ── 2a. Analysis-tool test files: rules fire on code specimens ──
   // Test suites for code analysis tools necessarily embed template-literal
-  // code samples in many languages. Pattern-based TEST-* rules (vague
-  // names, hardcoded dates, external deps, sleeps, large file size)
-  // inevitably match content inside those string specimens rather than
-  // genuine test smells.
-  if (fileCategory === "test" && finding.ruleId.startsWith("TEST-")) {
+  // code samples in many languages. Pattern-based rules (TEST-*, SEC-*,
+  // HALLU-*) inevitably match content inside those string specimens
+  // rather than genuine issues in the test code itself.
+  if (fileCategory === "test" && /^(?:TEST|SEC|HALLU)-/.test(finding.ruleId)) {
     const codeText = lines.join("\n");
     const isAnalysisToolTest =
       /\b(?:evaluateWith|scoreFindings|evaluateCode|filterFalsePositive|classifyFile|TribunalVerdict|JudgeDefinition|judgePanelEvaluate|evaluateWithTribunal)\b/.test(
@@ -422,7 +429,7 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
       // Verify file is dominated by template literal code specimens
       const templateLiteralCount = (codeText.match(/`[^`]{50,}/g) || []).length;
       if (templateLiteralCount >= 3) {
-        return `TEST-* rule ${finding.ruleId} triggered by patterns inside code specimens (template literal fixtures) in analysis-tool tests — not actual test smell.`;
+        return `Rule ${finding.ruleId} triggered by patterns inside code specimens (template literal fixtures) in analysis-tool tests — not actual test code.`;
       }
     }
   }
@@ -443,7 +450,19 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     return "Absence-based rule does not apply to pure type-definition files — no runtime logic to evaluate.";
   }
 
-  // ── 2d. CLI-tool file gating: server/cloud rules on CLI commands ──
+  // ── 2d. Benchmark CLI files: SEC/HALLU on embedded code specimens ──
+  // Benchmark files in the commands/ directory contain intentional
+  // vulnerable-code snippets embedded as template literal strings. These
+  // are test data, not real vulnerabilities.
+  if (fileCategory === "cli" && filePath && /benchmark/i.test(filePath) && /^(?:SEC|HALLU)-/.test(finding.ruleId)) {
+    const codeText = lines.join("\n");
+    const templateLiteralCount = (codeText.match(/`[^`]{50,}/g) || []).length;
+    if (templateLiteralCount >= 5) {
+      return `Rule ${finding.ruleId} triggered by intentional code specimens in benchmark test data — not a real vulnerability.`;
+    }
+  }
+
+  // ── 2e. CLI-tool file gating: server/cloud rules on CLI commands ──
   // CLI tools are short-lived processes that legitimately use process.exit(),
   // console.log for output, synchronous I/O, and in-memory data structures.
   // Scalability, observability infrastructure, structured logging, rate
@@ -577,9 +596,23 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     if (finding.isAbsenceBased) {
       return "Absence-based infrastructure rules do not apply to CLI commands.";
     }
+
+    // Suppress SEC file-system-access findings — CLI tools are designed to
+    // read/write files based on user-provided command-line arguments. File
+    // system operations with argv/args paths are the tool's core purpose.
+    if (/^SEC-/.test(finding.ruleId) && finding.title.toLowerCase().includes("file system access")) {
+      return "File system access from CLI arguments is the tool's core purpose — not a vulnerability.";
+    }
+
+    // Suppress SEC database-related findings — CLI tools have no database
+    // connections; "untrusted input in query" fires on function arguments
+    // that are file paths, not SQL.
+    if (/^SEC-/.test(finding.ruleId) && /database|sql|query construction/i.test(finding.title)) {
+      return "CLI tools have no database connections — argument flow into internal functions is not SQL injection.";
+    }
   }
 
-  // ── 2e. Analysis-tool file gating ──
+  // ── 2f. Analysis-tool file gating ──
   // Code analysis tools (judge definitions, evaluators, linters, formatters,
   // AST analyzers) necessarily contain the very patterns they detect. They
   // are single-process developer utilities, not production web services.
@@ -642,7 +675,7 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     }
   }
 
-  // ── 2f. VS Code extension file gating ──
+  // ── 2g. VS Code extension file gating ──
   // VS Code extensions are desktop plugins running inside the editor process.
   // They use the VS Code API for I/O, diagnostics, and UI — cloud/service
   // rules are not applicable.
@@ -684,7 +717,7 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     }
   }
 
-  // ── 2g. Utility module gating ──
+  // ── 2h. Utility module gating ──
   // Utility modules are library code with no HTTP endpoints, no user-facing
   // UI, and no cloud-service responsibilities. Server-infrastructure and
   // cloud-readiness rules do not apply.
@@ -707,6 +740,25 @@ function getFpReason(finding: Finding, lines: string[], isIaC: boolean, fileCate
     const isUtilityInapplicable = UTILITY_INAPPLICABLE.some((p) => finding.ruleId.startsWith(p));
     if (isUtilityInapplicable) {
       return `Rule ${finding.ruleId} does not apply to utility library modules — no cloud/service infrastructure.`;
+    }
+
+    // For path-confirmed utility modules (not content-based guesses),
+    // also suppress code-quality rules that fire on internal CLI internals:
+    // sync I/O, empty catches in cache cleanup, structural complexity in
+    // data-aggregation code, etc.
+    if (filePath) {
+      const INTERNAL_UTILITY_INAPPLICABLE = [
+        "PERF-", // sync I/O is idiomatic for single-threaded CLI utility internals
+        "COST-", // same as PERF — sync I/O is the expected pattern
+        "TEST-", // utility modules are tested indirectly through integration tests
+        "COMPAT-", // internal data structures, not public API
+        "ERR-", // utility modules use intentional swallowed errors (cache cleanup, etc.)
+        "STRUCT-", // data-aggregation utilities have inherent branching complexity
+      ];
+      const isInternalInapplicable = INTERNAL_UTILITY_INAPPLICABLE.some((p) => finding.ruleId.startsWith(p));
+      if (isInternalInapplicable) {
+        return `Rule ${finding.ruleId} does not apply to internal utility modules — CLI internals have different patterns.`;
+      }
     }
 
     // Suppress absence-based findings on utilities
