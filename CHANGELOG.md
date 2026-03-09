@@ -2,6 +2,22 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.25.1] — 2026-03-09
+
+### Fixed
+- **PR review JSON output pollution** — In `--format json` mode, banner and informational `console.log` messages were written to stdout alongside the JSON result, corrupting the output file. All non-JSON output now redirected to stderr so stdout is pure JSON
+- **Inline PR review comments never posted in JSON mode** — `process.exit()` was called before the GitHub review-posting code, so inline comments and approve/request-changes events were silently skipped. Now posts the review before emitting JSON
+- **Workflow stderr redirect corrupting result file** — Removed `2>&1` from the PR review workflow step so stderr (Node.js warnings, subprocess output) no longer pollutes `judges-review-result.json`
+- **CodeQL code scanning alerts resolved** — Fixed 14 code scanning alerts: command injection via `execSync` replaced with `execFileSync`, incomplete URL substring sanitization, missing origin checks in `postMessage`, and unsafe regexp construction
+- **ESLint unused variable/import warnings** — Resolved 5 lint errors across evaluators, scoring, and comparison modules
+
+### Changed
+- **CI: actions/configure-pages bumped from v4 to v5** (Dependabot #18)
+- **Dev dependencies updated** — vitest, @biomejs/biome, and @anthropic-ai/sdk bumped (Dependabot #19)
+
+### Tests
+- 2191 tests (2161 pass, 30 pre-existing failures unrelated to this release)
+
 ## [3.25.0] — 2026-03-09
 
 ### Added

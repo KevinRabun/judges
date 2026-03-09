@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.25.1] — 2026-03-09
+
+### Fixed
+- **PR review inline comments now work in JSON mode** — Inline review comments and approve/request-changes events were silently skipped in JSON mode; now correctly posted to GitHub
+- **JSON output no longer corrupted by banner text** — Non-JSON log messages redirected to stderr so `--format json` produces clean output
+- **CodeQL security alerts resolved** — Command injection, URL sanitization, and unsafe regexp construction fixes
+- **ESLint warnings resolved** — Unused variable/import cleanup across multiple modules
+
+### Changed
+- **CI and dev dependency updates** — actions/configure-pages v5, vitest, biome, and Anthropic SDK bumped
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.25.0] — 2026-03-09
 
 ### Added
