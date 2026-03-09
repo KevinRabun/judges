@@ -11,7 +11,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "fs";
-import { resolve, extname } from "path";
+import { resolve, extname, relative } from "path";
 
 import { evaluateWithTribunal, evaluateWithJudge } from "../evaluators/index.js";
 import { getJudge } from "../judges/index.js";
@@ -169,6 +169,119 @@ export function applyPatches(
   }
 
   return { result: lines.join("\n"), applied, skipped, overlapped };
+}
+
+// ─── Multi-File Patch Coordination ──────────────────────────────────────────
+
+/** A group of patches scoped to a single file within a cross-file fix set. */
+export interface FilePatchGroup {
+  /** Absolute or relative file path. */
+  filePath: string;
+  /** Patches to apply to this file. */
+  patches: PatchCandidate[];
+}
+
+/** A coordinated set of patches across multiple files. */
+export type PatchSet = FilePatchGroup[];
+
+/** Result of applying a multi-file patch set. */
+export interface PatchSetResult {
+  /** Per-file results. */
+  files: Array<{
+    filePath: string;
+    applied: number;
+    skipped: number;
+    overlapped: number;
+  }>;
+  /** Aggregate totals. */
+  totalApplied: number;
+  totalSkipped: number;
+  totalOverlapped: number;
+  totalFiles: number;
+}
+
+/**
+ * Collect patches from findings across multiple files into a PatchSet.
+ * Groups findings by their associated file path.
+ * `fileMap` provides a finding-to-path lookup; unmatched findings use `defaultPath`.
+ */
+export function collectPatchSet(findings: Finding[], defaultPath: string, fileMap?: Map<Finding, string>): PatchSet {
+  const groups = new Map<string, PatchCandidate[]>();
+
+  for (const f of findings) {
+    if (!f.patch) continue;
+    const fp = fileMap?.get(f) ?? defaultPath;
+    if (!groups.has(fp)) groups.set(fp, []);
+    groups.get(fp)!.push({
+      ruleId: f.ruleId,
+      title: f.title,
+      severity: f.severity,
+      patch: f.patch,
+      lineNumbers: f.lineNumbers,
+    });
+  }
+
+  return Array.from(groups.entries()).map(([filePath, patches]) => ({
+    filePath,
+    patches,
+  }));
+}
+
+/**
+ * Apply a coordinated patch set across multiple files.
+ * Each file's patches are applied independently using `applyPatches()`,
+ * with optional `filter` applied per file.
+ */
+export function applyPatchSet(
+  patchSet: PatchSet,
+  options: { apply?: boolean; filter?: PatchFilter; basePath?: string } = {},
+): PatchSetResult {
+  const results: PatchSetResult = {
+    files: [],
+    totalApplied: 0,
+    totalSkipped: 0,
+    totalOverlapped: 0,
+    totalFiles: patchSet.length,
+  };
+
+  for (const group of patchSet) {
+    const absPath = options.basePath ? resolve(options.basePath, group.filePath) : resolve(group.filePath);
+
+    if (!existsSync(absPath)) {
+      results.files.push({
+        filePath: group.filePath,
+        applied: 0,
+        skipped: group.patches.length,
+        overlapped: 0,
+      });
+      results.totalSkipped += group.patches.length;
+      continue;
+    }
+
+    let patches = group.patches;
+    if (options.filter) {
+      patches = filterPatches(patches, options.filter);
+    }
+
+    if (patches.length === 0) {
+      results.files.push({ filePath: group.filePath, applied: 0, skipped: 0, overlapped: 0 });
+      continue;
+    }
+
+    const code = readFileSync(absPath, "utf-8");
+    const { result, applied, skipped, overlapped } = applyPatches(code, patches);
+
+    if (options.apply && applied > 0) {
+      writeFileSync(absPath, result, "utf-8");
+    }
+
+    results.files.push({ filePath: group.filePath, applied, skipped, overlapped });
+    results.totalApplied += applied;
+    results.totalSkipped += skipped;
+    results.totalOverlapped += overlapped;
+  }
+
+  return results;
 }
 
 // ─── Fix Command Arguments ─────────────────────────────────────────────────

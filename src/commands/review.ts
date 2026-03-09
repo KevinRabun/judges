@@ -571,6 +571,247 @@ function buildReviewSummary(result: ReviewResult): string {
   return lines.join("\n");
 }
 
+// ─── Rich PR Narrative ──────────────────────────────────────────────────────
+
+/** Parsed metadata extracted from a review comment body. */
+interface CommentMeta {
+  severity: string;
+  title: string;
+  ruleId: string;
+  path: string;
+  line: number;
+}
+
+function parseCommentMeta(comment: ReviewComment): CommentMeta | undefined {
+  // Body format: `🔴 **CRITICAL** — Title here (\`RULE-001\`)`
+  const match = comment.body.match(/\*\*(\w+)\*\*\s*—\s*(.+?)\s*\(`([^`]+)`\)/);
+  if (!match) return undefined;
+  return {
+    severity: match[1].toLowerCase(),
+    title: match[2],
+    ruleId: match[3],
+    path: comment.path,
+    line: comment.line,
+  };
+}
+
+const DOMAIN_LABELS: Record<string, string> = {
+  SEC: "Security",
+  PERF: "Performance",
+  LOG: "Logging & Observability",
+  ERR: "Error Handling",
+  INJ: "Injection",
+  FW: "Framework Misuse",
+  HALLU: "AI Hallucination",
+  AGENT: "AI Agent Safety",
+  AICS: "AI Code Safety",
+  SWDEV: "Software Engineering",
+  SOV: "Sovereignty",
+  I18N: "Internationalization",
+  COMP: "Compliance",
+  SCALE: "Scalability",
+  PRIV: "Privacy",
+  LEAK: "Data Leakage",
+  AUTH: "Authentication",
+};
+
+function domainFromRuleId(ruleId: string): string {
+  const prefix = ruleId.split("-")[0];
+  return DOMAIN_LABELS[prefix] ?? prefix;
+}
+
+/**
+ * Build a rich PR-level review narrative with executive summary, per-file
+ * breakdown, cross-cutting themes, and prioritized action items.
+ */
+export function buildPRReviewNarrative(result: ReviewResult): string {
+  const metas = result.comments.map(parseCommentMeta).filter((m): m is CommentMeta => m !== undefined);
+  const lines: string[] = [];
+
+  // ── Executive summary ─────────────────────────────────────────────
+  const emoji = result.approved ? "✅" : "❌";
+  lines.push(`## ${emoji} Judges Panel Review`);
+  lines.push("");
+
+  if (result.totalFindings === 0) {
+    lines.push(
+      `Analyzed **${result.filesAnalyzed}** file(s) with no findings. The changes look clean — no security, performance, or quality issues detected.`,
+    );
+    lines.push("", "---", "*Powered by [Judges Panel](https://github.com/KevinRabun/judges)*");
+    return lines.join("\n");
+  }
+
+  const sevParts: string[] = [];
+  if (result.criticalCount > 0) sevParts.push(`**${result.criticalCount}** critical`);
+  if (result.highCount > 0) sevParts.push(`**${result.highCount}** high`);
+  if (result.mediumCount > 0) sevParts.push(`**${result.mediumCount}** medium`);
+  if (result.lowCount > 0) sevParts.push(`**${result.lowCount}** low`);
+
+  lines.push(
+    `Analyzed **${result.filesAnalyzed}** file(s) and found **${result.totalFindings}** issue(s): ${sevParts.join(", ")}.`,
+  );
+  lines.push("");
+
+  if (!result.approved) {
+    lines.push("> **⚠️ Action required:** Critical or high severity findings must be addressed before merging.");
+    lines.push("");
+  }
+
+  // ── Per-file breakdown ────────────────────────────────────────────
+  const byFile = new Map<string, CommentMeta[]>();
+  for (const m of metas) {
+    const arr = byFile.get(m.path) ?? [];
+    arr.push(m);
+    byFile.set(m.path, arr);
+  }
+
+  if (byFile.size > 0) {
+    lines.push("### Files with findings");
+    lines.push("");
+    const sorted = [...byFile.entries()].sort((a, b) => b[1].length - a[1].length);
+    for (const [path, fileMetas] of sorted) {
+      const sevOrder = ["critical", "high", "medium", "low", "info"];
+      const worstSev = fileMetas.reduce((w, m) => {
+        return sevOrder.indexOf(m.severity) < sevOrder.indexOf(w) ? m.severity : w;
+      }, "info");
+      const worstEmoji = SEVERITY_EMOJI[worstSev] ?? "⚠️";
+      const uniqueTitles = [...new Set(fileMetas.map((m) => m.title))];
+      const summary =
+        uniqueTitles.length <= 3
+          ? uniqueTitles.join(", ")
+          : `${uniqueTitles.slice(0, 2).join(", ")} + ${uniqueTitles.length - 2} more`;
+      lines.push(`- ${worstEmoji} **\`${path}\`** (${fileMetas.length}): ${summary}`);
+    }
+    lines.push("");
+  }
+
+  // ── Cross-cutting themes ──────────────────────────────────────────
+  const byDomain = new Map<string, CommentMeta[]>();
+  for (const m of metas) {
+    const domain = domainFromRuleId(m.ruleId);
+    const arr = byDomain.get(domain) ?? [];
+    arr.push(m);
+    byDomain.set(domain, arr);
+  }
+
+  if (byDomain.size > 1) {
+    lines.push("### Themes across files");
+    lines.push("");
+    const sortedDomains = [...byDomain.entries()].sort((a, b) => b[1].length - a[1].length);
+    for (const [domain, domainMetas] of sortedDomains) {
+      const fileCount = new Set(domainMetas.map((m) => m.path)).size;
+      const fileWord = fileCount === 1 ? "file" : "files";
+      lines.push(`- **${domain}** — ${domainMetas.length} finding(s) across ${fileCount} ${fileWord}`);
+    }
+    lines.push("");
+  }
+
+  // ── Prioritized action items ──────────────────────────────────────
+  const criticals = metas.filter((m) => m.severity === "critical");
+  const highs = metas.filter((m) => m.severity === "high");
+  if (criticals.length > 0 || highs.length > 0) {
+    lines.push("### Priority fixes");
+    lines.push("");
+    let idx = 1;
+    for (const m of criticals) {
+      lines.push(`${idx}. 🔴 **${m.title}** in \`${m.path}\` (line ${m.line})`);
+      idx++;
+    }
+    for (const m of highs) {
+      lines.push(`${idx}. 🟠 **${m.title}** in \`${m.path}\` (line ${m.line})`);
+      idx++;
+    }
+    lines.push("");
+  }
+
+  // ── Footer ────────────────────────────────────────────────────────
+  if (result.fpSuppressed > 0) {
+    lines.push(`> 🧪 ${result.fpSuppressed} finding(s) suppressed by FP-rate calibration.`);
+    lines.push("");
+  }
+
+  if (result.commentsPosted < result.totalFindings) {
+    lines.push(
+      `> Showing top ${result.commentsPosted} of ${result.totalFindings} findings. Run \`judges eval\` locally for the full report.`,
+    );
+    lines.push("");
+  }
+
+  lines.push("---", "*Powered by [Judges Panel](https://github.com/KevinRabun/judges)*");
+  return lines.join("\n");
+}
+
+// ─── Review Completeness Signal ─────────────────────────────────────────────
+
+export interface ReviewCompleteness {
+  /** Overall status: complete, partial, or insufficient */
+  status: "complete" | "partial" | "insufficient";
+  /** Fraction of PR files that were analyzable (0–1) */
+  fileCoverage: number;
+  /** Number of files analyzed vs total files in PR */
+  filesAnalyzed: number;
+  totalFiles: number;
+  /** Number of files skipped (binary, removed, unsupported language) */
+  filesSkipped: number;
+  /** Whether cross-file analysis was performed */
+  crossFileAnalyzed: boolean;
+  /** Whether FP calibration was applied */
+  calibrated: boolean;
+  /** Summary reason when status is not "complete" */
+  reason?: string;
+}
+
+/**
+ * Assess whether a PR review is complete enough to serve as the sole
+ * code review gate. Returns a structured signal that CI/CD or humans
+ * can use to decide whether additional review is needed.
+ */
+export function assessReviewCompleteness(
+  prFiles: Array<{ filename: string; status: string; patch?: string }>,
+  result: ReviewResult,
+  options?: { crossFile?: boolean; calibrated?: boolean },
+): ReviewCompleteness {
+  const totalFiles = prFiles.length;
+  const codeFiles = prFiles.filter((f) => f.status !== "removed" && f.patch && detectLanguage(f.filename)).length;
+  const fileCoverage = totalFiles > 0 ? result.filesAnalyzed / totalFiles : 1;
+  const filesSkipped = totalFiles - result.filesAnalyzed;
+
+  const crossFileAnalyzed = options?.crossFile ?? false;
+  const calibrated = options?.calibrated ?? false;
+
+  // Determine status
+  let status: ReviewCompleteness["status"];
+  let reason: string | undefined;
+
+  if (codeFiles === 0) {
+    // No analyzable code files (all binary, config, docs, etc.)
+    status = "complete";
+    reason = "No analyzable code files in this PR.";
+  } else if (result.filesAnalyzed === 0) {
+    status = "insufficient";
+    reason = "No code files could be analyzed — all files were skipped or had empty patches.";
+  } else if (fileCoverage >= 0.9) {
+    status = "complete";
+  } else if (fileCoverage >= 0.5) {
+    status = "partial";
+    reason = `Only ${result.filesAnalyzed} of ${totalFiles} files were analyzed (${(fileCoverage * 100).toFixed(0)}% coverage).`;
+  } else {
+    status = "insufficient";
+    reason = `Low coverage: only ${result.filesAnalyzed} of ${totalFiles} files analyzed (${(fileCoverage * 100).toFixed(0)}%).`;
+  }
+
+  return {
+    status,
+    fileCoverage,
+    filesAnalyzed: result.filesAnalyzed,
+    totalFiles,
+    filesSkipped,
+    crossFileAnalyzed,
+    calibrated,
+    reason,
+  };
+}
+
 // ─── CLI Entry Point ────────────────────────────────────────────────────────
 
 export function parseReviewArgs(argv: string[]): ReviewArgs {
@@ -803,7 +1044,7 @@ AUTHENTICATION:
     const reviewEvent = result.approved && args.approve ? "APPROVE" : result.approved ? "COMMENT" : "REQUEST_CHANGES";
 
     const reviewBody = {
-      body: buildReviewSummary(result),
+      body: buildPRReviewNarrative(result),
       event: reviewEvent,
       comments: result.comments,
     };
@@ -820,7 +1061,7 @@ AUTHENTICATION:
       console.log("  Falling back to summary comment...");
 
       const fallbackResp = apiRequest("POST", `/repos/${repo}/issues/${args.pr}/comments`, args.token, {
-        body: buildReviewSummary(result),
+        body: buildPRReviewNarrative(result),
       });
 
       if (fallbackResp.status === 201 || fallbackResp.status === 200) {

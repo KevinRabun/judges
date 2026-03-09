@@ -158,7 +158,8 @@ export type { AiFingerprint, AiSignal } from "./fingerprint.js";
 // ─── Confidence Calibration ─────────────────────────────────────────────────
 export { buildCalibrationProfile, calibrateFindings, autoCalibrateFindings } from "./calibration.js";
 export type { CalibrationProfile } from "./calibration.js";
-export { estimateFindingConfidence, estimateFindingConfidenceWithBasis } from "./scoring.js";
+export { estimateFindingConfidence, estimateFindingConfidenceWithBasis, buildEvidenceChain } from "./scoring.js";
+export type { EvidenceChain, EvidenceStep } from "./types.js";
 
 // ─── Fix History / Learning ──────────────────────────────────────────────────
 export {
@@ -173,8 +174,15 @@ export {
 export type { FixOutcome, FixHistory, FixStats } from "./fix-history.js";
 
 // ─── Patch Application ─────────────────────────────────────────────────────
-export { applyPatches, filterPatches, detectOverlaps, sortPatchesBottomUp } from "./commands/fix.js";
-export type { PatchCandidate, PatchFilter } from "./commands/fix.js";
+export {
+  applyPatches,
+  filterPatches,
+  detectOverlaps,
+  sortPatchesBottomUp,
+  collectPatchSet,
+  applyPatchSet,
+} from "./commands/fix.js";
+export type { PatchCandidate, PatchFilter, FilePatchGroup, PatchSet, PatchSetResult } from "./commands/fix.js";
 
 // ─── Custom Rule Testing ────────────────────────────────────────────────────
 export {
@@ -296,6 +304,26 @@ export type { ProjectSignals, ProjectType, PresetRecommendation } from "./comman
 export { formatSmartOutput, formatSmartSingleJudge } from "./commands/smart-output.js";
 export type { SmartOutputOptions } from "./commands/smart-output.js";
 
+// ─── Project Context Detection ───────────────────────────────────────────────
+export { detectProjectContext } from "./evaluators/shared.js";
+export type { ProjectContext } from "./types.js";
+
+// ─── Finding Lifecycle & Triage ──────────────────────────────────────────────
+export {
+  loadFindingStore,
+  saveFindingStore,
+  updateFindings,
+  getFindingStats,
+  generateFindingFingerprint,
+  triageFinding,
+  getTriagedFindings,
+  triageToFeedbackEntries,
+  getTriageBasedSuppressions,
+  formatDelta,
+  formatTriageSummary,
+} from "./finding-lifecycle.js";
+export type { TrackedFinding, FindingStore, FindingDelta, TriageStatus } from "./finding-lifecycle.js";
+
 // ─── Convenience Aliases ─────────────────────────────────────────────────────
 
 import { evaluateWithTribunal, evaluateWithJudge } from "./evaluators/index.js";
@@ -342,6 +370,11 @@ export function evaluateCodeSingleJudge(
 
 export { filterFalsePositiveHeuristics } from "./evaluators/false-positive-review.js";
 export type { FpFilterResult } from "./evaluators/false-positive-review.js";
+
+// ─── PR Review Narrative ─────────────────────────────────────────────────────
+
+export { buildPRReviewNarrative, assessReviewCompleteness } from "./commands/review.js";
+export type { ReviewCompleteness } from "./commands/review.js";
 
 // ─── Streaming / Async API ──────────────────────────────────────────────────
 

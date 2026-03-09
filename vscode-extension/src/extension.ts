@@ -264,6 +264,28 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
+  // ─── Real-Time (On-Change) Evaluation ────────────────────────────────
+
+  let changeDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument((event) => {
+      const config = vscode.workspace.getConfiguration("judges");
+      if (!config.get<boolean>("evaluateOnChange", false)) return;
+
+      const document = event.document;
+      // Only re-evaluate on actual content changes, not metadata
+      if (event.contentChanges.length === 0) return;
+
+      const changeDebounceMs = config.get<number>("changeDebounceMs", 2000);
+
+      if (changeDebounceTimer) clearTimeout(changeDebounceTimer);
+      changeDebounceTimer = setTimeout(() => {
+        diagnosticProvider.evaluate(document);
+      }, changeDebounceMs);
+    }),
+  );
+
   // ─── Status Bar ──────────────────────────────────────────────────────
 
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);

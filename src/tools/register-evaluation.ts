@@ -15,6 +15,7 @@ import {
   formatEvaluationAsMarkdown,
 } from "../evaluators/index.js";
 import { evaluateCodeV2, evaluateProjectV2, getSupportedPolicyProfiles } from "../evaluators/v2.js";
+import { detectProjectContext } from "../evaluators/shared.js";
 import { configSchema, toJudgesConfig } from "./schemas.js";
 import { buildSingleJudgeDeepReviewSection, buildTribunalDeepReviewSection } from "./deep-review.js";
 import type { RelatedFileSnippet } from "./deep-review.js";
@@ -107,8 +108,9 @@ function registerEvaluateCode(server: McpServer): void {
           config: toJudgesConfig(config),
         });
 
+        const projectContext = detectProjectContext(code, language);
         const patternResults = formatVerdictAsMarkdown(verdict);
-        const deepReview = buildTribunalDeepReviewSection(JUDGES, language, context, relatedFiles);
+        const deepReview = buildTribunalDeepReviewSection(JUDGES, language, context, relatedFiles, projectContext);
 
         return {
           content: [
@@ -193,8 +195,9 @@ function registerEvaluateSingleJudge(server: McpServer): void {
           config: toJudgesConfig(config),
         });
 
+        const projectContext = detectProjectContext(code, language);
         const patternResults = formatEvaluationAsMarkdown(evaluation);
-        const deepReview = buildSingleJudgeDeepReviewSection(judge, language, context, relatedFiles);
+        const deepReview = buildSingleJudgeDeepReviewSection(judge, language, context, relatedFiles, projectContext);
 
         return {
           content: [
@@ -470,8 +473,9 @@ function registerEvaluateFile(server: McpServer): void {
           config: toJudgesConfig(config),
         });
 
+        const projectContext = detectProjectContext(code, detectedLang, filePath);
         const patternResults = formatVerdictAsMarkdown(verdict);
-        const deepReview = buildTribunalDeepReviewSection(JUDGES, detectedLang, context);
+        const deepReview = buildTribunalDeepReviewSection(JUDGES, detectedLang, context, undefined, projectContext);
 
         return {
           content: [

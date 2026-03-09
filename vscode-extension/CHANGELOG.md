@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.25.0] — 2026-03-09
+
+### Added
+- **Real-time on-change evaluation** — New debounced `onDidChangeTextDocument` handler evaluates code as you type. Controlled by `judges.evaluateOnChange` (default: off) and `judges.changeDebounceMs` (default: 2000ms) settings
+- **Project context awareness** — Evaluation now auto-detects frameworks, runtime, and project type to calibrate review findings
+- **Evidence chains** — Findings now include multi-step evidence trails with impact statements
+- **PR review narrative** — Rich review summaries with per-file breakdown, cross-cutting themes, and prioritized action items
+- **Review completeness signal** — `assessReviewCompleteness()` provides coverage percentage and unreviewed file tracking
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.24.0] — 2026-03-09
 
 ### Added

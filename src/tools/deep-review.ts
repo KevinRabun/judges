@@ -5,7 +5,7 @@
 // pattern matching.
 // ──────────────────────────────────────────────────────────────────────────────
 
-import type { JudgeDefinition } from "../types.js";
+import type { JudgeDefinition, ProjectContext } from "../types.js";
 
 // ─── Content-Policy Refusal Detection ────────────────────────────────────────
 
@@ -103,6 +103,41 @@ function formatRelatedFilesSection(relatedFiles: RelatedFileSnippet[]): string {
   return md;
 }
 
+// ─── Project Context Section ─────────────────────────────────────────────────
+
+/**
+ * Format detected project context into a prompt section so the LLM
+ * understands the runtime environment, framework, and architectural role.
+ */
+export function formatProjectContextSection(projectContext: ProjectContext): string {
+  const parts: string[] = [];
+  if (projectContext.frameworks.length > 0) {
+    parts.push(`**Frameworks:** ${projectContext.frameworks.join(", ")}`);
+  }
+  if (projectContext.frameworkVersions.length > 0) {
+    parts.push(`**Versions:** ${projectContext.frameworkVersions.join(", ")}`);
+  }
+  if (projectContext.entryPointType !== "unknown") {
+    parts.push(`**File Role:** ${projectContext.entryPointType}`);
+  }
+  if (projectContext.runtime !== "unknown") {
+    parts.push(`**Runtime:** ${projectContext.runtime}`);
+  }
+  if (projectContext.projectType !== "unknown") {
+    parts.push(`**Project Type:** ${projectContext.projectType}`);
+  }
+  if (projectContext.dependencies.length > 0) {
+    parts.push(`**Key Dependencies:** ${projectContext.dependencies.join(", ")}`);
+  }
+  if (parts.length === 0) return "";
+
+  let md = `### Project Context (auto-detected)\n\n`;
+  md += `> Use this context to calibrate your review. For example, absence-based rules\n`;
+  md += `> about rate limiting are less relevant for a CLI tool than for an API controller.\n\n`;
+  md += parts.join("\n") + "\n\n";
+  return md;
+}
+
 // ─── Single-Judge Deep Review ────────────────────────────────────────────────
 
 export function buildSingleJudgeDeepReviewSection(
@@ -110,6 +145,7 @@ export function buildSingleJudgeDeepReviewSection(
   language: string,
   context?: string,
   relatedFiles?: RelatedFileSnippet[],
+  projectContext?: ProjectContext,
 ): string {
   let md = `\n\n---\n\n`;
   md += `## 🔍 Deep Contextual Review Required\n\n`;
@@ -122,6 +158,10 @@ export function buildSingleJudgeDeepReviewSection(
 
   if (context) {
     md += `**Context provided:** ${context}\n\n`;
+  }
+
+  if (projectContext) {
+    md += formatProjectContextSection(projectContext);
   }
 
   if (relatedFiles && relatedFiles.length > 0) {
@@ -169,6 +209,7 @@ export function buildTribunalDeepReviewSection(
   language: string,
   context?: string,
   relatedFiles?: RelatedFileSnippet[],
+  projectContext?: ProjectContext,
 ): string {
   let md = `\n\n---\n\n`;
   md += `## 🔍 Deep Contextual Review Required\n\n`;
@@ -182,6 +223,10 @@ export function buildTribunalDeepReviewSection(
 
   if (context) {
     md += `**Context provided:** ${context}\n\n`;
+  }
+
+  if (projectContext) {
+    md += formatProjectContextSection(projectContext);
   }
 
   if (relatedFiles && relatedFiles.length > 0) {

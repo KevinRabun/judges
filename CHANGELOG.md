@@ -2,6 +2,25 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.25.0] — 2026-03-09
+
+### Added
+- **Project context in L2 prompts** — `detectProjectContext()` auto-detects frameworks, runtime, entry-point type, project type, and dependencies from code. `formatProjectContextSection()` injects this context into deep-review prompts so L2 reviews calibrate to the stack (e.g., absence-based rate-limiting rules suppressed for CLI tools). Wired into `evaluate_code`, `evaluate_code_single_judge`, and `evaluate_file` MCP handlers. React added to framework detection patterns
+- **Multi-file fix coordination** — `collectPatchSet()` groups findings by file path into a `PatchSet`, and `applyPatchSet()` applies patches across multiple files with per-file results. Enables cross-file auto-fix from a single review pass
+- **Real-time IDE evaluation** — VS Code extension now supports on-change evaluation via debounced `onDidChangeTextDocument` handler. Controlled by `judges.evaluateOnChange` (default: off) and `judges.changeDebounceMs` (default: 2000ms) settings
+- **Evidence chains on findings** — `buildEvidenceChain()` constructs multi-step evidence (detection trigger, location precision, cross-file context, fix availability) with a severity-calibrated impact statement. `EvidenceChain` and `EvidenceStep` types added to `Finding`
+- **Auto-suppression from triage history** — `triageToFeedbackEntries()` converts false-positive/wont-fix triage decisions into feedback entries. `getTriageBasedSuppressions()` identifies rules that should be auto-suppressed based on triage patterns (≥80% FP rate with ≥3 samples)
+- **AI-specific benchmark cases** — 10 new benchmark cases covering model-serving input validation, embedding data leakage, unbounded LLM streaming, async race conditions, memory leak patterns, N+1 queries, unsafe type assertions, hardcoded AI credentials, plus 2 clean counterparts
+- **PR review summary narrative** — `buildPRReviewNarrative()` generates rich review summaries with executive summary, per-file breakdown (sorted by finding count), cross-cutting theme analysis (17 domain labels), and prioritized action items. Replaces the previous `buildReviewSummary()`
+- **Review completeness signal** — `assessReviewCompleteness()` returns a `ReviewCompleteness` struct with `complete` boolean, coverage percentage, unreviewed files list, and human-readable status message
+
+### Fixed
+- **Node.js runtime detection** — `require()` calls now correctly detected by splitting the regex to avoid trailing `\b` failure on non-word characters
+- **Serverless entry-point detection** — Added "serverless" pattern to `ENTRY_POINT_PATTERNS` so `exports.handler` / Lambda / Azure Functions code is correctly classified as serverless entry points
+
+### Tests
+- 821 tests (808 pass, 13 pre-existing failures unrelated to this release)
+
 ## [3.24.0] — 2026-03-09
 
 ### Added

@@ -6,7 +6,7 @@
  * and absence-based finding suppression for non-server files.
  */
 
-import type { Finding, MustFixGateOptions, MustFixGateResult } from "./types.js";
+import type { Finding, MustFixGateOptions, MustFixGateResult, EvidenceChain, EvidenceStep } from "./types.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -311,4 +311,80 @@ export function isAbsenceBasedFinding(finding: Finding): boolean {
   // noise: e.g. "No test infrastructure detected" firing 618 times per-file.
 
   return true;
+}
+
+/**
+ * Build a structured evidence chain for a finding based on its metadata.
+ * This transforms the flat `evidenceBasis` and `provenance` strings into
+ * a step-by-step chain explaining why the finding matters in context.
+ */
+export function buildEvidenceChain(finding: Finding): EvidenceChain {
+  const steps: EvidenceStep[] = [];
+  const prov = (finding.provenance ?? "").toLowerCase();
+
+  // Step 1: Detection trigger
+  if (prov.includes("taint-flow") || prov.includes("cross-file-taint")) {
+    steps.push({
+      observation: `Taint-flow analysis detected untrusted data reaching a dangerous sink`,
+      source: "taint-flow",
+      line: finding.lineNumbers?.[0],
+    });
+  } else if (prov.includes("ast-confirmed") || prov.includes("tree-sitter")) {
+    steps.push({
+      observation: `AST analysis confirmed structural pattern: ${finding.title}`,
+      source: "ast-confirmed",
+      line: finding.lineNumbers?.[0],
+    });
+  } else if (prov.includes("absence")) {
+    steps.push({
+      observation: `No evidence of expected security control: ${finding.title}`,
+      source: "absence-of-pattern",
+    });
+  } else {
+    steps.push({
+      observation: `Pattern match detected: ${finding.title}`,
+      source: "pattern-match",
+      line: finding.lineNumbers?.[0],
+    });
+  }
+
+  // Step 2: Location precision
+  if (finding.lineNumbers && finding.lineNumbers.length > 0) {
+    const lines =
+      finding.lineNumbers.length === 1
+        ? `line ${finding.lineNumbers[0]}`
+        : `lines ${finding.lineNumbers[0]}-${finding.lineNumbers[finding.lineNumbers.length - 1]}`;
+    steps.push({
+      observation: `Issue pinpointed at ${lines}`,
+      source: prov.includes("ast") ? "ast-confirmed" : "pattern-match",
+      line: finding.lineNumbers[0],
+    });
+  }
+
+  // Step 3: Cross-file context (if applicable)
+  if (prov.includes("cross-file")) {
+    steps.push({
+      observation: `Data flow crosses module boundaries — impact extends beyond this file`,
+      source: "cross-file",
+    });
+  }
+
+  // Build impact statement from severity + domain
+  const severity = finding.severity;
+  const domain = finding.ruleId.split("-")[0];
+  const domainNames: Record<string, string> = {
+    CYBER: "security",
+    AUTH: "authentication",
+    DATA: "data protection",
+    SEC: "security",
+    IAC: "infrastructure security",
+    AICS: "AI safety",
+    PERF: "performance",
+    API: "API design",
+    COMP: "compliance",
+  };
+  const domainName = domainNames[domain] || "code quality";
+  const impactStatement = `${severity === "critical" || severity === "high" ? "High" : "Moderate"}-impact ${domainName} concern: ${finding.description.slice(0, 120)}`;
+
+  return { steps, impactStatement };
 }

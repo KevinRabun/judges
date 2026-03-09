@@ -64,6 +64,41 @@ export interface Finding {
    * the final score, e.g. "AST-confirmed (+0.15), line-precise (+0.22)".
    */
   evidenceBasis?: string;
+  /**
+   * Structured evidence chain explaining why this finding matters in context.
+   * Each step traces the reasoning from detected pattern to security impact.
+   */
+  evidenceChain?: EvidenceChain;
+}
+
+/**
+ * A single link in an evidence chain — one step in the reasoning from
+ * detected pattern to security/quality impact.
+ */
+export interface EvidenceStep {
+  /** What was observed (e.g., "User input read from req.body.email") */
+  observation: string;
+  /** Source of this evidence: pattern match, AST, taint-flow, cross-file, etc. */
+  source:
+    | "pattern-match"
+    | "ast-confirmed"
+    | "taint-flow"
+    | "cross-file"
+    | "framework-knowledge"
+    | "absence-of-pattern";
+  /** Optional line number where this evidence was observed */
+  line?: number;
+}
+
+/**
+ * Structured evidence chain for a finding — traces the reasoning path
+ * from the initial detection signal to the concrete security/quality impact.
+ */
+export interface EvidenceChain {
+  /** Ordered steps from trigger → impact */
+  steps: EvidenceStep[];
+  /** One-sentence summary of why this matters in this specific codebase */
+  impactStatement: string;
 }
 
 /**
@@ -533,6 +568,27 @@ export interface MustFixGateResult {
   matchedCount: number;
   matchedRuleIds: string[];
   summary: string;
+}
+
+// ─── Project Context ─────────────────────────────────────────────────────────
+
+/**
+ * Inferred project-level context injected into L2 prompts so the LLM
+ * understands the runtime, framework, and architectural role of the file.
+ */
+export interface ProjectContext {
+  /** Detected framework(s), e.g. ["express", "helmet"] */
+  frameworks: string[];
+  /** Framework version hints found in code or manifests */
+  frameworkVersions: string[];
+  /** Architectural role of the file, e.g. "api-controller", "middleware", "cli" */
+  entryPointType: string;
+  /** Runtime environment hint, e.g. "node", "browser", "serverless", "container" */
+  runtime: string;
+  /** Key dependencies detected from imports/requires */
+  dependencies: string[];
+  /** Project type hint, e.g. "web-api", "cli-tool", "library", "full-stack" */
+  projectType: string;
 }
 
 /**

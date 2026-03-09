@@ -431,3 +431,73 @@ export function formatTriageSummary(dirOrStore: string | FindingStore): string {
 
   return lines.join("\n");
 }
+
+// ─── Triage → Auto-Tune Bridge ──────────────────────────────────────────────
+
+/**
+ * Convert triage decisions from the finding store into feedback entries
+ * suitable for auto-tune. This bridges lifecycle triage (users marking
+ * findings as false-positive, wont-fix, etc.) into the calibration loop.
+ *
+ * - false-positive → verdict "fp"
+ * - wont-fix → verdict "fp" (not useful enough to keep)
+ * - accepted-risk → verdict "tp" (real finding, intentionally accepted)
+ * - deferred → verdict "tp" (real finding, just not fixing now)
+ */
+export function triageToFeedbackEntries(
+  dirOrStore: string | FindingStore,
+): Array<{ ruleId: string; verdict: "tp" | "fp"; severity: Severity; timestamp: string }> {
+  const store = typeof dirOrStore === "string" ? loadFindingStore(dirOrStore) : dirOrStore;
+  const entries: Array<{ ruleId: string; verdict: "tp" | "fp"; severity: Severity; timestamp: string }> = [];
+
+  for (const f of store.findings) {
+    if (f.status === "false-positive" || f.status === "wont-fix") {
+      entries.push({
+        ruleId: f.ruleId,
+        verdict: "fp",
+        severity: f.severity,
+        timestamp: f.triagedAt || f.lastSeen,
+      });
+    } else if (f.status === "accepted-risk" || f.status === "deferred") {
+      entries.push({
+        ruleId: f.ruleId,
+        verdict: "tp",
+        severity: f.severity,
+        timestamp: f.triagedAt || f.lastSeen,
+      });
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * Get the set of rule IDs that should be auto-suppressed based on
+ * accumulated triage history. Uses a simple threshold: if ≥ `threshold`
+ * fraction of triaged findings for a rule are FP/wont-fix, suppress it.
+ */
+export function getTriageBasedSuppressions(
+  dirOrStore: string | FindingStore,
+  options: { threshold?: number; minSamples?: number } = {},
+): Set<string> {
+  const threshold = options.threshold ?? 0.8;
+  const minSamples = options.minSamples ?? 3;
+  const entries = triageToFeedbackEntries(dirOrStore);
+
+  const byRule = new Map<string, { fp: number; total: number }>();
+  for (const e of entries) {
+    const stats = byRule.get(e.ruleId) ?? { fp: 0, total: 0 };
+    stats.total++;
+    if (e.verdict === "fp") stats.fp++;
+    byRule.set(e.ruleId, stats);
+  }
+
+  const suppressed = new Set<string>();
+  for (const [ruleId, stats] of byRule) {
+    if (stats.total >= minSamples && stats.fp / stats.total >= threshold) {
+      suppressed.add(ruleId);
+    }
+  }
+
+  return suppressed;
+}

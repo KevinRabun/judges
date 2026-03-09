@@ -10767,3 +10767,619 @@ describe("Config Merge — mergeConfigs", () => {
     assert.strictEqual(merged.minSeverity, "high");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v3.25.0 — Gap 1: Project Context Detection
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Project Context Detection — detectProjectContext", () => {
+  it("should detect Express framework from require statement", async () => {
+    const { detectProjectContext } = await import("../src/evaluators/shared.js");
+    const ctx = detectProjectContext(
+      'const express = require("express");\nconst app = express();\napp.listen(3000);',
+      "javascript",
+    );
+    assert.ok(ctx.frameworks.includes("express"), "Should detect express");
+  });
+
+  it("should detect React import", async () => {
+    const { detectProjectContext } = await import("../src/evaluators/shared.js");
+    const ctx = detectProjectContext('import React from "react";\nfunction App() { return <div />; }', "typescript");
+    assert.ok(ctx.frameworks.includes("react"), "Should detect react");
+  });
+
+  it("should detect Node.js runtime from require", async () => {
+    const { detectProjectContext } = await import("../src/evaluators/shared.js");
+    const ctx = detectProjectContext('const fs = require("fs");\nfs.readFileSync("file.txt");', "javascript");
+    assert.strictEqual(ctx.runtime, "node", "Should detect Node runtime");
+  });
+
+  it("should detect serverless entry point", async () => {
+    const { detectProjectContext } = await import("../src/evaluators/shared.js");
+    const ctx = detectProjectContext(
+      "exports.handler = async (event, context) => {\n  return { statusCode: 200 };\n};",
+      "javascript",
+    );
+    assert.strictEqual(ctx.entryPointType, "serverless", "Should detect serverless entry point");
+  });
+
+  it("should return empty context for plain code", async () => {
+    const { detectProjectContext } = await import("../src/evaluators/shared.js");
+    const ctx = detectProjectContext("const x = 1;\nconst y = 2;\nconsole.log(x + y);", "javascript");
+    assert.strictEqual(ctx.frameworks.length, 0, "No frameworks expected");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v3.25.0 — Gap 1: Project Context in Deep Review
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Deep Review — formatProjectContextSection", () => {
+  it("should format project context into prompt section", async () => {
+    const { formatProjectContextSection } = await import("../src/tools/deep-review.js");
+    const section = formatProjectContextSection({
+      frameworks: ["express", "passport"],
+      frameworkVersions: {},
+      entryPointType: "http-server",
+      runtime: "node",
+      dependencies: [],
+      projectType: "api",
+    });
+    assert.ok(section.includes("express"), "Should mention express");
+    assert.ok(section.includes("node"), "Should mention node runtime");
+    assert.ok(section.includes("http-server"), "Should mention entry point type");
+  });
+
+  it("should return empty string when no context signals", async () => {
+    const { formatProjectContextSection } = await import("../src/tools/deep-review.js");
+    const section = formatProjectContextSection({
+      frameworks: [],
+      frameworkVersions: [],
+      entryPointType: "unknown",
+      runtime: "unknown",
+      dependencies: [],
+      projectType: "unknown",
+    });
+    assert.strictEqual(section, "", "Should return empty string for empty context");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v3.25.0 — Gap 2: Multi-File Fix Coordination
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Multi-File Fix — collectPatchSet and applyPatchSet", () => {
+  it("should collect patches grouped by file", async () => {
+    const { collectPatchSet } = await import("../src/commands/fix.js");
+    const authFinding = makeFinding({
+      ruleId: "SEC-001",
+      severity: "high",
+      title: "SQL Injection",
+      patch: { startLine: 5, endLine: 5, oldText: "query(input)", newText: "query(escape(input))" },
+    });
+    const utilFinding = makeFinding({
+      ruleId: "PERF-001",
+      severity: "medium",
+      title: "Slow loop",
+      patch: { startLine: 10, endLine: 10, oldText: "for (let i", newText: "for (const i" },
+    });
+    const fileMap = new Map<Finding, string>();
+    fileMap.set(authFinding, "src/auth.ts");
+    fileMap.set(utilFinding, "src/utils.ts");
+    const patchSet = collectPatchSet([authFinding, utilFinding], "default.ts", fileMap);
+    assert.strictEqual(patchSet.length, 2, "Should have 2 file groups");
+    assert.ok(
+      patchSet.some((f) => f.filePath === "src/auth.ts"),
+      "Should include auth.ts",
+    );
+    assert.ok(
+      patchSet.some((f) => f.filePath === "src/utils.ts"),
+      "Should include utils.ts",
+    );
+  });
+
+  it("should skip findings without patches", async () => {
+    const { collectPatchSet } = await import("../src/commands/fix.js");
+    const noPatch = makeFinding({ ruleId: "SEC-002", severity: "medium", title: "No patch" });
+    const hasPatch = makeFinding({
+      ruleId: "SEC-003",
+      severity: "high",
+      title: "Has patch",
+      patch: { startLine: 1, endLine: 1, oldText: "a", newText: "b" },
+    });
+    const patchSet = collectPatchSet([noPatch, hasPatch], "src/app.ts");
+    assert.strictEqual(patchSet.length, 1, "Should have 1 file group");
+    assert.strictEqual(patchSet[0].patches.length, 1, "Should have 1 patch");
+  });
+
+  it("applyPatchSet should report results per file", async () => {
+    const { collectPatchSet, applyPatchSet } = await import("../src/commands/fix.js");
+    const finding = makeFinding({
+      ruleId: "SEC-001",
+      severity: "high",
+      patch: { startLine: 1, endLine: 1, oldText: "a", newText: "b" },
+    });
+    const patchSet = collectPatchSet([finding], "nonexistent/file.ts");
+    const result = applyPatchSet(patchSet); // dry-run (default apply=false)
+    assert.ok(result.totalFiles >= 1, "Should attempt at least 1 file");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v3.25.0 — Gap 4: Evidence Chains
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Evidence Chains — buildEvidenceChain", () => {
+  it("should build a chain for a finding with patch and lineNumbers", async () => {
+    const { buildEvidenceChain } = await import("../src/scoring.js");
+    const finding = makeFinding({
+      ruleId: "SEC-001",
+      severity: "high",
+      title: "SQL Injection",
+      description: "User input flows into SQL query without sanitization",
+      lineNumbers: [10],
+      provenance: "ast-confirmed",
+      patch: { startLine: 10, endLine: 10, oldText: "query(input)", newText: "query(escape(input))" },
+    });
+    const chain = buildEvidenceChain(finding);
+    assert.ok(chain.steps.length >= 1, "Should have at least one step");
+    assert.ok(chain.impactStatement.length > 0, "Should have an impact statement");
+  });
+
+  it("should produce a chain for a finding without patch", async () => {
+    const { buildEvidenceChain } = await import("../src/scoring.js");
+    const finding = makeFinding({
+      ruleId: "LOG-001",
+      severity: "medium",
+      title: "Missing logging",
+      description: "No structured logging for audit trail",
+      provenance: "absence-of-pattern",
+    });
+    const chain = buildEvidenceChain(finding);
+    assert.ok(chain.steps.length >= 1, "Should have at least one step");
+    assert.ok(chain.impactStatement.includes("code quality"), "Impact should reference domain");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v3.25.0 — Gap 5: Auto-Suppression from Triage
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Triage-Based Suppression — triageToFeedbackEntries", () => {
+  it("should convert triage history to feedback entries", async () => {
+    const { triageToFeedbackEntries } = await import("../src/finding-lifecycle.js");
+    const now = new Date().toISOString();
+    const store = {
+      version: "1",
+      lastRunAt: now,
+      runNumber: 1,
+      findings: [
+        {
+          fingerprint: "f1",
+          ruleId: "SEC-001",
+          severity: "high" as const,
+          filePath: "a.ts",
+          title: "T1",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "false-positive" as const,
+          triagedAt: now,
+        },
+        {
+          fingerprint: "f2",
+          ruleId: "SEC-001",
+          severity: "high" as const,
+          filePath: "b.ts",
+          title: "T2",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "false-positive" as const,
+          triagedAt: now,
+        },
+        {
+          fingerprint: "f3",
+          ruleId: "SEC-002",
+          severity: "medium" as const,
+          filePath: "c.ts",
+          title: "T3",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "wont-fix" as const,
+          triagedAt: now,
+        },
+        {
+          fingerprint: "f4",
+          ruleId: "SEC-001",
+          severity: "high" as const,
+          filePath: "d.ts",
+          title: "T4",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "accepted-risk" as const,
+          triagedAt: now,
+        },
+      ],
+    };
+    const entries = triageToFeedbackEntries(store);
+    // SEC-001: 2 FP + 1 accepted-risk (TP) = 3 entries
+    const sec001 = entries.filter((e) => e.ruleId === "SEC-001");
+    assert.strictEqual(sec001.length, 3, "Should create 3 entries for SEC-001");
+    assert.strictEqual(sec001.filter((e) => e.verdict === "fp").length, 2, "Should have 2 FP entries");
+  });
+});
+
+describe("Triage-Based Suppression — getTriageBasedSuppressions", () => {
+  it("should suppress rules with high FP rate from triage", async () => {
+    const { getTriageBasedSuppressions } = await import("../src/finding-lifecycle.js");
+    const now = new Date().toISOString();
+    const store = {
+      version: "1",
+      lastRunAt: now,
+      runNumber: 1,
+      findings: [
+        // 4 FP + 1 accepted-risk = 80% FP rate → should suppress (threshold 0.8, minSamples 3)
+        {
+          fingerprint: "f1",
+          ruleId: "SEC-099",
+          severity: "high" as const,
+          filePath: "a.ts",
+          title: "T",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "false-positive" as const,
+        },
+        {
+          fingerprint: "f2",
+          ruleId: "SEC-099",
+          severity: "high" as const,
+          filePath: "b.ts",
+          title: "T",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "false-positive" as const,
+        },
+        {
+          fingerprint: "f3",
+          ruleId: "SEC-099",
+          severity: "high" as const,
+          filePath: "c.ts",
+          title: "T",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "false-positive" as const,
+        },
+        {
+          fingerprint: "f4",
+          ruleId: "SEC-099",
+          severity: "high" as const,
+          filePath: "d.ts",
+          title: "T",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "false-positive" as const,
+        },
+        {
+          fingerprint: "f5",
+          ruleId: "SEC-099",
+          severity: "high" as const,
+          filePath: "e.ts",
+          title: "T",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "accepted-risk" as const,
+        },
+      ],
+    };
+    const suppressions = getTriageBasedSuppressions(store);
+    assert.ok(suppressions.has("SEC-099"), "Should suppress SEC-099 (80% FP rate ≥ threshold)");
+  });
+
+  it("should not suppress rules with low FP rate", async () => {
+    const { getTriageBasedSuppressions } = await import("../src/finding-lifecycle.js");
+    const now = new Date().toISOString();
+    const store = {
+      version: "1",
+      lastRunAt: now,
+      runNumber: 1,
+      findings: [
+        // 1 FP + 4 accepted-risk = 20% FP rate → should NOT suppress
+        {
+          fingerprint: "f1",
+          ruleId: "SEC-100",
+          severity: "medium" as const,
+          filePath: "a.ts",
+          title: "T",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "false-positive" as const,
+        },
+        {
+          fingerprint: "f2",
+          ruleId: "SEC-100",
+          severity: "medium" as const,
+          filePath: "b.ts",
+          title: "T",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "accepted-risk" as const,
+        },
+        {
+          fingerprint: "f3",
+          ruleId: "SEC-100",
+          severity: "medium" as const,
+          filePath: "c.ts",
+          title: "T",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "accepted-risk" as const,
+        },
+        {
+          fingerprint: "f4",
+          ruleId: "SEC-100",
+          severity: "medium" as const,
+          filePath: "d.ts",
+          title: "T",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "accepted-risk" as const,
+        },
+        {
+          fingerprint: "f5",
+          ruleId: "SEC-100",
+          severity: "medium" as const,
+          filePath: "e.ts",
+          title: "T",
+          firstSeen: now,
+          lastSeen: now,
+          runCount: 1,
+          status: "accepted-risk" as const,
+        },
+      ],
+    };
+    const suppressions = getTriageBasedSuppressions(store);
+    assert.ok(!suppressions.has("SEC-100"), "Should NOT suppress SEC-100 (20% FP rate < threshold)");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v3.25.0 — Gap 7: PR Review Narrative
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("PR Review Narrative — buildPRReviewNarrative", () => {
+  it("should produce clean summary for zero findings", async () => {
+    const { buildPRReviewNarrative } = await import("../src/commands/review.js");
+    const narrative = buildPRReviewNarrative({
+      filesAnalyzed: 5,
+      totalFindings: 0,
+      commentsPosted: 0,
+      criticalCount: 0,
+      highCount: 0,
+      mediumCount: 0,
+      lowCount: 0,
+      fpSuppressed: 0,
+      approved: true,
+      comments: [],
+    });
+    assert.ok(narrative.includes("✅"), "Should show approval emoji");
+    assert.ok(narrative.includes("no findings") || narrative.includes("no security"), "Should indicate clean review");
+    assert.ok(narrative.includes("5"), "Should mention file count");
+  });
+
+  it("should include per-file breakdown when findings exist", async () => {
+    const { buildPRReviewNarrative } = await import("../src/commands/review.js");
+    const narrative = buildPRReviewNarrative({
+      filesAnalyzed: 3,
+      totalFindings: 2,
+      commentsPosted: 2,
+      criticalCount: 1,
+      highCount: 1,
+      mediumCount: 0,
+      lowCount: 0,
+      fpSuppressed: 0,
+      approved: false,
+      comments: [
+        {
+          path: "src/auth.ts",
+          line: 10,
+          side: "RIGHT",
+          body: "🔴 **CRITICAL** — SQL Injection (`SEC-001`)\n\nUnsafe query\n\n**Recommendation:** Use params",
+        },
+        {
+          path: "src/api.ts",
+          line: 20,
+          side: "RIGHT",
+          body: "🟠 **HIGH** — Missing Auth (`SEC-002`)\n\nNo auth check\n\n**Recommendation:** Add auth",
+        },
+      ],
+    });
+    assert.ok(narrative.includes("❌"), "Should show rejection emoji");
+    assert.ok(narrative.includes("src/auth.ts"), "Should mention auth.ts");
+    assert.ok(narrative.includes("src/api.ts"), "Should mention api.ts");
+    assert.ok(narrative.includes("Priority fixes"), "Should include priority fixes section");
+    assert.ok(narrative.includes("SQL Injection"), "Should list SQL Injection as priority");
+    assert.ok(narrative.includes("Action required"), "Should indicate action required");
+  });
+
+  it("should show cross-cutting themes for multi-domain findings", async () => {
+    const { buildPRReviewNarrative } = await import("../src/commands/review.js");
+    const narrative = buildPRReviewNarrative({
+      filesAnalyzed: 2,
+      totalFindings: 3,
+      commentsPosted: 3,
+      criticalCount: 0,
+      highCount: 0,
+      mediumCount: 3,
+      lowCount: 0,
+      fpSuppressed: 0,
+      approved: true,
+      comments: [
+        {
+          path: "src/a.ts",
+          line: 1,
+          side: "RIGHT",
+          body: "🟡 **MEDIUM** — Slow Query (`PERF-001`)\n\nSlow\n\n**Recommendation:** Optimize",
+        },
+        {
+          path: "src/a.ts",
+          line: 5,
+          side: "RIGHT",
+          body: "🟡 **MEDIUM** — No Logging (`LOG-001`)\n\nMissing\n\n**Recommendation:** Add logs",
+        },
+        {
+          path: "src/b.ts",
+          line: 3,
+          side: "RIGHT",
+          body: "🟡 **MEDIUM** — XSS Risk (`SEC-001`)\n\nUnsafe\n\n**Recommendation:** Sanitize",
+        },
+      ],
+    });
+    assert.ok(narrative.includes("Themes across files"), "Should include themes section");
+  });
+
+  it("should show FP suppression and truncation notes", async () => {
+    const { buildPRReviewNarrative } = await import("../src/commands/review.js");
+    const narrative = buildPRReviewNarrative({
+      filesAnalyzed: 10,
+      totalFindings: 50,
+      commentsPosted: 25,
+      criticalCount: 0,
+      highCount: 0,
+      mediumCount: 50,
+      lowCount: 0,
+      fpSuppressed: 5,
+      approved: true,
+      comments: [],
+    });
+    assert.ok(narrative.includes("5 finding(s) suppressed"), "Should note FP suppression");
+    assert.ok(narrative.includes("25 of 50"), "Should note truncation");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v3.25.0 — Gap 8: Review Completeness Signal
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Review Completeness — assessReviewCompleteness", () => {
+  it("should return complete when all files analyzed", async () => {
+    const { assessReviewCompleteness } = await import("../src/commands/review.js");
+    const prFiles = [
+      { filename: "src/app.ts", status: "modified", patch: "@@ -1 +1 @@\n+code" },
+      { filename: "src/utils.ts", status: "modified", patch: "@@ -1 +1 @@\n+code" },
+    ];
+    const result = {
+      filesAnalyzed: 2,
+      totalFindings: 1,
+      commentsPosted: 1,
+      criticalCount: 0,
+      highCount: 0,
+      mediumCount: 1,
+      lowCount: 0,
+      fpSuppressed: 0,
+      approved: true,
+      comments: [],
+    };
+    const completeness = assessReviewCompleteness(prFiles, result);
+    assert.strictEqual(completeness.status, "complete");
+    assert.strictEqual(completeness.fileCoverage, 1.0);
+    assert.strictEqual(completeness.filesSkipped, 0);
+  });
+
+  it("should return partial when coverage is moderate", async () => {
+    const { assessReviewCompleteness } = await import("../src/commands/review.js");
+    const prFiles = [
+      { filename: "src/a.ts", status: "modified", patch: "@@ -1 +1 @@\n+code" },
+      { filename: "src/b.ts", status: "modified", patch: "@@ -1 +1 @@\n+code" },
+      { filename: "src/c.ts", status: "modified", patch: "@@ -1 +1 @@\n+code" },
+      { filename: "README.md", status: "modified", patch: "@@ -1 +1 @@\n+docs" },
+    ];
+    const result = {
+      filesAnalyzed: 2,
+      totalFindings: 0,
+      commentsPosted: 0,
+      criticalCount: 0,
+      highCount: 0,
+      mediumCount: 0,
+      lowCount: 0,
+      fpSuppressed: 0,
+      approved: true,
+      comments: [],
+    };
+    const completeness = assessReviewCompleteness(prFiles, result);
+    assert.strictEqual(completeness.status, "partial");
+    assert.ok(completeness.reason!.includes("2 of 4"), "Should mention file counts");
+  });
+
+  it("should return insufficient when no files analyzed", async () => {
+    const { assessReviewCompleteness } = await import("../src/commands/review.js");
+    const prFiles = [{ filename: "src/app.ts", status: "modified", patch: "@@ -1 +1 @@\n+code" }];
+    const result = {
+      filesAnalyzed: 0,
+      totalFindings: 0,
+      commentsPosted: 0,
+      criticalCount: 0,
+      highCount: 0,
+      mediumCount: 0,
+      lowCount: 0,
+      fpSuppressed: 0,
+      approved: true,
+      comments: [],
+    };
+    const completeness = assessReviewCompleteness(prFiles, result);
+    assert.strictEqual(completeness.status, "insufficient");
+  });
+
+  it("should report crossFile and calibrated flags", async () => {
+    const { assessReviewCompleteness } = await import("../src/commands/review.js");
+    const prFiles = [{ filename: "src/app.ts", status: "modified", patch: "@@ -1 +1 @@\n+code" }];
+    const result = {
+      filesAnalyzed: 1,
+      totalFindings: 0,
+      commentsPosted: 0,
+      criticalCount: 0,
+      highCount: 0,
+      mediumCount: 0,
+      lowCount: 0,
+      fpSuppressed: 0,
+      approved: true,
+      comments: [],
+    };
+    const completeness = assessReviewCompleteness(prFiles, result, { crossFile: true, calibrated: true });
+    assert.strictEqual(completeness.crossFileAnalyzed, true);
+    assert.strictEqual(completeness.calibrated, true);
+  });
+
+  it("should handle PR with only non-code files as complete", async () => {
+    const { assessReviewCompleteness } = await import("../src/commands/review.js");
+    const prFiles = [
+      { filename: "README.md", status: "modified", patch: "@@ -1 +1 @@\n+docs" },
+      { filename: "image.png", status: "added" },
+    ];
+    const result = {
+      filesAnalyzed: 0,
+      totalFindings: 0,
+      commentsPosted: 0,
+      criticalCount: 0,
+      highCount: 0,
+      mediumCount: 0,
+      lowCount: 0,
+      fpSuppressed: 0,
+      approved: true,
+      comments: [],
+    };
+    const completeness = assessReviewCompleteness(prFiles, result);
+    assert.strictEqual(completeness.status, "complete", "Non-code PR should be complete");
+  });
+});

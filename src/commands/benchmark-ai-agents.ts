@@ -3560,6 +3560,520 @@ if (process.env.NODE_ENV === "production") {
     category: "clean",
     difficulty: "hard",
   },
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  AI-specific code patterns — common LLM-generated antipatterns
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "aics-deep-model-serving-no-validation",
+    description: "ML model inference endpoint with no input validation or output bounds",
+    language: "python",
+    code: `from flask import Flask, request, jsonify
+import pickle
+import numpy as np
+
+app = Flask(__name__)
+
+# Load model at startup from user-uploadable path
+model = pickle.load(open("model.pkl", "rb"))  # Unsafe deserialization
+
+@app.route("/predict", methods=["POST"])
+def predict():
+    # No input validation — accepts any shape/size tensor
+    data = request.json
+    features = np.array(data["features"])  # No shape check, no type check
+
+    # No rate limiting on inference calls
+    # No input size limit — could cause OOM with huge arrays
+    prediction = model.predict(features)
+
+    # Returns raw model output without sanitization
+    # Could leak training data via model inversion
+    return jsonify({
+        "prediction": prediction.tolist(),
+        "confidence": model.predict_proba(features).tolist(),  # Full probability distribution leaked
+        "model_version": model.__class__.__name__,
+        "feature_importance": model.feature_importances_.tolist(),  # Internal model details leaked
+    })
+
+@app.route("/retrain", methods=["POST"])
+def retrain():
+    # No authentication — anyone can retrain the model
+    new_data = request.json
+    X = np.array(new_data["X"])
+    y = np.array(new_data["y"])
+    model.fit(X, y)  # Training on unvalidated user-submitted data
+    pickle.dump(model, open("model.pkl", "wb"))
+    return jsonify({"status": "retrained"})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", debug=True)`,
+    expectedRuleIds: ["DATA-001", "CYBER-001", "SEC-001"],
+    category: "ai-code-safety",
+    difficulty: "medium",
+  },
+  {
+    id: "aics-deep-embedding-data-leakage",
+    description: "Vector store operations leaking data across tenants and missing access control",
+    language: "typescript",
+    code: `import { PineconeClient } from "@pinecone-database/pinecone";
+import OpenAI from "openai";
+
+const openai = new OpenAI();
+const pinecone = new PineconeClient();
+
+// Single shared index for all tenants — no namespace isolation
+const index = pinecone.Index("shared-knowledge-base");
+
+export async function ingestDocument(tenantId: string, document: string) {
+  const embedding = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: document,
+  });
+
+  // No tenant isolation — all docs go into same namespace
+  await index.upsert([{
+    id: \`doc_\${Date.now()}\`,
+    values: embedding.data[0].embedding,
+    metadata: {
+      text: document,  // Full document text stored in metadata — no PII filtering
+      tenant: tenantId,
+      // No access control level, no classification
+    },
+  }]);
+}
+
+export async function searchDocuments(userQuery: string) {
+  const queryEmbedding = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: userQuery,  // User query sent to external API without sanitization
+  });
+
+  // No tenant filter — returns docs from ALL tenants
+  const results = await index.query({
+    vector: queryEmbedding.data[0].embedding,
+    topK: 20,
+    includeMetadata: true,  // Returns full document text
+  });
+
+  // No relevance threshold — returns low-quality matches
+  // No PII redaction on results
+  return results.matches!.map(m => ({
+    text: m.metadata!.text,  // Full text including potential PII
+    score: m.score,
+    tenant: m.metadata!.tenant,  // Leaks which tenant owns the data
+  }));
+}`,
+    expectedRuleIds: ["DATA-001", "AICS-001", "SEC-001"],
+    category: "ai-code-safety",
+    difficulty: "hard",
+  },
+  {
+    id: "aics-deep-llm-streaming-unbounded",
+    description: "LLM streaming response with no token limits, timeouts, or cost controls",
+    language: "typescript",
+    code: `import OpenAI from "openai";
+
+const openai = new OpenAI();
+
+export async function streamChat(
+  messages: { role: string; content: string }[],
+  res: Response,
+) {
+  // No max_tokens — model can generate unlimited output
+  // No timeout — stream can hang indefinitely
+  // No cost tracking — no budget enforcement
+  const stream = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: messages as any,  // No message validation
+    stream: true,
+    // No max_tokens limit
+    // No temperature constraint
+    // No stop sequences
+  });
+
+  // Stream directly to client without filtering
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content;
+    if (content) {
+      // No output filtering for PII, secrets, or harmful content
+      // No token counting during stream
+      res.write(content);
+    }
+  }
+
+  res.end();
+  // No logging of token usage or cost
+  // No rate limiting per user
+  // No circuit breaker for API failures
+}
+
+export async function batchProcess(items: string[]) {
+  // No concurrency limit — could spawn thousands of API calls
+  const results = await Promise.all(
+    items.map(item =>
+      openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [{ role: "user", content: item }],
+        // No per-request timeout
+      })
+    )
+  );
+  // No error handling for partial failures
+  // No cost tracking for batch operations
+  return results;
+}`,
+    expectedRuleIds: ["AICS-001", "RATE-001", "COST-001"],
+    category: "ai-code-safety",
+    difficulty: "medium",
+  },
+  {
+    id: "aics-deep-race-condition-async",
+    description: "AI-generated async code with race conditions and shared mutable state",
+    language: "typescript",
+    code: `// AI-generated user session manager — shared mutable state without synchronization
+let activeConnections = 0;
+const userBalances = new Map<string, number>();
+
+export async function processTransaction(userId: string, amount: number) {
+  // Read-then-write race condition
+  const currentBalance = userBalances.get(userId) || 0;
+
+  // Async gap where another request could read the same stale balance
+  await validateTransaction(userId, amount);
+
+  // Write based on stale read — lost update
+  userBalances.set(userId, currentBalance - amount);
+}
+
+export async function handleConnection(socket: WebSocket) {
+  // Non-atomic increment — race condition under concurrent load
+  activeConnections++;
+  console.log(\`Active: \${activeConnections}\`);
+
+  socket.on("message", async (data) => {
+    const msg = JSON.parse(data.toString());
+
+    // Multiple async operations on shared state without locking
+    const user = await getUser(msg.userId);
+    user.lastSeen = new Date();
+    user.messageCount++;
+    await saveUser(user);  // Another handler may have modified user in between
+  });
+
+  socket.on("close", () => {
+    activeConnections--;  // Non-atomic decrement
+  });
+}
+
+// AI-generated parallel processor — no error isolation
+export async function processAllOrders(orders: Order[]) {
+  const results: any[] = [];
+
+  // forEach with async doesn't await — fire-and-forget
+  orders.forEach(async (order) => {
+    const result = await processOrder(order);
+    results.push(result);  // Race: array push not guaranteed ordered
+  });
+
+  // Returns immediately with empty results array
+  return results;
+}`,
+    expectedRuleIds: ["CONC-001", "SWDEV-001"],
+    category: "ai-code-safety",
+    difficulty: "medium",
+  },
+  {
+    id: "aics-deep-memory-leak-patterns",
+    description: "AI-generated code with event listener and timer memory leaks",
+    language: "typescript",
+    code: `// AI-generated real-time dashboard component
+export class DashboardWidget {
+  private data: any[] = [];
+
+  initialize(element: HTMLElement) {
+    // Event listener never removed — leaks on re-init or destroy
+    window.addEventListener("resize", () => {
+      this.renderChart(element);
+    });
+
+    // Interval never cleared — continues after widget is destroyed
+    setInterval(async () => {
+      const newData = await fetch("/api/metrics").then(r => r.json());
+      this.data.push(...newData);  // Unbounded growth — never pruned
+    }, 1000);
+
+    // MutationObserver never disconnected
+    const observer = new MutationObserver(() => {
+      this.recalculate();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // EventEmitter listener accumulation
+    const emitter = getGlobalEmitter();
+    emitter.on("data-update", (data: any) => {
+      this.data.push(data);  // New listener added each time initialize() is called
+    });
+  }
+
+  // No destroy/cleanup method
+}
+
+// AI-generated cache with no eviction
+export class DataCache {
+  private cache = new Map<string, { data: any; timestamp: number }>();
+
+  async get(key: string): Promise<any> {
+    const entry = this.cache.get(key);
+    if (entry) return entry.data;
+
+    const data = await fetchFromAPI(key);
+    this.cache.set(key, { data, timestamp: Date.now() });
+    // Cache grows forever — no max size, no TTL eviction, no LRU
+    return data;
+  }
+
+  // No clear(), no prune(), no size limit
+}`,
+    expectedRuleIds: ["SWDEV-001", "PERF-001"],
+    category: "ai-code-safety",
+    difficulty: "medium",
+  },
+  {
+    id: "aics-deep-n-plus-one-queries",
+    description: "AI-generated ORM code with N+1 query antipattern",
+    language: "typescript",
+    code: `// AI-generated data access layer — classic N+1 queries
+export async function getUsersWithOrders() {
+  const users = await prisma.user.findMany(); // Query 1
+
+  // N queries — one for each user
+  const usersWithOrders = await Promise.all(
+    users.map(async (user) => {
+      // Each iteration runs a separate query
+      const orders = await prisma.order.findMany({
+        where: { userId: user.id },
+      });
+
+      // Another N queries — one per order
+      const ordersWithItems = await Promise.all(
+        orders.map(async (order) => {
+          const items = await prisma.orderItem.findMany({
+            where: { orderId: order.id },
+          });
+          return { ...order, items };
+        })
+      );
+
+      // Yet another N queries — one per user for profile
+      const profile = await prisma.profile.findUnique({
+        where: { userId: user.id },
+      });
+
+      return { ...user, orders: ordersWithItems, profile };
+    })
+  );
+
+  // Total queries: 1 + N + N*M + N = O(N*M)
+  // Could be done in 1–3 queries with includes/joins
+  return usersWithOrders;
+}
+
+// AI-generated report — sequential queries that could be parallel
+export async function generateReport(orgId: string) {
+  const users = await prisma.user.count({ where: { orgId } });
+  const orders = await prisma.order.count({ where: { orgId } });
+  const revenue = await prisma.order.aggregate({ _sum: { total: true }, where: { orgId } });
+  const topProducts = await prisma.orderItem.groupBy({ by: ["productId"], _count: true, orderBy: { _count: { productId: "desc" } }, take: 10 });
+  // 4 sequential queries that could run in parallel with Promise.all
+  return { users, orders, revenue, topProducts };
+}`,
+    expectedRuleIds: ["PERF-001", "SCALE-001"],
+    category: "ai-code-safety",
+    difficulty: "medium",
+  },
+  {
+    id: "aics-deep-unsafe-type-assertions",
+    description: "AI-generated TypeScript with unsafe type assertions bypassing safety",
+    language: "typescript",
+    code: `// AI-generated API handler with type assertions instead of validation
+export async function handleRequest(req: Request): Promise<Response> {
+  // Casting unknown data as a known type without validation
+  const body = await req.json() as UserInput;  // No runtime check
+
+  // Double assertion to bypass TypeScript's safety
+  const config = JSON.parse(rawConfig) as unknown as AppConfig;
+
+  // Using 'as any' to silence errors instead of fixing types
+  const user = await getUser(body.id);
+  (user as any).role = body.role;  // Bypasses readonly
+  (user as any).isAdmin = true;    // Bypasses access control types
+  await saveUser(user as any);
+
+  // Non-null assertion on nullable values
+  const profile = user.profile!;           // Could be null
+  const address = profile.addresses![0]!;  // Could be undefined
+  const zipCode = address.zip!;            // Could be null
+
+  // Type assertion on API response without verification
+  const apiResult = await fetch("/api/data")
+    .then(r => r.json()) as { items: Product[]; total: number };
+
+  // Asserting DOM elements exist without checking
+  const form = document.getElementById("form") as HTMLFormElement;
+  const input = document.querySelector(".email") as HTMLInputElement;
+  form.submit();  // Could throw if element doesn't exist
+
+  return Response.json(apiResult);
+}`,
+    expectedRuleIds: ["SWDEV-001"],
+    category: "ai-code-safety",
+    difficulty: "easy",
+  },
+  {
+    id: "aics-deep-hardcoded-ai-credentials",
+    description: "AI-generated code with hardcoded service credentials and API keys",
+    language: "typescript",
+    code: `// AI-generated AI service integration
+import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
+
+// Hardcoded API keys — the #1 AI-generated code mistake
+const openai = new OpenAI({
+  apiKey: "sk-proj-abc123def456ghi789jkl012mno345pqr678stu901vwx234",
+});
+
+const anthropic = new Anthropic({
+  apiKey: "sk-ant-api03-abcDEFghiJKLmnoPQRstuVWXyz-0123456789ABCDEF",
+});
+
+// Database connection string with credentials
+const DATABASE_URL = "postgresql://admin:SuperSecret123!@prod-db.example.com:5432/maindb";
+
+// AWS credentials inline
+const AWS_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE";
+const AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+
+// Stripe keys
+const STRIPE_SECRET = "sk_live_EXAMPLE_KEY_NOT_REAL_0123456789abcdef";
+
+export async function processWithAI(prompt: string) {
+  // Using hardcoded key
+  const response = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  // Logging the API key to debug
+  console.log("Using API key:", openai.apiKey);
+
+  // Sending credentials to an analytics service
+  await fetch("https://analytics.example.com/track", {
+    method: "POST",
+    body: JSON.stringify({
+      event: "ai_call",
+      apiKey: openai.apiKey,
+      dbUrl: DATABASE_URL,
+    }),
+  });
+
+  return response;
+}`,
+    expectedRuleIds: ["SEC-001", "CYBER-001", "CLOUD-001"],
+    category: "ai-code-safety",
+    difficulty: "easy",
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  CLEAN cases for AI-specific patterns — FP validation
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: "clean-aics-proper-model-serving",
+    description: "Clean: ML model serving with proper input validation and rate limiting",
+    language: "python",
+    code: `from flask import Flask, request, jsonify
+from flask_limiter import Limiter
+from marshmallow import Schema, fields, validate
+import numpy as np
+import joblib
+
+app = Flask(__name__)
+limiter = Limiter(app, default_limits=["100 per minute"])
+
+model = joblib.load("model.joblib")  # Safe serialization format
+
+class PredictionSchema(Schema):
+    features = fields.List(
+        fields.Float(),
+        required=True,
+        validate=validate.Length(min=1, max=100),
+    )
+
+prediction_schema = PredictionSchema()
+
+@app.route("/predict", methods=["POST"])
+@limiter.limit("50 per minute")
+def predict():
+    errors = prediction_schema.validate(request.json)
+    if errors:
+        return jsonify({"error": errors}), 400
+
+    features = np.array(request.json["features"]).reshape(1, -1)
+
+    if features.shape[1] != model.n_features_in_:
+        return jsonify({"error": "Invalid feature dimensions"}), 400
+
+    prediction = model.predict(features)
+    return jsonify({"prediction": prediction[0].item()})`,
+    expectedRuleIds: [],
+    category: "clean",
+    difficulty: "medium",
+  },
+  {
+    id: "clean-aics-proper-vector-store",
+    description: "Clean: Vector store operations with tenant isolation and access control",
+    language: "typescript",
+    code: `import { PineconeClient } from "@pinecone-database/pinecone";
+import OpenAI from "openai";
+
+const openai = new OpenAI();
+const pinecone = new PineconeClient();
+
+export async function searchDocuments(
+  tenantId: string,
+  userQuery: string,
+  accessLevel: number,
+) {
+  const index = pinecone.Index("knowledge-base");
+
+  const queryEmbedding = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: userQuery.slice(0, 8000), // Limit input size
+  });
+
+  // Tenant-isolated search with access control filter
+  const results = await index.query({
+    vector: queryEmbedding.data[0].embedding,
+    topK: 10,
+    filter: {
+      tenant: { $eq: tenantId },
+      accessLevel: { $lte: accessLevel },
+    },
+    includeMetadata: true,
+  });
+
+  // Only return results above relevance threshold
+  return (results.matches || [])
+    .filter(m => (m.score ?? 0) > 0.7)
+    .map(m => ({
+      text: m.metadata!.summary, // Return summary, not full PII-containing text
+      score: m.score,
+    }));
+}`,
+    expectedRuleIds: [],
+    category: "clean",
+    difficulty: "hard",
+  },
+
   {
     id: "clean-hallu-proper-react",
     description: "Clean: React code using only real built-in hooks and APIs",

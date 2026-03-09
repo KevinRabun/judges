@@ -414,6 +414,8 @@ const FRAMEWORK_DETECT_PATTERNS: [DetectedFramework, RegExp][] = [
   ["express-rate-limit", /express-rate-limit|rateLimit\s*\(\s*\{/],
   ["cors-middleware", /\bcors\s*\(|from\s+['"]cors['"]/],
   ["csurf", /csurf|csrf-csrf/],
+  // ── React ──
+  ["react" as DetectedFramework, /from\s+['"]react['"]|import\s+React\b|require\s*\(\s*['"]react['"]\)/],
   // ── Python ──
   ["fastapi", /from\s+fastapi\s+import|FastAPI\s*\(/],
   ["django", /from\s+django\b|django\.\w+|INSTALLED_APPS/],
@@ -507,6 +509,110 @@ export function applyFrameworkAwareness(findings: Finding[], code: string): Find
     }
     return f;
   });
+}
+
+// ─── Project Context Detection ───────────────────────────────────────────────
+
+import type { ProjectContext } from "../types.js";
+
+const RUNTIME_PATTERNS: [string, RegExp][] = [
+  ["node", /\b(?:process\.env|module\.exports|__dirname|__filename|Buffer\.from)\b|\brequire\s*\(/],
+  ["browser", /\b(?:document\.|window\.|localStorage|sessionStorage|navigator\.|DOM|HTMLElement)\b/],
+  ["serverless", /\b(?:exports\.handler|lambda|@azure\/functions|AzureFunction|APIGatewayEvent)\b/],
+  ["container", /(?:Dockerfile|HEALTHCHECK|EXPOSE\s+\d+|docker-compose)/i],
+  ["deno", /\b(?:Deno\.|import\s.*from\s+["']https:\/\/deno)/],
+  ["bun", /\b(?:Bun\.|bun:)/],
+];
+
+const ENTRY_POINT_PATTERNS: [string, RegExp][] = [
+  ["serverless", /\b(?:exports\.handler|lambda\s*=|AzureFunction|APIGatewayEvent)\b|@azure\/functions/],
+  ["api-controller", /\bapp\.(?:get|post|put|delete|patch)\s*\(|@(?:Get|Post|Put|Delete|Controller)\b/],
+  ["middleware", /\b(?:next\s*\(\)|app\.use\s*\(|middleware)/i],
+  ["worker", /\b(?:Worker|parentPort|workerData|SharedWorker|ServiceWorker)\b/],
+  ["websocket", /\b(?:WebSocket|ws\.Server|socket\.io|onmessage)\b/i],
+  ["graphql", /\b(?:GraphQL|gql`|typeDefs|resolvers|ApolloServer)\b/i],
+  ["grpc", /\b(?:grpc|protobuf|proto\.load)\b/i],
+  ["queue-consumer", /\b(?:SQS|amqp|RabbitMQ|kafka|bullmq|BullQueue)\b/i],
+  ["cron-job", /\b(?:cron|node-schedule|agenda|setInterval)\b/i],
+];
+
+const PROJECT_TYPE_PATTERNS: [string, RegExp][] = [
+  ["web-api", /\bapp\.listen\s*\(|createServer\s*\(|@RestController\b/],
+  ["cli-tool", /\b(?:process\.argv|commander|yargs|argparse|@Command)\b/],
+  ["library", /^\s*(?:export\s+(?:function|class|const|interface|type)\b)/m],
+  ["full-stack", /\b(?:getServerSideProps|getStaticProps|NextRequest|pages\/api)\b/],
+  ["static-site", /\b(?:gatsby|vuepress|astro|eleventy|jekyll)\b/i],
+];
+
+const DEPENDENCY_PATTERNS: RegExp[] = [/(?:import|from|require)\s*[\s(]+['"]([@\w][^'"]*)['"]/g];
+
+/**
+ * Detect project-level context from code content. This context is injected
+ * into L2 prompts so the LLM understands what kind of code it is reviewing.
+ */
+export function detectProjectContext(code: string, language: string, filePath?: string): ProjectContext {
+  const frameworks = detectFrameworks(code);
+  const versions = detectFrameworkVersions(code);
+
+  // Detect runtime
+  let runtime = "unknown";
+  for (const [name, pattern] of RUNTIME_PATTERNS) {
+    if (pattern.test(code)) {
+      runtime = name;
+      break;
+    }
+  }
+
+  // Detect entry point type
+  let entryPointType = "unknown";
+  if (filePath) {
+    const category = classifyFile(code, language, filePath);
+    if (category !== "unknown") entryPointType = category;
+  }
+  // Refine with content-based patterns
+  for (const [name, pattern] of ENTRY_POINT_PATTERNS) {
+    if (pattern.test(code)) {
+      entryPointType = name;
+      break;
+    }
+  }
+
+  // Detect project type
+  let projectType = "unknown";
+  for (const [name, pattern] of PROJECT_TYPE_PATTERNS) {
+    if (pattern.test(code)) {
+      projectType = name;
+      break;
+    }
+  }
+
+  // Extract top dependencies (first 10 unique package imports)
+  const deps = new Set<string>();
+  for (const pattern of DEPENDENCY_PATTERNS) {
+    const re = new RegExp(pattern.source, pattern.flags);
+    let m;
+    while ((m = re.exec(code)) !== null && deps.size < 10) {
+      const pkg = m[1];
+      // Only external packages (not relative)
+      if (!pkg.startsWith(".") && !pkg.startsWith("/")) {
+        deps.add(
+          pkg
+            .split("/")
+            .slice(0, pkg.startsWith("@") ? 2 : 1)
+            .join("/"),
+        );
+      }
+    }
+  }
+
+  return {
+    frameworks,
+    frameworkVersions: versions.map((v) => `${v.framework}@${v.raw ?? "unknown"}`),
+    entryPointType,
+    runtime,
+    dependencies: [...deps],
+    projectType,
+  };
 }
 
 // ─── Shared Utilities ────────────────────────────────────────────────────────

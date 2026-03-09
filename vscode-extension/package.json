@@ -2,7 +2,7 @@
   "name": "judges-panel",
   "displayName": "Judges Panel",
   "description": "39 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.24.0",
+  "version": "3.25.0",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -282,6 +282,16 @@
           "type": "number",
           "default": 1000,
           "description": "Debounce delay in milliseconds for on-save evaluation."
+        },
+        "judges.evaluateOnChange": {
+          "type": "boolean",
+          "default": false,
+          "description": "Evaluate files in real-time as you type (uses a longer debounce). May increase CPU usage."
+        },
+        "judges.changeDebounceMs": {
+          "type": "number",
+          "default": 2000,
+          "description": "Debounce delay in milliseconds for on-change evaluation."
         },
         "judges.exclude": {
           "type": "array",
