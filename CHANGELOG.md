@@ -2,6 +2,11 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.34.1] — 2026-03-10
+
+### Fixed
+- **CI build fix** — Added missing `findings` property to the `CaseResult` interface in `benchmark.ts`, resolving TS2353 compile error that failed the v3.34.0 publish workflow
+
 ## [3.34.0] — 2026-03-10
 
 ### Fixed

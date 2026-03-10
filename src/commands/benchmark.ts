@@ -137,6 +137,7 @@ export interface CaseResult {
   detectedRuleIds: string[];
   missedRuleIds: string[];
   falsePositiveRuleIds: string[];
+  findings?: Finding[];
 }
 
 // ─── Built-in Benchmark Cases ───────────────────────────────────────────────
