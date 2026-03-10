@@ -530,5 +530,72 @@ export function analyzeHallucinationDetection(code: string, language: string): F
     }
   }
 
+  // 5. Heuristic import verification — detect imports with suspiciously
+  //    generic compound names that LLMs fabricate (e.g. "super-auth-helper",
+  //    "easy-db-connect"). These follow an "adjective-noun-verb" naming pattern
+  //    rarely used by real packages.
+  if (lang === "javascript" || lang === "typescript") {
+    const genericPrefixes =
+      /^(?:easy|simple|fast|quick|auto|super|smart|magic|instant|ultra|mega|safe|secure|better|awesome)[-_]/i;
+    const genericSuffixes =
+      /[-_](?:helper|utils|tools|manager|handler|wrapper|service|client|provider|plugin|module|kit|lib|core|engine|base|factory|builder|connector)$/i;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (isCommentLine(lines[i])) continue;
+      const line = lines[i];
+      const importMatch = line.match(/\bfrom\s+['"]([^'"@./][^'"]*)['"]/);
+      if (!importMatch) continue;
+      const pkgName = importMatch[1].split("/")[0];
+      // Must match BOTH a generic prefix and a generic suffix
+      if (genericPrefixes.test(pkgName) && genericSuffixes.test(pkgName)) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "medium",
+          title: `Suspicious package name: "${pkgName}"`,
+          description:
+            `The package "${pkgName}" follows a naming pattern commonly fabricated by AI code generators ` +
+            "(generic-adjective + generic-noun). Verify this package exists on npmjs.com before using it.",
+          lineNumbers: [i + 1],
+          recommendation:
+            "Search npmjs.com for this exact package name. If it doesn't exist, find an established alternative.",
+          reference: "AI Code Safety — Import Verification",
+          confidence: 0.65,
+          provenance: "regex-pattern-match",
+        });
+      }
+    }
+  }
+
+  if (lang === "python") {
+    const genericPrefixes =
+      /^(?:easy|simple|fast|quick|auto|super|smart|magic|instant|ultra|mega|safe|secure|better|awesome)[_-]/i;
+    const genericSuffixes =
+      /[_-](?:helper|utils|tools|manager|handler|wrapper|service|client|provider|plugin|module|kit|lib|core|engine|base|factory|builder|connector)$/i;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (isCommentLine(lines[i])) continue;
+      const line = lines[i];
+      const importMatch = line.match(/^\s*(?:import|from)\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      if (!importMatch) continue;
+      const pkgName = importMatch[1];
+      if (genericPrefixes.test(pkgName) && genericSuffixes.test(pkgName)) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "medium",
+          title: `Suspicious package name: "${pkgName}"`,
+          description:
+            `The package "${pkgName}" follows a naming pattern commonly fabricated by AI code generators. ` +
+            "Verify this package exists on pypi.org before using it.",
+          lineNumbers: [i + 1],
+          recommendation:
+            "Search pypi.org for this exact package name. If it doesn't exist, find an established alternative.",
+          reference: "AI Code Safety — Import Verification",
+          confidence: 0.65,
+          provenance: "regex-pattern-match",
+        });
+      }
+    }
+  }
+
   return findings;
 }

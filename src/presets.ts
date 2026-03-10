@@ -223,6 +223,28 @@ export const PRESETS: Record<string, Preset> = {
       minSeverity: "low" as Severity,
     },
   },
+
+  onboarding: {
+    name: "Onboarding",
+    description:
+      "Smart defaults for first-time adoption — suppresses noisy absence-based rules, " +
+      "focuses on high-confidence security/correctness findings only. " +
+      "Ideal for introducing Judges into an existing codebase without alert fatigue.",
+    config: {
+      minSeverity: "high" as Severity,
+      disabledJudges: [
+        "compliance",
+        "ethics-bias",
+        "data-sovereignty",
+        "cost-effectiveness",
+        "documentation",
+        "internationalization",
+        "accessibility",
+        "ux",
+        "agent-instructions",
+      ],
+    },
+  },
 };
 
 /**

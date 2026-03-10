@@ -54,6 +54,8 @@ export {
   validatePluginSpecifiers,
   isValidJudgeDefinition,
   applyOverridesForFile,
+  applyLanguageProfile,
+  resolveExtendsConfig,
 } from "./config.js";
 
 // ─── Judge Registry ──────────────────────────────────────────────────────────
@@ -71,6 +73,7 @@ export {
   crossEvaluatorDedup,
   diffFindings,
   formatFindingDiff,
+  evaluateNetChangeGate,
   applyInlineSuppressions,
   applyInlineSuppressionsWithAudit,
   runAppBuilderWorkflow,
@@ -78,7 +81,7 @@ export {
   formatEvaluationAsMarkdown,
   clearEvaluationCaches,
 } from "./evaluators/index.js";
-export type { FindingDiff } from "./evaluators/index.js";
+export type { FindingDiff, NetChangeGateOptions, NetChangeGateResult } from "./evaluators/index.js";
 
 // ─── V2 Policy-Aware API ────────────────────────────────────────────────────
 export { evaluateCodeV2, evaluateProjectV2, getSupportedPolicyProfiles } from "./evaluators/v2.js";
@@ -280,8 +283,16 @@ export {
   recordSnapshot,
   computeTrend,
   formatTrendReport,
+  computeMetrics,
 } from "./commands/snapshot.js";
-export type { FindingSnapshot, SnapshotStore, TrendPoint, TrendReport } from "./commands/snapshot.js";
+export type {
+  FindingSnapshot,
+  SnapshotStore,
+  TrendPoint,
+  TrendReport,
+  RuleMetric,
+  MetricsSummary,
+} from "./commands/snapshot.js";
 
 // ─── Rule Hit Metrics ───────────────────────────────────────────────────────
 export { findJudgeForRule, computeRuleHitMetrics, formatRuleHitReport } from "./commands/rule-metrics.js";

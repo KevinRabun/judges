@@ -569,3 +569,69 @@ export function formatFindingDiff(diff: FindingDiff): string {
 
   return lines.join("\n");
 }
+
+// ─── Net-Change CI Gate ──────────────────────────────────────────────────────
+
+export interface NetChangeGateOptions {
+  /** Pass if this PR fixed at least this many more findings than it introduced. Defaults to 0 (break-even). */
+  minNetFixed?: number;
+  /** When true, new critical/high findings cause failure regardless of net change. Defaults to true. */
+  blockOnNewHighSeverity?: boolean;
+}
+
+export interface NetChangeGateResult {
+  /** Whether the gate passed: the PR's net impact is positive */
+  passed: boolean;
+  /** Net findings resolved (positive = net improvement, negative = net regression) */
+  netFixed: number;
+  /** Number of new findings introduced */
+  introduced: number;
+  /** Number of existing findings resolved */
+  resolved: number;
+  /** New critical/high findings that caused a block (if blockOnNewHighSeverity) */
+  blockers: Finding[];
+  /** Human-readable summary */
+  summary: string;
+}
+
+/**
+ * Evaluate whether a PR's net change is positive — i.e., it fixed more
+ * findings than it introduced. Designed for CI pipelines where teams want to
+ * enforce a "leave the codebase better than you found it" policy.
+ *
+ * @param diff - The FindingDiff from comparing baseline vs current findings
+ * @param options - Gate configuration
+ */
+export function evaluateNetChangeGate(diff: FindingDiff, options?: NetChangeGateOptions): NetChangeGateResult {
+  const minNetFixed = options?.minNetFixed ?? 0;
+  const blockOnNewHigh = options?.blockOnNewHighSeverity ?? true;
+
+  const netFixed = diff.stats.fixedCount - diff.stats.newCount;
+
+  // Check for new critical/high findings
+  const blockers = blockOnNewHigh
+    ? diff.newFindings.filter((f) => f.severity === "critical" || f.severity === "high")
+    : [];
+
+  const passed = blockers.length === 0 && netFixed >= minNetFixed;
+
+  const parts: string[] = [];
+  parts.push(
+    `Net change: ${netFixed >= 0 ? "+" : ""}${netFixed} (${diff.stats.fixedCount} fixed, ${diff.stats.newCount} introduced)`,
+  );
+  if (blockers.length > 0) {
+    parts.push(
+      `Blocked by ${blockers.length} new critical/high finding(s): ${blockers.map((b) => b.ruleId).join(", ")}`,
+    );
+  }
+  parts.push(`Gate: ${passed ? "PASSED" : "FAILED"}`);
+
+  return {
+    passed,
+    netFixed,
+    introduced: diff.stats.newCount,
+    resolved: diff.stats.fixedCount,
+    blockers,
+    summary: parts.join(". "),
+  };
+}

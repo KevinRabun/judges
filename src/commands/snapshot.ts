@@ -271,3 +271,108 @@ export function formatTrendReport(report: TrendReport): string {
 
   return lines.join("\n");
 }
+
+// ─── Metrics & Aggregation ──────────────────────────────────────────────────
+
+export interface RuleMetric {
+  ruleId: string;
+  /** Number of snapshots where this rule appeared */
+  occurrences: number;
+  /** First seen timestamp */
+  firstSeen: string;
+  /** Last seen timestamp */
+  lastSeen: string;
+  /** Whether rule appeared in the most recent snapshot */
+  isActive: boolean;
+}
+
+export interface MetricsSummary {
+  /** Top offender rule IDs ranked by total occurrence count */
+  topOffenders: RuleMetric[];
+  /** Severity breakdown averaged across all snapshots */
+  averageBySeverity: Record<Severity, number>;
+  /** Number of distinct rules ever seen */
+  distinctRules: number;
+  /** Rules that were present early but disappeared (resolved) */
+  resolvedRules: string[];
+  /** Rules introduced in the most recent snapshot */
+  newRules: string[];
+}
+
+/**
+ * Compute aggregated metrics and top-offender analysis from snapshot history.
+ */
+export function computeMetrics(store: SnapshotStore): MetricsSummary {
+  if (store.snapshots.length === 0) {
+    return {
+      topOffenders: [],
+      averageBySeverity: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+      distinctRules: 0,
+      resolvedRules: [],
+      newRules: [],
+    };
+  }
+
+  const sorted = [...store.snapshots].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const ruleMap = new Map<string, RuleMetric>();
+
+  for (const snap of sorted) {
+    for (const ruleId of snap.ruleIds) {
+      const existing = ruleMap.get(ruleId);
+      if (existing) {
+        existing.occurrences++;
+        existing.lastSeen = snap.timestamp;
+      } else {
+        ruleMap.set(ruleId, {
+          ruleId,
+          occurrences: 1,
+          firstSeen: snap.timestamp,
+          lastSeen: snap.timestamp,
+          isActive: false,
+        });
+      }
+    }
+  }
+
+  // Mark rules active if present in most recent snapshot
+  const lastSnapshot = sorted[sorted.length - 1];
+  const lastRuleSet = new Set(lastSnapshot.ruleIds);
+  for (const [id, metric] of ruleMap) {
+    metric.isActive = lastRuleSet.has(id);
+  }
+
+  // Top offenders — sorted by occurrence count desc
+  const topOffenders = [...ruleMap.values()].sort((a, b) => b.occurrences - a.occurrences).slice(0, 20);
+
+  // Average severity breakdown
+  const avgBySeverity: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+  for (const snap of sorted) {
+    for (const sev of Object.keys(avgBySeverity) as Severity[]) {
+      avgBySeverity[sev] += snap.bySeverity[sev] ?? 0;
+    }
+  }
+  const count = sorted.length;
+  for (const sev of Object.keys(avgBySeverity) as Severity[]) {
+    avgBySeverity[sev] = Math.round((avgBySeverity[sev] / count) * 10) / 10;
+  }
+
+  // Resolved rules: appeared in earlier snapshots but NOT in the last one
+  const resolvedRules = [...ruleMap.values()]
+    .filter((m) => !m.isActive && m.occurrences > 0)
+    .map((m) => m.ruleId)
+    .sort();
+
+  // New rules: appeared first in the most recent snapshot
+  const newRules = [...ruleMap.values()]
+    .filter((m) => m.firstSeen === lastSnapshot.timestamp && m.occurrences === 1)
+    .map((m) => m.ruleId)
+    .sort();
+
+  return {
+    topOffenders,
+    averageBySeverity: avgBySeverity,
+    distinctRules: ruleMap.size,
+    resolvedRules,
+    newRules,
+  };
+}

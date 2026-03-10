@@ -9,6 +9,7 @@ import type { JudgesConfig, Severity, JudgeDefinition } from "./types.js";
 import type { JudgesPlugin } from "./plugins.js";
 import { registerPlugin } from "./plugins.js";
 import { ConfigError } from "./errors.js";
+import { normalizeLanguage } from "./language-patterns.js";
 
 const VALID_SEVERITIES = new Set<Severity>(["critical", "high", "medium", "low", "info"]);
 const VALID_FORMATS = new Set(["text", "json", "sarif", "markdown", "html", "junit", "codeclimate"]);
@@ -30,6 +31,17 @@ export function parseConfig(jsonStr: string): JudgesConfig {
 
   const obj = raw as Record<string, unknown>;
   const config: JudgesConfig = {};
+
+  // extends
+  if (obj.extends !== undefined) {
+    if (typeof obj.extends === "string") {
+      config.extends = obj.extends;
+    } else if (Array.isArray(obj.extends) && obj.extends.every((e: unknown) => typeof e === "string")) {
+      config.extends = obj.extends as string[];
+    } else {
+      throw new ConfigError('Invalid .judgesrc: "extends" must be a string or array of strings');
+    }
+  }
 
   // disabledRules
   if (obj.disabledRules !== undefined) {
@@ -205,6 +217,33 @@ export function parseConfig(jsonStr: string): JudgesConfig {
     config.overrides = parsedOverrides;
   }
 
+  // languageProfiles
+  if (obj.languageProfiles !== undefined) {
+    if (
+      typeof obj.languageProfiles !== "object" ||
+      obj.languageProfiles === null ||
+      Array.isArray(obj.languageProfiles)
+    ) {
+      throw new ConfigError(
+        'Invalid .judgesrc: "languageProfiles" must be an object mapping language names to config overrides',
+      );
+    }
+    const profiles: JudgesConfig["languageProfiles"] = {};
+    for (const [lang, val] of Object.entries(obj.languageProfiles as Record<string, unknown>)) {
+      if (typeof val !== "object" || val === null) {
+        throw new ConfigError(`Invalid .judgesrc: languageProfiles["${lang}"] must be an object`);
+      }
+      try {
+        const partial = parseConfig(JSON.stringify(val));
+        (profiles as Record<string, JudgesConfig>)[lang] = partial;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new ConfigError(`Invalid .judgesrc: languageProfiles["${lang}"]: ${msg}`);
+      }
+    }
+    config.languageProfiles = profiles;
+  }
+
   return config;
 }
 
@@ -238,7 +277,9 @@ export function discoverCascadingConfigs(startDir: string, rootDir?: string): Ju
       const p = join(current, name);
       if (existsSync(p)) {
         try {
-          const cfg = parseConfig(readFileSync(p, "utf-8"));
+          let cfg = parseConfig(readFileSync(p, "utf-8"));
+          // Resolve extends relative to the config file's directory
+          cfg = resolveExtendsConfig(cfg, current);
           configs.push({ dir: current, config: cfg });
         } catch {
           // Skip invalid config files
@@ -315,6 +356,57 @@ export function mergeConfigs(...configs: JudgesConfig[]): JudgesConfig {
   }
 
   return merged;
+}
+
+/**
+ * Resolve `extends` references in a config. Each value in `extends` is treated
+ * as a file path (relative to `baseDir`). The referenced configs are loaded
+ * and merged (left-to-right), then the current config is applied on top.
+ *
+ * Circular extends are detected and rejected with a ConfigError.
+ *
+ * @param config - The config to resolve
+ * @param baseDir - Directory for resolving relative extends paths
+ * @param seen - Set of already-resolved paths (for cycle detection)
+ * @returns The fully resolved and merged config
+ */
+export function resolveExtendsConfig(
+  config: JudgesConfig,
+  baseDir: string,
+  seen: Set<string> = new Set(),
+): JudgesConfig {
+  if (!config.extends) return config;
+
+  const extendsList = Array.isArray(config.extends) ? config.extends : [config.extends];
+  const baseConfigs: JudgesConfig[] = [];
+
+  for (const ext of extendsList) {
+    const resolvedPath = resolve(baseDir, ext);
+    if (seen.has(resolvedPath)) {
+      throw new ConfigError(`Circular extends detected: ${resolvedPath}`);
+    }
+    if (!existsSync(resolvedPath)) {
+      throw new ConfigError(`Extended config not found: ${resolvedPath}`);
+    }
+    seen.add(resolvedPath);
+
+    try {
+      const content = readFileSync(resolvedPath, "utf-8");
+      let parentConfig = parseConfig(content);
+      // Recursively resolve the parent's extends (with cycle detection)
+      parentConfig = resolveExtendsConfig(parentConfig, dirname(resolvedPath), seen);
+      baseConfigs.push(parentConfig);
+    } catch (e) {
+      if (e instanceof ConfigError) throw e;
+      throw new ConfigError(
+        `Failed to load extended config ${resolvedPath}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
+  // Merge: bases first (left-to-right), then current config on top
+  const { extends: _ext, ...currentWithoutExtends } = config;
+  return mergeConfigs(...baseConfigs, currentWithoutExtends);
 }
 
 /**
@@ -532,4 +624,25 @@ function globMatch(path: string, pattern: string): boolean {
   }
 
   return new RegExp("^" + regex + "$", "i").test(path);
+}
+
+// ─── Language Profile Application ────────────────────────────────────────────
+
+/**
+ * Apply language-specific config overrides from languageProfiles.
+ * The language string is normalised to a LangFamily before lookup.
+ *
+ * @param config   - Base config (may include languageProfiles)
+ * @param language - The detected language (e.g. "typescript", "python")
+ * @returns A new config with the matching language profile merged on top
+ */
+export function applyLanguageProfile(config: JudgesConfig, language: string): JudgesConfig {
+  if (!config.languageProfiles) return config;
+
+  const normalised = normalizeLanguage(language);
+  const profile = (config.languageProfiles as Record<string, JudgesConfig>)[normalised];
+  if (!profile) return config;
+
+  const { languageProfiles: _lp, ...baseWithoutProfiles } = config;
+  return mergeConfigs(baseWithoutProfiles, profile);
 }

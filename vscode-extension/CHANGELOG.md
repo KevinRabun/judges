@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.28.0] — 2026-07-07
+
+### Added
+- Synced with core v3.28.0 — 13 new features including onboarding preset, parallel judge execution, org config inheritance, metrics API, net-change CI gate, and per-language rule profiles
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.27.1] — 2026-03-09
 
 ### Fixed

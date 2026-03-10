@@ -2,6 +2,26 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.28.0] — 2026-07-07
+
+### Added
+- **Onboarding preset** — New `onboarding` preset profile for first-time adopters with high-severity-only filtering and advisory judges disabled
+- **Import verification for hallucination detection** — Heuristic import verification (section 5) using dual-pattern matching for generic prefixes and suffixes to catch hallucinated API imports
+- **Diff deletion analysis** — New DIFF-DEL-001 rule detecting security-relevant deletions (auth checks, input validation, CSRF tokens, rate limiting) in PR diffs
+- **PR summary comment** — Enhanced GitHub Action PR review body with rich summary table including verdict, score, severity breakdown, baseline suppressed count, and top 5 most frequent rule IDs; zero-findings path posts clean bill of health
+- **Passive calibration** — `buildPassiveCalibrationProfile()` merging 3 signal sources: explicit feedback, inline suppressions (implicit FP signals), and triage history
+- **Test quality analysis** — Tautological assertion detection (e.g. `expect(true).toBe(true)`) and over-mocking detection (mock setup count exceeding 3× test case count)
+- **Cross-file breaking changes** — DIFF-BREAK-001 rule detecting exported function signature changes (renamed, removed, or parameter count changes) across PR diffs
+- **Parallel judge execution** — Configurable `concurrency` option with AST/taint cache pre-warming via `preWarmCaches()` and chunked batch file processing in project evaluator
+- **Organization config inheritance** — `extends` field in `.judgesrc` supporting single or array of base config paths with cycle detection via `resolveExtendsConfig()`
+- **Metrics & trends API** — `computeMetrics()` function with `RuleMetric` and `MetricsSummary` types for top offenders, severity breakdown, distinct/resolved/new rule tracking
+- **Net-change CI gate** — `evaluateNetChangeGate()` with `NetChangeGateOptions` and `NetChangeGateResult` for pass/fail decisions on whether a PR fixed more than it introduced
+- **Per-language rule profiles** — `languageProfiles` config field and `applyLanguageProfile()` for language-specific judge configuration overrides
+
+### Tests
+- 1040 tests, 0 failures
+- Benchmark: Grade A
+
 ## [3.27.1] — 2026-03-09
 
 ### Fixed

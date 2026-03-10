@@ -189,6 +189,14 @@ export interface RuleOverride {
  * Project-level configuration (loaded from .judgesrc or .judgesrc.json).
  */
 export interface JudgesConfig {
+  /**
+   * Inherit from a base configuration. Can be:
+   * - A relative or absolute file path to a .judgesrc / .judgesrc.json file
+   * - An npm package name exporting a config (resolved via require/import)
+   * Multiple values can be specified as an array; they are merged left-to-right
+   * with this config applied last (highest priority).
+   */
+  extends?: string | string[];
   /** Rules to suppress entirely */
   disabledRules?: string[];
   /** Per-rule overrides keyed by rule ID or prefix (e.g. "SEC-*" or "SEC-003") */
@@ -241,6 +249,22 @@ export interface JudgesConfig {
    * ```
    */
   overrides?: Array<{ files: string } & Partial<Omit<JudgesConfig, "overrides">>>;
+  /**
+   * Per-language evaluation profiles. Maps language families to partial config
+   * overrides that are applied when evaluating files of that language.
+   * This allows auto-disabling judges/rules that are irrelevant for certain
+   * languages (e.g., disabling `documentation` for SQL, or `performance`
+   * for config files).
+   *
+   * Example:
+   * ```json
+   * { "languageProfiles": {
+   *   "python": { "disabledJudges": ["memory-safety"] },
+   *   "sql":    { "disabledJudges": ["documentation", "testing"] }
+   * }}
+   * ```
+   */
+  languageProfiles?: Partial<Record<LangFamily, Partial<Omit<JudgesConfig, "languageProfiles" | "overrides">>>>;
 }
 
 // ─── Project / Multi-file Types ──────────────────────────────────────────────

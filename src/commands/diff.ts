@@ -9,6 +9,7 @@
 import { readFileSync, existsSync } from "fs";
 import { resolve, extname } from "path";
 import { evaluateDiff } from "../evaluators/index.js";
+import type { Finding } from "../types.js";
 
 // ─── Unified Diff Parser ────────────────────────────────────────────────────
 
@@ -19,6 +20,8 @@ interface DiffHunk {
   newContent: string;
   /** Changed line numbers (1-based) in the new content */
   changedLines: number[];
+  /** Lines that were removed (deleted) from the old version */
+  removedLines: string[];
 }
 
 /**
@@ -32,18 +35,21 @@ function parseUnifiedDiff(diffText: string): DiffHunk[] {
   let currentFile: string | undefined;
   let newLines: string[] = [];
   let changedLineNumbers: number[] = [];
+  let removedLineTexts: string[] = [];
   let newLineNum = 0;
 
   function flushFile(): void {
-    if (currentFile && (newLines.length > 0 || changedLineNumbers.length > 0)) {
+    if (currentFile && (newLines.length > 0 || changedLineNumbers.length > 0 || removedLineTexts.length > 0)) {
       hunks.push({
         filePath: currentFile,
         newContent: newLines.join("\n"),
         changedLines: changedLineNumbers,
+        removedLines: removedLineTexts,
       });
     }
     newLines = [];
     changedLineNumbers = [];
+    removedLineTexts = [];
     newLineNum = 0;
   }
 
@@ -86,8 +92,9 @@ function parseUnifiedDiff(diffText: string): DiffHunk[] {
       continue;
     }
 
-    // Removed line — skip (not in new content)
+    // Removed line — capture for deletion analysis
     if (line.startsWith("-")) {
+      removedLineTexts.push(line.slice(1));
       continue;
     }
   }
@@ -134,6 +141,174 @@ function detectLanguage(filePath: string): string | undefined {
   const ext = extname(filePath.toLowerCase());
   if (filePath.toLowerCase().includes("dockerfile")) return "dockerfile";
   return EXT_TO_LANG[ext];
+}
+
+// ─── Deletion Analysis ──────────────────────────────────────────────────────
+
+/**
+ * Patterns that indicate security-relevant code. When these are removed
+ * in a diff, it's a red flag that deserves a finding.
+ */
+const SECURITY_DELETION_PATTERNS: Array<{ pattern: RegExp; label: string; description: string }> = [
+  {
+    pattern:
+      /(?:authenticate|authorization|isAuthenticated|requireAuth|requireLogin|passport\.|jwt\.verify|verifyToken|checkAuth|ensureAuth)/i,
+    label: "authentication/authorization check",
+    description: "Removing authentication or authorization logic may expose endpoints to unauthorized access.",
+  },
+  {
+    pattern:
+      /(?:validateInput|sanitize|escapeHtml|xss|DOMPurify|createDOMPurify|purify\.sanitize|validator\.|express-validator)/i,
+    label: "input validation/sanitization",
+    description: "Removing input validation or sanitization may re-introduce injection vulnerabilities.",
+  },
+  {
+    pattern: /(?:rateLimit|rateLimiter|throttle|express-rate-limit|bottleneck|RateLimiterMemory)/i,
+    label: "rate limiting",
+    description: "Removing rate limiting may expose the service to denial-of-service attacks.",
+  },
+  {
+    pattern: /(?:helmet|csrf|csurf|cors\(|Content-Security-Policy|X-Frame-Options|Strict-Transport-Security)/i,
+    label: "security headers/middleware",
+    description: "Removing security headers or middleware weakens the application's defense-in-depth.",
+  },
+  {
+    pattern: /(?:bcrypt|argon2|scrypt|pbkdf2|crypto\.createHash|hashPassword|comparePassword|\.hash\(|\.compare\()/i,
+    label: "password hashing/crypto",
+    description: "Removing cryptographic operations may lead to plaintext credential storage.",
+  },
+  {
+    pattern:
+      /(?:try\s*\{|catch\s*\(|\.catch\(|process\.on\s*\(\s*['"]uncaughtException|process\.on\s*\(\s*['"]unhandledRejection)/i,
+    label: "error handling",
+    description: "Removing error handling may cause unhandled exceptions to crash the process or leak stack traces.",
+  },
+];
+
+/**
+ * Analyze removed lines for security-relevant deletions.
+ * Returns findings for patterns that were deleted from the codebase.
+ */
+function analyzeDeletions(removedLines: string[], filePath: string): Finding[] {
+  if (removedLines.length === 0) return [];
+  const findings: Finding[] = [];
+  const combinedRemoved = removedLines.join("\n");
+
+  for (const { pattern, label, description } of SECURITY_DELETION_PATTERNS) {
+    if (pattern.test(combinedRemoved)) {
+      findings.push({
+        ruleId: "DIFF-DEL-001",
+        severity: "high",
+        title: `Deleted ${label} code`,
+        description:
+          `This diff removes code related to ${label}. ${description} ` +
+          "Ensure the removed functionality is handled elsewhere or is intentionally deprecated.",
+        recommendation:
+          `Verify that ${label} is still provided by another module or middleware. ` +
+          "If this removal is intentional, add a code comment explaining the rationale.",
+        reference: "Secure Code Review — Deletion Impact Analysis",
+        confidence: 0.72,
+        provenance: "diff-deletion-analysis",
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ─── Cross-file Breaking Change Detection ────────────────────────────────────
+
+/**
+ * Pattern matching exported function/method signatures in common languages.
+ * Captures: [fullMatch, functionName, paramList]
+ */
+const EXPORT_SIG_PATTERN =
+  /(?:export\s+(?:default\s+)?(?:async\s+)?function|export\s+(?:const|let)\s+\w+\s*=\s*(?:async\s+)?\(|pub\s+fn|def\s+|public\s+(?:static\s+)?(?:async\s+)?\w+\s+)\s*(\w+)\s*\(([^)]*)\)/g;
+
+/**
+ * Extract exported function signatures from code lines.
+ * Returns a map of functionName → parameter string.
+ */
+function extractExportedSignatures(lines: string[]): Map<string, string> {
+  const sigs = new Map<string, string>();
+  const combined = lines.join("\n");
+  EXPORT_SIG_PATTERN.lastIndex = 0;
+  let m;
+  while ((m = EXPORT_SIG_PATTERN.exec(combined)) !== null) {
+    const fnName = m[1];
+    const params = m[2].trim();
+    sigs.set(fnName, params);
+  }
+  return sigs;
+}
+
+/**
+ * Count the number of parameters in a parameter list string.
+ */
+function countParams(paramStr: string): number {
+  if (!paramStr.trim()) return 0;
+  // Handle generic type parameters by removing angle-bracket contents
+  const cleaned = paramStr.replace(/<[^>]*>/g, "");
+  return cleaned.split(",").length;
+}
+
+/**
+ * Detect breaking changes in exported function signatures.
+ * Compares removed (old) vs added (new) exported signatures and flags:
+ * - Added required parameters (increases arity)
+ * - Removed parameters (may break callers relying on position)
+ * - Renamed functions (removed export + new one)
+ */
+function analyzeBreakingChanges(removedLines: string[], addedLines: string[], filePath: string): Finding[] {
+  const oldSigs = extractExportedSignatures(removedLines);
+  const newSigs = extractExportedSignatures(addedLines);
+  const findings: Finding[] = [];
+
+  for (const [fnName, oldParams] of oldSigs) {
+    const newParams = newSigs.get(fnName);
+    if (newParams === undefined) continue; // Function was removed entirely, not a sig change
+
+    const oldCount = countParams(oldParams);
+    const newCount = countParams(newParams);
+
+    if (newCount > oldCount) {
+      // Added parameters — potential breaking change if not optional
+      const hasOptional = /\?\s*:|=\s*[^,)]+/.test(newParams);
+      if (!hasOptional || newCount - oldCount > 1) {
+        findings.push({
+          ruleId: "DIFF-BREAK-001",
+          severity: "high",
+          title: `Breaking change: \`${fnName}\` signature expanded`,
+          description:
+            `Exported function \`${fnName}\` in ${filePath} changed from ${oldCount} to ${newCount} parameter(s). ` +
+            "Callers in other files may break if the new parameters are required.",
+          recommendation:
+            "Make new parameters optional with default values, or add a new function with the extended signature " +
+            "and deprecate the old one to maintain backward compatibility.",
+          reference: "Semantic Versioning — Breaking Changes",
+          confidence: 0.7,
+          provenance: "diff-breaking-change-analysis",
+        });
+      }
+    } else if (newCount < oldCount) {
+      findings.push({
+        ruleId: "DIFF-BREAK-001",
+        severity: "high",
+        title: `Breaking change: \`${fnName}\` parameters removed`,
+        description:
+          `Exported function \`${fnName}\` in ${filePath} changed from ${oldCount} to ${newCount} parameter(s). ` +
+          "Callers passing the removed parameters will get unexpected behavior or type errors.",
+        recommendation:
+          "Mark parameters as deprecated (accept but ignore) rather than removing them, " +
+          "or update all call sites before merging.",
+        reference: "Semantic Versioning — Breaking Changes",
+        confidence: 0.75,
+        provenance: "diff-breaking-change-analysis",
+      });
+    }
+  }
+
+  return findings;
 }
 
 // ─── CLI Entry Point ────────────────────────────────────────────────────────
@@ -226,6 +401,20 @@ export function runDiff(argv: string[]): void {
     }
 
     const verdict = evaluateDiff(codeToEvaluate, lang, changedLines);
+
+    // Analyze removed lines for security-relevant deletions
+    const deletionFindings = analyzeDeletions(hunk.removedLines, hunk.filePath);
+    if (deletionFindings.length > 0) {
+      verdict.findings.push(...deletionFindings);
+    }
+
+    // Detect cross-file breaking changes in exported signatures
+    const addedLines = hunk.newContent.split("\n").filter((_, i) => hunk.changedLines.includes(i + 1));
+    const breakingFindings = analyzeBreakingChanges(hunk.removedLines, addedLines, hunk.filePath);
+    if (breakingFindings.length > 0) {
+      verdict.findings.push(...breakingFindings);
+    }
+
     totalFindings += verdict.findings.length;
     if (verdict.score < worstScore) worstScore = verdict.score;
     allResults.push({ file: hunk.filePath, verdict });

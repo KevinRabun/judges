@@ -248,6 +248,69 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         snapshotLines.push(i + 1);
       }
     });
+
+    // Detect tautological / empty assertions (always-pass)
+    const tautologyLines: number[] = [];
+    lines.forEach((line, i) => {
+      if (isCommentLine(line)) return;
+      const trimmed = line.trim();
+      if (
+        // JS/TS: expect(true).toBe(true), expect(1).toBe(1), expect(false).toBe(false)
+        /expect\s*\(\s*(?:true|false|1|0|null|undefined|''|"")\s*\)\s*\.toBe\s*\(\s*(?:true|false|1|0|null|undefined|''|"")\s*\)/i.test(
+          trimmed,
+        ) ||
+        // JS/TS: expect(true).toBeTruthy(), expect(1).toBeTruthy()
+        /expect\s*\(\s*(?:true|1|"[^"]+"|'[^']+')\s*\)\s*\.toBeTruthy\s*\(\s*\)/i.test(trimmed) ||
+        // Python: assert True, self.assertTrue(True)
+        /^\s*assert\s+True\s*$/i.test(trimmed) ||
+        /self\.assertTrue\s*\(\s*True\s*\)/i.test(trimmed) ||
+        // C#/Java: Assert.True(true), Assert.AreEqual(1, 1)
+        /Assert\.(?:True|IsTrue)\s*\(\s*true\s*\)/i.test(trimmed) ||
+        /Assert\.AreEqual\s*\(\s*(\d+|true|false)\s*,\s*\1\s*\)/i.test(trimmed)
+      ) {
+        tautologyLines.push(i + 1);
+      }
+    });
+    if (tautologyLines.length > 0) {
+      ruleNum++;
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        severity: "high",
+        title: "Tautological assertions (always pass)",
+        description:
+          "Assertions that compare a literal to itself (e.g., `expect(true).toBe(true)`) always pass and test nothing. They create an illusion of coverage without verifying any behavior.",
+        lineNumbers: tautologyLines,
+        recommendation:
+          "Replace tautological assertions with assertions against actual computed values from the code under test.",
+        reference: "Unit Testing Anti-Patterns: Tautological Tests",
+        suggestedFix:
+          "Replace `expect(true).toBe(true)` with an assertion that tests the actual result, e.g., `expect(result.isValid).toBe(true)`.",
+        confidence: 0.95,
+      });
+    }
+
+    // Detect over-mocking (more mock setups than test cases)
+    const mockSetupCount = (
+      code.match(
+        /jest\.mock\s*\(|jest\.fn\s*\(|sinon\.stub\s*\(|sinon\.mock\s*\(|vi\.mock\s*\(|vi\.fn\s*\(|@patch\s*\(|mock\.\w+\.return_value|mockImplementation\s*\(|spyOn\s*\(/gi,
+      ) || []
+    ).length;
+    const testCaseCount = testBlockLines.length;
+    if (mockSetupCount > 0 && testCaseCount > 0 && mockSetupCount > testCaseCount * 3) {
+      ruleNum++;
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Excessive mocking relative to test count",
+        description: `Found ${mockSetupCount} mock setups for ${testCaseCount} test case(s). Excessive mocking often means tests are coupled to implementation details rather than behavior.`,
+        recommendation:
+          "Reduce mocking by testing through public interfaces. Consider integration tests for heavily-mocked units. Prefer dependency injection over patching.",
+        reference: "Test Doubles Best Practices / Over-Mocking Anti-Pattern",
+        suggestedFix:
+          "Extract shared mock setups into a `beforeEach` block, eliminate mocks for internal implementation details, and test behavior through public APIs.",
+        confidence: 0.7,
+      });
+    }
     if (snapshotLines.length > 5) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

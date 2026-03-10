@@ -11,6 +11,7 @@ import { applyConfidenceThreshold, isAbsenceBasedFinding } from "../scoring.js";
 import { crossFileDedup } from "../dedup.js";
 import { LRUCache, contentHash } from "../cache.js";
 import type { EvaluationOptions } from "./index.js";
+import { preWarmCaches } from "./index.js";
 
 // ─── Module-level tribunal result cache ──────────────────────────────────────
 const tribunalResultCache = new LRUCache<TribunalVerdict>(256);
@@ -531,27 +532,56 @@ export function evaluateProject(
   // Scan all project files for security patterns (regardless of import relationships)
   const projectWideCategories = scanProjectWideSecurityPatterns(files);
 
-  // Per-file evaluations (cached by content hash to skip unchanged files)
-  const fileResults = files.map((f) => {
-    const hash = contentHash(f.content, f.language);
-    let verdict = tribunalResultCache.get(hash);
-    if (!verdict) {
-      verdict = runner.evaluateWithTribunal(f.content, f.language, context, options);
-      tribunalResultCache.set(hash, verdict);
+  // ── Batch pre-warm AST & taint caches ──────────────────────────────────
+  // Front-load the expensive parsing step for all files before the per-file
+  // tribunal loop.  This ensures each evaluateWithTribunal call gets a cache
+  // hit for AST/taint analysis, avoiding redundant computation.
+  const optionsSuffix = options
+    ? JSON.stringify({
+        ast: options.includeAstFindings,
+        mc: options.minConfidence,
+        mf: options.maxFindingsPerFile,
+        dr: options.config?.disabledRules,
+        dj: options.config?.disabledJudges,
+        ms: options.config?.minSeverity,
+        jw: options.config?.judgeWeights,
+        mfg: options.mustFixGate,
+      })
+    : "";
+  preWarmCaches(files, optionsSuffix);
+
+  // ── Per-file evaluations (batched, cached by content hash) ─────────────
+  const batchSize = options?.concurrency ?? 8;
+  const fileResults: Array<{
+    path: string;
+    language: string;
+    findings: Finding[];
+    score: number;
+  }> = [];
+
+  for (let i = 0; i < files.length; i += batchSize) {
+    const batch = files.slice(i, i + batchSize);
+    for (const f of batch) {
+      const hash = contentHash(f.content, f.language);
+      let verdict = tribunalResultCache.get(hash);
+      if (!verdict) {
+        verdict = runner.evaluateWithTribunal(f.content, f.language, context, options);
+        tribunalResultCache.set(hash, verdict);
+      }
+      // Apply cross-file adjustments if this file imports security modules
+      const mitigated = crossFileMitigations.get(f.path);
+      let adjustedFindings =
+        mitigated && mitigated.size > 0 ? applyCrossFileAdjustments(verdict.findings, mitigated) : verdict.findings;
+      // Apply project-wide absence resolution for categories found anywhere
+      adjustedFindings = applyProjectWideAbsenceResolution(adjustedFindings, projectWideCategories);
+      fileResults.push({
+        path: f.path,
+        language: f.language,
+        findings: adjustedFindings,
+        score: verdict.overallScore,
+      });
     }
-    // Apply cross-file adjustments if this file imports security modules
-    const mitigated = crossFileMitigations.get(f.path);
-    let adjustedFindings =
-      mitigated && mitigated.size > 0 ? applyCrossFileAdjustments(verdict.findings, mitigated) : verdict.findings;
-    // Apply project-wide absence resolution for categories found anywhere
-    adjustedFindings = applyProjectWideAbsenceResolution(adjustedFindings, projectWideCategories);
-    return {
-      path: f.path,
-      language: f.language,
-      findings: adjustedFindings,
-      score: verdict.overallScore,
-    };
-  });
+  }
 
   // Cross-file architectural findings
   const architecturalFindings: Finding[] = [];

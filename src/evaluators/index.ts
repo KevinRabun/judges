@@ -90,6 +90,13 @@ export interface EvaluationOptions {
    * for fine-grained control (minSamples, maxReduction, maxBoost).
    */
   calibrate?: boolean | CalibrationOptions;
+  /**
+   * Maximum number of files to evaluate concurrently in project mode.
+   * Files within each batch are processed sequentially (judges are CPU-bound),
+   * but AST and taint caches are pre-warmed for the entire batch before
+   * evaluation begins. Defaults to 8.
+   */
+  concurrency?: number;
   /** @internal — pre-computed AST structure for the file (set by evaluateWithTribunal) */
   _astCache?: CodeStructure;
   /** @internal — pre-computed taint flows for the file (set by evaluateWithTribunal) */
@@ -106,6 +113,27 @@ const taintFlowCache = new LRUCache<TaintFlow[]>(256);
 export function clearEvaluationCaches(): void {
   astStructureCache.clear();
   taintFlowCache.clear();
+}
+
+/**
+ * Pre-warm the AST structure and taint flow caches for a batch of files.
+ * Call this before running evaluateWithTribunal on each file to front-load
+ * the expensive parsing step and avoid redundant computation when the
+ * tribunal processes each file individually.
+ */
+export function preWarmCaches(
+  files: ReadonlyArray<{ content: string; language: string }>,
+  optionsSuffix?: string,
+): void {
+  for (const f of files) {
+    const hash = contentHash(f.content, f.language + (optionsSuffix ?? ""));
+    if (!astStructureCache.get(hash)) {
+      astStructureCache.set(hash, analyzeStructure(f.content, f.language));
+    }
+    if (!taintFlowCache.get(hash)) {
+      taintFlowCache.set(hash, analyzeTaintFlows(f.content, f.language));
+    }
+  }
 }
 
 /**
@@ -851,5 +879,11 @@ export function runAppBuilderWorkflow(
 
 export { formatVerdictAsMarkdown, formatEvaluationAsMarkdown };
 export { enrichWithPatches } from "../patches/index.js";
-export { crossEvaluatorDedup, crossFileDedup, diffFindings, formatFindingDiff } from "../dedup.js";
-export type { FindingDiff } from "../dedup.js";
+export {
+  crossEvaluatorDedup,
+  crossFileDedup,
+  diffFindings,
+  formatFindingDiff,
+  evaluateNetChangeGate,
+} from "../dedup.js";
+export type { FindingDiff, NetChangeGateOptions, NetChangeGateResult } from "../dedup.js";

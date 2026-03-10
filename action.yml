@@ -344,7 +344,18 @@ runs:
             }
 
             if (findings.length === 0) {
-              console.log('No findings to post as PR comments.');
+              // Post a clean-bill-of-health summary even when no findings
+              const score = results.score || results.overallScore || results.worstScore || 100;
+              const baselineFiltered = results._baselineFiltered || 0;
+              let cleanBody = '## 🔍 Judges Code Review\n\n';
+              cleanBody += '✅ **No findings** — score ' + score + '/100\n';
+              if (baselineFiltered > 0) cleanBody += '\n> ' + baselineFiltered + ' known finding(s) suppressed by baseline.\n';
+              await ghApi('POST', '/repos/' + repo + '/pulls/' + prNumber + '/reviews', {
+                event: 'COMMENT',
+                body: cleanBody,
+                comments: [],
+              });
+              console.log('✅ Posted clean PR summary (no findings)');
               return;
             }
 
@@ -381,11 +392,44 @@ runs:
               return;
             }
 
-            // ── Step 3: Post new review ──
+            // ── Step 3: Build summary body ──
+            const verdict = (results.verdict || results.overallVerdict || 'UNKNOWN').toUpperCase();
+            const score = results.score || results.overallScore || results.worstScore || 0;
+            const critCount = findings.filter(f => f.severity === 'critical').length;
+            const highCount = findings.filter(f => f.severity === 'high').length;
+            const medCount = findings.filter(f => f.severity === 'medium').length;
+            const lowCount = findings.filter(f => f.severity === 'low').length;
+            const baselineFiltered = results._baselineFiltered || 0;
+
+            // Top 5 most frequent rule IDs
+            const ruleCounts = {};
+            for (const f of findings) { ruleCounts[f.ruleId] = (ruleCounts[f.ruleId] || 0) + 1; }
+            const topRules = Object.entries(ruleCounts)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 5)
+              .map(([id, n]) => '\`' + id + '\` (' + n + ')')
+              .join(', ');
+
+            let summaryBody = '## 🔍 Judges Code Review\n\n';
+            summaryBody += '| Metric | Value |\n|--------|-------|\n';
+            summaryBody += '| Verdict | **' + verdict + '** |\n';
+            summaryBody += '| Score | ' + score + '/100 |\n';
+            summaryBody += '| Findings | ' + findings.length + ' |\n';
+            summaryBody += '| 🔴 Critical | ' + critCount + ' |\n';
+            summaryBody += '| 🟠 High | ' + highCount + ' |\n';
+            summaryBody += '| 🟡 Medium | ' + medCount + ' |\n';
+            summaryBody += '| 🔵 Low | ' + lowCount + ' |\n';
+            if (baselineFiltered > 0) {
+              summaryBody += '| Baseline suppressed | ' + baselineFiltered + ' |\n';
+            }
+            summaryBody += '\n';
+            if (topRules) summaryBody += '**Top rules:** ' + topRules + '\n\n';
+            if (findings.length > 50) summaryBody += '> ⚠️ Showing top 50 of ' + findings.length + ' findings as inline comments.\n\n';
+
+            // ── Step 4: Post new review ──
             const reviewRes = await ghApi('POST', '/repos/' + repo + '/pulls/' + prNumber + '/reviews', {
               event: findings.some(f => f.severity === 'critical') ? 'REQUEST_CHANGES' : 'COMMENT',
-              body: '## 🔍 Judges Code Review\n\nFound **' + findings.length + '** finding(s). See inline comments below.\n\n' +
-                (findings.length > 50 ? '> ⚠️ Showing top 50 of ' + findings.length + ' findings.\n' : ''),
+              body: summaryBody,
               comments: comments,
             });
 

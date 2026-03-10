@@ -10,7 +10,9 @@
  */
 
 import type { Finding } from "./types.js";
+import type { SuppressionRecord } from "./types.js";
 import { loadFeedbackStore, type FeedbackStore } from "./commands/feedback.js";
+import { triageToFeedbackEntries } from "./finding-lifecycle.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -165,4 +167,58 @@ export function calibrateFindings(
 export function autoCalibrateFindings(findings: Finding[], options?: CalibrationOptions): Finding[] {
   const profile = loadCalibrationProfile(options);
   return calibrateFindings(findings, profile, options);
+}
+
+// ─── Passive Calibration ────────────────────────────────────────────────────
+
+/**
+ * Build a calibration profile that passively learns from:
+ * 1. Explicit feedback (from `judges feedback`)
+ * 2. Inline suppressions (`judges-ignore` directives → implicit FP signal)
+ * 3. Triage history (from finding lifecycle store)
+ *
+ * This allows calibration to improve over time without requiring explicit
+ * feedback commands — every suppression directive is a passive signal.
+ */
+export function buildPassiveCalibrationProfile(
+  options?: CalibrationOptions & {
+    /** Suppression records from the current evaluation run */
+    suppressions?: SuppressionRecord[];
+    /** Directory containing .judges-findings.json for triage history */
+    findingsDir?: string;
+  },
+): CalibrationProfile {
+  const store = loadFeedbackStore(options?.feedbackPath);
+
+  // Merge in suppression signals as implicit FP entries
+  if (options?.suppressions) {
+    for (const s of options.suppressions) {
+      store.entries.push({
+        ruleId: s.ruleId,
+        verdict: "fp",
+        timestamp: new Date().toISOString(),
+        severity: s.severity,
+        title: s.title,
+        source: "manual",
+        comment: `Passive: inline suppression (${s.kind})${s.reason ? ` — ${s.reason}` : ""}`,
+      });
+    }
+  }
+
+  // Merge in triage history signals
+  if (options?.findingsDir) {
+    const triageEntries = triageToFeedbackEntries(options.findingsDir);
+    for (const t of triageEntries) {
+      store.entries.push({
+        ruleId: t.ruleId,
+        verdict: t.verdict,
+        timestamp: t.timestamp,
+        severity: t.severity,
+        source: "manual",
+        comment: "Passive: triage history",
+      });
+    }
+  }
+
+  return buildCalibrationProfile(store, options);
 }
