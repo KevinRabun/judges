@@ -4,6 +4,16 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.35.0] — 2026-03-10
+
+### Added
+- **5 conversational review MCP tools** — `explain_finding`, `triage_finding`, `get_finding_stats`, `get_suppression_analytics`, `list_triaged_findings` for interactive finding review directly in the editor
+- **Benchmark dashboard** — `run_benchmark` MCP tool with full per-judge/category/difficulty breakdowns
+- **10 new auto-fix rules** — timing-safe comparison, path traversal, hardcoded secrets, open redirect, SSRF, insecure cookies, Java/Python/C# SQL injection, CSP headers
+- **17 new framework patterns** — expanded coverage for Django, Flask, Spring Boot, and ASP.NET Core
+- **Suppression analytics** — analyze FP rates and get tuning recommendations
+- See [core CHANGELOG](../../CHANGELOG.md) for full details
+
 ## [3.34.1] — 2026-03-10
 
 ### Fixed

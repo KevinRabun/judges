@@ -2214,6 +2214,230 @@ const MULTI_LINE_PATCH_RULES: MultiLinePatchRule[] = [
       };
     },
   },
+
+  // ── v3.35.0 — Additional multi-line patches ──
+
+  // ── Timing-safe comparison → crypto.timingSafeEqual ──
+  {
+    match: /timing.*attack|timing.*safe|constant.*time.*compar|non.*constant.*time/i,
+    contextLines: 3,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)(?:if\s*\(\s*)?([\w.]+)\s*===?\s*([\w.]+)/);
+      if (!m) return null;
+      const [, indent, left, right] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}// TODO: ensure crypto is imported: const crypto = require("crypto");`,
+        `${indent}const _a = Buffer.from(String(${left}));`,
+        `${indent}const _b = Buffer.from(String(${right}));`,
+        `${indent}if (_a.length === _b.length && crypto.timingSafeEqual(_a, _b)) {`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Path traversal → sanitize with path.resolve + prefix check ──
+  {
+    match: /path.*traversal|directory.*traversal|dot.*dot.*slash|\.\..*path/i,
+    contextLines: 3,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(
+        /^(\s*)((?:const|let|var)\s+(\w+)\s*=\s*path\.(?:join|resolve)\s*\([^)]*(?:req\.\w+|params|query|body)[^)]*\))\s*;?\s*$/,
+      );
+      if (!m) return null;
+      const [, indent, stmt, varName] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}const __baseDir = path.resolve("./safe-root"); // TODO: set allowed base directory`,
+        `${indent}${stmt};`,
+        `${indent}if (!path.resolve(${varName}).startsWith(__baseDir)) { throw new Error("Path traversal blocked"); }`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Hardcoded secret/password → use environment variable ──
+  {
+    match: /hardcoded.*secret|hardcoded.*password|hardcoded.*key|embedded.*credential|hardcoded.*token/i,
+    contextLines: 2,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(
+        /^(\s*)(const|let|var)\s+(\w*(?:secret|password|key|token|apiKey|api_key)\w*)\s*=\s*["'`]([^"'`]+)["'`]\s*;?\s*$/i,
+      );
+      if (!m) return null;
+      const [, indent, decl, varName] = m;
+      const envName = varName.replace(/([a-z])([A-Z])/g, "$1_$2").toUpperCase();
+      const oldText = line;
+      const newText = `${indent}${decl} ${varName} = process.env.${envName}; // TODO: set ${envName} in environment`;
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Open redirect → validate redirect URL ──
+  {
+    match: /open.*redirect|unvalidated.*redirect|url.*redirect.*uncheck/i,
+    contextLines: 3,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(
+        /^(\s*)(?:res\.redirect|return\s+res\.redirect)\s*\(\s*(req\.(?:query|params|body)\.\w+|[\w]+)\s*\)/,
+      );
+      if (!m) return null;
+      const [, indent, urlExpr] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}const __redirectUrl = new URL(${urlExpr}, req.protocol + "://" + req.get("host"));`,
+        `${indent}if (__redirectUrl.origin !== req.protocol + "://" + req.get("host")) { return res.status(400).send("Invalid redirect"); }`,
+        `${indent}res.redirect(__redirectUrl.pathname);`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── SSRF → validate URL before HTTP request ──
+  {
+    match: /ssrf|server.*side.*request.*forgery|unvalidated.*url.*fetch/i,
+    contextLines: 3,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(
+        /^(\s*)((?:const|let|var)\s+\w+\s*=\s*)?(?:await\s+)?(?:fetch|axios\.(?:get|post|put|delete)|got|request)\s*\(\s*([\w.]+)\s*/,
+      );
+      if (!m) return null;
+      const [, indent, , urlVar] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}// TODO: validate URL against allowlist to prevent SSRF`,
+        `${indent}const __parsedUrl = new URL(${urlVar});`,
+        `${indent}const __allowedHosts = (process.env.ALLOWED_HOSTS || "").split(",");`,
+        `${indent}if (!__allowedHosts.includes(__parsedUrl.hostname)) { throw new Error("Blocked: host not in allowlist"); }`,
+        `${indent}${line.trim()}`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Insecure cookie → add secure flags ──
+  {
+    match: /insecure.*cookie|cookie.*secure.*flag|cookie.*httponly|session.*cookie.*flag/i,
+    contextLines: 4,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)res\.cookie\s*\(\s*["'](\w+)["']\s*,\s*(\S+)\s*\)\s*;?\s*$/);
+      if (!m) return null;
+      const [, indent, name, value] = m;
+      const oldText = line;
+      const newText = `${indent}res.cookie("${name}", ${value}, { httpOnly: true, secure: true, sameSite: "strict" });`;
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Java SQL injection → PreparedStatement ──
+  {
+    match: /sql.*inject|sql.*concatenat|jdbc.*inject/i,
+    contextLines: 4,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)(Statement\s+\w+\s*=\s*\w+\.createStatement\s*\(\s*\))\s*;?\s*$/);
+      if (!m) return null;
+      const [, indent] = m;
+      // Look for executeQuery with concatenation on subsequent lines
+      for (let j = idx + 1; j < Math.min(idx + 4, windowLines.length); j++) {
+        const next = windowLines[j];
+        const qm = next.match(/^(\s*)\w+\.executeQuery\s*\(\s*"([^"]+)"\s*\+\s*(\w+)/);
+        if (!qm) continue;
+        const [, , sql, param] = qm;
+        const oldText = windowLines.slice(idx, j + 1).join("\n");
+        const newText = [
+          `${indent}PreparedStatement pstmt = conn.prepareStatement("${sql}?");`,
+          `${indent}pstmt.setString(1, ${param});`,
+          `${indent}ResultSet rs = pstmt.executeQuery();`,
+        ].join("\n");
+        return { oldText, newText, startLine: findingLine, endLine: windowStart + j };
+      }
+      return null;
+    },
+  },
+
+  // ── Python f-string/format SQL → parameterized query ──
+  {
+    match: /sql.*inject|python.*sql.*format|f.*string.*sql/i,
+    contextLines: 3,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)(\w+)\.execute\s*\(\s*f["']([^"']*)\{(\w+)\}([^"']*)["']\s*\)/);
+      if (!m) return null;
+      const [, indent, cursor, sqlBefore, param, sqlAfter] = m;
+      const oldText = line;
+      const newText = `${indent}${cursor}.execute("${sqlBefore}%s${sqlAfter}", (${param},))`;
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── Missing Content-Security-Policy header → add CSP ──
+  {
+    match: /content.*security.*policy|missing.*csp|csp.*header/i,
+    contextLines: 5,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)(const\s+app\s*=\s*express\s*\(\s*\)\s*;?\s*)$/);
+      if (!m) return null;
+      const [, indent, appInit] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}${appInit}`,
+        `${indent}app.use((_req, res, next) => {`,
+        `${indent}  res.setHeader("Content-Security-Policy", "default-src 'self'"); // TODO: adjust CSP policy`,
+        `${indent}  next();`,
+        `${indent}});`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
+
+  // ── C# SQL injection → SqlParameter ──
+  {
+    match: /sql.*inject|csharp.*sql|ado.*net.*inject/i,
+    contextLines: 3,
+    generate: (windowLines, windowStart, findingLine) => {
+      const idx = findingLine - windowStart;
+      if (idx < 0 || idx >= windowLines.length) return null;
+      const line = windowLines[idx];
+      const m = line.match(/^(\s*)(?:var|string)\s+\w+\s*=\s*\$?"[^"]*"\s*\+\s*(\w+)\s*;/);
+      if (!m) return null;
+      // Look for SqlCommand nearby
+      const window = windowLines.join("\n");
+      if (!/SqlCommand|ExecuteReader|ExecuteNonQuery/.test(window)) return null;
+      const [, indent, param] = m;
+      const oldText = line;
+      const newText = [
+        `${indent}// TODO: use parameterized queries instead of string concatenation`,
+        `${indent}cmd.Parameters.AddWithValue("@param", ${param});`,
+      ].join("\n");
+      return { oldText, newText, startLine: findingLine, endLine: findingLine };
+    },
+  },
 ];
 
 export function enrichWithPatches(findings: Finding[], code: string): Finding[] {

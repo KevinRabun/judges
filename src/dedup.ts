@@ -123,6 +123,53 @@ const DEDUP_TOPIC_PATTERNS: Array<[RegExp, string]> = [
   // Error handling
   [/(?:unchecked|unhandled)\s*(?:error|exception|rejection|promise)/i, "unhandled-error"],
   [/(?:generic|bare)\s*(?:catch|except)|catch.*(?:Exception|Error)\s*[^a-z]/i, "generic-catch"],
+
+  // ── Cross-judge dedup gaps (v3.35.0) ──────────────────────────────────────
+  // Timing & side-channel
+  [
+    /(?:non.?constant.?time|timing.?(?:attack|unsafe|side)).*(?:compar|secret|token|crypt)|constant.?time.*compar/i,
+    "timing-attack",
+  ],
+
+  // Network & SSRF
+  [/ssrf|server.?side\s*request\s*forg|url.*(?:user|unvalidat|whitelist)/i, "ssrf"],
+
+  // Mass assignment / over-posting
+  [/mass\s*assign|over.?post|bulk\s*assign|whitelist.*(?:field|param|attr)/i, "mass-assignment"],
+
+  // Deserialization
+  [
+    /(?:insecure|unsafe)\s*deserialization|deserialization.*(?:attack|untrusted|remote)|pickle|ObjectInputStream/i,
+    "insecure-deserialization",
+  ],
+
+  // Information disclosure
+  [
+    /(?:verbose|stack.?trace|detailed)\s*error.*(?:user|client|response)|information\s*(?:disclosure|leak)/i,
+    "info-disclosure",
+  ],
+
+  // Denial of service
+  [
+    /(?:denial|dos)\s*(?:of\s*)?service|\bReDoS\b|catastrophic\s*backtrack|unbounded.*(?:loop|alloc)/i,
+    "denial-of-service",
+  ],
+
+  // File upload
+  [
+    /file\s*upload.*(?:unvalidat|unchecked|size|type)|upload.*(?:without|no).*(?:valid|restrict|limit)/i,
+    "file-upload-security",
+  ],
+
+  // Missing access control
+  [/(?:missing|no)\s*(?:access\s*control|authorization|authz)|broken\s*access\s*control/i, "missing-access-control"],
+
+  // Hardcoded port / IP / URL
+  [/hardcod.*(?:port|ip|host|url)|(?:port|ip|host).*hardcod/i, "hardcoded-config"],
+
+  // Frontend-specific overlaps
+  [/dangerouslySetInnerHTML|v-html|bypassSecurityTrust/i, "unsafe-html-render"],
+  [/(?:missing|no)\s*(?:alt|aria|label).*(?:accessib|a11y)|accessibility.*(?:missing|violat)/i, "a11y-violation"],
 ];
 
 const TOPIC_STOP_WORDS = new Set([

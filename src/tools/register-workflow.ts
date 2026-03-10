@@ -12,7 +12,12 @@ import { evaluateWithTribunal } from "../evaluators/index.js";
 import { evaluateFilesBatch } from "../api.js";
 import { generatePublicRepoReport } from "../reports/public-repo-report.js";
 import { configSchema, toJudgesConfig } from "./schemas.js";
-import { benchmarkGate, formatBenchmarkReport } from "../commands/benchmark.js";
+import {
+  benchmarkGate,
+  formatBenchmarkReport,
+  formatBenchmarkMarkdown,
+  runBenchmarkSuite,
+} from "../commands/benchmark.js";
 
 /**
  * Register workflow-focused tools: evaluate_public_repo_report, evaluate_project,
@@ -25,6 +30,7 @@ export function registerWorkflowTools(server: McpServer): void {
   registerEvaluateDiff(server);
   registerAnalyzeDependencies(server);
   registerBenchmarkGate(server);
+  registerBenchmarkDashboard(server);
   registerEvaluateBatch(server);
 }
 
@@ -509,6 +515,93 @@ function registerBenchmarkGate(server: McpServer): void {
           },
         ],
       };
+    },
+  );
+}
+
+// ─── run_benchmark (dashboard) ───────────────────────────────────────────────
+
+function registerBenchmarkDashboard(server: McpServer): void {
+  const judgeIds = JUDGES.map((j) => j.id);
+
+  server.tool(
+    "run_benchmark",
+    "Run the full benchmark suite and return a detailed dashboard with per-judge, per-category, and per-difficulty breakdowns. Includes precision, recall, F1, false positive rates, and individual case results. Use this to understand overall system quality and identify weak spots.",
+    {
+      judgeId: z
+        .string()
+        .optional()
+        .describe(`Optional: restrict benchmark to a single judge. One of: ${judgeIds.join(", ")}`),
+      format: z
+        .enum(["markdown", "json", "summary"])
+        .optional()
+        .describe(
+          "Output format: markdown (full report), json (raw data), summary (key metrics only). Default: markdown",
+        ),
+    },
+    async ({ judgeId, format }) => {
+      try {
+        const result = runBenchmarkSuite(undefined, judgeId);
+        const outputFormat = format || "markdown";
+
+        if (outputFormat === "json") {
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+          };
+        }
+
+        if (outputFormat === "summary") {
+          const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+          const grade =
+            result.f1Score >= 0.9
+              ? "A"
+              : result.f1Score >= 0.8
+                ? "B"
+                : result.f1Score >= 0.7
+                  ? "C"
+                  : result.f1Score >= 0.6
+                    ? "D"
+                    : "F";
+
+          const lines: string[] = [];
+          lines.push(`# Benchmark Summary — Grade ${grade}`);
+          lines.push("");
+          lines.push(`| Metric | Value |`);
+          lines.push(`|--------|-------|`);
+          lines.push(`| Test Cases | ${result.totalCases} |`);
+          lines.push(`| Detection Rate | ${pct(result.detectionRate)} |`);
+          lines.push(`| Precision | ${pct(result.precision)} |`);
+          lines.push(`| Recall | ${pct(result.recall)} |`);
+          lines.push(`| F1 Score | ${pct(result.f1Score)} |`);
+          lines.push(`| True Positives | ${result.truePositives} |`);
+          lines.push(`| False Positives | ${result.falsePositives} |`);
+          lines.push(`| False Negatives | ${result.falseNegatives} |`);
+
+          if (judgeId) {
+            lines.push(`\n*Filtered to judge: ${judgeId}*`);
+          }
+
+          return {
+            content: [{ type: "text" as const, text: lines.join("\n") }],
+          };
+        }
+
+        // Full markdown dashboard
+        const report = formatBenchmarkMarkdown(result);
+        return {
+          content: [{ type: "text" as const, text: report }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: error instanceof Error ? `Error: ${error.message}` : "Error: Failed to run benchmark",
+            },
+          ],
+          isError: true,
+        };
+      }
     },
   );
 }

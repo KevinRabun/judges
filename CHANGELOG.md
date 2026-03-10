@@ -2,6 +2,24 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.35.0] — 2026-03-10
+
+### Added
+- **Dedup: 12 new topic patterns** — timing-attack, ssrf, mass-assignment, insecure-deserialization, info-disclosure, denial-of-service, file-upload-security, missing-access-control, hardcoded-config, unsafe-html-render, a11y-violation — eliminates duplicate findings across judges
+- **Auto-fix: 10 new multi-line patch rules** — timing-safe comparison (`crypto.timingSafeEqual`), path traversal prevention, hardcoded secrets → env vars, open redirect validation, SSRF URL allowlist, insecure cookies, Java SQL injection (→ `PreparedStatement`), Python f-string SQL (→ parameterized), CSP header insertion, C# SQL injection (→ `SqlParameter`)
+- **Framework judges: 17 new patterns** — Django (5: SESSION_COOKIE_SECURE, SECURE_SSL_REDIRECT, mark_safe, FILE_UPLOAD_PERMISSIONS, locals/globals in render), Flask (2: send_file path traversal, session without SECRET_KEY), Spring Boot (5: @RequestBody without @Valid, permitAll on sensitive paths, Jackson default typing, hardcoded credentials, logging sensitive data), ASP.NET Core (5: missing UseHttpsRedirection, mass assignment model binding, string interpolation in ILogger, ProblemDetails with exception message, missing [Authorize] on [ApiController])
+- **Suppression analytics** — `getSuppressionAnalytics()` and `formatSuppressionAnalytics()` functions for analyzing FP rates by rule, suppression rates by judge, auto-suppress candidates, and actionable tuning recommendations
+- **5 new MCP tools for conversational review:**
+  - `explain_finding` — plain-language explanation with OWASP/CWE references and remediation guidance
+  - `triage_finding` — set triage status (accepted-risk, deferred, wont-fix, false-positive) with attribution
+  - `get_finding_stats` — lifecycle statistics: open, fixed, triaged counts with trends
+  - `get_suppression_analytics` — FP rates, auto-suppress candidates, per-judge analytics
+  - `list_triaged_findings` — browse triaged findings with optional status filter
+- **Benchmark dashboard MCP tool** — `run_benchmark` returns full dashboard with per-judge, per-category, per-difficulty breakdowns in markdown, JSON, or summary format
+
+### Tests
+- 1,075 tests pass across 217 suites
+
 ## [3.34.1] — 2026-03-10
 
 ### Fixed

@@ -502,3 +502,193 @@ export function getTriageBasedSuppressions(
 
   return suppressed;
 }
+
+// ─── Suppression Analytics ──────────────────────────────────────────────────
+
+export interface SuppressionAnalytics {
+  /** Total findings ever tracked */
+  totalTracked: number;
+  /** Total currently suppressed (FP + wont-fix) */
+  totalSuppressed: number;
+  /** Overall suppression rate (suppressed / total tracked) */
+  suppressionRate: number;
+  /** Rules ranked by suppression count */
+  topSuppressedRules: Array<{
+    ruleId: string;
+    judgePrefix: string;
+    suppressedCount: number;
+    totalCount: number;
+    fpRate: number;
+  }>;
+  /** Judge prefixes ranked by FP rate */
+  byJudge: Array<{
+    judgePrefix: string;
+    totalFindings: number;
+    fpCount: number;
+    wontFixCount: number;
+    deferredCount: number;
+    acceptedRiskCount: number;
+    fpRate: number;
+  }>;
+  /** Auto-suppress candidates (rules exceeding FP threshold) */
+  autoSuppressCandidates: string[];
+  /** Rules frequently deferred (may need priority/severity adjustment) */
+  frequentlyDeferred: string[];
+  /** Summary recommendations */
+  recommendations: string[];
+}
+
+/**
+ * Compute detailed suppression analytics from the finding store.
+ * Identifies patterns in what gets suppressed and recommends tuning actions.
+ */
+export function getSuppressionAnalytics(
+  dirOrStore: string | FindingStore,
+  options: { fpThreshold?: number; minSamples?: number } = {},
+): SuppressionAnalytics {
+  const fpThreshold = options.fpThreshold ?? 0.7;
+  const minSamples = options.minSamples ?? 3;
+  const store = typeof dirOrStore === "string" ? loadFindingStore(dirOrStore) : dirOrStore;
+
+  const totalTracked = store.findings.length;
+  const suppressed = store.findings.filter((f) => f.status === "false-positive" || f.status === "wont-fix");
+
+  // ── Per-rule analytics ──
+  const ruleStats = new Map<
+    string,
+    { total: number; fp: number; wontFix: number; deferred: number; acceptedRisk: number }
+  >();
+  for (const f of store.findings) {
+    const stats = ruleStats.get(f.ruleId) ?? { total: 0, fp: 0, wontFix: 0, deferred: 0, acceptedRisk: 0 };
+    stats.total++;
+    if (f.status === "false-positive") stats.fp++;
+    if (f.status === "wont-fix") stats.wontFix++;
+    if (f.status === "deferred") stats.deferred++;
+    if (f.status === "accepted-risk") stats.acceptedRisk++;
+    ruleStats.set(f.ruleId, stats);
+  }
+
+  const topSuppressedRules = [...ruleStats.entries()]
+    .map(([ruleId, s]) => ({
+      ruleId,
+      judgePrefix: ruleId.replace(/-\d+$/, ""),
+      suppressedCount: s.fp + s.wontFix,
+      totalCount: s.total,
+      fpRate: s.total > 0 ? (s.fp + s.wontFix) / s.total : 0,
+    }))
+    .filter((r) => r.suppressedCount > 0)
+    .sort((a, b) => b.suppressedCount - a.suppressedCount);
+
+  // ── Per-judge analytics ──
+  const judgeStats = new Map<
+    string,
+    { total: number; fp: number; wontFix: number; deferred: number; acceptedRisk: number }
+  >();
+  for (const [ruleId, s] of ruleStats) {
+    const prefix = ruleId.replace(/-\d+$/, "");
+    const js = judgeStats.get(prefix) ?? { total: 0, fp: 0, wontFix: 0, deferred: 0, acceptedRisk: 0 };
+    js.total += s.total;
+    js.fp += s.fp;
+    js.wontFix += s.wontFix;
+    js.deferred += s.deferred;
+    js.acceptedRisk += s.acceptedRisk;
+    judgeStats.set(prefix, js);
+  }
+
+  const byJudge = [...judgeStats.entries()]
+    .map(([judgePrefix, s]) => ({
+      judgePrefix,
+      totalFindings: s.total,
+      fpCount: s.fp,
+      wontFixCount: s.wontFix,
+      deferredCount: s.deferred,
+      acceptedRiskCount: s.acceptedRisk,
+      fpRate: s.total > 0 ? (s.fp + s.wontFix) / s.total : 0,
+    }))
+    .sort((a, b) => b.fpRate - a.fpRate);
+
+  // ── Auto-suppress candidates ──
+  const autoSuppressCandidates = topSuppressedRules
+    .filter((r) => r.totalCount >= minSamples && r.fpRate >= fpThreshold)
+    .map((r) => r.ruleId);
+
+  // ── Frequently deferred ──
+  const frequentlyDeferred = [...ruleStats.entries()]
+    .filter(([, s]) => s.deferred >= minSamples)
+    .map(([ruleId]) => ruleId);
+
+  // ── Recommendations ──
+  const recommendations: string[] = [];
+  if (autoSuppressCandidates.length > 0) {
+    recommendations.push(
+      `${autoSuppressCandidates.length} rule(s) have FP rate ≥ ${(fpThreshold * 100).toFixed(0)}% — consider auto-suppressing: ${autoSuppressCandidates.join(", ")}`,
+    );
+  }
+  for (const jp of byJudge) {
+    if (jp.totalFindings >= minSamples * 2 && jp.fpRate >= 0.5) {
+      recommendations.push(
+        `Judge ${jp.judgePrefix} has ${(jp.fpRate * 100).toFixed(0)}% suppression rate across ${jp.totalFindings} findings — review its detection patterns`,
+      );
+    }
+  }
+  if (frequentlyDeferred.length > 0) {
+    recommendations.push(
+      `${frequentlyDeferred.length} rule(s) are frequently deferred — consider lowering severity: ${frequentlyDeferred.join(", ")}`,
+    );
+  }
+  if (suppressed.length === 0 && totalTracked > 10) {
+    recommendations.push("No findings have been triaged yet — use triage tools to improve calibration over time");
+  }
+
+  return {
+    totalTracked,
+    totalSuppressed: suppressed.length,
+    suppressionRate: totalTracked > 0 ? suppressed.length / totalTracked : 0,
+    topSuppressedRules,
+    byJudge,
+    autoSuppressCandidates,
+    frequentlyDeferred,
+    recommendations,
+  };
+}
+
+/**
+ * Format suppression analytics as a human-readable summary.
+ */
+export function formatSuppressionAnalytics(analytics: SuppressionAnalytics): string {
+  const lines: string[] = [
+    `Suppression Analytics`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `Total tracked: ${analytics.totalTracked} | Suppressed: ${analytics.totalSuppressed} (${(analytics.suppressionRate * 100).toFixed(1)}%)`,
+    "",
+  ];
+
+  if (analytics.topSuppressedRules.length > 0) {
+    lines.push("Top Suppressed Rules:");
+    for (const r of analytics.topSuppressedRules.slice(0, 10)) {
+      lines.push(
+        `  ${r.ruleId}: ${r.suppressedCount}/${r.totalCount} suppressed (${(r.fpRate * 100).toFixed(0)}% FP rate)`,
+      );
+    }
+    lines.push("");
+  }
+
+  if (analytics.byJudge.length > 0) {
+    lines.push("By Judge:");
+    for (const j of analytics.byJudge.slice(0, 10)) {
+      lines.push(
+        `  ${j.judgePrefix}: ${j.totalFindings} total, ${j.fpCount} FP, ${j.wontFixCount} won't-fix (${(j.fpRate * 100).toFixed(0)}% suppression rate)`,
+      );
+    }
+    lines.push("");
+  }
+
+  if (analytics.recommendations.length > 0) {
+    lines.push("Recommendations:");
+    for (const r of analytics.recommendations) {
+      lines.push(`  💡 ${r}`);
+    }
+  }
+
+  return lines.join("\n");
+}

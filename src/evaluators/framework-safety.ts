@@ -752,6 +752,142 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
         });
       }
     }
+
+    // ── v3.35.0 — Additional Django patterns ──
+
+    if (hasDjango) {
+      // Django: SESSION_COOKIE_SECURE = False
+      const insecureSessionLines = getLineNumbers(code, /^\s*SESSION_COOKIE_SECURE\s*=\s*False\b/gm);
+      if (insecureSessionLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "high",
+          title: "Django SESSION_COOKIE_SECURE=False — session hijacking over HTTP",
+          description:
+            "Session cookies are sent over unencrypted HTTP connections. Attackers on the same network can intercept session cookies via passive sniffing.",
+          lineNumbers: insecureSessionLines,
+          recommendation:
+            "Set SESSION_COOKIE_SECURE = True. Also set CSRF_COOKIE_SECURE = True and SECURE_SSL_REDIRECT = True.",
+          reference: "Django Security — https://docs.djangoproject.com/en/5.0/ref/settings/#session-cookie-secure",
+          confidence: 0.9,
+        });
+      }
+
+      // Django: SECURE_SSL_REDIRECT = False
+      const noSslRedirectLines = getLineNumbers(code, /^\s*SECURE_SSL_REDIRECT\s*=\s*False\b/gm);
+      if (noSslRedirectLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "medium",
+          title: "Django SECURE_SSL_REDIRECT=False — no HTTPS enforcement",
+          description:
+            "HTTP requests are not redirected to HTTPS. Sensitive data including credentials and session tokens may be transmitted in cleartext.",
+          lineNumbers: noSslRedirectLines,
+          recommendation: "Set SECURE_SSL_REDIRECT = True in production settings.",
+          reference: "Django SSL — https://docs.djangoproject.com/en/5.0/ref/settings/#secure-ssl-redirect",
+          confidence: 0.85,
+        });
+      }
+
+      // Django: mark_safe() with variable input
+      const markSafeLines = getLineNumbers(code, /mark_safe\s*\(\s*(?:f["']|.*\+|\w+(?:\.\w+)*\s*\))/gm);
+      if (markSafeLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "high",
+          title: "Django mark_safe() with dynamic content — XSS vulnerability",
+          description:
+            "mark_safe() is called with f-strings, concatenation, or variable input. This bypasses Django's auto-escaping and can introduce XSS when user-controlled data is included.",
+          lineNumbers: markSafeLines,
+          recommendation:
+            "Use format_html() instead of mark_safe() for dynamic content: format_html('<b>{}</b>', user_input).",
+          reference:
+            "Django mark_safe — https://docs.djangoproject.com/en/5.0/ref/utils/#django.utils.safestring.mark_safe",
+          confidence: 0.85,
+        });
+      }
+
+      // Django: FILE_UPLOAD_PERMISSIONS too permissive
+      const uploadPermLines = getLineNumbers(code, /FILE_UPLOAD_PERMISSIONS\s*=\s*0o?7[0-7]{2}/gm);
+      if (uploadPermLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "medium",
+          title: "Django FILE_UPLOAD_PERMISSIONS too permissive",
+          description:
+            "Uploaded files are created with world-readable or world-writable permissions. This may allow other system users to read or modify uploaded files.",
+          lineNumbers: uploadPermLines,
+          recommendation:
+            "Set FILE_UPLOAD_PERMISSIONS = 0o644 to restrict access to owner-writable, group/world-readable.",
+          reference:
+            "Django File Uploads — https://docs.djangoproject.com/en/5.0/ref/settings/#file-upload-permissions",
+          confidence: 0.8,
+        });
+      }
+
+      // Django: using globals() or locals() in render context
+      const localsRenderLines = getLineNumbers(code, /render\s*\([^)]*(?:locals|globals)\s*\(\s*\)/gm);
+      if (localsRenderLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "medium",
+          title: "Django render() with locals()/globals() — data exposure",
+          description:
+            "Passing locals() or globals() as template context exposes all local/global variables to the template, potentially leaking sensitive data like database connections, secrets, or internal state.",
+          lineNumbers: localsRenderLines,
+          recommendation:
+            "Pass an explicit context dictionary: render(request, 'template.html', {'user': user, 'items': items}).",
+          reference: "Django Views — https://docs.djangoproject.com/en/5.0/topics/http/shortcuts/#render",
+          confidence: 0.8,
+        });
+      }
+    }
+
+    // ── v3.35.0 — Additional Flask patterns ──
+
+    if (hasFlask) {
+      // Flask: send_file with user-controlled path (path traversal)
+      const sendFilePaths = getLineNumbers(
+        code,
+        /send_file\s*\(\s*(?:request\.|f["']|os\.path\.join\s*\([^)]*request\.)/gm,
+      );
+      if (sendFilePaths.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "critical",
+          title: "Flask send_file with user input — path traversal",
+          description:
+            "send_file() uses user-controlled input to determine the file path. Attackers can use ../ sequences to read arbitrary files from the server.",
+          lineNumbers: sendFilePaths,
+          recommendation:
+            "Use send_from_directory() with a fixed base directory, or validate the filename with secure_filename().",
+          reference: "Flask send_file — https://flask.palletsprojects.com/en/3.0.x/api/#flask.send_file",
+          confidence: 0.9,
+        });
+      }
+
+      // Flask: session without SECRET_KEY
+      const sessionNoKeyLines: number[] = [];
+      if (/session\[/.test(code) && !/secret_key|SECRET_KEY/.test(code)) {
+        const sessionUseLines = getLineNumbers(code, /session\[/gm);
+        sessionNoKeyLines.push(...sessionUseLines);
+      }
+      if (sessionNoKeyLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "high",
+          title: "Flask session used without SECRET_KEY in file",
+          description:
+            "Flask sessions are used but no SECRET_KEY is configured in this file. Without a strong secret key, session cookies can be tampered with or forged.",
+          lineNumbers: sessionNoKeyLines,
+          recommendation:
+            "Set app.secret_key = os.environ['SECRET_KEY'] before using sessions. Ensure the key is cryptographically random.",
+          reference: "Flask Sessions — https://flask.palletsprojects.com/en/3.0.x/quickstart/#sessions",
+          confidence: 0.65,
+          isAbsenceBased: true,
+        });
+      }
+    }
   }
 
   // ── Spring Boot (Java) ────────────────────────────────────────────────────
@@ -889,6 +1025,113 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
           confidence: 0.95,
         });
       }
+
+      // ── v3.35.0 — Additional Spring Boot patterns ──
+
+      // Spring: @RequestBody without @Valid/@Validated
+      const noValidationLines: number[] = [];
+      for (let i = 0; i < lines.length; i++) {
+        if (isCommentLine(lines[i])) continue;
+        if (/@RequestBody\b/.test(lines[i]) && !/@Valid\b|@Validated\b/.test(lines[i])) {
+          noValidationLines.push(i + 1);
+        }
+      }
+      if (noValidationLines.length >= 2) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "medium",
+          title: "Spring @RequestBody without @Valid — no input validation",
+          description:
+            "Request bodies are deserialized without Bean Validation. Invalid or malicious data passes directly to business logic without constraint checks.",
+          lineNumbers: noValidationLines,
+          recommendation:
+            "Add @Valid annotation: public ResponseEntity<?> create(@Valid @RequestBody UserDto dto). Define constraints on the DTO with @NotNull, @Size, @Email, etc.",
+          reference: "Spring Validation — https://docs.spring.io/spring-framework/reference/core/validation.html",
+          confidence: 0.75,
+          isAbsenceBased: true,
+        });
+      }
+
+      // Spring: permitAll on sensitive paths
+      const permitAllLines = getLineNumbers(
+        code,
+        /\.requestMatchers\s*\([^)]*(?:admin|user|account|api\/v|manage|config)[^)]*\)\s*\.permitAll\s*\(\s*\)/gim,
+      );
+      if (permitAllLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "high",
+          title: "Spring Security permitAll() on sensitive path",
+          description:
+            "Paths containing admin, user, account, or management keywords are configured with permitAll(), allowing unauthenticated access to likely sensitive endpoints.",
+          lineNumbers: permitAllLines,
+          recommendation: 'Use authenticated() or hasRole(): .requestMatchers("/admin/**").hasRole("ADMIN").',
+          reference:
+            "Spring Security Authorization — https://docs.spring.io/spring-security/reference/servlet/authorization/authorize-http-requests.html",
+          confidence: 0.8,
+        });
+      }
+
+      // Spring: ObjectMapper with default typing enabled (deserialization attack)
+      const defaultTypingLines = getLineNumbers(
+        code,
+        /enableDefaultTyping|activateDefaultTyping|DefaultTyping\.NON_FINAL/gm,
+      );
+      if (defaultTypingLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "critical",
+          title: "Jackson default typing enabled — deserialization vulnerability",
+          description:
+            "Jackson ObjectMapper has default typing enabled, which allows attackers to specify arbitrary classes during deserialization. This can lead to remote code execution via gadget chains.",
+          lineNumbers: defaultTypingLines,
+          recommendation:
+            "Remove enableDefaultTyping(). Use @JsonTypeInfo on specific classes instead. Configure PolymorphicTypeValidator to restrict allowed types.",
+          reference: "Jackson Deserialization — https://github.com/FasterXML/jackson-databind/issues/2326",
+          confidence: 0.95,
+        });
+      }
+
+      // Spring: Hardcoded credentials in application.properties/YAML
+      const springCredLines = getLineNumbers(
+        code,
+        /(?:spring\.datasource\.password|spring\.mail\.password|spring\.security\.user\.password)\s*=\s*[^\s$\{]+/gm,
+      );
+      if (springCredLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "critical",
+          title: "Spring Boot hardcoded credentials in configuration",
+          description:
+            "Database, mail, or security passwords are hardcoded in configuration files. These credentials will be committed to version control and exposed to anyone with repository access.",
+          lineNumbers: springCredLines,
+          recommendation:
+            "Use environment variables: spring.datasource.password=${DB_PASSWORD}. Use Spring Cloud Config or Vault for secrets management.",
+          reference:
+            "Spring Externalized Config — https://docs.spring.io/spring-boot/reference/features/external-config.html",
+          confidence: 0.9,
+        });
+      }
+
+      // Spring: Logging sensitive data
+      const logSensitiveLines = getLineNumbers(
+        code,
+        /(?:log|logger|LOG)\.\w+\s*\([^)]*(?:password|secret|token|apiKey|credentials|ssn|creditCard)/gim,
+      );
+      if (logSensitiveLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "high",
+          title: "Spring logging sensitive data — credential exposure",
+          description:
+            "Sensitive data such as passwords, secrets, or tokens appears in log statements. Log files are often stored with weaker access controls and retained for extended periods.",
+          lineNumbers: logSensitiveLines,
+          recommendation:
+            "Remove sensitive data from log statements. Use structured logging with field masking. Never log raw passwords or tokens.",
+          reference: "OWASP Logging — https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html",
+          confidence: 0.8,
+        });
+      }
     }
   }
 
@@ -1023,6 +1266,107 @@ export function analyzeFrameworkSafety(code: string, language: string): Finding[
             'Remove [AllowAnonymous] and use [Authorize] with appropriate roles: [Authorize(Roles = "Admin")].',
           reference: "ASP.NET Authorization — https://learn.microsoft.com/aspnet/core/security/authorization/simple",
           confidence: 0.8,
+        });
+      }
+
+      // ── v3.35.0 — Additional ASP.NET Core patterns ──
+
+      // ASP.NET: Missing HTTPS redirection
+      if (/WebApplication\.Create|builder\.Build\(\)/.test(code) && !/UseHttpsRedirection/.test(code)) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "medium",
+          title: "ASP.NET missing UseHttpsRedirection — no HTTPS enforcement",
+          description:
+            "The application does not call app.UseHttpsRedirection(). HTTP requests are not automatically redirected to HTTPS, allowing sensitive data to be transmitted in cleartext.",
+          lineNumbers: [1],
+          recommendation: "Add app.UseHttpsRedirection() in the middleware pipeline before app.UseAuthorization().",
+          reference: "ASP.NET HTTPS — https://learn.microsoft.com/aspnet/core/security/enforcing-ssl",
+          confidence: 0.7,
+          isAbsenceBased: true,
+        });
+      }
+
+      // ASP.NET: Unsafe model binding (OverpostTo/Bind with too many properties)
+      const bindAllLines = getLineNumbers(
+        code,
+        /\[Bind\s*\(\s*\)\s*\]|\.Entry\s*\(\s*\w+\s*\)\.CurrentValues\.SetValues/gm,
+      );
+      if (bindAllLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "high",
+          title: "ASP.NET mass assignment — unsafe model binding",
+          description:
+            "Models are bound without specifying which properties to include. Attackers can set properties they shouldn't have access to (e.g., IsAdmin, Role, Price) via extra form fields.",
+          lineNumbers: bindAllLines,
+          recommendation:
+            'Use DTOs or [Bind(Include = "Name,Email")] to explicitly whitelist bindable properties. Never bind entity models directly from user input.',
+          reference: "ASP.NET Model Binding — https://learn.microsoft.com/aspnet/core/mvc/models/model-binding",
+          confidence: 0.75,
+        });
+      }
+
+      // ASP.NET: Logging with string interpolation (structured logging bypass)
+      const logInterpolationLines = getLineNumbers(code, /_?(?:logger|log|Logger|Log)\.\w+\s*\(\s*\$/gm);
+      if (logInterpolationLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "low",
+          title: "ASP.NET string interpolation in logging — structured logging bypass",
+          description:
+            'Using $"..." in ILogger calls bypasses structured logging. Log aggregation tools cannot parse or filter by parameters when they are pre-interpolated into the message string.',
+          lineNumbers: logInterpolationLines,
+          recommendation:
+            'Use message templates: _logger.LogInformation("User {UserId} logged in", userId) instead of $"User {userId} logged in".',
+          reference: "ASP.NET Logging — https://learn.microsoft.com/aspnet/core/fundamentals/logging",
+          confidence: 0.8,
+        });
+      }
+
+      // ASP.NET: Returning ProblemDetails with sensitive info
+      const problemDetailsLines = getLineNumbers(
+        code,
+        /Problem\s*\(\s*(?:detail|title)\s*:\s*(?:ex\.Message|exception\.Message|e\.Message|err\.Message)/gm,
+      );
+      if (problemDetailsLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "medium",
+          title: "ASP.NET ProblemDetails with exception message — information disclosure",
+          description:
+            "Exception messages are passed directly to ProblemDetails responses. In production, this leaks internal error details, stack traces, and potentially sensitive data to API consumers.",
+          lineNumbers: problemDetailsLines,
+          recommendation:
+            'Return generic messages: Problem(detail: "An error occurred"). Log the full exception server-side. Use exception filters for centralized error handling.',
+          reference: "ASP.NET Error Handling — https://learn.microsoft.com/aspnet/core/web-api/handle-errors",
+          confidence: 0.8,
+        });
+      }
+
+      // ASP.NET: Missing authorization on controller
+      const controllerNoAuthLines: number[] = [];
+      for (let i = 0; i < lines.length; i++) {
+        if (/\[ApiController\]/.test(lines[i])) {
+          const chunk = lines.slice(Math.max(0, i - 3), i + 1).join(" ");
+          if (!/\[Authorize|AllowAnonymous/.test(chunk)) {
+            controllerNoAuthLines.push(i + 1);
+          }
+        }
+      }
+      if (controllerNoAuthLines.length > 0) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "medium",
+          title: "ASP.NET [ApiController] without [Authorize] — no default auth",
+          description:
+            "API controller does not have [Authorize] attribute. All endpoints on this controller are accessible without authentication unless individually decorated.",
+          lineNumbers: controllerNoAuthLines,
+          recommendation:
+            "Add [Authorize] at the controller level and use [AllowAnonymous] for specific public endpoints: [Authorize] [ApiController] public class UsersController.",
+          reference: "ASP.NET Authorization — https://learn.microsoft.com/aspnet/core/security/authorization/simple",
+          confidence: 0.65,
+          isAbsenceBased: true,
         });
       }
     }

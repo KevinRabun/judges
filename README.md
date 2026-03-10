@@ -656,7 +656,7 @@ const svg2 = generateBadgeSvg(75, "quality"); // custom label
 | **Code Structure** | Structural Analysis | `STRUCT-` | Cyclomatic complexity, nesting depth, function length, dead code, type safety |
 | **Agent Instructions** | Agent Instruction Markdown Quality & Safety | `AGENT-` | Instruction hierarchy, conflict detection, unsafe overrides, scope, validation, policy guidance |
 | **AI Code Safety** | AI-Generated Code Quality & Security | `AICS-` | Prompt injection, insecure LLM output handling, debug defaults, missing validation, unsafe deserialization of AI responses |
-| **Framework Safety** | Framework-Specific Security & Best Practices | `FW-` | React hooks ordering, Express middleware chains, Next.js SSR/SSG pitfalls, Angular/Vue lifecycle patterns, framework-specific anti-patterns |
+| **Framework Safety** | Framework-Specific Security & Best Practices | `FW-` | React hooks ordering, Express middleware chains, Next.js SSR/SSG pitfalls, Angular/Vue lifecycle patterns, Django/Flask/FastAPI safety, Spring Boot security, ASP.NET Core auth & CORS, Go Gin/Echo/Fiber patterns |
 | **IaC Security** | Infrastructure as Code | `IAC-` | Terraform, Bicep, ARM template misconfigurations, hardcoded secrets, missing encryption, overly permissive network/IAM rules |
 | **Security** | General Security Posture | `SEC-` | Holistic security assessment — insecure data flows, weak cryptography, unsafe deserialization |
 | **Hallucination Detection** | AI-Hallucinated API & Import Validation | `HALLU-` | Detects hallucinated APIs, fabricated imports, and non-existent modules from AI code generators |
@@ -990,7 +990,7 @@ Each judge has a corresponding prompt for LLM-powered deep analysis:
 | `judge-code-structure` | Deep AST-based structural analysis review |
 | `judge-agent-instructions` | Deep review of agent instruction markdown quality and safety |
 | `judge-ai-code-safety` | Deep review of AI-generated code risks: prompt injection, insecure LLM output handling, debug defaults, missing validation |
-| `judge-framework-safety` | Deep review of framework-specific safety: React hooks, Express middleware, Next.js SSR/SSG, Angular/Vue patterns |
+| `judge-framework-safety` | Deep review of framework-specific safety: React hooks, Express middleware, Next.js SSR/SSG, Angular/Vue, Django, Spring Boot, ASP.NET Core, Flask, FastAPI, Go frameworks |
 | `judge-iac-security` | Deep review of infrastructure-as-code security: Terraform, Bicep, ARM template misconfigurations |
 | `judge-security` | Deep holistic security posture review: insecure data flows, weak cryptography, unsafe deserialization |
 | `judge-hallucination-detection` | Deep review of AI-hallucinated APIs, fabricated imports, non-existent modules |
