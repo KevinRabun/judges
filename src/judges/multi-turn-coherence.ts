@@ -8,7 +8,6 @@ export const multiTurnCoherenceJudge: JudgeDefinition = {
     "boolean assignments, dead code after returns, conflicting configs, and TODO density.",
   domain: "Code Coherence & Consistency",
   rulePrefix: "COH",
-  weight: 0.8,
   systemPrompt: `You are Judge Multi-Turn Coherence — an expert in detecting self-contradicting and incoherent code patterns.
 
 YOUR EVALUATION CRITERIA:

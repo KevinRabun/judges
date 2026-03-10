@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.29.1] — 2026-03-09
+
+### Fixed
+- **Build fix** — Synced with core v3.29.1 to resolve TypeScript compilation errors
+
 ## [3.29.0] — 2026-07-07
 
 ### Added

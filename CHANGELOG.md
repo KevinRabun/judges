@@ -2,6 +2,11 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.29.1] — 2026-03-09
+
+### Fixed
+- **TypeScript compilation error** — Removed invalid `weight` property from 3 judge definitions (api-contract, multi-turn-coherence, model-fingerprint) that does not exist on `JudgeDefinition` interface, fixing CI build failure
+
 ## [3.29.0] — 2026-07-07
 
 ### Added

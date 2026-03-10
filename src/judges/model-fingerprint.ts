@@ -9,7 +9,6 @@ export const modelFingerprintJudge: JudgeDefinition = {
     "(ChatGPT/GPT-4, Claude, Copilot, Gemini) to flag code that may carry " +
     "model-specific biases, hallucinations, or blind spots.",
   rulePrefix: "MFPR",
-  weight: 0.5,
   systemPrompt: `You are Judge Model Fingerprint Detection — an expert in identifying stylistic signatures of AI-generated code.
 
 YOUR EVALUATION CRITERIA:

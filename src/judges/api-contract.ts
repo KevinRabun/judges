@@ -8,7 +8,6 @@ export const apiContractJudge: JudgeDefinition = {
     "proper status codes, error handling, rate limiting, versioning, and content-type management.",
   domain: "API Design & REST Best Practices",
   rulePrefix: "API",
-  weight: 1.0,
   systemPrompt: `You are Judge API Contract Conformance — an expert in REST API design, HTTP semantics, and contract-first development.
 
 YOUR EVALUATION CRITERIA:
