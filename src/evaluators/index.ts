@@ -39,7 +39,13 @@ import {
 } from "./shared.js";
 
 // ─── Extracted Modules ───────────────────────────────────────────────────────
-import { evaluateMustFixGate, clampConfidence, applyConfidenceThreshold, isAbsenceBasedFinding } from "../scoring.js";
+import {
+  evaluateMustFixGate,
+  clampConfidence,
+  applyConfidenceThreshold,
+  isAbsenceBasedFinding,
+  mapToOwaspLlmTop10,
+} from "../scoring.js";
 import { enrichWithPatches } from "../patches/index.js";
 import { crossEvaluatorDedup, severityRank } from "../dedup.js";
 import { filterFalsePositiveHeuristics } from "./false-positive-review.js";
@@ -697,7 +703,14 @@ export function evaluateWithTribunal(
   };
 
   const judges = resolveJudgeSet(enrichedOptions);
-  const evaluations = judges.map((judge) => evaluateWithJudge(judge, code, language, context, enrichedOptions));
+  const tribunalStart = performance.now();
+  const evaluations = judges.map((judge) => {
+    const start = performance.now();
+    const result = evaluateWithJudge(judge, code, language, context, enrichedOptions);
+    result.durationMs = Math.round(performance.now() - start);
+    return result;
+  });
+  const tribunalDurationMs = Math.round(performance.now() - tribunalStart);
 
   // Weighted score aggregation — uses judgeWeights from config when available
   const weights = enrichedOptions?.config?.judgeWeights;
@@ -798,7 +811,15 @@ export function evaluateWithTribunal(
     const conf = f.confidence ?? 0.5;
     const tier: Finding["confidenceTier"] = conf >= 0.8 ? "essential" : conf >= 0.6 ? "important" : "supplementary";
     const needsHumanReview = escalationThreshold !== undefined && conf < escalationThreshold ? true : undefined;
-    return { ...f, confidenceTier: tier, ...(needsHumanReview ? { needsHumanReview } : {}) };
+    const owaspLlmTop10 = mapToOwaspLlmTop10(f);
+    const provenance = f.provenance ?? "regex-pattern-match";
+    return {
+      ...f,
+      confidenceTier: tier,
+      provenance,
+      ...(needsHumanReview ? { needsHumanReview } : {}),
+      ...(owaspLlmTop10 ? { owaspLlmTop10 } : {}),
+    };
   });
 
   const mustFixGate = evaluateMustFixGate(allFindings, options?.mustFixGate);
@@ -827,6 +848,14 @@ export function evaluateWithTribunal(
     timestamp: new Date().toISOString(),
     mustFixGate,
     ...(allSuppressions.length > 0 ? { suppressions: allSuppressions } : {}),
+    timing: {
+      totalMs: tribunalDurationMs,
+      perJudge: evaluations.map((e) => ({
+        judgeId: e.judgeId,
+        judgeName: e.judgeName,
+        durationMs: e.durationMs ?? 0,
+      })),
+    },
   };
 
   // ── Disk cache: persist for future runs ──

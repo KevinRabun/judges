@@ -272,6 +272,147 @@ export function formatTrendReport(report: TrendReport): string {
   return lines.join("\n");
 }
 
+// ─── HTML Trend Dashboard ────────────────────────────────────────────────────
+
+function escHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * Format a trend report as a self-contained HTML dashboard with inline
+ * SVG charts, severity breakdown, and dark/light theme support.
+ */
+export function formatTrendReportHtml(report: TrendReport): string {
+  const trendLabel = report.stats.trend;
+  const trendIcon =
+    trendLabel === "improving" ? "&#x1F4C9;" : trendLabel === "regressing" ? "&#x1F4C8;" : "&#x27A1;&#xFE0F;";
+  const trendColor = trendLabel === "improving" ? "#16a34a" : trendLabel === "regressing" ? "#dc2626" : "#ca8a04";
+
+  // Build chart data points
+  const points = report.points;
+  const maxFindings = Math.max(1, ...points.map((p) => p.totalFindings));
+  const chartW = 800;
+  const chartH = 300;
+  const padL = 50;
+  const padR = 20;
+  const padT = 20;
+  const padB = 40;
+  const plotW = chartW - padL - padR;
+  const plotH = chartH - padT - padB;
+
+  function px(i: number): number {
+    return padL + (points.length > 1 ? (i / (points.length - 1)) * plotW : plotW / 2);
+  }
+  function py(val: number): number {
+    return padT + plotH - (val / maxFindings) * plotH;
+  }
+
+  // SVG polyline for total findings
+  const totalLine = points.map((p, i) => `${px(i)},${py(p.totalFindings)}`).join(" ");
+  const critLine = points.map((p, i) => `${px(i)},${py(p.critical)}`).join(" ");
+  const highLine = points.map((p, i) => `${px(i)},${py(p.high)}`).join(" ");
+
+  // Y-axis labels
+  const ySteps = 5;
+  const yLabels: string[] = [];
+  for (let s = 0; s <= ySteps; s++) {
+    const val = Math.round((maxFindings / ySteps) * s);
+    const yPos = py(val);
+    yLabels.push(
+      `<text x="${padL - 8}" y="${yPos + 4}" text-anchor="end" fill="var(--muted)" font-size="11">${val}</text>`,
+    );
+    yLabels.push(
+      `<line x1="${padL}" y1="${yPos}" x2="${chartW - padR}" y2="${yPos}" stroke="var(--border)" stroke-dasharray="4"/>`,
+    );
+  }
+
+  // X-axis labels (show up to 10 dates)
+  const xLabels: string[] = [];
+  const step = Math.max(1, Math.floor(points.length / 10));
+  for (let i = 0; i < points.length; i += step) {
+    const date = points[i].timestamp.slice(0, 10);
+    xLabels.push(
+      `<text x="${px(i)}" y="${chartH - 5}" text-anchor="middle" fill="var(--muted)" font-size="10">${escHtml(date)}</text>`,
+    );
+  }
+
+  // Table rows
+  const tableRows = points
+    .map(
+      (p) =>
+        `<tr><td>${escHtml(p.timestamp.slice(0, 10))}</td><td>${p.totalFindings}</td><td style="color:#dc2626">${p.critical}</td><td style="color:#ea580c">${p.high}</td><td style="color:#ca8a04">${p.medium}</td><td style="color:#2563eb">${p.low}</td><td>${p.delta >= 0 ? "+" : ""}${p.delta}</td><td>${p.label ? escHtml(p.label) : ""}</td></tr>`,
+    )
+    .join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Judges Panel — Findings Trend Dashboard</title>
+<style>
+  :root { --bg: #ffffff; --fg: #1a1a1a; --card: #f9fafb; --border: #e5e7eb; --muted: #6b7280; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f172a; --fg: #e2e8f0; --card: #1e293b; --border: #334155; --muted: #94a3b8; }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--fg); padding: 2rem; }
+  h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .stat-card .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; }
+  .stat-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; }
+  .chart-container { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 2rem; }
+  .legend { display: flex; gap: 1.5rem; margin-top: 0.5rem; font-size: 0.85rem; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 3px; margin-right: 4px; vertical-align: middle; }
+  .legend .total::before { background: #2563eb; }
+  .legend .crit::before { background: #dc2626; }
+  .legend .high::before { background: #ea580c; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+  th { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); }
+  .footer { margin-top: 2rem; font-size: 0.75rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<h1>Judges Panel &mdash; Findings Trend Dashboard</h1>
+
+<div class="stats">
+  <div class="stat-card"><div class="label">Total Runs</div><div class="value">${report.stats.totalRuns}</div></div>
+  <div class="stat-card"><div class="label">Current Findings</div><div class="value">${report.stats.currentTotal}</div></div>
+  <div class="stat-card"><div class="label">Overall Delta</div><div class="value" style="color:${trendColor}">${report.stats.overallDelta >= 0 ? "+" : ""}${report.stats.overallDelta}</div></div>
+  <div class="stat-card"><div class="label">Average / Run</div><div class="value">${report.stats.averageFindings}</div></div>
+  <div class="stat-card"><div class="label">Trend</div><div class="value" style="color:${trendColor}">${trendIcon} ${escHtml(trendLabel)}</div></div>
+</div>
+
+<div class="chart-container">
+<svg viewBox="0 0 ${chartW} ${chartH}" width="100%" preserveAspectRatio="xMidYMid meet">
+  ${yLabels.join("\n  ")}
+  ${xLabels.join("\n  ")}
+  <polyline points="${totalLine}" fill="none" stroke="#2563eb" stroke-width="2"/>
+  <polyline points="${critLine}" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4"/>
+  <polyline points="${highLine}" fill="none" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="4"/>
+  ${points.map((p, i) => `<circle cx="${px(i)}" cy="${py(p.totalFindings)}" r="3" fill="#2563eb"/>`).join("\n  ")}
+</svg>
+<div class="legend">
+  <span class="total">Total</span>
+  <span class="crit">Critical</span>
+  <span class="high">High</span>
+</div>
+</div>
+
+<table>
+<thead><tr><th>Date</th><th>Total</th><th>Critical</th><th>High</th><th>Medium</th><th>Low</th><th>Delta</th><th>Label</th></tr></thead>
+<tbody>
+${tableRows}
+</tbody>
+</table>
+
+<div class="footer">Generated by Judges Panel &mdash; ${escHtml(new Date().toISOString().slice(0, 10))}</div>
+</body>
+</html>`;
+}
+
 // ─── Metrics & Aggregation ──────────────────────────────────────────────────
 
 export interface RuleMetric {

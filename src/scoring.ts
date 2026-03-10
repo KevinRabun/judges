@@ -447,3 +447,100 @@ export function buildEvidenceChain(finding: Finding): EvidenceChain {
 
   return { steps, impactStatement };
 }
+
+// ─── OWASP LLM Top 10 (2025) Mapping ────────────────────────────────────────
+//
+// Maps rule-ID prefixes and finding patterns to OWASP Top 10 for LLM
+// Applications categories. This helps teams track AI-specific risks
+// when using LLM-generated code.
+//
+// Reference: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+// ──────────────────────────────────────────────────────────────────────────────
+
+interface OwaspLlmMapping {
+  id: string;
+  title: string;
+  /** Rule prefixes that map to this category */
+  prefixes: string[];
+  /** Keywords in finding titles/descriptions that suggest this category */
+  keywords: RegExp;
+}
+
+const OWASP_LLM_TOP_10: OwaspLlmMapping[] = [
+  {
+    id: "LLM01",
+    title: "Prompt Injection",
+    prefixes: ["AICS", "INTENT"],
+    keywords: /prompt\s*inject|system\s*prompt|instruction\s*override|jailbreak|input\s*manipulat/i,
+  },
+  {
+    id: "LLM02",
+    title: "Insecure Output Handling",
+    prefixes: [],
+    keywords: /unsanitized\s*output|output\s*inject|xss.*llm|unescaped.*response|raw.*ai.*output/i,
+  },
+  {
+    id: "LLM03",
+    title: "Training Data Poisoning",
+    prefixes: [],
+    keywords: /training\s*data|data\s*poison|model\s*integrity|backdoor.*model/i,
+  },
+  {
+    id: "LLM04",
+    title: "Model Denial of Service",
+    prefixes: ["RATE"],
+    keywords: /model\s*dos|token\s*limit|resource\s*exhaust.*llm|api\s*rate.*ai|unbounded.*prompt/i,
+  },
+  {
+    id: "LLM05",
+    title: "Supply Chain Vulnerabilities",
+    prefixes: ["DEPS"],
+    keywords: /supply\s*chain|typosquat|dependency.*vuln|malicious.*package|compromised.*model/i,
+  },
+  {
+    id: "LLM06",
+    title: "Sensitive Information Disclosure",
+    prefixes: ["DATA", "LOG"],
+    keywords: /pii\s*leak|sensitive.*expos|credential.*log|secret.*output|data\s*exfiltrat/i,
+  },
+  {
+    id: "LLM07",
+    title: "Insecure Plugin Design",
+    prefixes: [],
+    keywords: /plugin.*insecur|tool.*inject|function\s*call.*unvalidat|agent.*permiss/i,
+  },
+  {
+    id: "LLM08",
+    title: "Excessive Agency",
+    prefixes: ["AGENT"],
+    keywords: /excessive.*agenc|autonomous.*action|unrestricted.*tool|agent.*privilege|over-permissive/i,
+  },
+  {
+    id: "LLM09",
+    title: "Overreliance",
+    prefixes: ["HALLU", "MFING"],
+    keywords: /hallucin|overrelian|fabricat|confabulat|phantom.*api|invented.*function/i,
+  },
+  {
+    id: "LLM10",
+    title: "Model Theft",
+    prefixes: [],
+    keywords: /model\s*theft|model\s*extract|weight.*exfiltrat|api\s*key.*model/i,
+  },
+];
+
+/**
+ * Map a finding to its OWASP LLM Top 10 category, if applicable.
+ * Returns the formatted string (e.g. "LLM01: Prompt Injection") or undefined.
+ */
+export function mapToOwaspLlmTop10(finding: Finding): string | undefined {
+  const prefix = finding.ruleId.split("-")[0];
+  const text = `${finding.title} ${finding.description}`;
+
+  for (const entry of OWASP_LLM_TOP_10) {
+    if (entry.prefixes.includes(prefix) || entry.keywords.test(text)) {
+      return `${entry.id}: ${entry.title}`;
+    }
+  }
+  return undefined;
+}

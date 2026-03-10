@@ -117,8 +117,8 @@ function findingsAreWellFormed(findings: Finding[]): void {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Judge Registry", () => {
-  it("should have exactly 43 judges registered", () => {
-    assert.equal(JUDGES.length, 43);
+  it("should have exactly 44 judges registered", () => {
+    assert.equal(JUDGES.length, 44);
   });
 
   it("should allow lookup of every judge by ID", () => {
@@ -10478,7 +10478,7 @@ describe("Finding Snapshot — Rule Coverage Stability", () => {
 
   it("should maintain the expected number of judges producing findings", () => {
     const judgesWithFindings = verdict.evaluations.filter((e) => e.findings.length > 0).length;
-    // At least 30 of 39 judges should produce findings on the intentionally flawed sample
+    // At least 30 of 44 judges should produce findings on the intentionally flawed sample
     assert.ok(
       judgesWithFindings >= 30,
       `Only ${judgesWithFindings} judges produced findings — expected ≥30 on flawed sample`,

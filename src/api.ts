@@ -161,7 +161,12 @@ export type { AiFingerprint, AiSignal } from "./fingerprint.js";
 // ─── Confidence Calibration ─────────────────────────────────────────────────
 export { buildCalibrationProfile, calibrateFindings, autoCalibrateFindings } from "./calibration.js";
 export type { CalibrationProfile } from "./calibration.js";
-export { estimateFindingConfidence, estimateFindingConfidenceWithBasis, buildEvidenceChain } from "./scoring.js";
+export {
+  estimateFindingConfidence,
+  estimateFindingConfidenceWithBasis,
+  buildEvidenceChain,
+  mapToOwaspLlmTop10,
+} from "./scoring.js";
 export type { EvidenceChain, EvidenceStep } from "./types.js";
 
 // ─── Fix History / Learning ──────────────────────────────────────────────────

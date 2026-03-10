@@ -235,7 +235,7 @@ async function handleShallowReview(
 
   if (token.isCancellationRequested) return;
 
-  stream.progress("Running 39 judges on the active file…");
+  stream.progress("Running 44 judges on the active file…");
 
   const code = document.getText();
   if (!code.trim()) {
@@ -520,7 +520,7 @@ async function handleWorkspaceReview(
 /**
  * Combined Layer 1 + Layer 2 analysis.
  *
- * 1. Runs all 39 deterministic evaluators (Layer 1)
+ * 1. Runs all 44 deterministic evaluators (Layer 1)
  * 2. Streams the pattern-match findings to chat
  * 3. Builds a deep-review prompt with the L1 findings + expert criteria
  * 4. Sends to the VS Code Language Model API (Layer 2)
@@ -555,7 +555,7 @@ async function handleDeepReview(
   if (token.isCancellationRequested) return;
 
   // ── Layer 1: Deterministic Evaluation ──────────────────────────────────
-  stream.progress("Layer 1 — Running 39 judges (deterministic analysis)…");
+  stream.progress("Layer 1 — Running 44 judges (deterministic analysis)…");
 
   const relativePath = vscode.workspace.asRelativePath(document.uri);
   let findings: Finding[];

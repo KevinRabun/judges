@@ -74,6 +74,11 @@ export interface Finding {
    * and should be routed to a human reviewer rather than auto-actioned.
    */
   needsHumanReview?: boolean;
+  /**
+   * OWASP LLM Top 10 mapping when the finding relates to AI/LLM-generated code risks.
+   * e.g. "LLM01: Prompt Injection", "LLM02: Insecure Output Handling"
+   */
+  owaspLlmTop10?: string;
 }
 
 /**
@@ -591,6 +596,8 @@ export interface JudgeEvaluation {
   findings: Finding[];
   /** Audit trail of findings suppressed by inline comments for this judge */
   suppressions?: SuppressionRecord[];
+  /** Execution time for this judge in milliseconds */
+  durationMs?: number;
 }
 
 /**
@@ -616,6 +623,11 @@ export interface TribunalVerdict {
   mustFixGate?: MustFixGateResult;
   /** Audit trail of inline-suppressed findings (present when suppressions exist) */
   suppressions?: SuppressionRecord[];
+  /** Per-judge timing metrics (present when timing is recorded) */
+  timing?: {
+    totalMs: number;
+    perJudge: Array<{ judgeId: string; judgeName: string; durationMs: number }>;
+  };
 }
 
 /**

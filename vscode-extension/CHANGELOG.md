@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.32.0] — 2026-03-11
+
+### Added
+- **CodeLens provider** — Shows finding counts above functions, methods, and classes directly in the editor; refreshes automatically when findings change
+- **Per-judge timing** — Evaluation results now include timing data in text output
+
+### Changed
+- **New over-engineering judge** — 44th judge detects excessive abstraction, trivial wrappers, god interfaces, and enterprise patterns in small codebases
+- **PDF export** — New `--format pdf` generates print-optimized HTML for "Save as PDF" workflows
+- See [core CHANGELOG](../../CHANGELOG.md) for full details
+
 ## [3.31.0] — 2026-03-10
 
 ### Changed

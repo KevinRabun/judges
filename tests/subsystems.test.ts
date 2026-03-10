@@ -5630,8 +5630,8 @@ describe("getContextWindow — basic behavior", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("JUDGES array — count matches documentation", () => {
-  it("should contain exactly 39 judges", () => {
-    assert.equal(JUDGES.length, 39, `Expected 39 judges, got ${JUDGES.length}`);
+  it("should contain exactly 44 judges", () => {
+    assert.equal(JUDGES.length, 44, `Expected 44 judges, got ${JUDGES.length}`);
   });
 
   it("every judge should have an id, name, domain, and description", () => {

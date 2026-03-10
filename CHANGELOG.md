@@ -2,6 +2,22 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.32.0] — 2026-03-11
+
+### Added
+- **Over-engineering detector judge** — New 44th judge (`over-engineering`) with 6 rules detecting excessive abstraction layers, trivial wrappers, god interfaces, builder pattern overuse, enterprise patterns in small codebases, and excessive generic type parameters
+- **PDF export formatter** (`--format pdf`) — Print-optimized HTML report with @media print styles, page breaks, and clean A4 layout; open in browser and "Save as PDF"
+- **HTML trend dashboard** (`judges trend --format html`) — Self-contained interactive HTML with SVG bar chart, severity breakdown, metrics summary, run history table, and dark/light theme support
+- **`--sample` flag** — Random file sampling for large repos; use with `--max-files` to randomly select files instead of taking the first N alphabetically
+- **Suppression metrics in text output** — When inline suppressions are present, the text report now shows suppressed finding count, breakdown by type (line/next-line/block/file), and top suppressed rules
+- **Code provenance signals** — All findings now carry a `provenance` field (defaults to `"regex-pattern-match"`) indicating how the finding was detected
+- **Per-judge timing metrics** — Each `JudgeEvaluation` includes `durationMs`; `TribunalVerdict` includes `timing` with total and per-judge breakdown; text output shows timing and slowest judges
+- **OWASP LLM Top 10 mapping** — Findings are automatically mapped to OWASP LLM Top 10 categories (LLM01–LLM10) where applicable
+- **VS Code CodeLens provider** — Shows finding counts above functions, methods, and classes in the editor
+
+### Tests
+- 1075 tests passing, Benchmark Grade A
+
 ## [3.31.0] — 2026-03-10
 
 ### Changed

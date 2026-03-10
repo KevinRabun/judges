@@ -290,7 +290,7 @@
   <div class="container">
     <header>
       <h1>Judges Playground</h1>
-      <p>Paste code below and evaluate it with 39 specialized judges — entirely client-side simulation</p>
+      <p>Paste code below and evaluate it with 44 specialized judges — entirely client-side simulation</p>
     </header>
 
     <div class="samples">
@@ -363,7 +363,7 @@ app.listen(3000);</textarea>
         <div class="results-body" id="results-body">
           <div class="empty-state">
             <div class="icon">⚖️</div>
-            <p>Click <strong>Evaluate</strong> to analyze your code with 39 judges</p>
+            <p>Click <strong>Evaluate</strong> to analyze your code with 44 judges</p>
             <p style="margin-top: 0.5rem; font-size: 0.8rem;">Covers security, performance, reliability, compliance &amp; more</p>
           </div>
         </div>
@@ -687,7 +687,7 @@ app.get("/ping", (req, res) => {
         <div class="verdict-banner ${verdictClass}">
           <span class="verdict-score">${result.score}/100</span>
           <span class="verdict-label">${verdictIcon} ${result.verdict.toUpperCase()}</span>
-          <span class="verdict-meta">${result.totalFindings} findings from 39 judges</span>
+          <span class="verdict-meta">${result.totalFindings} findings from 44 judges</span>
         </div>
         <div class="stats-row">
           <div class="stat-mini"><div class="val" style="color:var(--red)">${result.criticalCount}</div><div class="lbl">Critical</div></div>
@@ -738,7 +738,7 @@ app.get("/ping", (req, res) => {
         <div style="padding: 1rem 0;">
           <p style="color: var(--text-muted); margin-bottom: 1rem;">
             This playground simulates a subset of the evaluation rules client-side.
-            For full accuracy with all 39 judges, AST analysis, and auto-fix patches,
+            For full accuracy with all 44 judges, AST analysis, and auto-fix patches,
             use the real CLI:
           </p>
           <div style="background: var(--bg); padding: 1rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.85rem; border: 1px solid var(--border);">

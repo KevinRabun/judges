@@ -4,7 +4,7 @@
 //
 // Token-optimised: shared behavioural directives (adversarial mandate,
 // precision mandate) are stated ONCE in the tribunal preamble instead of
-// being duplicated across all 39 judges. Per-judge sections include only
+// being duplicated across all 44 judges. Per-judge sections include only
 // the unique evaluation criteria, domain-specific rules, and FP-avoidance
 // guidance. This reduces the tribunal prompt by ~40 000 chars (~10 000
 // tokens) without removing any evaluation criteria.

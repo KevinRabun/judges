@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { JudgesDiagnosticProvider } from "./diagnostics";
 import { JudgesCodeActionProvider } from "./code-actions";
+import { JudgesCodeLensProvider } from "./codelens";
 import { JudgesFindingsPanel } from "./findings-panel";
 import { registerChatParticipant } from "./chat-participant";
 import { registerLmTools } from "./lm-tool";
@@ -268,6 +269,10 @@ export function activate(context: vscode.ExtensionContext): void {
     "swift",
   ];
 
+  // ─── CodeLens Provider ───────────────────────────────────────────────
+  const codeLensProvider = new JudgesCodeLensProvider((uri) => diagnosticProvider.getFindings(uri));
+  diagnosticProvider.onFindingsChanged(() => codeLensProvider.refresh());
+
   for (const lang of supportedLanguages) {
     context.subscriptions.push(
       vscode.languages.registerCodeActionsProvider(
@@ -275,6 +280,7 @@ export function activate(context: vscode.ExtensionContext): void {
         new JudgesCodeActionProvider(diagnosticProvider),
         { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] },
       ),
+      vscode.languages.registerCodeLensProvider({ language: lang, scheme: "file" }, codeLensProvider),
     );
   }
 
@@ -362,7 +368,7 @@ export function deactivate(): void {
 
 /**
  * Register the Judges MCP server via the VS Code MCP provider API.
- * This makes the 39 expert-persona prompts (Layer 2) automatically available
+ * This makes the 44 expert-persona prompts (Layer 2) automatically available
  * to Copilot and other LMs — zero manual configuration required.
  */
 function registerMcpServer(context: vscode.ExtensionContext): void {

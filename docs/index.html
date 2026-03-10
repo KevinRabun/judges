@@ -169,12 +169,12 @@
   <div class="container">
     <header>
       <h1>Judges Dashboard</h1>
-      <p>39 specialized judges evaluating AI-generated code for security, cost, and quality</p>
+      <p>44 specialized judges evaluating AI-generated code for security, cost, and quality</p>
     </header>
 
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="value accent">37</div>
+        <div class="value accent">44</div>
         <div class="label">Judges</div>
       </div>
       <div class="stat-card">
@@ -190,7 +190,7 @@
         <div class="label">Critical Issues</div>
       </div>
       <div class="stat-card">
-        <div class="value green" id="stat-tests">899</div>
+        <div class="value green" id="stat-tests">1075</div>
         <div class="label">Tests Passing</div>
       </div>
     </div>
@@ -218,7 +218,7 @@
     </div>
 
     <div class="section">
-      <h2>The 39 Judges</h2>
+      <h2>The 44 Judges</h2>
       <div class="judge-grid" id="judge-grid">
       </div>
     </div>
@@ -239,7 +239,7 @@
           </tr>
           <tr>
             <td><strong>2. Evaluate</strong></td>
-            <td>All 39 judges independently score the code on their domain (0-100) using deterministic heuristics</td>
+            <td>All 44 judges independently score the code on their domain (0-100) using deterministic heuristics</td>
           </tr>
           <tr>
             <td><strong>3. Tribunal</strong></td>
@@ -251,7 +251,7 @@
           </tr>
           <tr>
             <td><strong>5. Deep Review</strong></td>
-            <td>39 expert-persona MCP prompts let your LLM client perform probabilistic analysis beyond static patterns</td>
+            <td>44 expert-persona MCP prompts let your LLM client perform probabilistic analysis beyond static patterns</td>
           </tr>
         </tbody>
       </table>
@@ -303,7 +303,7 @@
       { repo: "fastapi/fastapi", url: "https://github.com/fastapi/fastapi", verdict: "FAIL", score: 100, files: 150, critical: 2, high: 2, total: 14 },
     ];
 
-    // All 39 judges
+    // All 44 judges
     const judges = [
       { name: "Cybersecurity", desc: "SQL injection, XSS, command injection, path traversal" },
       { name: "Authentication", desc: "Weak hashing, missing auth, token exposure" },
@@ -340,6 +340,15 @@
       { name: "Agent Instructions", desc: "LLM system prompt safety, prompt injection" },
       { name: "AI Code Safety", desc: "AI-generated code patterns, hallucination risk" },
       { name: "Framework Safety", desc: "Framework-specific anti-patterns and misuse" },
+      { name: "IaC Security", desc: "Terraform, Bicep, ARM misconfigurations, permissive IAM" },
+      { name: "Security", desc: "Holistic security posture, insecure data flows, weak crypto" },
+      { name: "Hallucination Detection", desc: "Hallucinated APIs, fabricated imports from AI generators" },
+      { name: "Intent Alignment", desc: "Code–comment mismatches, stubs, placeholder functions" },
+      { name: "API Contract", desc: "Input validation, REST conformance, contract consistency" },
+      { name: "Multi-Turn Coherence", desc: "Self-contradictions, duplicate definitions, dead code" },
+      { name: "Model Fingerprint", desc: "AI code provenance, model attribution fingerprints" },
+      { name: "Over-Engineering", desc: "Unnecessary abstractions, wrapper-mania, over-complexity" },
+      { name: "False-Positive Review", desc: "Meta-judge filtering false positives from pattern analysis" },
     ];
 
     function verdictClass(v) {

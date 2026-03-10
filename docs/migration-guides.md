@@ -37,7 +37,7 @@ judges eval src/
 
 ### Key Differences
 
-- **Judges evaluates 39 dimensions** — not just style/lint. Security, performance,
+- **Judges evaluates 44 dimensions** — not just style/lint. Security, performance,
   accessibility, database, API design, error handling, and more.
 - **No per-rule config needed** — Judges auto-selects relevant rules per language.
 - **Confidence scores** — every finding has a 0-1 confidence score with evidence basis.
@@ -82,7 +82,7 @@ judges eval src/ --fail-on-findings --min-score 7
 
 | Semgrep Concept | Judges Equivalent |
 |---|---|
-| `.semgrep.yml` rules | Built-in evaluators (39 domains, 600+ rules) |
+| `.semgrep.yml` rules | Built-in evaluators (44 domains, 600+ rules) |
 | `--config auto` | `judges eval` (auto-selects relevant judges) |
 | `--sarif` | `--format sarif` |
 | `# nosemgrep: rule-id` | `// judges-ignore RULE-ID: reason` |
@@ -106,7 +106,7 @@ judges eval src/ --format sarif --output results.sarif
 - **Beyond pattern matching** — Judges includes AST analysis, taint tracking,
   cross-file analysis, and confidence scoring.
 - **Auto-fix** — `judges fix <file> --apply` applies deterministic patches.
-- **39 evaluation domains** vs. pattern-matching rules.
+- **44 evaluation domains** vs. pattern-matching rules.
 
 ---
 

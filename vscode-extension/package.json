@@ -1,8 +1,8 @@
 {
   "name": "judges-panel",
   "displayName": "Judges Panel",
-  "description": "43 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.31.0",
+  "description": "44 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
+  "version": "3.32.0",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -77,7 +77,7 @@
     "viewsWelcome": [
       {
         "view": "judges.findingsPanel",
-        "contents": "Save a file to run 39 judges automatically, or click below.\n[Evaluate Current File](command:judges.evaluateFile)\n[Evaluate Workspace](command:judges.evaluateWorkspace)\n[Open @judges Chat](command:workbench.action.chat.open)"
+        "contents": "Save a file to run 44 judges automatically, or click below.\n[Evaluate Current File](command:judges.evaluateFile)\n[Evaluate Workspace](command:judges.evaluateWorkspace)\n[Open @judges Chat](command:workbench.action.chat.open)"
       }
     ],
     "commands": [
@@ -337,7 +337,7 @@
         "id": "judges-panel.judges",
         "name": "judges",
         "fullName": "Judges Panel",
-        "description": "Evaluate code for security, performance, reliability, and quality using 39 specialized judges",
+        "description": "Evaluate code for security, performance, reliability, and quality using 44 specialized judges",
         "isSticky": false,
         "commands": [
           {
@@ -400,7 +400,7 @@
         "name": "judges_evaluate",
         "toolReferenceName": "judgesEvaluate",
         "displayName": "Judges: Evaluate Code",
-        "modelDescription": "Evaluate source code using 39 specialized judges covering security, performance, reliability, cost, compliance, observability, API design, and more. Use this tool when the user asks for a judges panel review, judges evaluation, code quality review, security review, or wants to check code against best practices. Returns findings with severity, description, and suggested fixes.",
+        "modelDescription": "Evaluate source code using 44 specialized judges covering security, performance, reliability, cost, compliance, observability, API design, and more. Use this tool when the user asks for a judges panel review, judges evaluation, code quality review, security review, or wants to check code against best practices. Returns findings with severity, description, and suggested fixes.",
         "canBeReferencedInPrompt": true,
         "icon": "$(shield)",
         "inputSchema": {

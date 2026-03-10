@@ -36,6 +36,7 @@ import { getJudge, getJudgeSummaries } from "./judges/index.js";
 import { verdictToSarif } from "./formatters/sarif.js";
 import { verdictToHtml } from "./formatters/html.js";
 import { verdictToJUnit } from "./formatters/junit.js";
+import { verdictToPdfHtml } from "./formatters/pdf.js";
 import { verdictToCodeClimate } from "./formatters/codeclimate.js";
 import { verdictToGitHubActions } from "./formatters/github-actions.js";
 import { runReport } from "./commands/report.js";
@@ -111,7 +112,7 @@ interface CliArgs {
   command: string | undefined;
   file: string | undefined;
   language: string | undefined;
-  format: "text" | "json" | "sarif" | "markdown" | "html" | "junit" | "codeclimate" | "github-actions";
+  format: "text" | "json" | "sarif" | "markdown" | "html" | "pdf" | "junit" | "codeclimate" | "github-actions";
   judge: string | undefined;
   help: boolean;
   failOnFindings: boolean;
@@ -129,6 +130,7 @@ interface CliArgs {
   maxFiles: number | undefined;
   changedOnly: boolean;
   explain: boolean;
+  sample: boolean;
 }
 
 function parseCliArgs(argv: string[]): CliArgs {
@@ -154,6 +156,7 @@ function parseCliArgs(argv: string[]): CliArgs {
     maxFiles: undefined,
     changedOnly: false,
     explain: false,
+    sample: false,
   };
 
   // First non-flag arg is the command
@@ -236,6 +239,9 @@ function parseCliArgs(argv: string[]): CliArgs {
       case "--max-files":
         args.maxFiles = parseInt(argv[++i], 10);
         break;
+      case "--sample":
+        args.sample = true;
+        break;
       default:
         // If it looks like a file path (not a flag), treat as --file
         if (!arg.startsWith("-") && !args.file) {
@@ -289,7 +295,7 @@ USAGE:
 EVAL OPTIONS:
   --file, -f <path>          File to evaluate (or pass as positional arg)
   --language, -l <lang>      Language override (auto-detected from extension)
-  --format, -o <fmt>         Output: text, json, sarif, markdown, html, junit, codeclimate, github-actions
+  --format, -o <fmt>         Output: text, json, sarif, markdown, html, pdf, junit, codeclimate, github-actions
   --judge, -j <id>           Run a single judge instead of the full tribunal
   --fail-on-findings         Exit with code 1 when verdict is fail
   --baseline, -b <path>      Suppress findings already in baseline file
@@ -303,6 +309,7 @@ EVAL OPTIONS:
   --exclude, -x <glob>       Exclude files matching glob pattern (repeatable)
   --include, -i <glob>       Only include files matching glob pattern (repeatable)
   --max-files <n>            Maximum number of files to analyze in directory mode
+  --sample                   Randomly sample files instead of taking first N (use with --max-files)
   --no-color                 Disable colored output
   --verbose                  Show detailed evaluation information
   --quiet                    Suppress non-essential output
@@ -473,6 +480,7 @@ interface CollectOptions {
   exclude?: string[];
   include?: string[];
   maxFiles?: number;
+  sample?: boolean;
 }
 
 export function collectFiles(target: string, options: CollectOptions = {}): string[] {
@@ -484,8 +492,15 @@ export function collectFiles(target: string, options: CollectOptions = {}): stri
 
   if (stat.isDirectory()) {
     const files: string[] = [];
-    walkDir(resolved, resolved, files, options);
+    walkDir(resolved, resolved, files, { ...options, maxFiles: options.sample ? undefined : options.maxFiles });
     if (options.maxFiles && files.length > options.maxFiles) {
+      if (options.sample) {
+        // Fisher-Yates shuffle then take first N
+        for (let i = files.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [files[i], files[j]] = [files[j], files[i]];
+        }
+      }
       return files.slice(0, options.maxFiles);
     }
     return files;
@@ -620,9 +635,45 @@ function formatTextOutput(verdict: ReturnType<typeof evaluateWithTribunal>): str
     const name = evaluation.judgeName.padEnd(28);
     const score = String(evaluation.score).padStart(3);
     const findings = String(evaluation.findings.length).padStart(2);
-    lines.push(`  ${icon} ${name} ${score}/100   ${findings} finding(s)`);
+    const timing = evaluation.durationMs !== undefined ? `  ${evaluation.durationMs}ms` : "";
+    lines.push(`  ${icon} ${name} ${score}/100   ${findings} finding(s)${timing}`);
   }
   lines.push("");
+
+  // Timing summary
+  if (verdict.timing) {
+    lines.push(`  Total evaluation time: ${verdict.timing.totalMs}ms`);
+    const sorted = [...verdict.timing.perJudge].sort((a, b) => b.durationMs - a.durationMs);
+    const slowest = sorted.slice(0, 5);
+    if (slowest.length > 0) {
+      lines.push("  Slowest judges:");
+      for (const j of slowest) {
+        lines.push(`    ${j.judgeName.padEnd(28)} ${j.durationMs}ms`);
+      }
+    }
+    lines.push("");
+  }
+
+  // Suppression metrics
+  if (verdict.suppressions && verdict.suppressions.length > 0) {
+    const supps = verdict.suppressions;
+    const byKind = { line: 0, "next-line": 0, block: 0, file: 0 };
+    const byRule = new Map<string, number>();
+    for (const s of supps) {
+      byKind[s.kind] = (byKind[s.kind] || 0) + 1;
+      byRule.set(s.ruleId, (byRule.get(s.ruleId) ?? 0) + 1);
+    }
+    lines.push(`  Suppressed Findings: ${supps.length}`);
+    const kinds = Object.entries(byKind)
+      .filter(([, v]) => v > 0)
+      .map(([k, v]) => `${k}: ${v}`);
+    lines.push(`    By type: ${kinds.join(", ")}`);
+    const topRules = [...byRule.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    if (topRules.length > 0) {
+      lines.push(`    Top suppressed rules: ${topRules.map(([r, c]) => `${r} (${c})`).join(", ")}`);
+    }
+    lines.push("");
+  }
 
   // Top findings
   const allFindings = verdict.evaluations.flatMap((e) => e.findings);
@@ -908,15 +959,23 @@ export async function runCli(argv: string[]): Promise<void> {
 
   // ─── Trend Command ───────────────────────────────────────────────────
   if (args.command === "trend") {
-    const { loadSnapshotStore, computeTrend, formatTrendReport } = await import("./commands/snapshot.js");
-    const snapshotFile = argv[3] || ".judges-snapshots.json";
+    const { loadSnapshotStore, computeTrend, formatTrendReport, formatTrendReportHtml } =
+      await import("./commands/snapshot.js");
+    const snapshotFile = argv.find((a, i) => i >= 3 && !a.startsWith("-")) || ".judges-snapshots.json";
+    const formatArg = argv.includes("--format") ? argv[argv.indexOf("--format") + 1] : "text";
     const store = loadSnapshotStore(snapshotFile);
     if (store.snapshots.length === 0) {
       console.log("No snapshot data found. Run evaluations with --snapshot to collect trend data.");
       console.log(`  Expected file: ${snapshotFile}`);
     } else {
       const report = computeTrend(store);
-      console.log(formatTrendReport(report));
+      if (formatArg === "html") {
+        console.log(formatTrendReportHtml(report));
+      } else if (formatArg === "json") {
+        console.log(JSON.stringify(report, null, 2));
+      } else {
+        console.log(formatTrendReport(report));
+      }
     }
     process.exit(0);
   }
@@ -962,6 +1021,7 @@ export async function runCli(argv: string[]): Promise<void> {
         exclude: excludePatterns,
         include: includePatterns,
         maxFiles: maxFilesLimit,
+        sample: args.sample,
       });
 
       // ── --changed-only: scope to git-changed files ──
@@ -1114,6 +1174,18 @@ export async function runCli(argv: string[]): Promise<void> {
           timestamp: new Date().toISOString(),
         };
         console.log(verdictToHtml(wrappedVerdict, resolvedPath || args.file));
+      } else if (args.format === "pdf") {
+        const wrappedForPdf = {
+          overallVerdict: evaluation.verdict,
+          overallScore: evaluation.score,
+          summary: evaluation.summary,
+          evaluations: [evaluation],
+          findings: evaluation.findings,
+          criticalCount: evaluation.findings.filter((f) => f.severity === "critical").length,
+          highCount: evaluation.findings.filter((f) => f.severity === "high").length,
+          timestamp: new Date().toISOString(),
+        };
+        console.log(verdictToPdfHtml(wrappedForPdf, resolvedPath || args.file));
       } else {
         console.log(formatSingleJudgeTextOutput(evaluation));
       }
@@ -1187,6 +1259,8 @@ export async function runCli(argv: string[]): Promise<void> {
         printSummaryLine(verdict.overallVerdict, verdict.overallScore, totalFindings);
       } else if (args.format === "html") {
         console.log(verdictToHtml(verdict, resolvedPath || args.file));
+      } else if (args.format === "pdf") {
+        console.log(verdictToPdfHtml(verdict, resolvedPath || args.file));
       } else if (args.format === "junit") {
         console.log(verdictToJUnit(verdict, resolvedPath || args.file));
       } else if (args.format === "codeclimate") {
