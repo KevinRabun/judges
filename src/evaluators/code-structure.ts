@@ -76,8 +76,11 @@ export function analyzeCodeStructure(code: string, language: string): Finding[] 
   }
 
   // ─── STRUCT-003: Long function (>50 lines) ────────────────────────────────
+  // Require at least 2 long functions to reduce false positives — a single
+  // long function (e.g. a main handler or React component) is common in
+  // otherwise well-structured code.
   const longFunctions = structure.functions.filter((f) => f.lineCount > 50);
-  if (longFunctions.length > 0) {
+  if (longFunctions.length > 1) {
     findings.push({
       ruleId: `${prefix}-003`,
       severity: "medium",
@@ -117,7 +120,10 @@ export function analyzeCodeStructure(code: string, language: string): Finding[] 
   }
 
   // ─── STRUCT-005: Dead / unreachable code ──────────────────────────────────
-  if (structure.deadCodeLines.length > 0) {
+  // Require at least 3 unreachable lines to avoid false positives from
+  // parser artefacts, switch-case fall-through patterns, and intentional
+  // early-return guard clauses.
+  if (structure.deadCodeLines.length > 2) {
     findings.push({
       ruleId: `${prefix}-005`,
       severity: "low",

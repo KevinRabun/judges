@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.29.2] — 2026-03-09
+
+### Fixed
+- **FP rate reduction** — All judges now report <30% individual FP rates; synced with core v3.29.2 evaluator precision improvements across STRUCT, COH, INTENT, and API judges
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.29.1] — 2026-03-09
 
 ### Fixed

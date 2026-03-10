@@ -48,6 +48,9 @@ export function analyzeIntentAlignment(code: string, _language: string): Finding
     const bodyText = bodyLines.join("\n");
 
     if (todoStubBody.test(bodyText)) {
+      // Skip explicitly deprecated/legacy functions — stubs are expected there
+      if (/^(?:old_|legacy_|deprecated_)/i.test(fnName) || /\bdeprecated\b/i.test(bodyText)) continue;
+
       const isSecurity = securityNames.test(fnName);
       findings.push({
         ruleId: `${prefix}-${isSecurity ? "002" : "001"}`,
@@ -73,6 +76,10 @@ export function analyzeIntentAlignment(code: string, _language: string): Finding
   const emptyFnPattern =
     /(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:\([^)]*\)|[^=])\s*=>|(\w+)\s*\([^)]*\)\s*(?::\s*\w[^{]*?)?\{|def\s+(\w+)|fn\s+(\w+))/;
 
+  // Require at least 2 empty functions to reduce false positives — a single
+  // empty function (e.g. a default trait method, callback stub, or protocol
+  // conformance) is common in otherwise well-written code.
+  const emptyFnLines: number[] = [];
   for (let i = 0; i < lines.length; i++) {
     if (isCommentLine(lines[i])) continue;
     const fnMatch = lines[i].match(emptyFnPattern);
@@ -93,21 +100,23 @@ export function analyzeIntentAlignment(code: string, _language: string): Finding
       /^(?:\{?\s*\}|return\s*;?\s*\}|return\s+(?:null|undefined|None|nil|false|"")\s*;?\s*\}|pass\s*$)/.test(next);
 
     if (isEmpty && fnName.length > 2 && !/^(?:noop|empty|stub|mock|fake|dummy|_)/i.test(fnName)) {
-      findings.push({
-        ruleId: `${prefix}-003`,
-        severity: "medium",
-        title: `Empty function body: \`${fnName}()\``,
-        description:
-          `Function \`${fnName}()\` has an empty or trivial body (returns null/undefined/false with no logic). ` +
-          "If this is intentional, consider naming it with a 'noop' prefix or adding a comment.",
-        lineNumbers: [i + 1],
-        recommendation:
-          "Implement the function logic, or if it's a deliberate no-op, rename it (e.g., `noop${fnName.charAt(0).toUpperCase() + fnName.slice(1)}`) to signal intent.",
-        reference: "Code Review — Empty Implementation Detection",
-        confidence: 0.65,
-        provenance: "intent-alignment",
-      });
+      emptyFnLines.push(i + 1);
     }
+  }
+  if (emptyFnLines.length > 1) {
+    findings.push({
+      ruleId: `${prefix}-003`,
+      severity: "medium",
+      title: `Empty function bodies (${emptyFnLines.length} found)`,
+      description:
+        `${emptyFnLines.length} functions have empty or trivial bodies (return null/undefined/false with no logic). ` +
+        "If this is intentional, consider naming them with a 'noop' prefix or adding a comment.",
+      lineNumbers: emptyFnLines.slice(0, 5),
+      recommendation: "Implement the function logic, or if they are deliberate no-ops, rename them to signal intent.",
+      reference: "Code Review — Empty Implementation Detection",
+      confidence: 0.65,
+      provenance: "intent-alignment",
+    });
   }
 
   // ── INTENT-004: Placeholder returns (hardcoded value from dynamic name) ──

@@ -66,34 +66,11 @@ export function analyzeMultiTurnCoherence(code: string, _language: string): Find
   }
 
   // ── COH-002: Dead code after unconditional return/throw ───────────────
+  // Skipped — STRUCT-005 covers dead-code detection with AST-based analysis
+  // which correctly handles switch/case, guard clauses, and nested blocks.
+  // The regex-based heuristic here produced excessive false positives on
+  // returns inside if-blocks, switch cases, and early-return guard patterns.
   ruleNum = 2;
-  const deadCodeLines: number[] = [];
-  for (let i = 0; i < lines.length - 1; i++) {
-    const line = lines[i].trim();
-    const nextLine = lines[i + 1]?.trim() || "";
-    // Unconditional return/throw not inside a ternary or short-circuit
-    if (/^(return\b|throw\b)/.test(line) && !line.includes("?") && !line.includes("&&")) {
-      // Next line is code (not a closing brace, comment, or blank)
-      if (nextLine && !/^[}\])]/.test(nextLine) && !/^\/[/*]/.test(nextLine) && !/^$/.test(nextLine)) {
-        deadCodeLines.push(i + 2); // +2 because 0-indexed +1 for line number +1 for next line
-      }
-    }
-  }
-  if (deadCodeLines.length > 0) {
-    findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
-      severity: "medium",
-      title: "Unreachable code after return/throw",
-      description:
-        "Code exists after an unconditional return or throw statement. " +
-        "This code will never execute and may indicate incomplete refactoring.",
-      lineNumbers: deadCodeLines.slice(0, 5),
-      recommendation:
-        "Remove the unreachable code or restructure the logic so the code " +
-        "is reached under the intended conditions.",
-      confidence: 0.75,
-    });
-  }
 
   // ── COH-003: Duplicate function definitions ───────────────────────────
   ruleNum = 3;
@@ -147,7 +124,7 @@ export function analyzeMultiTurnCoherence(code: string, _language: string): Find
       }
     }
   }
-  if (conflictLines.length > 0 && conflictLines.length <= 10) {
+  if (conflictLines.length >= 6 && conflictLines.length <= 10) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

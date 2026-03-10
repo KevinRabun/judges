@@ -119,7 +119,7 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
 
   // Detect missing API versioning (multi-language route detection)
   const routeRegLines = getLangLineNumbers(code, language, LP.HTTP_ROUTE);
-  const hasVersioning = /\/v\d+\//i.test(code) || testCode(code, /api-version|x-api-version/i);
+  const hasVersioning = /\/v\d+\b/i.test(code) || testCode(code, /api-version|x-api-version/i);
   if (routeRegLines.length > 4 && !hasVersioning) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -174,7 +174,10 @@ export function analyzeApiDesign(code: string, language: string): Finding[] {
       bodyParsingLines.push(i + 1);
     }
   });
-  const hasContentTypeCheck = testCode(code, /content-type|content_type|contentType|express\.json|bodyParser/i);
+  const hasContentTypeCheck = testCode(
+    code,
+    /content-type|content_type|contentType|express\.(?:json|urlencoded)|bodyParser|multer|koa-body|fastify\.register/i,
+  );
   if (bodyParsingLines.length > 0 && !hasContentTypeCheck) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

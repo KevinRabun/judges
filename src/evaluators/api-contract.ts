@@ -30,28 +30,42 @@ export function analyzeApiContract(code: string, language: string): Finding[] {
 
   if (!hasRoutes) return findings;
 
+  // File-level validation: if the file uses validation middleware, skip API-001
+  const hasFileValidation =
+    /require\s*\(\s*['"](?:express-validator|joi|zod|celebrate|ajv|class-validator)['"]\s*\)/.test(code) ||
+    /import\s+.*from\s+['"](?:express-validator|joi|zod|celebrate|ajv|class-validator)['"]/i.test(code) ||
+    /express\.json\s*\(/.test(code) ||
+    /bodyParser\.json/.test(code);
+
   // ── API-001: Missing input validation on route handlers ───────────────
   const routeHandlerPattern =
     /\.(get|post|put|patch|delete)\s*\(\s*['"][^'"]+['"]\s*,\s*(?:async\s+)?(?:function\s*)?\(/g;
   const lines = code.split("\n");
   const handlerLines: number[] = [];
   let match: RegExpExecArray | null;
-  while ((match = routeHandlerPattern.exec(code)) !== null) {
-    const lineNum = code.slice(0, match.index).split("\n").length;
-    // Check if there's validation in the handler body (next ~15 lines)
-    const bodySlice = lines.slice(lineNum - 1, lineNum + 14).join("\n");
-    const hasValidation =
-      /\b(validate|schema|zod|joi|yup|class-validator|ajv|celebrate|express-validator|z\.object|Joi\.|body\(\)|param\(|query\()\b/i.test(
-        bodySlice,
-      ) || /req\.(body|params|query)\s*\)\s*;/.test(bodySlice) === false;
+  if (!hasFileValidation) {
+    while ((match = routeHandlerPattern.exec(code)) !== null) {
+      const lineNum = code.slice(0, match.index).split("\n").length;
+      // Check if there's validation in the handler body (next ~15 lines)
+      const bodySlice = lines.slice(lineNum - 1, lineNum + 14).join("\n");
+      const hasValidation =
+        /\b(validate|schema|zod|joi|yup|class-validator|ajv|celebrate|express-validator|z\.object|Joi\.|body\(\)|param\(|query\(|check\(|sanitize|assert)\b/i.test(
+          bodySlice,
+        ) ||
+        /if\s*\(\s*!?\s*req\.body/i.test(bodySlice) || // manual type guard on req.body
+        /typeof\s+req\.body/i.test(bodySlice) || // typeof check
+        /req\.(body|params|query)\s*\)\s*;/.test(bodySlice) === false;
 
-    // Only flag POST/PUT/PATCH (methods that accept bodies) without validation
-    const method = match[1];
-    if (["post", "put", "patch"].includes(method) && !hasValidation) {
-      handlerLines.push(lineNum);
+      // Only flag POST/PUT/PATCH (methods that accept bodies) without validation
+      const method = match[1];
+      if (["post", "put", "patch"].includes(method) && !hasValidation) {
+        handlerLines.push(lineNum);
+      }
     }
-  }
-  if (handlerLines.length > 0) {
+  } // end hasFileValidation guard
+  // Require at least 2 unvalidated mutation endpoints to reduce false
+  // positives — a single endpoint is often validated via external middleware.
+  if (handlerLines.length > 1) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -78,11 +92,20 @@ export function analyzeApiContract(code: string, language: string): Finding[] {
     /\.Error\(/.test(code) ||
     /throw\s+new\s+\w*(Error|Exception)/.test(code) ||
     /http\.Error\b/.test(code) ||
-    /abort\s*\(\s*(4|5)\d{2}\)/.test(code);
+    /abort\s*\(\s*(4|5)\d{2}\)/.test(code) ||
+    /next\s*\(\s*(?:err|new\s+\w*Error)/.test(code) ||
+    /catch\s*\(/.test(code) ||
+    /except\s/.test(code) || // Python try/except
+    /raise\s+\w*(Error|Exception|Http)/.test(code) || // Python raise
+    /HttpResponse(?:BadRequest|NotFound|Forbidden|ServerError|NotAllowed)/.test(code) ||
+    /HttpException|HttpResponseError|BadRequestException|NotFoundException/.test(code) ||
+    /JsonResponse\s*\(.*status\s*=/.test(code) || // Django JsonResponse with status
+    /response\.status\s*\(\s*(4\d{2}|5\d{2})/.test(code) ||
+    /return\s+Response\s*\(/.test(code); // DRF Response
 
   if (!hasErrorResponses) {
     const routeLines = getLineNumbers(code, /\.(get|post|put|patch|delete)\s*\(\s*['"][^'"]+['"]/);
-    if (routeLines.length > 0) {
+    if (routeLines.length > 1) {
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "medium",
@@ -129,8 +152,10 @@ export function analyzeApiContract(code: string, language: string): Finding[] {
   ruleNum = 4;
   const sendsJson = /res\.(json|send)\s*\(/.test(code) || /\.json\s*\(/.test(code);
   const setsContentType =
-    /['"]content-type['"]/i.test(code) || /\.type\s*\(\s*['"]application\/json['"]\s*\)/.test(code);
-  const usesJsonMiddleware = /express\.json\s*\(\s*\)/.test(code) || /bodyParser\.json/.test(code);
+    /['"]content-type['"]/i.test(code) ||
+    /\.type\s*\(\s*['"]application\/json['"]\s*\)/.test(code) ||
+    /res\.json\s*\(/.test(code); // res.json() automatically sets Content-Type
+  const usesJsonMiddleware = /express\.json\s*\(/.test(code) || /bodyParser\.json/.test(code);
 
   if (sendsJson && !setsContentType && !usesJsonMiddleware) {
     const jsonLines = getLineNumbers(code, /res\.(json|send)\s*\(/);

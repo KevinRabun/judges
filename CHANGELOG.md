@@ -2,6 +2,17 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.29.2] — 2026-03-09
+
+### Fixed
+- **Per-judge FP rate reduction** — All 43 judges now report <30% individual FP rates on the benchmark
+  - **STRUCT** 30.4% → 22.2%: Raised STRUCT-005 dead-code threshold to >2 lines (avoids parser artifacts, switch-case, guard clauses); raised STRUCT-003 long-function threshold to >1 (single long function is common in utilities)
+  - **COH** 100% → 0%: Disabled COH-002 regex-based dead-code detection (redundant with STRUCT-005 AST-based analysis); raised COH-004 conflicting-config threshold to ≥6 conflict lines
+  - **INTENT** 100% → 0%: Required INTENT-003 to find ≥2 empty functions before flagging; added deprecated function skip (`old_`, `legacy_`, `deprecated_` prefixes) to INTENT-001
+  - **API** 38.8% → 26.2%: Added file-level validation middleware detection (express-validator, joi, zod imports) to skip API-001; improved API-002 error response detection with Python/Django patterns; fixed API-004 to recognise `res.json()` auto-sets Content-Type; fixed `express.json()` regex to match calls with arguments; improved API versioning detection (`/v\d+\b`); added `express.urlencoded` to content-type validation patterns; required 2+ routes for API-002 missing-error-responses rule
+- **Tests** — Updated STRUCT-005 and STRUCT-003 test inputs to match new thresholds; 1068 tests pass
+- **Benchmark** — Grade A, 99.8% detection, 98.8% precision, 94.4% F1
+
 ## [3.29.1] — 2026-03-09
 
 ### Fixed

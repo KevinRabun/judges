@@ -1418,6 +1418,7 @@ function hasDeadCode(): string {
   return "early";
   console.log("this is dead");
   const x = 42;
+  const y = x + 1;
 }
 `;
 
@@ -1434,9 +1435,9 @@ function hasDeadCode(): string {
 });
 
 describe("AST Analysis — Long Functions", () => {
-  // Generate a function with 60 lines
+  // Generate two functions with 60 lines each (threshold requires 2+)
   const longLines = Array.from({ length: 55 }, (_, i) => `  const v${i} = ${i};`).join("\n");
-  const longFnCode = `function longFunction() {\n${longLines}\n  return 0;\n}`;
+  const longFnCode = `function longFunction() {\n${longLines}\n  return 0;\n}\nfunction anotherLongFunction() {\n${longLines}\n  return 1;\n}`;
 
   it("should detect long functions (>50 lines)", () => {
     const findings = analyzeCodeStructure(longFnCode, "typescript");
