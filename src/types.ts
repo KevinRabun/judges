@@ -601,6 +601,32 @@ export interface JudgeEvaluation {
 }
 
 /**
+ * Code review decision — synthesized from findings to act as a primary reviewer.
+ */
+export type ReviewAction = "approve" | "request-changes" | "comment";
+
+export interface ReviewDecision {
+  /** The review action: approve (no issues), request-changes (blocking issues), comment (advisory) */
+  action: ReviewAction;
+  /** Human-readable summary paragraph explaining the decision */
+  summary: string;
+  /** Count of findings by severity */
+  severityCounts: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    info: number;
+  };
+  /** Total findings count */
+  totalFindings: number;
+  /** Whether all findings have auto-fix patches available */
+  allAutoFixable: boolean;
+  /** Top blocking issues (up to 3 critical/high findings) */
+  blockingIssues: string[];
+}
+
+/**
  * The combined result from the full tribunal panel.
  */
 export interface TribunalVerdict {
@@ -628,6 +654,12 @@ export interface TribunalVerdict {
     totalMs: number;
     perJudge: Array<{ judgeId: string; judgeName: string; durationMs: number }>;
   };
+  /**
+   * Synthesized code review decision — transforms findings into an actionable
+   * reviewer verdict: approve, request-changes, or comment. Enables judges to
+   * act as a primary code reviewer rather than just a warning list.
+   */
+  reviewDecision?: ReviewDecision;
 }
 
 /**

@@ -32,7 +32,7 @@ export interface TribunalRunner {
 // ─── Cross-file Import Resolution ─────────────────────────────────────────────
 
 /** Security-relevant content categories detectable in imported project files */
-const CROSS_FILE_SECURITY_CATEGORIES: Array<{
+export const CROSS_FILE_SECURITY_CATEGORIES: Array<{
   category: string;
   contentPattern: RegExp;
   findingPattern: RegExp;
@@ -240,7 +240,7 @@ function applyCrossFileAdjustments(findings: Finding[], mitigatedCategories: Set
  * pattern (e.g., helmet middleware, rate limiting) exists in ANY file, absence-
  * based findings about that category can have their confidence reduced.
  */
-function scanProjectWideSecurityPatterns(
+export function scanProjectWideSecurityPatterns(
   files: Array<{ path: string; content: string; language: string }>,
 ): Set<string> {
   const found = new Set<string>();

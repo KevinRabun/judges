@@ -25,6 +25,7 @@ import { BENCHMARK_INFRASTRUCTURE } from "./benchmark-infrastructure.js";
 import { BENCHMARK_COMPLIANCE_ETHICS } from "./benchmark-compliance-ethics.js";
 import { BENCHMARK_AI_AGENTS } from "./benchmark-ai-agents.js";
 import { BENCHMARK_ADVANCED_CASES } from "./benchmark-advanced.js";
+import { BENCHMARK_AI_OUTPUT } from "./benchmark-ai-output.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -2362,6 +2363,7 @@ export function UserList({ users, onSelect, searchLabel = "Search users" }: User
   ...BENCHMARK_COMPLIANCE_ETHICS,
   ...BENCHMARK_AI_AGENTS,
   ...BENCHMARK_ADVANCED_CASES,
+  ...BENCHMARK_AI_OUTPUT,
 ];
 
 // ─── Benchmark Runner ───────────────────────────────────────────────────────

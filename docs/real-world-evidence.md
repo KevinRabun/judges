@@ -4,7 +4,7 @@ This document demonstrates Judges' effectiveness by analyzing well-known open-so
 
 ## 1. Open-Source Project Analysis
 
-We ran Judges against three popular open-source frameworks using `--quickStart` mode (high-signal, filtered defaults). The tool-layer analysis shown below is deterministic — regex + AST pattern matching with no LLM calls and no network requests beyond cloning the repo. (Judges also exposes 44 expert-persona MCP prompts for LLM-powered deep analysis — see the [README](../README.md#how-it-works) for the full dual-layer architecture.)
+We ran Judges against three popular open-source frameworks using `--quickStart` mode (high-signal, filtered defaults). The tool-layer analysis shown below is deterministic — regex + AST pattern matching with no LLM calls and no network requests beyond cloning the repo. (Judges also exposes 45 expert-persona MCP prompts for LLM-powered deep analysis — see the [README](../README.md#how-it-works) for the full dual-layer architecture.)
 
 ### Results Summary
 
@@ -43,7 +43,7 @@ FastAPI — known for strong typing and modern patterns — scored exceptionally
 
 1. **Judges calibrates well**: Express and FastAPI (known for quality) scored 99-100. Flask's lower verdict reflects real patterns worth examining.
 2. **False positive rate is low**: With `--quickStart` (≥90% confidence filter), findings are actionable and evidence-backed.
-3. **44 judges provide breadth**: Security, performance, practices, scalability, and compliance are all covered in a single pass.
+3. **45 judges provide breadth**: Security, performance, practices, scalability, and compliance are all covered in a single pass.
 4. **Speed**: All three repos analyzed in under 15 seconds each — the deterministic tool layer has no LLM latency.
 
 ---
@@ -75,7 +75,7 @@ $ judges eval --file examples/sample-vulnerable-api.ts
   Judge Data Security          48/100  █████░░░░░  5 findings
   Judge Configuration Mgmt     55/100  ██████░░░░  4 findings
   ...
-  Total: 165 findings across 44 judges
+  Total: 165 findings across 45 judges
 ```
 
 ### Critical Findings Identified
@@ -190,4 +190,4 @@ judges eval --judge cybersecurity --file your-api.ts
 judges eval --file your-api.ts --format sarif > results.sarif
 ```
 
-Tool-layer analysis is deterministic and offline — no API keys, no LLM calls, no telemetry. For deeper review, connect Judges to an LLM client to activate the 44 expert-persona prompts.
+Tool-layer analysis is deterministic and offline — no API keys, no LLM calls, no telemetry. For deeper review, connect Judges to an LLM client to activate the 45 expert-persona prompts.

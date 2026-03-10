@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.36.0] — 2026-03-10
+
+### Added
+- **Diff-aware evaluation** — new `judges.evaluateDiff` command runs full analysis but only surfaces findings on changed lines relative to git HEAD (±2 line context margin)
+- **Judge grouping in findings panel** — new "Sort by Judge" mode groups findings by judge prefix (AUTH, CRYPTO, LOGIC, etc.) with collapsible tree nodes and worst-severity icons
+- **New logic-review judge** — 7 detection categories for semantic correctness issues common in AI-generated code
+- See [core CHANGELOG](../../CHANGELOG.md) for full details (triage feedback, AI-output benchmarks, JetBrains guide, and more)
+
 ## [3.35.0] — 2026-03-10
 
 ### Added

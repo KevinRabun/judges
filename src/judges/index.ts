@@ -44,6 +44,7 @@ import { apiContractJudge } from "./api-contract.js";
 import { multiTurnCoherenceJudge } from "./multi-turn-coherence.js";
 import { modelFingerprintJudge } from "./model-fingerprint.js";
 import { overEngineeringJudge } from "./over-engineering.js";
+import { logicReviewJudge } from "./logic-review.js";
 
 // ─── Analyzer Imports ────────────────────────────────────────────────────────
 import { analyzeDataSecurity } from "../evaluators/data-security.js";
@@ -89,6 +90,7 @@ import { analyzeApiContract } from "../evaluators/api-contract.js";
 import { analyzeMultiTurnCoherence } from "../evaluators/multi-turn-coherence.js";
 import { analyzeModelFingerprint } from "../evaluators/model-fingerprint.js";
 import { analyzeOverEngineering } from "../evaluators/over-engineering.js";
+import { analyzeLogicReview } from "../evaluators/logic-review.js";
 
 // ─── Wire each judge to its analyzer ─────────────────────────────────────────
 
@@ -135,6 +137,7 @@ apiContractJudge.analyze = analyzeApiContract;
 multiTurnCoherenceJudge.analyze = analyzeMultiTurnCoherence;
 modelFingerprintJudge.analyze = analyzeModelFingerprint;
 overEngineeringJudge.analyze = analyzeOverEngineering;
+logicReviewJudge.analyze = analyzeLogicReview;
 
 /**
  * The panel of judges that comprise the Judges Panel.
@@ -187,6 +190,7 @@ export const JUDGES: JudgeDefinition[] = [
   multiTurnCoherenceJudge,
   modelFingerprintJudge,
   overEngineeringJudge,
+  logicReviewJudge,
   falsePositiveReviewJudge,
 ];
 

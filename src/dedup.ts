@@ -239,6 +239,44 @@ function extractFindingTopic(finding: Finding): string {
     .join("-");
 }
 
+// ─── Semantic Similarity for Cross-Judge Dedup ──────────────────────────────
+
+/**
+ * Minimum Jaccard-like similarity for two findings to be considered duplicates.
+ * Set high to avoid false merges — 0.6 catches paraphrases like
+ * "comparison of secrets" vs "comparison of cryptographic material" while
+ * keeping genuinely different findings apart.
+ */
+const SEMANTIC_DEDUP_THRESHOLD = 0.6;
+
+/** Tokenize text into meaningful lower-case word stems */
+function tokenize(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !TOPIC_STOP_WORDS.has(w)),
+  );
+}
+
+/**
+ * Compute a similarity score (0-1) between two findings based on token overlap
+ * of their titles and recommendations. Uses Jaccard index on the combined
+ * token sets.
+ */
+function findingSimilarity(a: Finding, b: Finding): number {
+  const tokensA = tokenize(`${a.title} ${a.recommendation ?? ""}`);
+  const tokensB = tokenize(`${b.title} ${b.recommendation ?? ""}`);
+  if (tokensA.size === 0 || tokensB.size === 0) return 0;
+  let intersection = 0;
+  for (const t of tokensA) {
+    if (tokensB.has(t)) intersection++;
+  }
+  const unionSize = tokensA.size + tokensB.size - intersection;
+  return unionSize > 0 ? intersection / unionSize : 0;
+}
+
 // ─── Union-Find Deduplication ────────────────────────────────────────────────
 
 /**
@@ -315,6 +353,30 @@ export function crossEvaluatorDedup(findings: Finding[]): Finding[] {
   for (const indices of topicBridgeGroups.values()) {
     for (let j = 1; j < indices.length; j++) {
       union(indices[0], indices[j]);
+    }
+  }
+
+  // ── Semantic similarity bridge (v3.36.0) ────────────────────────────────
+  // After pattern-based topic matching, use token-set Jaccard similarity on
+  // (title + recommendation) to catch findings that describe the same issue
+  // with different wording — e.g. "Non-constant-time comparison of secrets"
+  // vs "Non-constant-time comparison of cryptographic material".
+  // Only merge findings whose similarity ≥ SEMANTIC_DEDUP_THRESHOLD and
+  // that share at least one overlapping line number (or both have no line).
+  for (let i = 0; i < findings.length; i++) {
+    for (let j = i + 1; j < findings.length; j++) {
+      if (find(i) === find(j)) continue; // already merged
+      const sim = findingSimilarity(findings[i], findings[j]);
+      if (sim < SEMANTIC_DEDUP_THRESHOLD) continue;
+      // Require overlapping lines (or both line-less)
+      const linesI = findings[i].lineNumbers ?? [];
+      const linesJ = findings[j].lineNumbers ?? [];
+      if (linesI.length === 0 && linesJ.length === 0) {
+        union(i, j);
+      } else if (linesI.length > 0 && linesJ.length > 0) {
+        const setI = new Set(linesI);
+        if (linesJ.some((l) => setI.has(l))) union(i, j);
+      }
     }
   }
 

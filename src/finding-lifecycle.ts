@@ -692,3 +692,56 @@ export function formatSuppressionAnalytics(analytics: SuppressionAnalytics): str
 
   return lines.join("\n");
 }
+
+// ─── Triage Feedback Learning Loop ──────────────────────────────────────────
+
+/**
+ * Compute per-rule false positive rates from historical triage data.
+ * Returns a map from ruleId to a confidence adjustment factor
+ * (negative number indicating how much to reduce confidence).
+ */
+export function computeTriageFeedback(store: FindingStore): Map<string, number> {
+  const ruleCounts = new Map<string, { total: number; fp: number }>();
+
+  for (const tracked of store.findings) {
+    const ruleId = tracked.ruleId;
+    const entry = ruleCounts.get(ruleId) ?? { total: 0, fp: 0 };
+    entry.total++;
+    if (tracked.status === "false-positive" || tracked.status === "wont-fix") {
+      entry.fp++;
+    }
+    ruleCounts.set(ruleId, entry);
+  }
+
+  const adjustments = new Map<string, number>();
+  for (const [ruleId, { total, fp }] of ruleCounts) {
+    if (total < 3) continue; // Need at least 3 observations to adjust
+    const fpRate = fp / total;
+    // High FP rate → reduce confidence proportionally (max -0.3)
+    if (fpRate > 0.3) {
+      adjustments.set(ruleId, -Math.min(fpRate * 0.5, 0.3));
+    }
+  }
+
+  return adjustments;
+}
+
+/**
+ * Apply triage feedback to a set of findings, adjusting confidence scores
+ * downward for rules that have historically high false positive rates.
+ */
+export function applyTriageFeedback(findings: Finding[], store: FindingStore): Finding[] {
+  const adjustments = computeTriageFeedback(store);
+  if (adjustments.size === 0) return findings;
+
+  return findings.map((f) => {
+    const adj = adjustments.get(f.ruleId);
+    if (adj === undefined) return f;
+    const adjusted = Math.max(0.1, (f.confidence ?? 0.8) + adj);
+    return {
+      ...f,
+      confidence: adjusted,
+      needsHumanReview: true, // Flag for human review if confidence was reduced
+    };
+  });
+}

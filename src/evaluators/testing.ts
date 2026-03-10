@@ -327,6 +327,58 @@ export function analyzeTesting(code: string, language: string): Finding[] {
         confidence: 0.9,
       });
     }
+
+    // Detect happy-path-only testing (no error/edge scenarios)
+    const hasErrorTests =
+      /(?:error|fail|invalid|reject|throw|exception|edge.?case|boundary|negative|unhappy|bad.?input|malformed|missing|null|undefined|empty|overflow|timeout)/i.test(
+        code,
+      );
+    const hasOnlySuccessTests =
+      /(?:success|happy|valid|correct|should\s+(?:return|work|pass|succeed|create|get))/i.test(code);
+    if (testCaseCount >= 3 && !hasErrorTests && hasOnlySuccessTests) {
+      ruleNum++;
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Tests cover only happy path",
+        description:
+          `Found ${testCaseCount} test cases but none appear to test error conditions, invalid inputs, or edge cases. ` +
+          "AI-generated tests frequently omit negative test scenarios.",
+        recommendation:
+          "Add tests for: invalid/missing inputs, error responses, boundary values, concurrent access, and timeout scenarios.",
+        reference: "Test Coverage — Happy Path vs Edge Cases",
+        suggestedFix:
+          "Add test cases like: `it('should throw on invalid input', ...)`, `it('should handle empty array', ...)`, `it('should reject unauthorized requests', ...)`.",
+        confidence: 0.65,
+      });
+    }
+
+    // Detect tests that only assert response status without checking body
+    const statusOnlyLines: number[] = [];
+    lines.forEach((line, i) => {
+      if (
+        /\.(?:status|statusCode)\s*\)\s*\.toBe\s*\(\s*200\s*\)/.test(line) ||
+        /assert.*status.*(?:==|===)\s*200/.test(line) ||
+        /expect\(.*\.status\)/.test(line)
+      ) {
+        statusOnlyLines.push(i + 1);
+      }
+    });
+    if (statusOnlyLines.length >= 3 && assertionLines.length <= statusOnlyLines.length + 2) {
+      ruleNum++;
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        severity: "medium",
+        title: "Tests only verify HTTP status codes",
+        description:
+          "Tests primarily assert response status codes without verifying response bodies, headers, or side effects. " +
+          "AI code generators often produce API tests that check only `status: 200` without verifying the actual response data.",
+        lineNumbers: statusOnlyLines.slice(0, 5),
+        recommendation:
+          "Assert on response body content, data structure, and side effects. Check for correct error messages, pagination, and data transformations.",
+        confidence: 0.6,
+      });
+    }
   } else {
     // No test structure detected - check if this is production code without tests
     // Exclude config files, type definitions, constants, and utility barrel files

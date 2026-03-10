@@ -80,6 +80,7 @@ export {
   formatVerdictAsMarkdown,
   formatEvaluationAsMarkdown,
   clearEvaluationCaches,
+  scanProjectWideSecurityPatterns,
 } from "./evaluators/index.js";
 export type { FindingDiff, NetChangeGateOptions, NetChangeGateResult } from "./evaluators/index.js";
 

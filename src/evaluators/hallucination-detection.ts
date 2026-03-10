@@ -536,7 +536,7 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
   // Fabricated npm packages — common hallucinated package names
   {
     pattern:
-      /\bfrom\s+['"](?:easy-jwt|simple-crypto|auto-sanitize|quick-hash|fast-validate|node-security-utils|express-secure|react-safe-render|mongo-safe|api-guard|auth-helper|crypto-utils|secure-config|safe-eval|node-encrypt)['"]/,
+      /\bfrom\s+['"](?:easy-jwt|simple-crypto|auto-sanitize|quick-hash|fast-validate|node-security-utils|express-secure|react-safe-render|mongo-safe|api-guard|auth-helper|crypto-utils|secure-config|safe-eval|node-encrypt|express-auth|express-jwt-auth|express-session-store|react-auth-provider|react-secure|react-data-grid-pro|node-auth|node-sanitize|node-validator|db-connect|sql-builder|sql-safe|prisma-utils|mongoose-helper|redis-helper|cache-manager-redis|graphql-auth|graphql-validate|ws-auth|socket-secure|file-encrypt|pdf-extract|csv-parse-sync|image-resize|video-transcode|email-send|sms-send|payment-process|stripe-helper|aws-helper|azure-helper|gcp-helper|cloud-deploy)['"]/,
     hallucinated: "Non-existent npm package import",
     reason:
       "This import references a package name commonly hallucinated by LLMs. The package either doesn't exist on npm or is a name-squatted stub.",
@@ -546,12 +546,30 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
   // Fabricated Python packages
   {
     pattern:
-      /^\s*(?:from|import)\s+(?:easy_jwt|simple_crypto|auto_sanitize|quick_hash|fast_validate|python_security|django_secure|flask_safe|mongo_safe|api_guard|auth_helper|crypto_utils|secure_config|safe_eval|py_encrypt)\b/,
+      /^\s*(?:from|import)\s+(?:easy_jwt|simple_crypto|auto_sanitize|quick_hash|fast_validate|python_security|django_secure|flask_safe|mongo_safe|api_guard|auth_helper|crypto_utils|secure_config|safe_eval|py_encrypt|django_auth_utils|flask_auth|fastapi_auth|fastapi_jwt|py_sanitize|py_validator|db_connect|sql_builder|sql_safe|redis_helper|cache_helper|graphql_auth|file_encrypt|pdf_extract|image_resize|email_send|payment_process|cloud_deploy|aws_helper|azure_helper|gcp_helper)\b/,
     hallucinated: "Non-existent Python package import",
     reason:
       "This import references a package name commonly hallucinated by LLMs. The package likely doesn't exist on PyPI.",
     fix: "Verify the package exists on pypi.org. Use established alternatives: PyJWT for JWT, cryptography for crypto, flask-wtf for validation.",
     languages: ["python"],
+  },
+  // Fabricated Go packages — common hallucinated module paths
+  {
+    pattern:
+      /^\s*"(?:github\.com\/go-(?:jwt|auth|sanitize|validate|encrypt|hash|session|middleware|cache|queue|email|payments))\b/,
+    hallucinated: "Non-existent Go module import",
+    reason: "This import references a Go module path commonly hallucinated by LLMs. The module likely doesn't exist.",
+    fix: "Verify on pkg.go.dev. Use established alternatives: github.com/golang-jwt/jwt for JWT, golang.org/x/crypto for crypto.",
+    languages: ["go"],
+  },
+  // Fabricated Java/Kotlin packages
+  {
+    pattern:
+      /^\s*import\s+(?:com\.(?:auth|security|validate|sanitize|encrypt)\.(?:utils|helper|manager|service)|org\.(?:auth|security|validate)\.(?:utils|helper|core))\b/,
+    hallucinated: "Non-existent Java/Kotlin package import",
+    reason: "This import references a Java/Kotlin package commonly hallucinated by LLMs.",
+    fix: "Verify the package exists on Maven Central/Gradle Plugin Portal. Use established alternatives from Spring Security, Apache Commons, or Bouncy Castle.",
+    languages: ["java", "kotlin"],
   },
 ];
 
@@ -926,6 +944,46 @@ export function analyzeHallucinationDetection(code: string, language: string): F
             impactStatement: `Possible supply-chain risk: package "${pkgName}" may not exist on PyPI`,
           },
           evidenceBasis: "Naming-heuristic (+0.35), generic-prefix-suffix-match (+0.30)",
+        });
+      }
+    }
+  }
+
+  // ── Dependency Confusion / Internal Namespace Detection ─────────────────
+  // Detect unscoped package names that look like internal company packages
+  // (common when AI fabricates imports based on the codebase context)
+  if (lang === "javascript" || lang === "typescript") {
+    const internalPatterns =
+      /\bfrom\s+['"](?!@)([a-z]+-(?:internal|private|core-api|backend-sdk|shared-types|company|org|platform|infra|deploy|devtools|build-tools|internal-utils|private-utils)(?:[-/][a-z]+)*)['"]/;
+    for (let i = 0; i < lines.length; i++) {
+      if (isCommentLine(lines[i])) continue;
+      const m = lines[i].match(internalPatterns);
+      if (m) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "high",
+          title: `Potential dependency confusion: "${m[1]}"`,
+          description:
+            `The package "${m[1]}" looks like an internal/private package name but is imported without a scoped namespace (@org/). ` +
+            "AI code generators may fabricate package names based on project context, creating dependency confusion risks.",
+          lineNumbers: [i + 1],
+          recommendation:
+            "Verify this package exists. Internal packages should use scoped names (@yourorg/package). " +
+            "If this is a private package, ensure your .npmrc is configured for your private registry.",
+          reference: "Dependency Confusion — Alex Birsan (2021)",
+          confidence: 0.7,
+          provenance: "regex-pattern-match",
+          evidenceChain: {
+            steps: [
+              {
+                observation: `Unscoped package "${m[1]}" contains internal-looking keywords`,
+                source: "pattern-match",
+                line: i + 1,
+              },
+            ],
+            impactStatement: `Supply-chain risk: "${m[1]}" could be claimed by an attacker on the public registry`,
+          },
+          evidenceBasis: "Dependency-confusion-heuristic (+0.40), naming-pattern (+0.30)",
         });
       }
     }

@@ -29,7 +29,7 @@ const SEVERITY_LABEL: Record<string, string> = {
 
 // ─── Tree Item Types ───────────────────────────────────────────────────────
 
-export type PanelItem = FileGroupItem | FindingItem | SummaryItem;
+export type PanelItem = FileGroupItem | JudgeGroupItem | FindingItem | SummaryItem;
 
 export class FileGroupItem extends vscode.TreeItem {
   constructor(
@@ -51,6 +51,25 @@ export class FileGroupItem extends vscode.TreeItem {
     );
     this.iconPath = new vscode.ThemeIcon(SEVERITY_ICON[worst] ?? "file", new vscode.ThemeColor(severityColor(worst)));
     this.contextValue = "fileGroup";
+  }
+}
+
+export class JudgeGroupItem extends vscode.TreeItem {
+  constructor(
+    public readonly judgePrefix: string,
+    public readonly findings: Finding[],
+    public readonly fileUri: vscode.Uri,
+  ) {
+    super(`${judgePrefix} (${findings.length})`, vscode.TreeItemCollapsibleState.Expanded);
+    const worst = findings.reduce(
+      (w, f) => ((SEVERITY_ORDER[f.severity] ?? 4) < (SEVERITY_ORDER[w] ?? 4) ? f.severity : w),
+      "info",
+    );
+    this.iconPath = new vscode.ThemeIcon(
+      SEVERITY_ICON[worst] ?? "symbol-namespace",
+      new vscode.ThemeColor(severityColor(worst)),
+    );
+    this.contextValue = "judgeGroup";
   }
 }
 
@@ -116,7 +135,7 @@ export class SummaryItem extends vscode.TreeItem {
 
 // ─── Tree Data Provider ────────────────────────────────────────────────────
 
-export type SortMode = "severity" | "file" | "rule";
+export type SortMode = "severity" | "file" | "rule" | "judge";
 export type FilterSeverity = "all" | "critical" | "high" | "medium" | "low" | "info";
 
 export class JudgesFindingsPanel implements vscode.TreeDataProvider<PanelItem> {
@@ -180,6 +199,9 @@ export class JudgesFindingsPanel implements vscode.TreeDataProvider<PanelItem> {
     if (element instanceof FileGroupItem) {
       return this.getFileChildren(element);
     }
+    if (element instanceof JudgeGroupItem) {
+      return element.findings.map((f) => new FindingItem(f, element.fileUri));
+    }
     return [];
   }
 
@@ -219,7 +241,25 @@ export class JudgesFindingsPanel implements vscode.TreeDataProvider<PanelItem> {
     return items;
   }
 
-  private getFileChildren(group: FileGroupItem): FindingItem[] {
+  private getFileChildren(group: FileGroupItem): (FindingItem | JudgeGroupItem)[] {
+    // Judge sort mode: group by judge prefix (e.g. AUTH, CRYPTO, LOGIC)
+    if (this.sortMode === "judge") {
+      const byJudge = new Map<string, Finding[]>();
+      for (const f of group.findings) {
+        const prefix = f.ruleId.split("-")[0] ?? "UNKNOWN";
+        const list = byJudge.get(prefix) ?? [];
+        list.push(f);
+        byJudge.set(prefix, list);
+      }
+      // Sort judge groups by worst severity
+      const sortedGroups = [...byJudge.entries()].sort((a, b) => {
+        const aWorst = Math.min(...a[1].map((f) => SEVERITY_ORDER[f.severity] ?? 4));
+        const bWorst = Math.min(...b[1].map((f) => SEVERITY_ORDER[f.severity] ?? 4));
+        return aWorst - bWorst;
+      });
+      return sortedGroups.map(([prefix, findings]) => new JudgeGroupItem(prefix, findings, group.uri));
+    }
+
     const sorted = [...group.findings].sort((a, b) => {
       if (this.sortMode === "severity") {
         const diff = (SEVERITY_ORDER[a.severity] ?? 4) - (SEVERITY_ORDER[b.severity] ?? 4);

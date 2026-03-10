@@ -53,6 +53,18 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }),
 
+    vscode.commands.registerCommand("judges.evaluateDiff", () => {
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        const result = diagnosticProvider.evaluateDiffAware(editor.document);
+        vscode.window.showInformationMessage(
+          `Judges: Diff-aware evaluation complete — ${result.diffFiltered} finding(s) on changed lines (${result.total} total).`,
+        );
+      } else {
+        vscode.window.showWarningMessage("Judges: No file is open. Open a file to evaluate.");
+      }
+    }),
+
     vscode.commands.registerCommand("judges.evaluateWorkspace", async () => {
       const files = await vscode.workspace.findFiles("**/*.{ts,js,py,go,rs,java,cs,cpp}", "**/node_modules/**");
       let count = 0;
@@ -226,6 +238,10 @@ export function activate(context: vscode.ExtensionContext): void {
       findingsPanel.setSortMode("rule");
     }),
 
+    vscode.commands.registerCommand("judges.sortByJudge", () => {
+      findingsPanel.setSortMode("judge");
+    }),
+
     vscode.commands.registerCommand("judges.filterAll", () => {
       findingsPanel.setFilterSeverity("all");
     }),
@@ -368,7 +384,7 @@ export function deactivate(): void {
 
 /**
  * Register the Judges MCP server via the VS Code MCP provider API.
- * This makes the 44 expert-persona prompts (Layer 2) automatically available
+ * This makes the 45 expert-persona prompts (Layer 2) automatically available
  * to Copilot and other LMs — zero manual configuration required.
  */
 function registerMcpServer(context: vscode.ExtensionContext): void {

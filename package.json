@@ -1,7 +1,7 @@
 {
   "name": "@kevinrabun/judges",
-  "version": "3.35.0",
-  "description": "44 specialized judges that evaluate AI-generated code for security, cost, and quality.",
+  "version": "3.36.0",
+  "description": "45 specialized judges that evaluate AI-generated code for security, cost, and quality.",
   "mcpName": "io.github.KevinRabun/judges",
   "type": "module",
   "main": "dist/index.js",

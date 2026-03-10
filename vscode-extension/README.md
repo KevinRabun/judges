@@ -1,6 +1,6 @@
 # Judges Panel — VS Code Extension
 
-**44 specialized judges evaluate every file you save** — catching security holes, performance traps, and compliance gaps before they reach production.
+**45 specialized judges evaluate every file you save** — catching security holes, performance traps, and compliance gaps before they reach production.
 
 - **Fewer escaped defects** — critical/high findings surface inline as you type, with one-click auto-fix patches
 - **Faster code review** — `@judges` in Copilot Chat delivers a full security + quality verdict in seconds
@@ -70,7 +70,7 @@ Or run **Judges: Add CI Workflow** from the Command Palette to generate the work
 
 | Command | Description |
 |---------|-------------|
-| **Judges: Evaluate Current File** | Run the full 44-judge tribunal on the active file |
+| **Judges: Evaluate Current File** | Run the full 45-judge tribunal on the active file |
 | **Judges: Auto-Fix Current File** | Apply all available auto-fix patches |
 | **Judges: Evaluate Workspace** | Evaluate all supported files with progress reporting |
 | **Judges: Deep Review (Layer 1 + Layer 2)** | Pattern analysis + AI contextual review — opens markdown report |
@@ -109,7 +109,7 @@ Runs in the extension host with no network calls:
 
 ### Layer 2 — LLM-Powered Deep Review (automatic)
 
-The extension registers a **Judges MCP server** with VS Code on activation. Copilot sees all 44 expert-persona prompts immediately — no manual MCP configuration required.
+The extension registers a **Judges MCP server** with VS Code on activation. Copilot sees all 45 expert-persona prompts immediately — no manual MCP configuration required.
 
 Ask Copilot *"review this file with the Judges cybersecurity expert"* and it works out of the box.
 

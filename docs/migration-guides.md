@@ -82,7 +82,7 @@ judges eval src/ --fail-on-findings --min-score 7
 
 | Semgrep Concept | Judges Equivalent |
 |---|---|
-| `.semgrep.yml` rules | Built-in evaluators (44 domains, 600+ rules) |
+| `.semgrep.yml` rules | Built-in evaluators (45 domains, 600+ rules) |
 | `--config auto` | `judges eval` (auto-selects relevant judges) |
 | `--sarif` | `--format sarif` |
 | `# nosemgrep: rule-id` | `// judges-ignore RULE-ID: reason` |
@@ -106,7 +106,7 @@ judges eval src/ --format sarif --output results.sarif
 - **Beyond pattern matching** — Judges includes AST analysis, taint tracking,
   cross-file analysis, and confidence scoring.
 - **Auto-fix** — `judges fix <file> --apply` applies deterministic patches.
-- **44 evaluation domains** vs. pattern-matching rules.
+- **45 evaluation domains** vs. pattern-matching rules.
 
 ---
 

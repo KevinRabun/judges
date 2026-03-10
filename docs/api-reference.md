@@ -26,7 +26,7 @@ const result = evaluateCodeSingleJudge("cybersecurity", code, "typescript");
 
 ### `evaluateCode(code, language, options?)`
 
-Evaluate code against the full panel of 44 judges.
+Evaluate code against the full panel of 45 judges.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|

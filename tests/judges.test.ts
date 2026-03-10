@@ -117,8 +117,8 @@ function findingsAreWellFormed(findings: Finding[]): void {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Judge Registry", () => {
-  it("should have exactly 44 judges registered", () => {
-    assert.equal(JUDGES.length, 44);
+  it("should have exactly 45 judges registered", () => {
+    assert.equal(JUDGES.length, 45);
   });
 
   it("should allow lookup of every judge by ID", () => {

@@ -169,12 +169,12 @@
   <div class="container">
     <header>
       <h1>Judges Dashboard</h1>
-      <p>44 specialized judges evaluating AI-generated code for security, cost, and quality</p>
+      <p>45 specialized judges evaluating AI-generated code for security, cost, and quality</p>
     </header>
 
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="value accent">44</div>
+        <div class="value accent">45</div>
         <div class="label">Judges</div>
       </div>
       <div class="stat-card">
@@ -218,7 +218,7 @@
     </div>
 
     <div class="section">
-      <h2>The 44 Judges</h2>
+      <h2>The 45 Judges</h2>
       <div class="judge-grid" id="judge-grid">
       </div>
     </div>
@@ -239,7 +239,7 @@
           </tr>
           <tr>
             <td><strong>2. Evaluate</strong></td>
-            <td>All 44 judges independently score the code on their domain (0-100) using deterministic heuristics</td>
+            <td>All 45 judges independently score the code on their domain (0-100) using deterministic heuristics</td>
           </tr>
           <tr>
             <td><strong>3. Tribunal</strong></td>
@@ -251,7 +251,7 @@
           </tr>
           <tr>
             <td><strong>5. Deep Review</strong></td>
-            <td>44 expert-persona MCP prompts let your LLM client perform probabilistic analysis beyond static patterns</td>
+            <td>45 expert-persona MCP prompts let your LLM client perform probabilistic analysis beyond static patterns</td>
           </tr>
         </tbody>
       </table>
@@ -303,7 +303,7 @@
       { repo: "fastapi/fastapi", url: "https://github.com/fastapi/fastapi", verdict: "FAIL", score: 100, files: 150, critical: 2, high: 2, total: 14 },
     ];
 
-    // All 44 judges
+    // All 45 judges
     // JUDGES_ARRAY_START
     const judges = [
       { name: "Data Security", desc: "Encryption, PII handling, secrets management, access controls" },
@@ -349,6 +349,7 @@
       { name: "Multi-Turn Coherence", desc: "Self-contradicting patterns, duplicate definitions, dead code, inconsistent naming" },
       { name: "Model Fingerprint Detection", desc: "Detects stylistic fingerprints characteristic of specific AI code generators" },
       { name: "Over-Engineering", desc: "Unnecessary abstractions, wrapper-mania, premature generalization, over-complex patterns" },
+      { name: "Logic Review", desc: "Inverted conditions, dead code, name-body mismatch, off-by-one, incomplete control flow" },
       { name: "False-Positive Review", desc: "Meta-judge reviewing pattern-based findings for false positives: string literal context, comment/docstring matches, test scaffolding, IaC template gating" },
     ];
 // JUDGES_ARRAY_END

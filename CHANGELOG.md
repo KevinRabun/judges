@@ -2,6 +2,25 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.36.0] — 2026-03-10
+
+### Added
+- **New judge: logic-review** — 7 detection categories for semantic correctness: inverted security conditions (critical), off-by-one errors (high), dead code after return/throw (medium), name-body mismatch (medium), swapped comparison operands (high), empty catch/except blocks (medium), redundant boolean comparisons (low). 45 judges total.
+- **Review verdict & summary** — `synthesizeReviewDecision()` wired into `TribunalVerdict`, producing an approve/request-changes/comment decision with blocking findings list and executive summary.
+- **Package registry verification** — expanded fabricated package detection: 50+ npm names, 30+ Python names, Go module hallucination patterns, Java/Kotlin hallucination patterns, and dependency confusion detection for unscoped packages with internal-looking names.
+- **Test adequacy assessment** — 2 new test quality checks: happy-path-only detection (test files with ≥3 cases but no error/edge scenarios) and status-code-only detection (API tests that only assert HTTP codes without body verification).
+- **LLM contextual auto-fixes** — `enrichWithContextualFixes()` generates `suggestedFix` for findings that lack a deterministic patch, using actual code context from affected lines.
+- **Triage feedback learning loop** — `computeTriageFeedback()` and `applyTriageFeedback()` adjust confidence scores based on historical false-positive rates from the finding lifecycle store. Rules with FP rate >30% get proportional confidence reduction (max -0.3).
+- **JetBrains IDE integration guide** — documentation for connecting Judges as an MCP server in IntelliJ IDEA, WebStorm, PyCharm, GoLand, and Rider via `.mcp.json` or IDE settings.
+- **AI-output benchmark suite** — 18 new benchmark cases targeting LLM-generated code patterns: logic inversions, off-by-one errors, dead code, name-body mismatches, swapped operands, empty catch blocks, happy-path-only tests, status-code-only tests, dependency confusion, and 3 negative (clean code) cases.
+
+### Changed (VS Code Extension)
+- **Diff-aware evaluation** — new `judges.evaluateDiff` command evaluates the full file but only reports findings on lines changed relative to git HEAD (±2 line context margin).
+- **Judge grouping in findings panel** — new "Sort by Judge" mode groups findings by judge prefix (AUTH, CRYPTO, LOGIC, etc.) with collapsible tree nodes.
+
+### Tests
+- 1,082 tests pass across 218 suites
+
 ## [3.35.0] — 2026-03-10
 
 ### Added

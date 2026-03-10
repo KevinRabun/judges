@@ -1,6 +1,6 @@
 # Judges Panel
 
-An MCP (Model Context Protocol) server that provides a panel of **44 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Combines **deterministic pattern matching & AST analysis** (instant, offline, zero LLM calls) with **LLM-powered deep-review prompts** that let your AI assistant perform expert-persona analysis across all 44 domains.
+An MCP (Model Context Protocol) server that provides a panel of **45 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Combines **deterministic pattern matching & AST analysis** (instant, offline, zero LLM calls) with **LLM-powered deep-review prompts** that let your AI assistant perform expert-persona analysis across all 45 domains.
 
 **Highlights:**
 - Includes an **App Builder Workflow (3-step)** demo for release decisions, plain-language risk summaries, and prioritized fixes — see [Try the Demo](#2-try-the-demo).
@@ -21,7 +21,7 @@ AI code generators (Copilot, Cursor, Claude, ChatGPT, etc.) write code fast — 
 
 | | ESLint / Biome | SonarQube | Semgrep / CodeQL | **Judges** |
 |---|---|---|---|---|
-| **Scope** | Style + some bugs | Bugs + code smells | Security patterns | **44 domains**: security, cost, compliance, a11y, API design, cloud, UX, … |
+| **Scope** | Style + some bugs | Bugs + code smells | Security patterns | **45 domains**: security, cost, compliance, a11y, API design, cloud, UX, … |
 | **AI-generated code focus** | No | No | Partial | **Purpose-built** for AI output failure modes |
 | **Setup** | Config per project | Server + scanner | Cloud or local | **One command**: `npx @kevinrabun/judges eval file.ts` |
 | **Auto-fix patches** | Some | No | No | **114 deterministic patches** — instant, offline |
@@ -79,7 +79,7 @@ judges eval --min-score 80 src/api.ts
 # One-line summary for scripts
 judges eval --summary src/api.ts
 
-# List all 44 judges
+# List all 45 judges
 judges list
 ```
 
@@ -190,7 +190,7 @@ npm run build
 
 ### 2. Try the Demo
 
-Run the included demo to see all 44 judges evaluate a purposely flawed API server:
+Run the included demo to see all 45 judges evaluate a purposely flawed API server:
 
 ```bash
 npm run demo
@@ -293,7 +293,7 @@ Install the **[Judges Panel](https://marketplace.visualstudio.com/items?itemName
 
 - **Inline diagnostics & quick-fixes** on every file save
 - **`@judges` chat participant** — type `@judges` in Copilot Chat, or just ask for a "judges panel review" and Copilot routes automatically
-- **Auto-configured MCP server** — all 44 expert-persona prompts available to Copilot with zero setup
+- **Auto-configured MCP server** — all 45 expert-persona prompts available to Copilot with zero setup
 
 ```bash
 code --install-extension kevinrabun.judges-panel
@@ -420,7 +420,7 @@ All commands support `--help` for usage details.
 
 ### `judges eval`
 
-Evaluate a file with all 44 judges or a single judge.
+Evaluate a file with all 45 judges or a single judge.
 
 | Flag | Description |
 |------|-------------|
@@ -665,6 +665,7 @@ const svg2 = generateBadgeSvg(75, "quality"); // custom label
 | **Multi-Turn Coherence** | Code Coherence & Consistency | `COH-` | Self-contradicting patterns, duplicate definitions, dead code, inconsistent naming |
 | **Model Fingerprint Detection** | AI Code Provenance & Model Attribution | `MFPR-` | Detects stylistic fingerprints characteristic of specific AI code generators |
 | **Over-Engineering** | Simplicity & Pragmatism | `OVER-` | Unnecessary abstractions, wrapper-mania, premature generalization, over-complex patterns |
+| **Logic Review** | Semantic Correctness & Logic Integrity | `LOGIC-` | Inverted conditions, dead code, name-body mismatch, off-by-one, incomplete control flow |
 | **False-Positive Review** | False Positive Detection & Finding Accuracy | `FPR-` | Meta-judge reviewing pattern-based findings for false positives: string literal context, comment/docstring matches, test scaffolding, IaC template gating |
 <!-- JUDGES_TABLE_END -->
 
@@ -678,13 +679,13 @@ The tribunal operates in three layers:
 
 2. **AST-Based Structural Analysis** — The Code Structure judge (`STRUCT-*` rules) uses real Abstract Syntax Tree parsing to measure cyclomatic complexity, nesting depth, function length, parameter count, dead code, and type safety with precision that regex cannot achieve. All supported languages — **TypeScript, JavaScript, Python, Rust, Go, Java, C#, and C++** — are parsed via **tree-sitter WASM grammars** (real syntax trees compiled to WebAssembly, in-process, zero native dependencies). A scope-tracking structural parser is kept as a fallback when WASM grammars are unavailable. No external AST server required.
 
-3. **LLM-Powered Deep Analysis (Prompts)** — The server exposes MCP prompts (e.g., `judge-data-security`, `full-tribunal`) that provide each judge's expert persona as a system prompt. When used by an LLM-based client (Copilot, Claude, Cursor, etc.), the host LLM performs deeper, context-aware probabilistic analysis beyond what static patterns can detect. This is where the `systemPrompt` on each judge comes alive — Judges itself makes no LLM calls, but it provides the expert criteria so your AI assistant can act as 44 specialized reviewers.
+3. **LLM-Powered Deep Analysis (Prompts)** — The server exposes MCP prompts (e.g., `judge-data-security`, `full-tribunal`) that provide each judge's expert persona as a system prompt. When used by an LLM-based client (Copilot, Claude, Cursor, etc.), the host LLM performs deeper, context-aware probabilistic analysis beyond what static patterns can detect. This is where the `systemPrompt` on each judge comes alive — Judges itself makes no LLM calls, but it provides the expert criteria so your AI assistant can act as 45 specialized reviewers.
 
 ---
 
 ## Composable by Design
 
-Judges Panel is a **dual-layer** review system: instant **deterministic tools** (offline, no API keys) for pattern and AST analysis, plus **44 expert-persona MCP prompts** that unlock LLM-powered deep analysis when connected to an AI client. It does not try to be a CVE scanner or a linter. Those capabilities belong in dedicated MCP servers that an AI agent can orchestrate alongside Judges.
+Judges Panel is a **dual-layer** review system: instant **deterministic tools** (offline, no API keys) for pattern and AST analysis, plus **45 expert-persona MCP prompts** that unlock LLM-powered deep analysis when connected to an AI client. It does not try to be a CVE scanner or a linter. Those capabilities belong in dedicated MCP servers that an AI agent can orchestrate alongside Judges.
 
 ### Built-in AST Analysis (v2.0.0+)
 
@@ -733,7 +734,7 @@ When your AI coding assistant connects to multiple MCP servers, each one contrib
 
 | Layer | What It Does | Example Servers |
 |-------|-------------|-----------------|
-| **Judges Panel** | 44-judge quality gate — security patterns, AST analysis, cost, scalability, a11y, compliance, sovereignty, ethics, dependency health, agent instruction governance, AI code safety, framework safety | This server |
+| **Judges Panel** | 45-judge quality gate — security patterns, AST analysis, cost, scalability, a11y, compliance, sovereignty, ethics, dependency health, agent instruction governance, AI code safety, framework safety | This server |
 | **CVE / SBOM** | Vulnerability scanning against live databases — known CVEs, license risks, supply chain | OSV, Snyk, Trivy, Grype MCP servers |
 | **Linting** | Language-specific style and correctness rules | ESLint, Ruff, Clippy MCP servers |
 | **Runtime Profiling** | Memory, CPU, latency measurement on running code | Custom profiling MCP servers |
@@ -887,7 +888,7 @@ Generated from https://github.com/microsoft/vscode on 2026-02-21T12:00:00.000Z.
 List all available judges with their domains and descriptions.
 
 ### `evaluate_code`
-Submit code to the **full judges panel**. all 44 judges evaluate independently and return a combined verdict.
+Submit code to the **full judges panel**. all 45 judges evaluate independently and return a combined verdict.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -911,7 +912,7 @@ Submit code to a **specific judge** for targeted review.
 | `config` | object | no | Inline configuration (see [Configuration](#configuration)) |
 
 ### `evaluate_project`
-Submit multiple files for **project-level analysis**. all 44 judges evaluate each file, plus cross-file architectural analysis detects code duplication, inconsistent error handling, and dependency cycles.
+Submit multiple files for **project-level analysis**. all 45 judges evaluate each file, plus cross-file architectural analysis detects code duplication, inconsistent error handling, and dependency cycles.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -922,7 +923,7 @@ Submit multiple files for **project-level analysis**. all 44 judges evaluate eac
 | `config` | object | no | Inline configuration (see [Configuration](#configuration)) |
 
 ### `evaluate_diff`
-Evaluate only the **changed lines** in a code diff. Runs all 44 judges on the full file but filters findings to lines you specify. Ideal for PR reviews and incremental analysis.
+Evaluate only the **changed lines** in a code diff. Runs all 45 judges on the full file but filters findings to lines you specify. Ideal for PR reviews and incremental analysis.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -999,8 +1000,9 @@ Each judge has a corresponding prompt for LLM-powered deep analysis:
 | `judge-multi-turn-coherence` | Deep review of code coherence: self-contradictions, duplicate definitions, dead code |
 | `judge-model-fingerprint` | Deep review of AI code provenance and model attribution fingerprints |
 | `judge-over-engineering` | Deep review of unnecessary abstractions, wrapper-mania, premature generalization |
+| `judge-logic-review` | Deep review of logic correctness, semantic mismatches, and dead code in AI-generated code |
 | `judge-false-positive-review` | Meta-judge review of pattern-based findings for false positive detection and accuracy |
-| `full-tribunal` | all 44 judges in a single prompt |
+| `full-tribunal` | all 45 judges in a single prompt |
 <!-- PROMPTS_TABLE_END -->
 
 ---
@@ -1123,7 +1125,7 @@ Each judge scores the code from **0 to 100**:
 - **WARNING** — Any high finding, any medium finding, or score < 80
 - **PASS** — Score ≥ 80 with no critical, high, or medium findings
 
-The **overall tribunal score** is the average of all 44 judges. The overall verdict fails if **any** judge fails.
+The **overall tribunal score** is the average of all 45 judges. The overall verdict fails if **any** judge fails.
 
 ---
 
@@ -1260,7 +1262,7 @@ judges/
 | `judges config export` | Export config as shareable package |
 | `judges config import <src>` | Import a shared configuration |
 | `judges compare` | Compare judges against other code review tools |
-| `judges list` | List all 44 judges with domains and descriptions |
+| `judges list` | List all 45 judges with domains and descriptions |
 
 ---
 
