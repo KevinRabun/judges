@@ -309,7 +309,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
   const handlerLines = getLineNumbers(code, requestHandlerPattern);
   const hasValidation = testCode(code, inputValidationPattern);
 
-  if (handlerLines.length >= 4 && !hasValidation) {
+  if (handlerLines.length >= 2 && !hasValidation) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

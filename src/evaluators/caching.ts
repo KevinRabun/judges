@@ -36,7 +36,7 @@ export function analyzeCaching(code: string, language: string): Finding[] {
     code,
   );
   const iacTemplate = isIaCTemplate(code);
-  if (expensiveOpLines.length >= 3 && !hasCaching && !iacTemplate && code.split("\n").length > 100) {
+  if (expensiveOpLines.length >= 3 && !hasCaching && !iacTemplate && code.split("\n").length > 30) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

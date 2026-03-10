@@ -174,7 +174,7 @@ export function analyzeConfigurationManagement(code: string, language: string): 
       ? Math.min((code.match(/os\.Getenv\b/g) || []).length, (code.match(/==\s*""/g) || []).length)
       : 0;
   const envTotal = envAccessLines.length;
-  if (envTotal >= 3 && envWithDefaults === 0 && goValidationCount === 0) {
+  if (envTotal >= 4 && envWithDefaults === 0 && goValidationCount === 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

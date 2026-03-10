@@ -56,7 +56,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
       code,
     );
 
-  if (hardcodedGlobalOrForeignLines.length >= 5 && !hasRegionPolicy && !iacTemplate) {
+  if (hardcodedGlobalOrForeignLines.length >= 1 && !hasRegionPolicy && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -100,7 +100,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     /(?:user|customer|patient|email|phone|ssn|passport|payment|credit.?card|personal.?data|\bpii\b|sensitive|address|profile|account|identity|subscriber)/i.test(
       code,
     );
-  if (crossBorderEgressLines.length >= 5 && !hasEgressGate && handlesPersonalData) {
+  if (crossBorderEgressLines.length >= 2 && !hasEgressGate && handlesPersonalData) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

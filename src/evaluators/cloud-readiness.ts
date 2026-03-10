@@ -37,7 +37,7 @@ export function analyzeCloudReadiness(code: string, language: string): Finding[]
     const ctx = getContextWindow(codeLines, ln, 2);
     return !defaultCtxPattern.test(ctx);
   });
-  if (hardcodedLines.length >= 5) {
+  if (hardcodedLines.length >= 1) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

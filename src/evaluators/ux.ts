@@ -16,7 +16,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
     );
   const inlineHandlerPattern = /\bon[A-Z]\w+\s*=\s*["'`]/gi;
   const inlineHandlerLines = isReactOrJsx ? [] : getLineNumbers(code, inlineHandlerPattern);
-  if (inlineHandlerLines.length > 10) {
+  if (inlineHandlerLines.length >= 2) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -42,7 +42,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
     code,
     /loading|isLoading|submitting|isSubmitting|disabled|pending|spinner|skeleton/gi,
   );
-  if (hasForm && !hasLoadingState && code.split("\n").length > 50) {
+  if (hasForm && !hasLoadingState && code.split("\n").length > 15) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",
@@ -80,7 +80,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
     }
     return true;
   });
-  if (genericUiErrorLines.length > 0) {
+  if (genericUiErrorLines.length > 0 && code.split("\n").length > 60) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -190,7 +190,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
     testCode(code, /<[a-z][a-z0-9]*[\s>]/i) || // HTML/JSX tags
     testCode(code, /innerHTML|appendChild|createElement|document\.|window\.|\$\(|v-for|ngFor|template\s*:/i) ||
     testCode(code, /from\s+['"](?:vue|@angular|svelte|lit|preact|solid)/i);
-  if (hasListRendering && hasUIRenderingContext && !hasEmptyCheck && code.split("\n").length > 80) {
+  if (hasListRendering && hasUIRenderingContext && !hasEmptyCheck && code.split("\n").length > 120) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",
@@ -235,7 +235,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
   const hasAsyncOp = testCode(code, /async\s+function|await\s+fetch|\.then\s*\(|Promise\./gi);
   const hasProgress = testCode(code, /progress|spinner|loading|isLoading|setLoading|skeleton|placeholder/gi);
   const hasFileProcessing = testCode(code, /readFile|writeFile|stream|pipe\s*\(|transform/gi);
-  if (hasFileProcessing && hasAsyncOp && !hasProgress) {
+  if (hasFileProcessing && hasAsyncOp && !hasProgress && code.split("\n").length > 60) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

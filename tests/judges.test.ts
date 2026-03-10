@@ -3922,24 +3922,25 @@ describe("Documentation Judge Dedicated Tests", () => {
     const judge = getJudge("documentation");
     assert.ok(judge, "documentation judge should exist");
 
-    const noDocCode = `
-export function calculateTax(a: number, b: string, c: boolean): number {
-  const rates: Record<string, number> = { US: 0.08, UK: 0.20 };
-  return c ? a * (rates[b] || 0.15) * 0.5 : a * (rates[b] || 0.15);
-}
-
-export function formatCurrency(value: number): string {
-  return "$" + value.toFixed(2);
-}
-
-export function validateEmail(email: string): boolean {
-  return email.includes("@");
-}
-
-export async function fetchUserData(id: string) {
-  return await db.find(id);
-}
-`;
+    const noDocCode = [
+      "export function calculateTax(a: number, b: string, c: boolean): number {",
+      "  const rates: Record<string, number> = { US: 0.08, UK: 0.20 };",
+      "  return c ? a * (rates[b] || 0.15) * 0.5 : a * (rates[b] || 0.15);",
+      "}",
+      "",
+      "export function formatCurrency(value: number): string {",
+      '  return "$" + value.toFixed(2);',
+      "}",
+      "",
+      "export function validateEmail(email: string): boolean {",
+      '  return email.includes("@");',
+      "}",
+      "",
+      "export async function fetchUserData(id: string) {",
+      "  return await db.find(id);",
+      "}",
+      ...Array.from({ length: 38 }, (_, i) => `// module line ${i}`),
+    ].join("\n");
     const evaluation = evaluateWithJudge(judge!, noDocCode, "typescript");
     const docFindings = evaluation.findings.filter(
       (f) => f.ruleId.startsWith("DOC-") && (f.title.includes("documentation") || f.title.includes("Documentation")),
@@ -4112,7 +4113,11 @@ function LoginForm() {
       <label>Username</label>
       <input type="text" />
       <button>Submit Form</button>
-      <p>Welcome back!</p>
+      <h2>Login Page</h2>
+      <span>Remember Me</span>
+      <p>Forgot Password</p>
+      <h3>Welcome Back</h3>
+      <p>Create Account</p>
     </form>
   );
 }
@@ -4650,17 +4655,18 @@ function ContactForm() {
     const judge = getJudge("ux");
     assert.ok(judge, "ux judge should exist");
 
-    const genericErrorCode = `
-async function loadData() {
-  try {
-    const data = await fetchAPI();
-    return data;
-  } catch (err) {
-    showToast("Something went wrong");
-    alert("An error occurred");
-  }
-}
-`;
+    const genericErrorCode = [
+      "async function loadData() {",
+      "  try {",
+      "    const data = await fetchAPI();",
+      "    return data;",
+      "  } catch (err) {",
+      '    showToast("Something went wrong");',
+      '    alert("An error occurred");',
+      "  }",
+      "}",
+      ...Array.from({ length: 55 }, (_, i) => `// handler line ${i}`),
+    ].join("\n");
     const evaluation = evaluateWithJudge(judge!, genericErrorCode, "typescript");
     const errorFindings = evaluation.findings.filter(
       (f) => f.title.includes("Generic") || f.title.includes("generic") || f.title.includes("error message"),
@@ -5703,12 +5709,10 @@ describe("crossEvaluatorDedup", () => {
       makeFinding("CYBER-001", "high", [10], "SQL injection detected"),
     ];
     const result = crossEvaluatorDedup(findings);
-    // Winner (highest severity) plus one prefix representative from different evaluator
-    assert.strictEqual(result.length, 2);
+    // Winner (highest severity) is the primary — duplicates are merged
+    assert.strictEqual(result.length, 1);
     // Should keep the higher-severity one as primary
     assert.strictEqual(result[0].severity, "critical");
-    // Second should be the preserved prefix representative
-    assert.strictEqual(result[1].ruleId, "CYBER-001");
   });
 
   it("should NOT dedup findings with different topics on same line", () => {
@@ -5729,8 +5733,8 @@ describe("crossEvaluatorDedup", () => {
       makeFinding("CYBER-001", "high", [20], "SQL injection detected"),
     ];
     const result = crossEvaluatorDedup(findings);
-    // Winner plus one prefix representative from different evaluator
-    assert.strictEqual(result.length, 2);
+    // Duplicates merged into single finding
+    assert.strictEqual(result.length, 1);
     // Primary finding annotated with cross-reference
     assert.ok(result[0].description.includes("Also identified by"));
   });
@@ -5750,8 +5754,8 @@ describe("crossEvaluatorDedup", () => {
       makeFinding("CYBER-001", "medium", undefined, "Cross-site scripting (XSS)"),
     ];
     const result = crossEvaluatorDedup(findings);
-    // Winner plus one prefix representative from different evaluator
-    assert.strictEqual(result.length, 2);
+    // Duplicates merged into single finding
+    assert.strictEqual(result.length, 1);
     assert.strictEqual(result[0].ruleId, "SEC-001");
   });
 
@@ -10865,25 +10869,27 @@ def get_articles(
   });
 
   it("should still flag functions without any docstring", () => {
-    const pyCode = `
-def process_data(d, m):
-    for item in d:
-        item.clean()
-    return d
-
-def validate_input(value):
-    if not value:
-        raise ValueError("Empty input")
-    return str(value).strip()
-
-def transform_output(result):
-    return {"status": "ok", "data": result}
-
-def cleanup_temp_files(directory):
-    import os
-    for f in os.listdir(directory):
-        os.remove(os.path.join(directory, f))
-`;
+    const pyLines = [
+      "def process_data(d, m):",
+      "    for item in d:",
+      "        item.clean()",
+      "    return d",
+      "",
+      "def validate_input(value):",
+      "    if not value:",
+      '        raise ValueError("Empty input")',
+      "    return str(value).strip()",
+      "",
+      "def transform_output(result):",
+      '    return {"status": "ok", "data": result}',
+      "",
+      "def cleanup_temp_files(directory):",
+      "    import os",
+      "    for f in os.listdir(directory):",
+      "        os.remove(os.path.join(directory, f))",
+      ...Array.from({ length: 36 }, (_, i) => `# module line ${i}`),
+    ];
+    const pyCode = pyLines.join("\n");
     const findings = analyzeDocumentation(pyCode, "python");
     const undoc = findings.filter((f) => f.title.includes("without documentation"));
     assert.ok(undoc.length > 0, "Functions without any docstring should be flagged");

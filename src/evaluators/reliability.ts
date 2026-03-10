@@ -18,7 +18,7 @@ export function analyzeReliability(code: string, language: string): Finding[] {
     /circuit.?breaker|opossum|cockatiel|retry|backoff|createTimeoutSignal|mergeSignalWithTimeout|createEgressAwareHttpClient|AbortController|AbortSignal\.timeout|withRetry|retryWith|exponentialBackoff/i.test(
       code,
     );
-  if (emptyCatchLines.length >= 3 && !hasResilienceInfra) {
+  if (emptyCatchLines.length >= 1 && !hasResilienceInfra) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

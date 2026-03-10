@@ -2393,7 +2393,17 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
       findings = verdict.findings;
     }
 
-    const foundRuleIds = [...new Set(findings.map((f) => f.ruleId))];
+    // Collect ruleIds including cross-references from dedup annotations
+    const allRuleIds = new Set(findings.map((f) => f.ruleId));
+    for (const f of findings) {
+      const m = f.description.match(/_Also identified by:\s*(.+?)_/);
+      if (m) {
+        for (const id of m[1].split(/,\s*/)) {
+          if (id.match(/^[A-Z]+-\d+$/)) allRuleIds.add(id);
+        }
+      }
+    }
+    const foundRuleIds = [...allRuleIds];
 
     // Prefix-based matching (lenient — CYBER-001 matches any CYBER-*)
     const expectedPrefixes = new Set(tc.expectedRuleIds.map((r) => r.split("-")[0]));
@@ -2472,6 +2482,7 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
       detectedRuleIds: foundRuleIds,
       missedRuleIds: missedExpected,
       falsePositiveRuleIds: falsePositiveIds,
+      findings,
     });
 
     // Per-category accumulators

@@ -70,7 +70,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
       }
     }
   }
-  if (nestedLoopLines.length >= 4 && !iacTemplate && !analysisCode) {
+  if (nestedLoopLines.length >= 2 && !iacTemplate && !analysisCode) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

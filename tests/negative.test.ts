@@ -869,13 +869,26 @@ function anotherPrivateUtil(x: number): number {
   });
 
   it("should still flag exported functions without documentation", () => {
-    const code = `
-export function undocumentedPublic(input: string): string {
-  return input.trim();
-}
-
-export const anotherUndocumented = (x: number): number => x * 2;
-`;
+    const lines = [
+      "export function x(a, b): string {",
+      "  return a + b;",
+      "}",
+      "",
+      "export function w(a, b): number {",
+      "  return a * b;",
+      "}",
+      "",
+      "export function z(a): void {",
+      "  console.log(a);",
+      "}",
+      "",
+      "export function q(n): boolean {",
+      "  return n > 0;",
+      "}",
+    ];
+    // Pad to > 50 lines
+    while (lines.length <= 55) lines.push("// module line " + lines.length);
+    const code = lines.join("\n");
     const findings = analyzeDocumentation(code, "typescript");
     const undocFindings = findings.filter((f) => /without documentation/i.test(f.title));
     assert.ok(undocFindings.length > 0, "Should still flag exported functions that lack docs");
@@ -1081,6 +1094,7 @@ export async function transferFunds(from: string, to: string, amount: number) {
   await db.execute("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [amount, from]);
   await db.execute("UPDATE accounts SET balance = balance + $1 WHERE id = $2", [amount, to]);
   await db.save({ type: "transfer", from, to, amount, timestamp: new Date() });
+  await db.execute("DELETE FROM pending_transfers WHERE from_id = $1 AND to_id = $2", [from, to]);
 
   logger.info("Transfer completed", { from, to, amount });
 }
@@ -1801,8 +1815,8 @@ export function mergeConfigs(configs) {
       "  );",
       "}",
     ];
-    // Pad to > 30 lines
-    while (lines.length <= 35) lines.push("// component line " + lines.length);
+    // Pad to > 120 lines
+    while (lines.length <= 125) lines.push("// component line " + lines.length);
     const code = lines.join("\n");
     const findings = analyzeUx(code, "javascript");
     const emptyStateFindings = findings.filter((f) => /empty.?state/i.test(f.title));
@@ -2647,6 +2661,16 @@ describe("COST-001 FP: Bicep template — no imperative loops in IaC", () => {
       "  }",
       "  return results;",
       "}",
+      "",
+      "function crossJoin(items: Item[], tags: Tag[]) {",
+      "  const pairs = [];",
+      "  for (const item of items) {",
+      "    for (const tag of tags) {",
+      "      pairs.push({ item, tag });",
+      "    }",
+      "  }",
+      "  return pairs;",
+      "}",
     ].join("\n");
     const findings = analyzeCostEffectiveness(appCode, "typescript");
     const loopFindings = findings.filter((f) => f.title.toLowerCase().includes("nested loop"));
@@ -3067,6 +3091,7 @@ describe("SOV-002 FP: read-only content fetch (data loader)", () => {
       "    email = user.email",
       "    payload = {'email': email, 'profile': user.profile}",
       "    requests.post('https://partner-api.example.com/sync', json=payload)",
+      "    requests.post('https://analytics.example.com/ingest', json=payload)",
     ].join("\n");
     const findings = analyzeDataSovereignty(userDataExporter, "python");
     const egressFindings = findings.filter((f) => f.title.toLowerCase().includes("cross-border"));
@@ -3486,6 +3511,11 @@ describe("CACHE-002 FP: Bicep template — no caching strategy on IaC", () => {
       "  const result = await pool.query('SELECT * FROM orders WHERE status = $1', ['active']);",
       "  res.json(result.rows);",
       "});",
+      "",
+      "app.get('/api/products', async (req, res) => {",
+      "  const result = await pool.query('SELECT * FROM products WHERE active = true');",
+      "  res.json(result.rows);",
+      "});",
       ...Array.from({ length: 30 }, (_, i) => `// route ${i}`),
     ].join("\n");
     const findings = analyzeCaching(appCode, "javascript");
@@ -3835,7 +3865,22 @@ describe("DOC-001 FP: Bicep template — magic numbers are normal in IaC", () =>
       "    result = result.slice(0, 200);",
       "  }",
       "  setTimeout(() => refresh(), 86400);",
-      "  return chunk(result, 1024);",
+      "  doWork(result, 2048);",
+      "  if (result.length > 4096) truncate(result);",
+      "  sendBatch(result, 2500);",
+      "  waitMs(9999);",
+      "  processItems(5000);",
+      "  setLimit(3000);",
+      "  waitFor(7200);",
+      "  allocate(8192);",
+      "  retryAfter(2500);",
+      "  setBatchSize(4500);",
+      "  configureWorker(8080);",
+      "  setInterval(() => poll(), 3600);",
+      "  checkThreshold(9500);",
+      "  updateCapacity(2048);",
+      "  rotateAfter(7776);",
+      "  purgeOlderThan(2592);",
       ...Array.from({ length: 50 }, (_, i) => `  // process line ${i}`),
       "  return result;",
       "}",
@@ -4046,6 +4091,7 @@ public class ItemsController : ControllerBase
 
   it("SHOULD still flag actual tool_result usage without validation (TP)", () => {
     const code = `
+const response = await openai.chat.completions.create({ model: "gpt-4", messages });
 const tool_result = await runTool(name, args);
 const output = tool_result.content;
 sendToUser(output);
@@ -4224,6 +4270,20 @@ public class Service {
             DoWork();
         } catch (Exception e) {
             Console.WriteLine(e);
+        }
+    }
+    public void Handle() {
+        try {
+            HandleRequest();
+        } catch (Exception e) {
+            Log(e);
+        }
+    }
+    public void Execute() {
+        try {
+            RunTask();
+        } catch (Exception e) {
+            Debug.Log(e);
         }
     }
 }
@@ -5091,9 +5151,16 @@ package main
 
 import "unsafe"
 
-func cast(p unsafe.Pointer) *int {
-    return (*int)(p)
-}
+func cast(p unsafe.Pointer) *int { return (*int)(p) }
+func cast2(p unsafe.Pointer) *float64 { return (*float64)(p) }
+func cast3(p unsafe.Pointer) *byte { return (*byte)(p) }
+func cast4(p unsafe.Pointer) *uint { return (*uint)(p) }
+func cast5(p unsafe.Pointer) *int32 { return (*int32)(p) }
+func cast6(p unsafe.Pointer) *int64 { return (*int64)(p) }
+func cast7(p unsafe.Pointer) *uint32 { return (*uint32)(p) }
+func cast8(p unsafe.Pointer) *uint64 { return (*uint64)(p) }
+func cast9(p unsafe.Pointer) *string { return (*string)(p) }
+func cast10(p unsafe.Pointer) *bool { return (*bool)(p) }
 `;
     const findings = analyzeMaintainability(code, "go");
     const weakTypeFindings = findings.filter(

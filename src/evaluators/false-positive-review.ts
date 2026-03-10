@@ -68,8 +68,6 @@ const PROD_ONLY_RULE_PREFIXES: string[] = [
   "REL-", // reliability patterns not needed in tests
   "CONC-", // concurrency patterns not needed in tests
   "FW-", // framework rules triggered by test fixtures
-  "CYBER-", // security rules triggered by intentional test patterns
-  "AUTH-", // auth rules triggered by test patterns
   "ERR-", // error handling patterns differ in test code
   "STRUCT-", // structural rules less meaningful in test files
   "DB-", // database rules triggered by test fixtures
@@ -827,11 +825,14 @@ function getFpReason(
     const titleAndDesc = `${finding.title} ${finding.description}`;
     for (const { trigger, identifierContext } of KEYWORD_IDENTIFIER_PATTERNS) {
       if (trigger.test(titleAndDesc)) {
-        const anyLineIsIdentifier = finding.lineNumbers.some((ln) => {
+        const matchingLines = finding.lineNumbers.filter((ln) => {
           const line = lines[ln - 1];
           return line !== undefined && identifierContext.test(line);
         });
-        if (anyLineIsIdentifier) {
+        // Require ALL flagged lines to match identifier context, not just any.
+        // When cross-evaluator dedup merges line numbers from multiple findings,
+        // a single inherited "foreign" line shouldn't suppress the entire finding.
+        if (matchingLines.length > 0 && matchingLines.length >= finding.lineNumbers.length) {
           return "Keyword appears as part of an identifier name, not as a dangerous operation.";
         }
       }
@@ -868,7 +869,7 @@ function getFpReason(
   // ── 9. Web-only rules on non-web code ──
   // Accessibility, UX, and i18n rendering rules are only meaningful on files
   // that contain web-facing patterns (HTML, JSX, routes, templates, CSS, or HTTP API responses).
-  const WEB_ONLY_PREFIXES = ["A11Y-", "UX-"];
+  const WEB_ONLY_PREFIXES = ["A11Y-", "UX-", "I18N-"];
   const isWebOnly = WEB_ONLY_PREFIXES.some((p) => finding.ruleId.startsWith(p));
   if (isWebOnly) {
     const hasWebPatterns =

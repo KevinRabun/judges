@@ -117,16 +117,18 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
     // ≥2 single-letter parameters (e.g. (a: number, b: string))
     const parenContent = fnLine.match(/\(([^)]*)\)/)?.[1];
     if (parenContent) {
-      const singleLetterParams = parenContent.match(/\b[a-zA-Z]\b/g) || [];
+      // Strip type annotations (: Type, : Type[]) to avoid counting generic type params like T
+      const cleanedParams = parenContent.replace(/:\s*[^,)]+/g, "");
+      const singleLetterParams = cleanedParams.match(/\b[a-zA-Z]\b/g) || [];
       if (singleLetterParams.length >= 2) return true;
     }
     return false;
   });
   if (
-    undocFnLines.length >= 2 &&
+    undocFnLines.length >= 4 &&
     totalExportedFns > 0 &&
     undocFnLines.length / totalExportedFns > 0.9 &&
-    lines.length > 10 &&
+    lines.length > 30 &&
     hasCrypticNaming
   ) {
     findings.push({
@@ -154,13 +156,13 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
     // Match numeric literals that aren't 0 or 1, not in imports, not in type definitions
     if (
       /(?<![.\w])(?:[2-9]\d{2,}|\d+\.\d+)(?![.\w])/i.test(line) &&
-      !/import|require|const\s+\w+\s*=|type|interface|enum|version|port|0x/i.test(line) &&
+      !/import|require|const\s+\w+\s*=|type|interface|enum|version|port|0x|assert/i.test(line) &&
       !/\/\/|\/\*|\*/i.test(line)
     ) {
       magicNumberLines.push(i + 1);
     }
   });
-  if (magicNumberLines.length > 50 && !isIaCTemplate(code)) {
+  if (magicNumberLines.length >= 20 && !isIaCTemplate(code)) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "low",

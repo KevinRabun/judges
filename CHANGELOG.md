@@ -2,6 +2,40 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.34.0] — 2026-03-10
+
+### Fixed
+- **False-positive filter (check #6) now requires ALL lines to match identifier context** — Previously, a single line matching identifier context would suppress the entire finding. When cross-evaluator dedup merges line numbers from multiple findings, a single inherited "foreign" line could wrongly suppress a legitimate finding. Now all flagged lines must match the identifier context pattern for suppression to apply.
+- **Removed CYBER- and AUTH- from test-only prefix suppression** — These prefixes were being incorrectly suppressed in test files, causing missed true positives
+- **Security evaluator skips import/require lines** for JWT verification detection — `import jsonwebtoken` no longer triggers a "JWT verification" finding
+- **Documentation evaluator strips type annotations** before counting single-letter parameters — generic type params like `T` in `(items: T[])` no longer trigger cryptic-naming detection
+- **Added `assert` to magic-number exclusion list** — Test assertions with numeric values are no longer flagged as magic numbers
+- **I18N added to web-only prefix suppression** — Internationalization rules now correctly suppressed for non-web files
+- **Shared `classifyFile` minimum line guard** — Files under 8 lines are no longer classified as "utility", preventing over-suppression of findings in small files
+
+### Changed
+- **12 evaluator threshold recalibrations** to reduce false positives while improving recall:
+  - AI Code Safety: unvalidated input handler threshold 4→2
+  - Caching: minimum file length 100→30 lines
+  - Cloud Readiness: hardcoded config threshold 5→1
+  - Configuration Management: env vars without defaults 3→4
+  - Cost Effectiveness: nested loop threshold 4→2
+  - Data Sovereignty: hardcoded global/foreign threshold 5→1, cross-border egress 5→2
+  - Documentation: undocumented exports count 2→4, minimum lines 10→30, magic numbers threshold 50→20
+  - Internationalization: hardcoded strings threshold 0→5
+  - Reliability: empty catch threshold 3→1
+  - UX: inline handlers 10→2, form loading state minimum 50→15 lines, generic errors minimum 60 lines, empty state minimum 80→120 lines, file/stream progress minimum 60 lines
+- **Cross-evaluator dedup simplified** — Removed per-prefix diversity logic (which preserved one representative per rule prefix) in favor of single-winner with cross-reference annotation; fixes dedup correctness for SQL injection, race conditions, and other cross-cutting findings
+- **Benchmark scoring now parses cross-reference annotations** — Dedup-merged findings annotated with `_Also identified by: AUTH-001, SEC-001_` now contribute their referenced ruleIds to true-positive matching, recovering 115 previously undercounted TPs
+
+### Benchmark
+- **Grade A** — F1: 93.0% (was 87.9%), Precision: 98.7%, Recall: 87.9% (was 79.3%), Detection Rate: 97.6% (was 94.0%)
+- TP: 1182 (+115), FN: 163 (−115), FP: 16
+- All per-judge false-positive rates ≤ 30%
+
+### Tests
+- 2226 tests passing, 0 failures
+
 ## [3.33.0] — 2026-03-10
 
 ### Added

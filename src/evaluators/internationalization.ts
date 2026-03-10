@@ -30,7 +30,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
       hardcodedStringLines.push(i + 1);
     }
   });
-  if (hardcodedStringLines.length > 0) {
+  if (hardcodedStringLines.length > 5) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "medium",

@@ -250,7 +250,7 @@ export function classifyFile(code: string, language: string, filePath?: string):
     /\b(?:fetch|axios|http|https|net|fs\.|readFile|writeFile|database|query|exec|spawn|child_process|socket)\b/i.test(
       code,
     );
-  if (!hasIO && lineCount < 200) {
+  if (!hasIO && lineCount >= 8 && lineCount < 200) {
     return "utility";
   }
 

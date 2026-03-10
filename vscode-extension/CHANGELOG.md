@@ -4,6 +4,22 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.34.0] — 2026-03-10
+
+### Fixed
+- **False-positive filter accuracy** — Keyword-in-identifier suppression now requires ALL flagged lines to match, preventing cross-evaluator dedup line merging from causing incorrect suppressions
+- **JWT import detection** — `import jsonwebtoken` no longer triggers a false finding
+- **Type annotation stripping** — Generic type parameters no longer trigger cryptic-naming detection
+
+### Changed
+- **12 evaluator threshold recalibrations** — Improved detection accuracy across AI Code Safety, Caching, Cloud Readiness, Configuration Management, Cost Effectiveness, Data Sovereignty, Documentation, Internationalization, Reliability, and UX evaluators
+- **Benchmark scoring** — Cross-reference annotations from dedup now properly count toward true-positive matching
+
+### Benchmark
+- Grade A — F1: 93.0%, Precision: 98.7%, Recall: 87.9%, 2226 tests passing
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.33.0] — 2026-03-10
 
 ### Added

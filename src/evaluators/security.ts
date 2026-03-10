@@ -353,6 +353,8 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (/jwt\.verify|jwt\.decode|jose\.jwtVerify|jsonwebtoken/i.test(line)) {
+        // Skip import/require statements — they're not verification calls
+        if (/^\s*import\b/.test(line) || /\brequire\s*\(/.test(line)) continue;
         const ctx = lines.slice(Math.max(0, i - 2), Math.min(lines.length, i + 5)).join("\n");
         // Check if algorithms is specified in options
         if (!/algorithms\s*[=:]/.test(ctx) && !/algorithm\s*[=:]/.test(ctx)) {
