@@ -244,6 +244,36 @@ export function parseConfig(jsonStr: string): JudgesConfig {
     config.languageProfiles = profiles;
   }
 
+  // escalationThreshold
+  if (obj.escalationThreshold !== undefined) {
+    if (typeof obj.escalationThreshold !== "number" || obj.escalationThreshold < 0 || obj.escalationThreshold > 1) {
+      throw new ConfigError('Invalid .judgesrc: "escalationThreshold" must be a number between 0 and 1');
+    }
+    config.escalationThreshold = obj.escalationThreshold;
+  }
+
+  // customRules
+  if (obj.customRules !== undefined) {
+    if (!Array.isArray(obj.customRules)) {
+      throw new ConfigError('Invalid .judgesrc: "customRules" must be an array');
+    }
+    for (let i = 0; i < obj.customRules.length; i++) {
+      const rule = obj.customRules[i] as Record<string, unknown>;
+      if (typeof rule !== "object" || rule === null) {
+        throw new ConfigError(`Invalid .judgesrc: customRules[${i}] must be an object`);
+      }
+      if (typeof rule.id !== "string" || typeof rule.pattern !== "string" || typeof rule.title !== "string") {
+        throw new ConfigError(`Invalid .judgesrc: customRules[${i}] requires id, pattern, and title (strings)`);
+      }
+      if (typeof rule.severity !== "string" || !VALID_SEVERITIES.has(rule.severity as Severity)) {
+        throw new ConfigError(
+          `Invalid .judgesrc: customRules[${i}].severity must be one of critical, high, medium, low, info`,
+        );
+      }
+    }
+    config.customRules = obj.customRules as JudgesConfig["customRules"];
+  }
+
   return config;
 }
 

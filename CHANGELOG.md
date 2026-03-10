@@ -2,6 +2,28 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.29.0] — 2026-07-07
+
+### Added
+- **Model fingerprint detection** — New judge #43 (MFPR prefix) detecting stylistic signatures of ChatGPT/GPT-4, Copilot, Claude, and Gemini in AI-generated code for provenance transparency
+- **Community pattern sharing** — New `community-patterns` CLI command with `import`, `export`, and `list` sub-commands for crowdsourced rule pack exchange via portable JSON format
+- **Interactive VS Code review** — New `judges.reviewSession` command walks through findings one-by-one with Accept/Dismiss/Skip actions and editor navigation
+- **Industry policy templates** — 5 new preset profiles: `fintech` (PCI DSS), `healthtech` (HIPAA), `saas` (multi-tenant), `open-source`, and `government` (FedRAMP/NIST)
+- **Intent alignment evaluator** — Judge #40 (INTENT prefix) detecting stub functions, misleading names, empty implementations, and contradictory comments
+- **API contract conformance** — Judge #41 (API prefix) evaluating REST endpoints for input validation, status codes, error handling, rate limiting, and versioning
+- **Multi-turn coherence** — Judge #42 (COH prefix) catching duplicate definitions, contradictory assignments, dead code after returns, and conflicting configs
+- **Confidence calibration dashboard** — New `calibration-dashboard` CLI command showing per-rule accuracy metrics and false-positive rates
+- **Human escalation escape hatch** — `escalationThreshold` config option flagging low-confidence findings with `needsHumanReview` for manual triage
+- **Explanation mode** — `--explain` flag providing educational context for any rule prefix with severity mapping and false-positive guidance
+- **Business logic validation** — `customRules` config field supporting user-defined regex-based detection rules with full severity and autofix support
+- **Inline fix suggestions** — ~50 new PATCH_RULES covering auth, crypto, injection, error handling, rate limiting, and more
+- **Approve/request-changes verdict** — Tiered GitHub review events (APPROVE for clean code, COMMENT for low-severity, REQUEST_CHANGES for critical findings)
+- **Test adequacy analysis** — TEST-COV-001 rule detecting missing test coverage for changed functions in PR diffs
+
+### Tests
+- 1068 tests, 0 failures
+- Benchmark: Grade A (99.8% detection, 98.8% precision, 94.4% F1)
+
 ## [3.28.0] — 2026-07-07
 
 ### Added

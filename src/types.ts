@@ -69,6 +69,11 @@ export interface Finding {
    * Each step traces the reasoning from detected pattern to security impact.
    */
   evidenceChain?: EvidenceChain;
+  /**
+   * When true, this finding has confidence below the escalation threshold
+   * and should be routed to a human reviewer rather than auto-actioned.
+   */
+  needsHumanReview?: boolean;
 }
 
 /**
@@ -265,6 +270,46 @@ export interface JudgesConfig {
    * ```
    */
   languageProfiles?: Partial<Record<LangFamily, Partial<Omit<JudgesConfig, "languageProfiles" | "overrides">>>>;
+  /**
+   * Confidence threshold (0–1) below which findings are flagged for human review.
+   * Findings with confidence below this value will have `needsHumanReview: true`.
+   * Default: not set (no escalation tagging).
+   */
+  escalationThreshold?: number;
+  /**
+   * User-defined pattern-based rules for business logic validation.
+   * Each entry defines a regex pattern to match, a rule ID, severity,
+   * and descriptive text. These are evaluated alongside built-in judges.
+   *
+   * Example:
+   * ```json
+   * { "customRules": [
+   *   { "id": "BIZ-001", "pattern": "price\\s*=\\s*0", "severity": "high",
+   *     "title": "Zero-price assignment", "description": "Setting price to 0 may indicate a logic error" }
+   * ]}
+   * ```
+   */
+  customRules?: CustomRule[];
+}
+
+/**
+ * A user-defined pattern-based rule for business logic validation.
+ */
+export interface CustomRule {
+  /** Rule ID (e.g. "BIZ-001") */
+  id: string;
+  /** Regex pattern to match against source code */
+  pattern: string;
+  /** Severity level */
+  severity: Severity;
+  /** Short title for the finding */
+  title: string;
+  /** Description of why this pattern is flagged */
+  description: string;
+  /** Optional recommendation for fixing */
+  recommendation?: string;
+  /** Optional file glob; when set, rule only applies to matching file paths */
+  files?: string;
 }
 
 // ─── Project / Multi-file Types ──────────────────────────────────────────────

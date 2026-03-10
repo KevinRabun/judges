@@ -311,6 +311,86 @@ function analyzeBreakingChanges(removedLines: string[], addedLines: string[], fi
   return findings;
 }
 
+// ─── Test Adequacy Check ─────────────────────────────────────────────────────
+
+/**
+ * Patterns that identify test files by path.
+ */
+const TEST_FILE_PATTERNS = [
+  /\.(?:test|spec|tests|specs)\.\w+$/i,
+  /(?:^|\/|\\)(?:tests?|__tests__|spec)(?:\/|\\)/i,
+  /\.stories\.\w+$/i,
+  /\.e2e\.\w+$/i,
+];
+
+/**
+ * Files that are configuration / non-production and don't need test coverage.
+ */
+const CONFIG_FILE_PATTERNS = [
+  /\.(?:json|ya?ml|toml|ini|cfg|env|lock|md|txt|css|scss|less|svg|png|jpg|ico)$/i,
+  /(?:^|\/|\\)(?:\.github|\.vscode|\.idea|node_modules|dist|build|coverage)(?:\/|\\)/i,
+  /(?:Dockerfile|Makefile|docker-compose|\.gitignore|\.eslintrc|\.prettierrc|tsconfig|jest\.config)/i,
+];
+
+function isTestFile(filePath: string): boolean {
+  return TEST_FILE_PATTERNS.some((p) => p.test(filePath));
+}
+
+function isConfigFile(filePath: string): boolean {
+  return CONFIG_FILE_PATTERNS.some((p) => p.test(filePath));
+}
+
+/**
+ * Check if production code changes have corresponding test changes.
+ * Returns findings for production files with significant changes but no
+ * related test file changes in the same diff.
+ */
+function analyzeTestAdequacy(hunks: DiffHunk[]): Finding[] {
+  const prodFiles: string[] = [];
+  const testFiles = new Set<string>();
+
+  for (const hunk of hunks) {
+    if (isConfigFile(hunk.filePath)) continue;
+    if (isTestFile(hunk.filePath)) {
+      testFiles.add(hunk.filePath);
+    } else if (hunk.changedLines.length > 0) {
+      prodFiles.push(hunk.filePath);
+    }
+  }
+
+  if (prodFiles.length === 0 || testFiles.size > 0) return [];
+
+  // Only flag if there are non-trivial production changes (> 5 changed lines total)
+  const totalProdChanges = hunks
+    .filter((h) => prodFiles.includes(h.filePath))
+    .reduce((sum, h) => sum + h.changedLines.length, 0);
+  if (totalProdChanges <= 5) return [];
+
+  const findings: Finding[] = [];
+  const fileList =
+    prodFiles.length <= 5
+      ? prodFiles.join(", ")
+      : `${prodFiles.slice(0, 5).join(", ")} and ${prodFiles.length - 5} more`;
+
+  findings.push({
+    ruleId: "TEST-COV-001",
+    severity: "medium",
+    title: "Production code changed without test updates",
+    description:
+      `This diff modifies ${prodFiles.length} production file(s) (${fileList}) ` +
+      `with ${totalProdChanges} changed line(s) but includes no changes to test files. ` +
+      "Changed production code should have corresponding test updates to maintain coverage.",
+    recommendation:
+      "Add or update tests covering the modified functionality. " +
+      "If changes are purely cosmetic (formatting, comments), this finding can be suppressed.",
+    reference: "Code Review Best Practices — Test Coverage for Changes",
+    confidence: 0.65,
+    provenance: "diff-test-adequacy-analysis",
+  });
+
+  return findings;
+}
+
 // ─── CLI Entry Point ────────────────────────────────────────────────────────
 
 export function parseDiffArgs(argv: string[]): { file?: string; language?: string; format: string } {
@@ -418,6 +498,28 @@ export function runDiff(argv: string[]): void {
     totalFindings += verdict.findings.length;
     if (verdict.score < worstScore) worstScore = verdict.score;
     allResults.push({ file: hunk.filePath, verdict });
+  }
+
+  // Cross-file: test adequacy check
+  const testAdequacyFindings = analyzeTestAdequacy(hunks);
+  if (testAdequacyFindings.length > 0) {
+    totalFindings += testAdequacyFindings.length;
+    // Attach to the first production file result or create a virtual entry
+    const firstProdResult = allResults.find((r) => !isTestFile(r.file) && !isConfigFile(r.file));
+    if (firstProdResult) {
+      firstProdResult.verdict.findings.push(...testAdequacyFindings);
+    } else {
+      allResults.push({
+        file: "(cross-file)",
+        verdict: {
+          linesAnalyzed: 0,
+          findings: testAdequacyFindings,
+          score: 85,
+          verdict: "warning" as const,
+          summary: "Production code changed without test updates.",
+        },
+      });
+    }
   }
 
   if (args.format === "json") {

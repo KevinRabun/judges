@@ -49,6 +49,8 @@ const cliCommands = new Set([
   "trend",
   "doctor",
   "scaffold-plugin",
+  "calibration-dashboard",
+  "community-patterns",
   "lsp",
   "version",
 ]);

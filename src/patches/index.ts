@@ -1428,6 +1428,379 @@ const PATCH_RULES: Array<{
       return { oldText: m[0], newText: `${m[1]}${m[2]}@v4 /* TODO: pin to specific SHA */` };
     },
   },
+
+  // ═══ Authentication Patches ═══
+
+  // AUTH: plaintext password comparison → bcrypt
+  {
+    match: /AUTH-.*|plaintext.*password|password.*comparison.*plain|comparing.*password/i,
+    generate: (line) => {
+      const m = line.match(/(password|passwd)\s*===?\s*(\w+)/i);
+      if (!m) return null;
+      return { oldText: m[0], newText: `await bcrypt.compare(${m[2]}, hashedPassword) /* TODO: use bcrypt */` };
+    },
+  },
+  // AUTH: session without expiry → add maxAge
+  {
+    match: /session.*expir|session.*timeout|session.*no.*expir/i,
+    generate: (line) => {
+      const m = line.match(/(session\s*\(\s*\{[^}]*?)(\})/);
+      if (!m) return null;
+      if (/maxAge|expires/.test(m[1])) return null;
+      return { oldText: m[0], newText: `${m[1]}, maxAge: 1800000 /* 30 min */}` };
+    },
+  },
+  // AUTH: jwt.decode → jwt.verify
+  {
+    match: /jwt.*decode.*verify|unverified.*jwt|jwt.*without.*verif/i,
+    generate: (line) => {
+      const m = line.match(/jwt\.decode\s*\(/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `jwt.verify(` };
+    },
+  },
+  // AUTH: missing rate limit on login
+  {
+    match: /brute.*force|login.*rate.*limit|missing.*rate.*limit.*auth/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)((?:app|router)\.post\s*\(\s*["']\/(?:login|auth|signin)["'])/);
+      if (!m) return null;
+      return {
+        oldText: m[0],
+        newText: `${m[1]}/* TODO: add rate limiting middleware (e.g., express-rate-limit) */\n${m[1]}${m[2]}`,
+      };
+    },
+  },
+
+  // ═══ Data Security Patches ═══
+
+  // DSEC: storing PII in localStorage
+  {
+    match: /pii.*localStorage|sensitive.*local.*storage|localStorage.*personal/i,
+    generate: (line) => {
+      const m = line.match(
+        /localStorage\.(setItem)\s*\(\s*(["'][^"']*(?:email|ssn|phone|name|address|dob)[^"']*["'])/i,
+      );
+      if (!m) return null;
+      return {
+        oldText: `localStorage.${m[1]}`,
+        newText: `sessionStorage.setItem /* TODO: encrypt or use httpOnly cookie instead */`,
+      };
+    },
+  },
+  // DSEC: logging PII fields
+  {
+    match: /pii.*log|logging.*personal|log.*sensitive|LOGPRIV/i,
+    generate: (line) => {
+      const m = line.match(
+        /(console\.log|logger\.\w+)\s*\([^)]*\b(email|ssn|password|creditCard|phoneNumber|socialSecurity)\b/i,
+      );
+      if (!m) return null;
+      return { oldText: m[2], newText: `[REDACTED:${m[2]}]` };
+    },
+  },
+
+  // ═══ Accessibility Patches ═══
+
+  // A11Y: img without alt → add alt=""
+  {
+    match: /A11Y-.*|missing.*alt|img.*alt|image.*alt/i,
+    generate: (line) => {
+      const m = line.match(/(<img\s+(?:(?!alt=)[^>])*?)(\/?>)/i);
+      if (!m) return null;
+      if (/alt=/i.test(m[1])) return null;
+      return { oldText: m[0], newText: `${m[1]} alt="" /* TODO: add descriptive alt text */${m[2]}` };
+    },
+  },
+  // A11Y: button/link without aria-label (icon-only)
+  {
+    match: /aria.*label|icon.*button.*access|accessible.*name/i,
+    generate: (line) => {
+      const m = line.match(/(<(?:button|a)\s+(?:(?!aria-label)[^>])*?)(>)/i);
+      if (!m) return null;
+      if (/aria-label=/.test(m[1])) return null;
+      if (!/icon|svg|fa-|material-icon/i.test(line)) return null;
+      return { oldText: m[0], newText: `${m[1]} aria-label="TODO: describe action"${m[2]}` };
+    },
+  },
+  // A11Y: onClick div → button
+  {
+    match: /interactive.*div|div.*onclick|click.*handler.*div/i,
+    generate: (line) => {
+      const m = line.match(/<div(\s+[^>]*?)onClick/i);
+      if (!m) return null;
+      return { oldText: `<div${m[1]}onClick`, newText: `<button${m[1]}onClick` };
+    },
+  },
+  // A11Y: autocomplete off on login fields
+  {
+    match: /autocomplete.*off.*password|login.*autocomplete/i,
+    generate: (line) => {
+      const m = line.match(/(type=["']password["'][^>]*?)autocomplete=["']off["']/i);
+      if (!m) return null;
+      return { oldText: `autocomplete="off"`, newText: `autocomplete="current-password"` };
+    },
+  },
+
+  // ═══ AI Code Safety Patches ═══
+
+  // AICS: user input concatenated into prompt
+  {
+    match: /AICS-.*|prompt.*inject|user.*input.*prompt|llm.*inject/i,
+    generate: (line) => {
+      const m = line.match(/(`[^`]*\$\{(?:req\.body|req\.query|request\.\w+|user[Ii]nput|input)\b[^}]*\}[^`]*`)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `/* TODO: sanitize user input before LLM prompt */ ${m[0]}` };
+    },
+  },
+  // AICS: LLM output in innerHTML
+  {
+    match: /llm.*output.*html|ai.*output.*innerhtml|inject.*llm.*output/i,
+    generate: (line) => {
+      const m = line.match(/\.innerHTML\s*=\s*(\w+(?:\.(?:response|output|text|completion|content))?)/);
+      if (!m) return null;
+      return { oldText: `.innerHTML = ${m[1]}`, newText: `.textContent = ${m[1]} /* sanitize LLM output */` };
+    },
+  },
+
+  // ═══ Compliance Patches ═══
+
+  // COMP: cookie without consent check
+  {
+    match: /cookie.*consent|gdpr.*cookie|tracking.*consent/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)(document\.cookie\s*=)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}if (hasUserConsent()) ${m[2]} /* TODO: implement consent check */` };
+    },
+  },
+  // COMP: collecting data without purpose
+  {
+    match: /data.*purpose|purpose.*limitation|gdpr.*purpose/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)((?:const|let|var)\s+\w+\s*=\s*(?:req\.body|request\.(?:form|json)))/);
+      if (!m) return null;
+      return {
+        oldText: m[0],
+        newText: `${m[1]}/* TODO: validate data collection purpose against privacy policy */\n${m[1]}${m[2]}`,
+      };
+    },
+  },
+
+  // ═══ Performance Patches ═══
+
+  // PERF: regex in loop → pre-compile
+  {
+    match: /regex.*loop|regexp.*inside.*loop|pattern.*repeated/i,
+    generate: (line) => {
+      const m = line.match(/(new\s+RegExp\s*\(\s*(["'][^"']+["'])\s*(?:,\s*["'][^"']*["'])?\s*\))/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `/* TODO: pre-compile regex outside loop */ ${m[0]}` };
+    },
+  },
+  // PERF: Array spread in reduce → push
+  {
+    match: /spread.*reduce|array.*spread.*accumul|O\(n.\).*reduce/i,
+    generate: (line) => {
+      const m = line.match(/\[\.\.\.(acc|accumulator|result)\s*,/);
+      if (!m) return null;
+      return { oldText: `[...${m[1]},`, newText: `/* TODO: use push() instead of spread in reduce */ [...${m[1]},` };
+    },
+  },
+
+  // ═══ Observability Patches ═══
+
+  // OBS: catch without logging
+  {
+    match: /catch.*no.*log|error.*not.*logged|swallow.*without.*log/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)\}\s*catch\s*\((\w+)\)\s*\{\s*$/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[0]}\n${m[1]}  console.error('Error:', ${m[2]});` };
+    },
+  },
+
+  // ═══ IaC Security Patches ═══
+
+  // IaC: Dockerfile USER root → USER node
+  {
+    match: /docker.*root|container.*root|USER.*root/i,
+    generate: (line) => {
+      const m = line.match(/^USER\s+root\s*$/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `USER node` };
+    },
+  },
+  // IaC: Terraform allow all ingress → restrict CIDR
+  {
+    match: /ingress.*0\.0\.0\.0|open.*ingress|unrestricted.*ingress/i,
+    generate: (line) => {
+      const m = line.match(/(cidr_blocks\s*=\s*\[)"0\.0\.0\.0\/0"(\])/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}"10.0.0.0/8"${m[2]} /* TODO: restrict to your CIDR */` };
+    },
+  },
+  // IaC: Kubernetes privileged container → drop privileges
+  {
+    match: /privileged.*true|container.*privileged|security.*context.*privileged/i,
+    generate: (line) => {
+      const m = line.match(/privileged:\s*true/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `privileged: false` };
+    },
+  },
+
+  // ═══ Database Patches ═══
+
+  // DB: missing index comment
+  {
+    match: /missing.*index|no.*index.*query|full.*table.*scan/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)((?:SELECT|FROM|WHERE)\b.*)$/i);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}/* TODO: ensure WHERE-clause columns are indexed */ ${m[2]}` };
+    },
+  },
+  // DB: transaction missing rollback
+  {
+    match: /transaction.*rollback|missing.*rollback|no.*rollback/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)((?:await\s+)?(?:client|conn|db|connection)\.query\s*\(\s*["']BEGIN)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}/* TODO: wrap in try/catch with ROLLBACK on error */\n${m[1]}${m[2]}` };
+    },
+  },
+
+  // ═══ Concurrency Patches ═══
+
+  // CONC: shared mutable variable → atomics hint
+  {
+    match: /race.*condition|shared.*mutable|concurrent.*access/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)(let|var)\s+(\w+)\s*=\s*(\d+)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}/* TODO: protect with mutex/lock */ ${m[2]} ${m[3]} = ${m[4]}` };
+    },
+  },
+
+  // ═══ API Design Patches ═══
+
+  // API: missing pagination
+  {
+    match: /missing.*pagination|no.*pagina|unbounded.*list/i,
+    generate: (line) => {
+      const m = line.match(/(\.find\s*\(\s*\{[^}]*\})\s*\)/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}).limit(100) /* TODO: add proper pagination */` };
+    },
+  },
+  // API: missing content-type validation
+  {
+    match: /content.*type.*valid|missing.*content.*type/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)((?:app|router)\.(post|put|patch)\s*\()/);
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}/* TODO: validate Content-Type header */\n${m[1]}${m[2]}` };
+    },
+  },
+
+  // ═══ Internationalization Patches ═══
+
+  // I18N: hardcoded user-facing string → i18n key
+  {
+    match: /I18N-.*|hardcoded.*string|user.*facing.*literal/i,
+    generate: (line) => {
+      const m = line.match(/((?:label|title|message|placeholder|text|heading)\s*[:=]\s*)(["'])([A-Z][a-z].*?)\2/);
+      if (!m) return null;
+      const key = m[3]
+        .toLowerCase()
+        .replace(/\s+/g, "_")
+        .replace(/[^a-z0-9_]/g, "")
+        .slice(0, 30);
+      return {
+        oldText: `${m[1]}${m[2]}${m[3]}${m[2]}`,
+        newText: `${m[1]}t("${key}") /* was: ${m[2]}${m[3]}${m[2]} */`,
+      };
+    },
+  },
+
+  // ═══ Scalability Patches ═══
+
+  // SCAL: in-memory session store → comment
+  {
+    match: /in.*memory.*session|session.*memory.*store|express.*session.*default/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)(app\.use\s*\(\s*session\s*\(\s*\{)/);
+      if (!m) return null;
+      return {
+        oldText: m[0],
+        newText: `${m[1]}/* TODO: use Redis/database session store for multi-instance */ ${m[2]}`,
+      };
+    },
+  },
+
+  // ═══ Sovereignty Patches ═══
+
+  // SOV: data sent to external analytics
+  {
+    match: /data.*third.*party|analytics.*external|sov.*data.*transfer/i,
+    generate: (line) => {
+      const m = line.match(
+        /^(\s*)((?:fetch|axios\.\w+|https?\.(?:get|post))\s*\(\s*["']https?:\/\/(?:analytics|tracking|telemetry)\b)/,
+      );
+      if (!m) return null;
+      return { oldText: m[0], newText: `${m[1]}/* TODO: verify data residency compliance before sending */ ${m[2]}` };
+    },
+  },
+
+  // ═══ Framework Safety Patches ═══
+
+  // FW: Express without helmet → add helmet
+  {
+    match: /missing.*helmet|no.*security.*headers|express.*headers/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)(const\s+app\s*=\s*express\s*\(\s*\)\s*;?)/);
+      if (!m) return null;
+      return {
+        oldText: m[0],
+        newText: `${m[1]}const helmet = require("helmet"); /* TODO: npm install helmet */\n${m[1]}${m[2]}\n${m[1]}app.use(helmet());`,
+      };
+    },
+  },
+  // FW: Flask debug mode in production
+  {
+    match: /flask.*debug|debug.*production|app\.run.*debug/i,
+    generate: (line) => {
+      const m = line.match(/app\.run\s*\(\s*([^)]*)debug\s*=\s*True/);
+      if (!m) return null;
+      return { oldText: `debug=True`, newText: `debug=os.environ.get("FLASK_DEBUG", "false") == "true"` };
+    },
+  },
+  // FW: Django SECRET_KEY hardcoded
+  {
+    match: /django.*secret|SECRET_KEY.*hardcoded|hardcoded.*django/i,
+    generate: (line) => {
+      const m = line.match(/^(\s*)SECRET_KEY\s*=\s*(["'])[^"']+\2/);
+      if (!m) return null;
+      return {
+        oldText: m[0],
+        newText: `${m[1]}SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "change-me-in-production")`,
+      };
+    },
+  },
+
+  // ═══ Supply Chain Patches ═══
+
+  // DEP: importing from CDN without SRI
+  {
+    match: /sri.*missing|subresource.*integrity|cdn.*integrity/i,
+    generate: (line) => {
+      const m = line.match(/(<script\s+src=["']https?:\/\/cdn[^"']*["'])(\s*>)/i);
+      if (!m) return null;
+      if (/integrity=/i.test(m[1])) return null;
+      return { oldText: m[0], newText: `${m[1]} integrity="TODO:sha384-hash" crossorigin="anonymous"${m[2]}` };
+    },
+  },
 ];
 
 /**

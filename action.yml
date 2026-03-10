@@ -325,7 +325,7 @@ runs:
               if (reviewsRes.status === 200 && Array.isArray(reviewsRes.data)) {
                 const judgesReviews = reviewsRes.data.filter(r =>
                   r.body && r.body.includes('Judges Code Review') &&
-                  (r.state === 'COMMENTED' || r.state === 'CHANGES_REQUESTED')
+                  (r.state === 'COMMENTED' || r.state === 'CHANGES_REQUESTED' || r.state === 'APPROVED')
                 );
                 for (const review of judgesReviews) {
                   try {
@@ -346,16 +346,19 @@ runs:
             if (findings.length === 0) {
               // Post a clean-bill-of-health summary even when no findings
               const score = results.score || results.overallScore || results.worstScore || 100;
+              const verdict = (results.verdict || results.overallVerdict || 'PASS').toUpperCase();
               const baselineFiltered = results._baselineFiltered || 0;
               let cleanBody = '## 🔍 Judges Code Review\n\n';
               cleanBody += '✅ **No findings** — score ' + score + '/100\n';
               if (baselineFiltered > 0) cleanBody += '\n> ' + baselineFiltered + ' known finding(s) suppressed by baseline.\n';
+              const reviewEvent = verdict === 'PASS' ? 'APPROVE' : 'COMMENT';
+              cleanBody += '\n**Review decision:** ' + reviewEvent + ' — ' + (reviewEvent === 'APPROVE' ? 'code passes all checks with no issues.' : 'verdict is ' + verdict + '; posting as comment.') + '\n';
               await ghApi('POST', '/repos/' + repo + '/pulls/' + prNumber + '/reviews', {
-                event: 'COMMENT',
+                event: reviewEvent,
                 body: cleanBody,
                 comments: [],
               });
-              console.log('✅ Posted clean PR summary (no findings)');
+              console.log('✅ Posted clean PR summary (no findings, event=' + reviewEvent + ')');
               return;
             }
 
@@ -426,9 +429,26 @@ runs:
             if (topRules) summaryBody += '**Top rules:** ' + topRules + '\n\n';
             if (findings.length > 50) summaryBody += '> ⚠️ Showing top 50 of ' + findings.length + ' findings as inline comments.\n\n';
 
+            // Decide review event based on severity and verdict
+            let reviewEvent = 'COMMENT';
+            let reviewReason = '';
+            if (critCount > 0) {
+              reviewEvent = 'REQUEST_CHANGES';
+              reviewReason = critCount + ' critical finding(s) require changes before merge.';
+            } else if (highCount > 0) {
+              reviewEvent = 'REQUEST_CHANGES';
+              reviewReason = highCount + ' high-severity finding(s) require changes before merge.';
+            } else if (verdict === 'PASS' && medCount === 0) {
+              reviewEvent = 'APPROVE';
+              reviewReason = 'All findings are low severity and code passes checks.';
+            } else {
+              reviewReason = 'Findings are advisory; review recommended but not blocking.';
+            }
+            summaryBody += '**Review decision:** ' + reviewEvent + ' — ' + reviewReason + '\n\n';
+
             // ── Step 4: Post new review ──
             const reviewRes = await ghApi('POST', '/repos/' + repo + '/pulls/' + prNumber + '/reviews', {
-              event: findings.some(f => f.severity === 'critical') ? 'REQUEST_CHANGES' : 'COMMENT',
+              event: reviewEvent,
               body: summaryBody,
               comments: comments,
             });

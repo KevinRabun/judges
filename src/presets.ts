@@ -245,6 +245,93 @@ export const PRESETS: Record<string, Preset> = {
       ],
     },
   },
+
+  // ── Industry-Vertical Presets ─────────────────────────────────────────────
+
+  fintech: {
+    name: "Fintech",
+    description:
+      "For financial services — PCI DSS compliance, cryptography, authentication, " +
+      "data security, audit logging, rate limiting, and fraud prevention patterns.",
+    config: {
+      minSeverity: "low" as Severity,
+      disabledJudges: [
+        "accessibility",
+        "ux",
+        "internationalization",
+        "portability",
+        "agent-instructions",
+        "code-structure",
+      ],
+      ruleOverrides: {
+        "AUTH-001": { severity: "critical" as Severity },
+        "CRYPTO-001": { severity: "critical" as Severity },
+        "DATA-001": { severity: "critical" as Severity },
+      },
+    },
+  },
+
+  healthtech: {
+    name: "Healthtech",
+    description:
+      "For healthcare applications — HIPAA compliance, data sovereignty, encryption at rest, " +
+      "audit trails, logging privacy, and sensitive data handling.",
+    config: {
+      minSeverity: "low" as Severity,
+      disabledJudges: [
+        "cost-effectiveness",
+        "ux",
+        "portability",
+        "agent-instructions",
+        "code-structure",
+        "backwards-compatibility",
+      ],
+      ruleOverrides: {
+        "DATA-001": { severity: "critical" as Severity },
+        "SOV-001": { severity: "critical" as Severity },
+        "COMP-001": { severity: "critical" as Severity },
+      },
+    },
+  },
+
+  saas: {
+    name: "SaaS",
+    description:
+      "For multi-tenant SaaS platforms — tenant isolation, rate limiting, scalability, " +
+      "API security, caching, authentication, and observability.",
+    config: {
+      minSeverity: "low" as Severity,
+      disabledJudges: ["data-sovereignty", "compliance", "internationalization", "portability", "agent-instructions"],
+    },
+  },
+
+  "open-source": {
+    name: "Open Source",
+    description:
+      "For open-source projects — documentation quality, backwards compatibility, " +
+      "security, code structure, and dependency health.",
+    config: {
+      minSeverity: "low" as Severity,
+      disabledJudges: ["compliance", "data-sovereignty", "cost-effectiveness", "ux", "logging-privacy"],
+    },
+  },
+
+  government: {
+    name: "Government",
+    description:
+      "For government and public sector — FedRAMP/NIST compliance, data sovereignty, " +
+      "accessibility (Section 508), audit logging, and security hardening.",
+    config: {
+      minSeverity: "info" as Severity,
+      disabledJudges: ["cost-effectiveness", "ux", "portability", "agent-instructions", "code-structure"],
+      ruleOverrides: {
+        "AUTH-001": { severity: "critical" as Severity },
+        "SOV-001": { severity: "critical" as Severity },
+        "COMP-001": { severity: "critical" as Severity },
+        "A11Y-001": { severity: "high" as Severity },
+      },
+    },
+  },
 };
 
 /**

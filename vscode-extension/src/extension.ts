@@ -157,6 +157,62 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.commands.executeCommand("judges.findingsPanel.focus");
     }),
 
+    // ─── Interactive Review Session ──────────────────────────────────────
+    // Walk through findings one-by-one with accept/dismiss/fix actions.
+    vscode.commands.registerCommand("judges.reviewSession", async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        vscode.window.showWarningMessage("Judges: No file is open. Open a file to start a review session.");
+        return;
+      }
+
+      // Force a fresh evaluation
+      diagnosticProvider.forceEvaluate(editor.document);
+      const findings = diagnosticProvider.getFindings(editor.document.uri.toString());
+
+      if (findings.length === 0) {
+        vscode.window.showInformationMessage("Judges: No findings to review.");
+        return;
+      }
+
+      // Sort by severity (critical first)
+      const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+      const sorted = [...findings].sort((a, b) => (severityOrder[a.severity] ?? 5) - (severityOrder[b.severity] ?? 5));
+
+      let dismissed = 0;
+      let accepted = 0;
+
+      for (let i = 0; i < sorted.length; i++) {
+        const f = sorted[i];
+        const lineRef = f.lineNumbers?.[0] ?? 1;
+
+        // Navigate to the finding location
+        const position = new vscode.Position(lineRef - 1, 0);
+        editor.selection = new vscode.Selection(position, position);
+        editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+
+        const label = `[${i + 1}/${sorted.length}] ${f.severity.toUpperCase()}: ${f.title}`;
+        const detail = f.description;
+
+        const action = await vscode.window.showInformationMessage(
+          label,
+          { modal: true, detail },
+          "Accept",
+          "Dismiss",
+          "Skip",
+          "Stop",
+        );
+
+        if (action === "Stop" || action === undefined) break;
+        if (action === "Accept") accepted++;
+        if (action === "Dismiss") dismissed++;
+      }
+
+      vscode.window.showInformationMessage(
+        `Review session complete: ${accepted} accepted, ${dismissed} dismissed, ${sorted.length - accepted - dismissed} skipped.`,
+      );
+    }),
+
     vscode.commands.registerCommand("judges.sortBySeverity", () => {
       findingsPanel.setSortMode("severity");
     }),

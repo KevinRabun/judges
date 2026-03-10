@@ -39,6 +39,10 @@ import { iacSecurityJudge } from "./iac-security.js";
 import { securityJudge } from "./security.js";
 import { falsePositiveReviewJudge } from "./false-positive-review.js";
 import { hallucinationDetectionJudge } from "./hallucination-detection.js";
+import { intentAlignmentJudge } from "./intent-alignment.js";
+import { apiContractJudge } from "./api-contract.js";
+import { multiTurnCoherenceJudge } from "./multi-turn-coherence.js";
+import { modelFingerprintJudge } from "./model-fingerprint.js";
 
 // ─── Analyzer Imports ────────────────────────────────────────────────────────
 import { analyzeDataSecurity } from "../evaluators/data-security.js";
@@ -79,6 +83,10 @@ import { analyzeFrameworkSafety } from "../evaluators/framework-safety.js";
 import { analyzeIacSecurity } from "../evaluators/iac-security.js";
 import { analyzeSecurity } from "../evaluators/security.js";
 import { analyzeHallucinationDetection } from "../evaluators/hallucination-detection.js";
+import { analyzeIntentAlignment } from "../evaluators/intent-alignment.js";
+import { analyzeApiContract } from "../evaluators/api-contract.js";
+import { analyzeMultiTurnCoherence } from "../evaluators/multi-turn-coherence.js";
+import { analyzeModelFingerprint } from "../evaluators/model-fingerprint.js";
 
 // ─── Wire each judge to its analyzer ─────────────────────────────────────────
 
@@ -120,6 +128,10 @@ frameworkSafetyJudge.analyze = analyzeFrameworkSafety;
 iacSecurityJudge.analyze = analyzeIacSecurity;
 securityJudge.analyze = analyzeSecurity;
 hallucinationDetectionJudge.analyze = analyzeHallucinationDetection;
+intentAlignmentJudge.analyze = analyzeIntentAlignment;
+apiContractJudge.analyze = analyzeApiContract;
+multiTurnCoherenceJudge.analyze = analyzeMultiTurnCoherence;
+modelFingerprintJudge.analyze = analyzeModelFingerprint;
 
 /**
  * The panel of judges that comprise the Judges Panel.
@@ -167,6 +179,10 @@ export const JUDGES: JudgeDefinition[] = [
   iacSecurityJudge,
   securityJudge,
   hallucinationDetectionJudge,
+  intentAlignmentJudge,
+  apiContractJudge,
+  multiTurnCoherenceJudge,
+  modelFingerprintJudge,
   falsePositiveReviewJudge,
 ];
 

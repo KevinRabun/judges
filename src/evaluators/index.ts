@@ -731,6 +731,35 @@ export function evaluateWithTribunal(
   );
   const configFiltered = applyConfig(fpFiltered, options?.config);
 
+  // ── Custom rules from .judgesrc ──
+  // Evaluate user-defined pattern-based rules and append to findings
+  if (options?.config?.customRules && options.config.customRules.length > 0) {
+    for (const rule of options.config.customRules) {
+      try {
+        const re = new RegExp(rule.pattern, "gm");
+        const codeLines = code.split("\n");
+        const matchedLines: number[] = [];
+        for (let i = 0; i < codeLines.length; i++) {
+          if (re.test(codeLines[i])) matchedLines.push(i + 1);
+          re.lastIndex = 0;
+        }
+        if (matchedLines.length > 0) {
+          configFiltered.push({
+            ruleId: rule.id,
+            severity: rule.severity,
+            title: rule.title,
+            description: rule.description || rule.title,
+            lineNumbers: matchedLines,
+            recommendation: rule.recommendation || `Review occurrences of pattern: ${rule.pattern}`,
+            confidence: 0.8,
+          });
+        }
+      } catch {
+        // Invalid regex in custom rule — skip silently
+      }
+    }
+  }
+
   // ── Feedback-driven confidence calibration & auto-tuning ──
   // When options.calibrate is set, load the feedback store and apply:
   // 1. Auto-suppression of rules with FP rate ≥ 80%
@@ -764,10 +793,12 @@ export function evaluateWithTribunal(
   // Tag each finding with a disclosure tier so downstream consumers (CLI,
   // formatters, VS Code extension) can show only high-confidence findings
   // by default and reveal lower tiers on demand.
+  const escalationThreshold = options?.config?.escalationThreshold;
   const allFindings = cappedFindings.map((f) => {
     const conf = f.confidence ?? 0.5;
     const tier: Finding["confidenceTier"] = conf >= 0.8 ? "essential" : conf >= 0.6 ? "important" : "supplementary";
-    return { ...f, confidenceTier: tier };
+    const needsHumanReview = escalationThreshold !== undefined && conf < escalationThreshold ? true : undefined;
+    return { ...f, confidenceTier: tier, ...(needsHumanReview ? { needsHumanReview } : {}) };
   });
 
   const mustFixGate = evaluateMustFixGate(allFindings, options?.mustFixGate);

@@ -128,6 +128,7 @@ interface CliArgs {
   include: string[];
   maxFiles: number | undefined;
   changedOnly: boolean;
+  explain: boolean;
 }
 
 function parseCliArgs(argv: string[]): CliArgs {
@@ -152,6 +153,7 @@ function parseCliArgs(argv: string[]): CliArgs {
     include: [],
     maxFiles: undefined,
     changedOnly: false,
+    explain: false,
   };
 
   // First non-flag arg is the command
@@ -219,6 +221,9 @@ function parseCliArgs(argv: string[]): CliArgs {
         break;
       case "--changed-only":
         args.changedOnly = true;
+        break;
+      case "--explain":
+        args.explain = true;
         break;
       case "--exclude":
       case "-x":
@@ -303,6 +308,7 @@ EVAL OPTIONS:
   --quiet                    Suppress non-essential output
   --fix                      Auto-fix findings after evaluation (applies patches in-place)
   --changed-only             Only evaluate files changed since last commit (uses git diff)
+  --explain                  Enrich findings with OWASP/CWE learning context
   --help, -h                 Show this help
 
 FIX OPTIONS:
@@ -869,6 +875,20 @@ export async function runCli(argv: string[]): Promise<void> {
     return;
   }
 
+  // ─── Calibration Dashboard Command ────────────────────────────────
+  if (args.command === "calibration-dashboard") {
+    const { runCalibrationDashboard } = await import("./commands/calibration-dashboard.js");
+    await runCalibrationDashboard(argv);
+    process.exit(0);
+  }
+
+  // ─── Community Patterns Command ───────────────────────────────────────
+  if (args.command === "community-patterns") {
+    const { runCommunityPatterns } = await import("./commands/community-patterns.js");
+    await runCommunityPatterns(argv);
+    process.exit(0);
+  }
+
   // ─── Compare Command ─────────────────────────────────────────────────
   if (args.command === "compare") {
     const toolName = argv[3];
@@ -1068,6 +1088,11 @@ export async function runCli(argv: string[]): Promise<void> {
         evaluation.findings = filterBySeverity(evaluation.findings, evalConfig.minSeverity);
       }
 
+      // Enrich with learning context when --explain is set
+      if (args.explain) {
+        evaluation.findings = enrichWithExplanations(evaluation.findings);
+      }
+
       const elapsed = Date.now() - startTime;
 
       if (args.summary) {
@@ -1145,6 +1170,14 @@ export async function runCli(argv: string[]): Promise<void> {
           evaluation.findings = filterBySeverity(evaluation.findings, evalConfig.minSeverity!);
         }
         verdict.findings = filterBySeverity(verdict.findings, evalConfig.minSeverity);
+      }
+
+      // Enrich with learning context when --explain is set
+      if (args.explain) {
+        for (const evaluation of verdict.evaluations) {
+          evaluation.findings = enrichWithExplanations(evaluation.findings);
+        }
+        verdict.findings = enrichWithExplanations(verdict.findings);
       }
 
       const elapsed = Date.now() - startTime;
@@ -1318,6 +1351,112 @@ function loadEvalConfig(args: CliArgs): JudgesConfig | undefined {
   }
 
   return config;
+}
+
+// ─── Explain Mode — Learning Context Enrichment ─────────────────────────────
+
+const RULE_PREFIX_CONTEXT: Record<string, { owasp?: string; cwe?: string; learn: string }> = {
+  SEC: {
+    owasp: "A03:2021 Injection",
+    cwe: "CWE-79/CWE-89",
+    learn: "Input validation prevents injection attacks where untrusted data is sent to an interpreter.",
+  },
+  AUTH: {
+    owasp: "A07:2021 Identification and Authentication Failures",
+    cwe: "CWE-287",
+    learn: "Authentication flaws let attackers compromise passwords, keys, or session tokens.",
+  },
+  CRYPTO: {
+    owasp: "A02:2021 Cryptographic Failures",
+    cwe: "CWE-327/CWE-328",
+    learn: "Weak or missing cryptography exposes sensitive data to interception and tampering.",
+  },
+  DATA: {
+    owasp: "A02:2021 Cryptographic Failures",
+    cwe: "CWE-200/CWE-312",
+    learn: "Sensitive data exposure occurs when applications do not adequately protect data at rest or in transit.",
+  },
+  CYBER: {
+    owasp: "A01:2021 Broken Access Control",
+    cwe: "CWE-284",
+    learn: "Access control enforces policy so users cannot act outside their intended permissions.",
+  },
+  INJ: {
+    owasp: "A03:2021 Injection",
+    cwe: "CWE-89/CWE-78",
+    learn: "Injection flaws occur when hostile data is sent to an interpreter as part of a command or query.",
+  },
+  XSS: {
+    owasp: "A03:2021 Injection",
+    cwe: "CWE-79",
+    learn: "Cross-site scripting (XSS) lets attackers inject scripts into web pages viewed by other users.",
+  },
+  SSRF: {
+    owasp: "A10:2021 Server-Side Request Forgery",
+    cwe: "CWE-918",
+    learn:
+      "SSRF lets attackers make the server send requests to unintended locations, potentially accessing internal services.",
+  },
+  PERF: { learn: "Performance issues cause slow response times, high resource usage, or scalability bottlenecks." },
+  A11Y: {
+    learn: "Accessibility ensures applications are usable by people with disabilities, per WCAG 2.1 guidelines.",
+  },
+  DOC: { learn: "Good documentation improves maintainability, onboarding, and reduces defect rates." },
+  TEST: { learn: "Adequate test coverage catches regressions, validates behaviour, and enables safe refactoring." },
+  AICS: {
+    owasp: "OWASP AI Security",
+    learn: "AI code safety rules detect prompt injection, model poisoning, and unsafe AI integration patterns.",
+  },
+  IAC: {
+    learn:
+      "Infrastructure as Code security ensures cloud resources are provisioned with least-privilege, encryption, and audit logging.",
+  },
+  SOV: {
+    learn:
+      "Data sovereignty rules verify data residency, jurisdictional compliance, and cross-border transfer controls.",
+  },
+  COMP: { learn: "Compliance rules enforce regulatory requirements like GDPR, HIPAA, PCI-DSS, and SOC 2." },
+  INTENT: {
+    learn: "Intent alignment detects mismatches between declared purpose (names, comments) and actual implementation.",
+  },
+  DSEC: {
+    learn: "Dependency security rules flag known-vulnerable packages, outdated dependencies, and supply-chain risks.",
+  },
+  MFPR: {
+    learn:
+      "Model fingerprint detection identifies stylistic patterns characteristic of specific AI generators (GPT, Claude, Copilot, Gemini).",
+  },
+  API: {
+    learn:
+      "API contract rules enforce input validation, proper status codes, content-type, rate limiting, and versioning on REST endpoints.",
+  },
+  COH: {
+    learn:
+      "Coherence rules detect contradictory assignments, dead code, duplicate definitions, and other self-inconsistent patterns.",
+  },
+  HALLU: {
+    learn:
+      "Hallucination detection catches fabricated APIs, non-existent imports, and phantom methods commonly generated by AI models.",
+  },
+};
+
+function enrichWithExplanations<T extends { ruleId: string; description: string; reference?: string }>(
+  findings: T[],
+): T[] {
+  return findings.map((f) => {
+    const prefix = f.ruleId.replace(/-\d+$/, "");
+    const ctx = RULE_PREFIX_CONTEXT[prefix];
+    if (!ctx) return f;
+    const parts: string[] = [f.description];
+    if (ctx.owasp) parts.push(`\n📚 OWASP: ${ctx.owasp}`);
+    if (ctx.cwe) parts.push(`CWE: ${ctx.cwe}`);
+    parts.push(`💡 ${ctx.learn}`);
+    return {
+      ...f,
+      description: parts.join("  "),
+      reference: f.reference || [ctx.owasp, ctx.cwe].filter(Boolean).join(" / ") || f.reference,
+    };
+  });
 }
 
 // ─── Severity Filter ────────────────────────────────────────────────────────

@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.29.0] — 2026-07-07
+
+### Added
+- **Interactive review session** — New `judges.reviewSession` command for guided finding-by-finding triage with Accept/Dismiss/Skip actions
+- Synced with core v3.29.0 — 4 new judges (#40-43), 5 industry presets, community pattern sharing, calibration dashboard, explanation mode, and 14 features total
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.28.0] — 2026-07-07
 
 ### Added
