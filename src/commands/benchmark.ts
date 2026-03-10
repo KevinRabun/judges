@@ -45,6 +45,8 @@ export interface BenchmarkCase {
   category: string;
   /** Difficulty level */
   difficulty: "easy" | "medium" | "hard";
+  /** AI model/tool that generated this code (e.g. "gpt-4", "claude", "copilot") */
+  aiSource?: string;
 }
 
 export interface BenchmarkResult {
@@ -90,6 +92,8 @@ export interface BenchmarkResult {
   perJudge: Record<string, JudgeBenchmarkResult>;
   /** Per-difficulty breakdown */
   perDifficulty: Record<string, DifficultyResult>;
+  /** Per-AI-source breakdown (when cases have aiSource tags) */
+  perAISource?: Record<string, CategoryResult>;
   /** Individual case results */
   cases: CaseResult[];
 }
@@ -2367,6 +2371,7 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
   const perCategory: Record<string, CategoryResult> = {};
   const perJudge: Record<string, JudgeBenchmarkResult> = {};
   const perDifficulty: Record<string, DifficultyResult> = {};
+  const perAISource: Record<string, CategoryResult> = {};
 
   let totalTP = 0;
   let totalFN = 0;
@@ -2434,6 +2439,29 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
     }
     perDifficulty[tc.difficulty].total++;
     if (casePassed) perDifficulty[tc.difficulty].detected++;
+
+    // Per-AI-source tracking (when cases are tagged)
+    if (tc.aiSource) {
+      if (!perAISource[tc.aiSource]) {
+        perAISource[tc.aiSource] = {
+          category: tc.aiSource,
+          total: 0,
+          detected: 0,
+          truePositives: 0,
+          falseNegatives: 0,
+          falsePositives: 0,
+          precision: 0,
+          recall: 0,
+          f1Score: 0,
+        };
+      }
+      const src = perAISource[tc.aiSource];
+      src.total++;
+      if (casePassed) src.detected++;
+      src.truePositives += caseTP;
+      src.falseNegatives += caseFN;
+      src.falsePositives += caseFP;
+    }
 
     caseResults.push({
       caseId: tc.id,
@@ -2521,6 +2549,15 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
     cat.f1Score = cat.precision + cat.recall > 0 ? (2 * cat.precision * cat.recall) / (cat.precision + cat.recall) : 0;
   }
 
+  // Compute per-AI-source metrics
+  for (const src of Object.values(perAISource)) {
+    src.precision =
+      src.truePositives + src.falsePositives > 0 ? src.truePositives / (src.truePositives + src.falsePositives) : 1;
+    src.recall =
+      src.truePositives + src.falseNegatives > 0 ? src.truePositives / (src.truePositives + src.falseNegatives) : 1;
+    src.f1Score = src.precision + src.recall > 0 ? (2 * src.precision * src.recall) / (src.precision + src.recall) : 0;
+  }
+
   // Compute per-judge metrics
   for (const jb of Object.values(perJudge)) {
     jb.precision =
@@ -2564,6 +2601,7 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
     perCategory,
     perJudge,
     perDifficulty,
+    ...(Object.keys(perAISource).length > 0 ? { perAISource } : {}),
     cases: caseResults,
   };
 }

@@ -8,8 +8,54 @@
 // observed across popular LLMs.
 // ──────────────────────────────────────────────────────────────────────────────
 
-import type { Finding } from "../types.js";
+import type { Finding, Patch, EvidenceChain } from "../types.js";
 import { getLangFamily, isCommentLine } from "./shared.js";
+
+// ─── Scope-Aware Method Definition Check ────────────────────────────────────
+// Prevents false positives on generic method patterns (e.g. `.push()` in
+// Python) when the method is actually defined locally in the same file.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function isMethodDefinedLocally(code: string, methodName: string, language: string): boolean {
+  const esc = methodName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const patterns: RegExp[] = [];
+  switch (language) {
+    case "python":
+      patterns.push(new RegExp(`\\bdef\\s+${esc}\\s*\\(`));
+      break;
+    case "go":
+      patterns.push(new RegExp(`\\bfunc\\s+\\([^)]+\\)\\s+${esc}\\s*\\(`));
+      break;
+    case "java":
+    case "kotlin":
+      patterns.push(new RegExp(`(?:public|private|protected|static|abstract|override|final)\\s+.*\\b${esc}\\s*\\(`));
+      break;
+    case "csharp":
+      patterns.push(
+        new RegExp(`(?:public|private|protected|internal|static|override|virtual|abstract)\\s+.*\\b${esc}\\s*\\(`),
+      );
+      break;
+    case "ruby":
+      patterns.push(new RegExp(`\\bdef\\s+${esc}\\b`));
+      break;
+    case "javascript":
+    case "typescript":
+      patterns.push(new RegExp(`\\bfunction\\s+${esc}\\s*\\(`));
+      patterns.push(new RegExp(`\\b${esc}\\s*\\([^)]*\\)\\s*\\{`));
+      patterns.push(new RegExp(`\\.prototype\\.${esc}\\s*=`));
+      break;
+    case "rust":
+      patterns.push(new RegExp(`\\bfn\\s+${esc}\\s*[(<]`));
+      break;
+    case "swift":
+      patterns.push(new RegExp(`\\bfunc\\s+${esc}\\s*[(<]`));
+      break;
+    case "php":
+      patterns.push(new RegExp(`\\bfunction\\s+${esc}\\s*\\(`));
+      break;
+  }
+  return patterns.some((p) => p.test(code));
+}
 
 // ─── Known Hallucinated APIs ────────────────────────────────────────────────
 
@@ -24,6 +70,17 @@ interface HallucinatedPattern {
   fix: string;
   /** Applicable languages */
   languages: string[];
+  /**
+   * When set, the finding is suppressed if a local definition of this method
+   * exists in the file. Applies to generic patterns (`.push()`, `.isEmpty()`)
+   * that could match on user-defined class methods.
+   */
+  scopeCheckMethod?: string;
+  /**
+   * When set, the finding only fires if the code contains an import from
+   * this module. Prevents cross-framework false positives.
+   */
+  requiresImport?: string;
 }
 
 /**
@@ -153,6 +210,7 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
     reason: "Python lists have no .push() method. LLMs port this from JavaScript's Array.push().",
     fix: "Use .append(item) for single items or .extend(items) for iterables.",
     languages: ["python"],
+    scopeCheckMethod: "push",
   },
   // dict.containsKey — doesn't exist, it's `key in dict`
   {
@@ -161,6 +219,7 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
     reason: "Python dicts have no .containsKey() method. LLMs hallucinate this from Java Maps.",
     fix: "Use the `in` operator: if key in my_dict:",
     languages: ["python"],
+    scopeCheckMethod: "containsKey",
   },
   // string.isEmpty() — doesn't exist
   {
@@ -169,6 +228,7 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
     reason: "Python strings have no .isEmpty() method. LLMs hallucinate this from Java/Kotlin.",
     fix: "Use `if not my_string:` or `if len(my_string) == 0:`.",
     languages: ["python"],
+    scopeCheckMethod: "isEmpty",
   },
   // asyncio.sleep used without await
   {
@@ -214,6 +274,7 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
     reason: "Go uses the built-in append() function, not a method on slices. LLMs hallucinate OOP-style method calls.",
     fix: "Use slice = append(slice, element) as a built-in function.",
     languages: ["go"],
+    scopeCheckMethod: "append",
   },
   // http.HandleFunc on a ServeMux with wrong signature
   {
@@ -233,6 +294,7 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
     reason: "Java has .isBlank() (Java 11+), not .blank(). LLMs truncate the method name.",
     fix: "Use .isBlank() for whitespace-only check or .isEmpty() for zero-length check.",
     languages: ["java"],
+    scopeCheckMethod: "blank",
   },
   // Arrays.asList().add — this returns a fixed-size list, add throws
   {
@@ -289,6 +351,7 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
     reason: "C# strings have no .IsEmpty() instance method. LLMs hallucinate it from Java or Kotlin.",
     fix: "Use string.IsNullOrEmpty(s) or string.IsNullOrWhiteSpace(s) as static methods.",
     languages: ["csharp"],
+    scopeCheckMethod: "IsEmpty",
   },
 
   // ── PHP ───────────────────────────────────────────────────────────────
@@ -300,6 +363,7 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
     reason: "PHP arrays don't have a ->push() method. LLMs hallucinate OOP-style array methods from JavaScript.",
     fix: "Use array_push($array, $value) or $array[] = $value.",
     languages: ["php"],
+    scopeCheckMethod: "push",
   },
   // string.length — PHP uses strlen()
   {
@@ -319,6 +383,7 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
     reason: "Ruby arrays have no .add() method. LLMs hallucinate this from Java/C#.",
     fix: "Use .push(item) or the << operator: array << item.",
     languages: ["ruby"],
+    scopeCheckMethod: "add",
   },
 
   // ── Kotlin ────────────────────────────────────────────────────────────
@@ -341,6 +406,129 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
     reason: "Swift's .count is a property, not a method. Calling .count() is a compile error.",
     fix: "Use .count without parentheses: array.count.",
     languages: ["swift"],
+    scopeCheckMethod: "count",
+  },
+
+  // ── Cross-language ────────────────────────────────────────────────────
+
+  // ── Python — FastAPI / SQLAlchemy / pandas ────────────────────────────
+
+  // FastAPI doesn't have app.route() — it's @app.get/@app.post
+  {
+    pattern: /\bapp\.route\s*\(\s*['"][^'"]+['"]\s*,\s*methods\s*=/,
+    hallucinated: "app.route(path, methods=...)",
+    reason: "FastAPI does not use Flask-style app.route() with methods=. LLMs conflate Flask and FastAPI routing.",
+    fix: 'Use @app.get("/path"), @app.post("/path"), etc. for FastAPI route decorators.',
+    languages: ["python"],
+    requiresImport: "fastapi",
+  },
+  // SQLAlchemy — session.query().all() is SA 1.x; LLMs mix it with 2.0 select()
+  {
+    pattern: /\bsession\.execute\s*\(\s*['"][^'"]*SELECT\b/i,
+    hallucinated: "session.execute(raw SQL string)",
+    reason:
+      "SQLAlchemy 2.0 session.execute() expects a Select object, not a raw SQL string. LLMs hallucinate mixing raw SQL with the ORM API.",
+    fix: "Use session.execute(select(Model).where(...)) with SQLAlchemy 2.0, or text() for raw SQL: session.execute(text('SELECT ...'))",
+    languages: ["python"],
+  },
+  // pandas — df.to_array() doesn't exist
+  {
+    pattern: /\.to_array\s*\(\s*\)/,
+    hallucinated: "df.to_array()",
+    reason: "pandas DataFrames have no .to_array() method. LLMs hallucinate this from JavaScript patterns.",
+    fix: "Use .to_numpy() for ndarray or .values for the underlying array.",
+    languages: ["python"],
+  },
+  // pandas — df.filterBy doesn't exist
+  {
+    pattern: /\.filterBy\s*\(/,
+    hallucinated: "df.filterBy()",
+    reason: "pandas has no .filterBy() method. LLMs fabricate this from ORM/ActiveRecord patterns.",
+    fix: "Use boolean indexing: df[df['col'] > value] or df.query('col > value').",
+    languages: ["python"],
+    scopeCheckMethod: "filterBy",
+  },
+
+  // ── Java — Spring Boot ────────────────────────────────────────────────
+
+  // @Autowired on a local variable (invalid — only works on fields/constructors/setters)
+  {
+    pattern: /^\s*@Autowired\s*\n\s*(?:var|final)\s+\w+/m,
+    hallucinated: "@Autowired on local variable",
+    reason:
+      "Spring's @Autowired cannot be applied to local variables. LLMs generate this when mixing constructor injection with field injection.",
+    fix: "Use constructor injection: add the dependency as a constructor parameter, or apply @Autowired to a field or setter.",
+    languages: ["java"],
+  },
+  // ResponseEntity.ok().body() — chaining is wrong, ok() already sets status
+  {
+    pattern: /\bResponseEntity\.ok\s*\(\s*\)\s*\.body\s*\(/,
+    hallucinated: "ResponseEntity.ok().body()",
+    reason:
+      "ResponseEntity.ok() returns a BodyBuilder; use .body(data) directly. But ResponseEntity.ok(data) is a shorthand that returns ResponseEntity<T> — LLMs confuse the two.",
+    fix: "Use ResponseEntity.ok(body) as shorthand, or ResponseEntity.ok().body(data) — both work, but .ok().body() is less common.",
+    languages: ["java"],
+  },
+
+  // ── C# — ASP.NET / Entity Framework ──────────────────────────────────
+
+  // DbContext.Query<T>() — doesn't exist, it's DbSet<T> or Set<T>()
+  {
+    pattern: /\bDbContext\.Query\s*<[^>]+>\s*\(\s*\)/,
+    hallucinated: "DbContext.Query<T>()",
+    reason: "EF Core removed DbContext.Query<T>(). LLMs hallucinate this from older EF versions.",
+    fix: "Use DbContext.Set<T>() or define a DbSet<T> property on your context.",
+    languages: ["csharp"],
+  },
+  // HttpContext.Response.Write() — doesn't exist in ASP.NET Core the same way
+  {
+    pattern: /\bHttpContext\.Response\.Write\s*\(/,
+    hallucinated: "HttpContext.Response.Write()",
+    reason:
+      "ASP.NET Core's HttpResponse has no synchronous Write() method. LLMs hallucinate this from classic ASP.NET.",
+    fix: "Use await HttpContext.Response.WriteAsync(content) for ASP.NET Core.",
+    languages: ["csharp"],
+  },
+
+  // ── Rust — tokio / async ──────────────────────────────────────────────
+
+  // tokio::spawn without async block
+  {
+    pattern: /\btokio::spawn\s*\(\s*[a-z_]\w*\s*\(\s*\)\s*\)/,
+    hallucinated: "tokio::spawn(fn())",
+    reason:
+      "tokio::spawn requires a Future, not a function call result (unless the function is async). LLMs omit async/await when spawning tasks.",
+    fix: "Use tokio::spawn(async { my_function().await }) or pass an async fn directly.",
+    languages: ["rust"],
+  },
+  // .unwrap_or_default() vs .unwrap_or(default) — LLMs generate .unwrap_default()
+  {
+    pattern: /\.unwrap_default\s*\(\s*\)/,
+    hallucinated: ".unwrap_default()",
+    reason: "Rust has .unwrap_or_default(), not .unwrap_default(). LLMs truncate the method name.",
+    fix: "Use .unwrap_or_default() for Default impl or .unwrap_or(value) for a specific fallback.",
+    languages: ["rust"],
+  },
+
+  // ── JavaScript/TypeScript — Deno / Bun specific ───────────────────────
+
+  // Deno.readFile — should be Deno.readTextFile or Deno.readFile (returns Uint8Array)
+  {
+    pattern: /\bDeno\.readFile\s*\(\s*['"][^'"]+['"]\s*,\s*['"]utf-?8['"]\s*\)/,
+    hallucinated: 'Deno.readFile(path, "utf-8")',
+    reason:
+      "Deno.readFile() does not accept an encoding parameter — it returns Uint8Array. LLMs confuse this with Node.js fs.readFile().",
+    fix: "Use Deno.readTextFile(path) for string output, or new TextDecoder().decode(await Deno.readFile(path)).",
+    languages: ["javascript", "typescript"],
+  },
+  // Bun.serve().listen() — Bun.serve already starts listening
+  {
+    pattern: /\bBun\.serve\s*\([^)]*\)\s*\.listen\s*\(/,
+    hallucinated: "Bun.serve().listen()",
+    reason:
+      "Bun.serve() starts the server immediately — there is no .listen() method. LLMs hallucinate this from Express/Node patterns.",
+    fix: "Remove .listen(). Bun.serve({ port, fetch }) starts listening on creation.",
+    languages: ["javascript", "typescript"],
   },
 
   // ── Cross-language ────────────────────────────────────────────────────
@@ -405,6 +593,29 @@ const SUSPICIOUS_SUBMODULE_PATTERNS: Array<{
       "Flask does not export these directly. They come from extensions: flask-login, flask-cors, flask-wtf, flask-limiter.",
     languages: ["python"],
   },
+  // FastAPI doesn't export these
+  {
+    parent: /\bfrom\s+fastapi\s+import\b/,
+    invalidChild: /\b(?:login_required|authenticate|validate_schema|cors|rate_limit|serialize)\b/,
+    reason:
+      "FastAPI does not export these. Use Depends() for dependency injection, or install separate packages (fastapi-limiter, etc.).",
+    languages: ["python"],
+  },
+  // Next.js doesn't export these from 'next'
+  {
+    parent: /\bfrom\s+['"]next['"]/,
+    invalidChild: /\b(?:useAuth|useUser|useSession|useFetch|useAPI|useDatabase)\b/,
+    reason:
+      "Next.js does not export these hooks. Authentication requires next-auth, data fetching uses SWR or React Query.",
+    languages: ["javascript", "typescript"],
+  },
+  // Vue doesn't export these
+  {
+    parent: /\bfrom\s+['"]vue['"]/,
+    invalidChild: /\b(?:useRequest|useFetch|useAuth|useStore|useAxios|useSocket)\b/,
+    reason: "Vue does not export these composables. useStore requires Pinia/Vuex, others need third-party libraries.",
+    languages: ["javascript", "typescript"],
+  },
 ];
 
 // ─── Main Analyzer ──────────────────────────────────────────────────────────
@@ -420,6 +631,16 @@ export function analyzeHallucinationDetection(code: string, language: string): F
   for (const hp of HALLUCINATED_PATTERNS) {
     if (!hp.languages.includes(lang)) continue;
 
+    // Scope-aware suppression: skip if the method is defined locally
+    if (hp.scopeCheckMethod && isMethodDefinedLocally(code, hp.scopeCheckMethod, lang)) {
+      continue;
+    }
+
+    // Import guard: skip if the pattern requires a specific import that's absent
+    if (hp.requiresImport && !code.includes(hp.requiresImport)) {
+      continue;
+    }
+
     const affectedLines: number[] = [];
     for (let i = 0; i < lines.length; i++) {
       if (isCommentLine(lines[i])) continue;
@@ -429,6 +650,30 @@ export function analyzeHallucinationDetection(code: string, language: string): F
     }
 
     if (affectedLines.length > 0) {
+      // Build auto-fix patch for the first affected line
+      const firstLine = affectedLines[0] - 1;
+      const patch: Patch = {
+        oldText: lines[firstLine],
+        newText: `/* FIX: ${hp.fix} */ ${lines[firstLine]}`,
+        startLine: affectedLines[0],
+        endLine: affectedLines[0],
+      };
+
+      const evidenceChain: EvidenceChain = {
+        steps: [
+          {
+            observation: `Detected hallucinated API: ${hp.hallucinated}`,
+            source: "pattern-match",
+            line: affectedLines[0],
+          },
+          {
+            observation: hp.reason,
+            source: "framework-knowledge",
+          },
+        ],
+        impactStatement: `Runtime error: ${hp.hallucinated} does not exist and will fail when executed`,
+      };
+
       findings.push({
         ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
         severity: "high",
@@ -436,9 +681,13 @@ export function analyzeHallucinationDetection(code: string, language: string): F
         description: hp.reason,
         lineNumbers: affectedLines,
         recommendation: hp.fix,
+        suggestedFix: hp.fix,
         reference: "AI Code Safety — Hallucinated API Detection",
         confidence: 0.85,
         provenance: "regex-pattern-match",
+        patch,
+        evidenceChain,
+        evidenceBasis: "Known-hallucination-registry (+0.40), regex-pattern-match (+0.25), stdlib-knowledge (+0.20)",
       });
     }
   }
@@ -458,9 +707,26 @@ export function analyzeHallucinationDetection(code: string, language: string): F
           lineNumbers: [i + 1],
           recommendation:
             "Verify the import exists in the package's documentation. Install the correct third-party package instead.",
+          suggestedFix: "Remove the invalid import and install the correct package.",
           reference: "AI Code Safety — Hallucinated Import Detection",
           confidence: 0.8,
           provenance: "regex-pattern-match",
+          evidenceChain: {
+            steps: [
+              {
+                observation: `Import from known package references non-existent export`,
+                source: "pattern-match",
+                line: i + 1,
+              },
+              {
+                observation: sp.reason,
+                source: "framework-knowledge",
+              },
+            ],
+            impactStatement: `Import will fail: the referenced export does not exist in this package`,
+          },
+          evidenceBasis:
+            "Known-package-export-registry (+0.35), regex-pattern-match (+0.25), framework-knowledge (+0.20)",
         });
       }
     }
@@ -482,9 +748,25 @@ export function analyzeHallucinationDetection(code: string, language: string): F
           description: "Native Promises have no .delay() method. LLMs hallucinate this from the Bluebird library.",
           lineNumbers: [i + 1],
           recommendation: "Use: await new Promise(resolve => setTimeout(resolve, ms));",
+          suggestedFix: "await new Promise(resolve => setTimeout(resolve, ms));",
           reference: "AI Code Safety — Hallucinated API Detection",
           confidence: 0.9,
           provenance: "regex-pattern-match",
+          evidenceChain: {
+            steps: [
+              {
+                observation: "Promise.resolve().delay() detected — .delay() is a Bluebird-only API",
+                source: "pattern-match",
+                line: i + 1,
+              },
+              {
+                observation: "Native Promise prototype has no .delay() method",
+                source: "framework-knowledge",
+              },
+            ],
+            impactStatement: "Runtime TypeError: .delay() is not a function on native Promises",
+          },
+          evidenceBasis: "Known-hallucination-registry (+0.45), stdlib-knowledge (+0.25), regex-pattern-match (+0.20)",
         });
       }
 
@@ -497,9 +779,21 @@ export function analyzeHallucinationDetection(code: string, language: string): F
           description: "JavaScript Maps use .has() not .contains(). LLMs often hallucinate Java's Map.containsKey().",
           lineNumbers: [i + 1],
           recommendation: "Use map.has(key) to check for key existence.",
+          suggestedFix: "Replace .contains(key) with .has(key).",
           reference: "AI Code Safety — Hallucinated API Detection",
           confidence: 0.7,
           provenance: "regex-pattern-match",
+          evidenceChain: {
+            steps: [
+              {
+                observation: ".contains() called in file that uses Map — Maps have .has(), not .contains()",
+                source: "pattern-match",
+                line: i + 1,
+              },
+            ],
+            impactStatement: "Potential TypeError: Map instances do not have a .contains() method",
+          },
+          evidenceBasis: "Map-usage-context (+0.30), regex-pattern-match (+0.20), stdlib-knowledge (+0.20)",
         });
       }
     }
@@ -522,9 +816,27 @@ export function analyzeHallucinationDetection(code: string, language: string): F
           lineNumbers: [i + 1],
           recommendation:
             "Remove the Promise wrapper — async functions already return Promises. Just use: async function name() { ... }",
+          suggestedFix: "Remove the new Promise() wrapper and use the async function directly.",
           reference: "AI Code Safety — Hallucinated Pattern Detection",
           confidence: 0.85,
           provenance: "regex-pattern-match",
+          evidenceChain: {
+            steps: [
+              {
+                observation: "async executor inside new Promise() constructor",
+                source: "pattern-match",
+                line: i + 1,
+              },
+              {
+                observation:
+                  "Async executors swallow thrown errors because Promise constructor only catches synchronous throws",
+                source: "framework-knowledge",
+              },
+            ],
+            impactStatement:
+              "Reliability risk: errors in async Promise executors cause unhandled rejections instead of proper rejection",
+          },
+          evidenceBasis: "Anti-pattern-registry (+0.40), regex-pattern-match (+0.25), runtime-semantics (+0.20)",
         });
       }
     }
@@ -561,6 +873,17 @@ export function analyzeHallucinationDetection(code: string, language: string): F
           reference: "AI Code Safety — Import Verification",
           confidence: 0.65,
           provenance: "regex-pattern-match",
+          evidenceChain: {
+            steps: [
+              {
+                observation: `Package "${pkgName}" matches AI-fabricated naming pattern (adjective-noun)`,
+                source: "pattern-match",
+                line: i + 1,
+              },
+            ],
+            impactStatement: `Possible supply-chain risk: package "${pkgName}" may not exist on npm`,
+          },
+          evidenceBasis: "Naming-heuristic (+0.35), generic-prefix-suffix-match (+0.30)",
         });
       }
     }
@@ -592,6 +915,17 @@ export function analyzeHallucinationDetection(code: string, language: string): F
           reference: "AI Code Safety — Import Verification",
           confidence: 0.65,
           provenance: "regex-pattern-match",
+          evidenceChain: {
+            steps: [
+              {
+                observation: `Package "${pkgName}" matches AI-fabricated naming pattern (adjective-noun)`,
+                source: "pattern-match",
+                line: i + 1,
+              },
+            ],
+            impactStatement: `Possible supply-chain risk: package "${pkgName}" may not exist on PyPI`,
+          },
+          evidenceBasis: "Naming-heuristic (+0.35), generic-prefix-suffix-match (+0.30)",
         });
       }
     }

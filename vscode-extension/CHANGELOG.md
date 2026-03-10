@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.30.0] — 2026-03-10
+
+### Added
+- **Smarter hallucination detection** — Scope-aware suppression, import guards, 14 new patterns, auto-fix patches, and evidence chains for all HALLU findings
+- **Per-LLM benchmark tracking** — Track detection effectiveness per AI code generator via new `perAISource` dimension
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.29.2] — 2026-03-09
 
 ### Fixed

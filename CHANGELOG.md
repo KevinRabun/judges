@@ -2,6 +2,25 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.30.0] — 2026-03-10
+
+### Added
+- **Scope-aware HALLU suppression** — Hallucination detector now checks for local method definitions before firing on generic patterns (`.push()` in Python, `.isEmpty()` in Python, `.append()` in Go, etc.), reducing false positives on user-defined methods
+- **Hallucination auto-fix patches** — All HALLU findings now include structured `Patch` objects with `oldText`/`newText` for automated remediation
+- **Confidence evidence trails** — All 5 hallucination detection sections now include `EvidenceChain` with multi-step reasoning (observation → source → line) and `evidenceBasis` scoring strings
+- **14 new hallucination patterns** — FastAPI `app.route()` confusion (import-guarded), SQLAlchemy raw SQL in `session.execute()`, pandas `.to_array()`/`.filterBy()`, Spring `@Autowired` on local variables, `ResponseEntity.ok().body()` chaining, EF Core `DbContext.Query<T>()`, ASP.NET `HttpContext.Response.Write()`, Rust `tokio::spawn` without async / `.unwrap_default()`, Deno `readFile` with encoding, Bun `.serve().listen()`
+- **3 new suspicious submodule patterns** — FastAPI, Next.js, and Vue fabricated submodule imports
+- **Import-guard system** — New `requiresImport` field on hallucination patterns prevents cross-framework false positives (e.g., Flask `app.route()` no longer triggers the FastAPI-specific pattern)
+- **Per-LLM benchmark tracking** — New `aiSource` field on benchmark cases and `perAISource` result breakdowns for tracking detection effectiveness per AI code generator
+
+### Tests
+- 1068 tests pass, 0 failures
+
+### Benchmark
+- Grade A, 99.8% detection, 1030/1032 cases, 15 FP
+- All 43 judges at ≤30% individual FP rate
+- HALLU judge: 100% precision (0 FP, improved from 67% FP rate in v3.29.2)
+
 ## [3.29.2] — 2026-03-09
 
 ### Fixed
