@@ -24,6 +24,7 @@ import type { EvaluationOptions } from "../evaluators/index.js";
 import type { Finding, Severity, JudgesConfig } from "../types.js";
 import { parseConfig, loadCascadingConfig } from "../config.js";
 import { loadFeedbackStore, getFpRateByRule } from "./feedback.js";
+import { JUDGES } from "../judges/index.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -40,10 +41,14 @@ interface ReviewArgs {
   configPath: string | undefined;
   /** Maximum FP rate threshold — suppress rules with FP rate above this (0–1) */
   confidence: number;
+  /** Minimum finding confidence to include (0–1). Findings below this are dropped. */
+  minConfidence: number;
   /** Enable feedback-driven confidence calibration */
   calibrate: boolean;
   /** Enable cross-file analysis for architectural findings */
   crossFile: boolean;
+  /** Only run these judges (comma-separated IDs). All others are disabled. */
+  judges?: string[];
 }
 
 interface PrFile {
@@ -314,10 +319,23 @@ const SEVERITY_EMOJI: Record<string, string> = {
   info: "ℹ️",
 };
 
-export function findingToCommentBody(finding: Finding): string {
+export function findingToCommentBody(finding: Finding, fpRate?: number): string {
   const emoji = SEVERITY_EMOJI[finding.severity] || "⚠️";
+  const conf = finding.confidence ?? 0.5;
+  const reliabilityTag =
+    fpRate !== undefined
+      ? fpRate <= 0.1
+        ? " · 🎯 99%+ reliable"
+        : fpRate <= 0.2
+          ? ` · 🎯 ${Math.round((1 - fpRate) * 100)}% reliable`
+          : fpRate <= 0.3
+            ? ` · ⚠️ ${Math.round((1 - fpRate) * 100)}% reliable`
+            : ""
+      : conf >= 0.9
+        ? " · 🎯 high confidence"
+        : "";
   const lines = [
-    `${emoji} **${finding.severity.toUpperCase()}** — ${finding.title} (\`${finding.ruleId}\`)`,
+    `${emoji} **${finding.severity.toUpperCase()}** — ${finding.title} (\`${finding.ruleId}\`)${reliabilityTag}`,
     "",
     finding.description,
     "",
@@ -366,6 +384,7 @@ function reviewPrFiles(
   fpRates?: Map<string, number>,
   fpThreshold?: number,
   crossFile?: boolean,
+  minConfidence?: number,
 ): ReviewResult {
   const comments: ReviewComment[] = [];
   let totalFindings = 0;
@@ -407,6 +426,15 @@ function reviewPrFiles(
         }
       }
 
+      // Suppress findings below minimum confidence threshold
+      if (minConfidence !== undefined && minConfidence > 0) {
+        const conf = finding.confidence ?? 0.5;
+        if (conf < minConfidence) {
+          fpSuppressed++;
+          continue;
+        }
+      }
+
       totalFindings++;
 
       switch (finding.severity) {
@@ -441,7 +469,7 @@ function reviewPrFiles(
         path: file.filename,
         line,
         side: "RIGHT",
-        body: findingToCommentBody(finding),
+        body: findingToCommentBody(finding, fpRates?.get(finding.ruleId)),
         // Multi-line suggestion range: if the patch spans multiple lines, set start_line
         // so the GitHub suggestion block covers the full replacement region.
         ...(finding.patch && finding.patch.startLine < finding.patch.endLine
@@ -494,7 +522,7 @@ function reviewPrFiles(
             path: firstFile,
             line: 1,
             side: "RIGHT",
-            body: findingToCommentBody(finding),
+            body: findingToCommentBody(finding, fpRates?.get(finding.ruleId)),
           });
         }
       } catch {
@@ -824,7 +852,8 @@ export function parseReviewArgs(argv: string[]): ReviewArgs {
     token: getToken(),
     configPath: undefined,
     confidence: 1.0,
-    calibrate: false,
+    minConfidence: 0.6,
+    calibrate: true,
     crossFile: false,
   };
 
@@ -862,11 +891,23 @@ export function parseReviewArgs(argv: string[]): ReviewArgs {
       case "--confidence":
         args.confidence = parseFloat(argv[++i]);
         break;
+      case "--min-confidence":
+        args.minConfidence = parseFloat(argv[++i]);
+        break;
       case "--calibrate":
         args.calibrate = true;
         break;
+      case "--no-calibrate":
+        args.calibrate = false;
+        break;
       case "--cross-file":
         args.crossFile = true;
+        break;
+      case "--judges":
+        args.judges = argv[++i]
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
         break;
       default:
         // Positional: treat as PR number if numeric
@@ -898,7 +939,7 @@ USAGE:
   judges review --pr <number> --dry-run      Preview without posting
   judges review --pr 42 --approve            Auto-approve if no critical/high
   judges review --pr 42 --repo owner/repo    Review PR in specific repo
-  judges review --pr 42 --calibrate          Enable FP-rate calibration
+  judges review --pr 42 --no-calibrate        Disable FP-rate calibration (on by default)
   judges review --pr 42 --cross-file         Enable cross-file architectural analysis
 
 OPTIONS:
@@ -911,8 +952,10 @@ OPTIONS:
   --format <fmt>          Output: text (default), json
   --config, -c <path>     Path to .judgesrc config file (auto-discovered if omitted)
   --confidence <0-1>      Suppress rules with FP rate above this threshold (default: 1.0)
-  --calibrate             Enable feedback-driven confidence calibration
+  --min-confidence <0-1>  Minimum finding confidence to include (default: 0.6)
+  --no-calibrate          Disable feedback-driven confidence calibration (enabled by default)
   --cross-file            Enable cross-file architectural analysis (detects duplication, taint flows)
+  --judges <id,id,...>    Only run these judges (comma-separated IDs, e.g. cybersecurity,authentication)
 
 AUTHENTICATION:
   Set GITHUB_TOKEN env var, or install the \`gh\` CLI and run \`gh auth login\`.
@@ -999,6 +1042,16 @@ AUTHENTICATION:
   if (config) evalOptions.config = config;
   if (args.calibrate) evalOptions.calibrate = true;
 
+  // ── Judge subset selection: convert include-list → disabledJudges ───
+  if (args.judges && args.judges.length > 0) {
+    const includeSet = new Set(args.judges);
+    const allIds = JUDGES.map((j) => j.id);
+    const disabledBySelection = allIds.filter((id) => !includeSet.has(id));
+    if (!evalOptions.config) evalOptions.config = {};
+    evalOptions.config.disabledJudges = [...(evalOptions.config.disabledJudges ?? []), ...disabledBySelection];
+    console.log(`  Judges     : ${args.judges.join(", ")} (${disabledBySelection.length} disabled)`);
+  }
+
   console.log("");
 
   // Run analysis
@@ -1010,6 +1063,7 @@ AUTHENTICATION:
     fpRates,
     fpThreshold,
     args.crossFile,
+    args.minConfidence,
   );
 
   if (args.format === "json") {

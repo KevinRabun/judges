@@ -332,6 +332,30 @@ export const PRESETS: Record<string, Preset> = {
       },
     },
   },
+
+  // ── AI-Generated Code Review ──────────────────────────────────────────────
+
+  "ai-review": {
+    name: "AI Code Review",
+    description:
+      "Optimized for reviewing AI-generated code (Copilot, ChatGPT, Cursor, etc.). " +
+      "Focuses on hallucination detection, security, authentication, and correctness. " +
+      "Calibration-ready with high-confidence-only defaults to minimize noise.",
+    config: {
+      minSeverity: "medium" as Severity,
+      disabledJudges: [
+        "documentation",
+        "internationalization",
+        "accessibility",
+        "ux",
+        "portability",
+        "cost-effectiveness",
+        "backwards-compatibility",
+        "code-structure",
+        "agent-instructions",
+      ],
+    },
+  },
 };
 
 /**

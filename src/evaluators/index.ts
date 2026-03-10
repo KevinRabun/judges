@@ -43,8 +43,8 @@ import { evaluateMustFixGate, clampConfidence, applyConfidenceThreshold, isAbsen
 import { enrichWithPatches } from "../patches/index.js";
 import { crossEvaluatorDedup, severityRank } from "../dedup.js";
 import { filterFalsePositiveHeuristics } from "./false-positive-review.js";
-import { buildCalibrationProfile, calibrateFindings, loadCalibrationProfile } from "../calibration.js";
-import type { CalibrationOptions, CalibrationProfile } from "../calibration.js";
+import { calibrateFindings, loadCalibrationProfile } from "../calibration.js";
+import type { CalibrationOptions } from "../calibration.js";
 import { applyAutoTune } from "../auto-tune.js";
 import { loadFeedbackStore } from "../commands/feedback.js";
 
@@ -871,9 +871,13 @@ export function evaluateDiff(
   const verdict = evaluateWithTribunal(code, language, context, options);
   const allFindings = verdict.findings;
 
-  // Filter findings to only those touching changed lines
+  // Filter findings to only those touching changed lines.
+  // Also drop absence-based findings in diff mode — these flag missing
+  // capabilities (rate limiting, auth, etc.) which cannot be accurately
+  // assessed from a single diff hunk.
   const changedSet = new Set(changedLines);
   const diffFindings = allFindings.filter((f) => {
+    if (isAbsenceBasedFinding(f)) return false;
     if (!f.lineNumbers || f.lineNumbers.length === 0) return false;
     return f.lineNumbers.some((ln) => changedSet.has(ln));
   });

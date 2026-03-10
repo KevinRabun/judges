@@ -2,6 +2,26 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.31.0] — 2026-03-10
+
+### Changed
+- **Calibration enabled by default** — PR review now applies feedback-driven confidence calibration automatically; use `--no-calibrate` to opt out
+- **diff-only mode default in Actions** — GitHub Action `diff-only` input now defaults to `true`, evaluating only changed lines in PRs to dramatically reduce noise
+- **Minimum confidence floor** — PR review applies a default `--min-confidence 0.6` threshold, dropping low-confidence findings automatically
+
+### Added
+- **FP-rate reliability badge** — Each PR review comment now shows a reliability badge (e.g., "🎯 99%+ reliable" or "⚠️ 75% reliable") based on historical false-positive rates
+- **Absence-based finding filter in diff mode** — Findings like "no rate limiting" or "no authentication" are now suppressed in diff mode since they cannot be accurately assessed from a single diff hunk
+- **`ai-review` preset** — New preset optimized for reviewing AI-generated code: focuses on security, hallucination, and correctness judges while disabling non-essential judges (documentation, i18n, accessibility, etc.)
+- **`--judges` flag for PR review** — Select a subset of judges to run during PR review (e.g., `--judges cybersecurity,authentication`); all other judges are disabled
+- **`--no-calibrate` flag** — Opt out of feedback-driven confidence calibration in PR reviews
+
+### Tests
+- 1068 tests pass, 0 failures
+
+### Benchmark
+- Grade A, 98.8% precision, 90.3% recall, F1 0.94
+
 ## [3.30.0] — 2026-03-10
 
 ### Added

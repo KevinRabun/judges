@@ -54,7 +54,7 @@ inputs:
   diff-only:
     description: "Only evaluate changed lines in a PR (requires pull-requests: read). Dramatically reduces noise."
     required: false
-    default: "false"
+    default: "true"
   baseline-file:
     description: "Path to a .judges-baseline.json file. Only new findings (not in baseline) are reported."
     required: false

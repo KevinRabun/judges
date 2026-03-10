@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.31.0] — 2026-03-10
+
+### Changed
+- **Smarter PR review defaults** — Calibration on by default, confidence floor at 0.6, diff-only mode in Actions, reliability badges on each comment
+- **New `ai-review` preset** — Optimized for reviewing AI-generated code with focused judge selection
+
+### Added
+- **`--judges` flag** — Select specific judges for PR review (e.g., `--judges cybersecurity,authentication`)
+- **Absence-based finding filter** — Diff mode now suppresses findings that can't be assessed from a single diff hunk
+
+See [core CHANGELOG](../CHANGELOG.md) for full details.
+
 ## [3.30.0] — 2026-03-10
 
 ### Added
