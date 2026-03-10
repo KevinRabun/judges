@@ -7,6 +7,8 @@ export const complianceJudge: JudgeDefinition = {
   description:
     "Evaluates code for OSS license compatibility, audit logging, SOC 2 controls, export controls, data residency, retention policies, and regulatory readiness.",
   rulePrefix: "COMP",
+  tableDescription: "GDPR/CCPA, PII protection, consent, data retention, audit trails",
+  promptDescription: "Deep regulatory compliance review",
   systemPrompt: `You are Judge Compliance — a regulatory compliance engineer and legal-tech specialist with expertise in OSS licensing, SOC 2, FedRAMP, PCI-DSS, and international data regulations.
 
 YOUR EVALUATION CRITERIA:

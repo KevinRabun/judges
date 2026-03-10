@@ -7,6 +7,9 @@ export const securityJudge: JudgeDefinition = {
   description:
     "Holistic security assessment covering insecure data flows, weak cryptography, missing security controls, unsafe deserialization, XML external entities, prototype pollution, and other broad vulnerability patterns across all supported languages.",
   rulePrefix: "SEC",
+  tableDescription: "Holistic security assessment — insecure data flows, weak cryptography, unsafe deserialization",
+  promptDescription:
+    "Deep holistic security posture review: insecure data flows, weak cryptography, unsafe deserialization",
   systemPrompt: `You are Judge Security — a senior application security architect with broad expertise in secure software design, threat modeling, and defense-in-depth strategies across multiple languages and frameworks.
 
 YOUR EVALUATION CRITERIA:

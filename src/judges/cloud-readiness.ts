@@ -7,6 +7,8 @@ export const cloudReadinessJudge: JudgeDefinition = {
   description:
     "Evaluates code for cloud-native patterns, 12-factor app compliance, containerization readiness, infrastructure as code, observability, and CI/CD maturity.",
   rulePrefix: "CLOUD",
+  tableDescription: "12-Factor compliance, containerization, graceful shutdown, IaC",
+  promptDescription: "Deep cloud readiness review",
   systemPrompt: `You are Judge Cloud Readiness — a cloud-native architect and DevOps practitioner certified across AWS, Azure, and GCP with deep expertise in platform engineering and SRE.
 
 YOUR EVALUATION CRITERIA:

@@ -7,6 +7,8 @@ export const softwarePracticesJudge: JudgeDefinition = {
   description:
     "Evaluates code quality, maintainability, testing practices, documentation, SOLID principles, design patterns, error handling, and secure software development lifecycle (SSDLC) compliance.",
   rulePrefix: "SWDEV",
+  tableDescription: "SOLID principles, type safety, error handling, input validation",
+  promptDescription: "Deep software practices review",
   systemPrompt: `You are Judge Software Practices — a principal software engineer and engineering quality leader with mastery of clean code, design patterns, testing strategies, and secure SDLC practices.
 
 YOUR EVALUATION CRITERIA:

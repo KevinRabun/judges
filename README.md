@@ -619,52 +619,54 @@ const svg2 = generateBadgeSvg(75, "quality"); // custom label
 
 ## The Judge Panel
 
+<!-- JUDGES_TABLE_START -->
 | Judge | Domain | Rule Prefix | What It Evaluates |
 |-------|--------|-------------|-------------------|
 | **Data Security** | Data Security & Privacy | `DATA-` | Encryption, PII handling, secrets management, access controls |
 | **Cybersecurity** | Cybersecurity & Threat Defense | `CYBER-` | Injection attacks, XSS, CSRF, auth flaws, OWASP Top 10 |
-| **Cost Effectiveness** | Cost Optimization | `COST-` | Algorithm efficiency, N+1 queries, memory waste, caching strategy |
+| **Cost Effectiveness** | Cost Optimization & Resource Efficiency | `COST-` | Algorithm efficiency, N+1 queries, memory waste, caching strategy |
 | **Scalability** | Scalability & Performance | `SCALE-` | Statelessness, horizontal scaling, concurrency, bottlenecks |
-| **Cloud Readiness** | Cloud-Native & DevOps | `CLOUD-` | 12-Factor compliance, containerization, graceful shutdown, IaC |
-| **Software Practices** | Engineering Best Practices | `SWDEV-` | SOLID principles, type safety, error handling, input validation |
+| **Cloud Readiness** | Cloud-Native Architecture & DevOps | `CLOUD-` | 12-Factor compliance, containerization, graceful shutdown, IaC |
+| **Software Practices** | Software Engineering Best Practices & Secure SDLC | `SWDEV-` | SOLID principles, type safety, error handling, input validation |
 | **Accessibility** | Accessibility (a11y) | `A11Y-` | WCAG compliance, screen reader support, keyboard navigation, ARIA |
 | **API Design** | API Design & Contracts | `API-` | REST conventions, versioning, pagination, error responses |
 | **Reliability** | Reliability & Resilience | `REL-` | Error handling, timeouts, retries, circuit breakers |
-| **Observability** | Observability & Monitoring | `OBS-` | Structured logging, health checks, metrics, tracing |
-| **Performance** | Performance & Efficiency | `PERF-` | N+1 queries, sync I/O, caching, memory leaks |
-| **Compliance** | Regulatory Compliance | `COMP-` | GDPR/CCPA, PII protection, consent, data retention, audit trails |
+| **Observability** | Monitoring & Diagnostics | `OBS-` | Structured logging, health checks, metrics, tracing |
+| **Performance** | Runtime Performance | `PERF-` | N+1 queries, sync I/O, caching, memory leaks |
+| **Compliance** | Regulatory & License Compliance | `COMP-` | GDPR/CCPA, PII protection, consent, data retention, audit trails |
 | **Data Sovereignty** | Data, Technological & Operational Sovereignty | `SOV-` | Data residency, cross-border transfers, vendor key management, AI model portability, identity federation, circuit breakers, audit trails, data export |
-| **Testing** | Testing & Quality Assurance | `TEST-` | Test coverage, assertions, test isolation, naming |
-| **Documentation** | Documentation & Readability | `DOC-` | JSDoc/docstrings, magic numbers, TODOs, code comments |
-| **Internationalization** | Internationalization (i18n) | `I18N-` | Hardcoded strings, locale handling, currency formatting |
-| **Dependency Health** | Dependency Management | `DEPS-` | Version pinning, deprecated packages, supply chain |
-| **Concurrency** | Concurrency & Async Safety | `CONC-` | Race conditions, unbounded parallelism, missing await |
-| **Ethics & Bias** | Ethics & Bias | `ETHICS-` | Demographic logic, dark patterns, inclusive language |
+| **Testing** | Test Quality & Coverage | `TEST-` | Test coverage, assertions, test isolation, naming |
+| **Documentation** | Documentation & Developer Experience | `DOC-` | JSDoc/docstrings, magic numbers, TODOs, code comments |
+| **Internationalization** | i18n & Localization | `I18N-` | Hardcoded strings, locale handling, currency formatting |
+| **Dependency Health** | Supply Chain & Dependencies | `DEPS-` | Version pinning, deprecated packages, supply chain |
+| **Concurrency** | Concurrency & Thread Safety | `CONC-` | Race conditions, unbounded parallelism, missing await |
+| **Ethics & Bias** | AI/ML Fairness & Ethics | `ETHICS-` | Demographic logic, dark patterns, inclusive language |
 | **Maintainability** | Code Maintainability & Technical Debt | `MAINT-` | Any types, magic numbers, deep nesting, dead code, file length |
 | **Error Handling** | Error Handling & Fault Tolerance | `ERR-` | Empty catch blocks, missing error handlers, swallowed errors |
 | **Authentication** | Authentication & Authorization | `AUTH-` | Hardcoded creds, missing auth middleware, token in query params |
 | **Database** | Database Design & Query Efficiency | `DB-` | SQL injection, N+1 queries, connection pooling, transactions |
 | **Caching** | Caching Strategy & Data Freshness | `CACHE-` | Unbounded caches, missing TTL, no HTTP cache headers |
-| **Configuration Mgmt** | Configuration & Secrets Management | `CFG-` | Hardcoded secrets, missing env vars, config validation |
-| **Backwards Compat** | Backwards Compatibility & Versioning | `COMPAT-` | API versioning, breaking changes, response consistency |
+| **Configuration Management** | Configuration & Secrets Management | `CFG-` | Hardcoded secrets, missing env vars, config validation |
+| **Backwards Compatibility** | Backwards Compatibility & Versioning | `COMPAT-` | API versioning, breaking changes, response consistency |
 | **Portability** | Platform Portability & Vendor Independence | `PORTA-` | OS-specific paths, vendor lock-in, hardcoded hosts |
 | **UX** | User Experience & Interface Quality | `UX-` | Loading states, error messages, pagination, destructive actions |
 | **Logging Privacy** | Logging Privacy & Data Redaction | `LOGPRIV-` | PII in logs, token logging, structured logging, redaction |
 | **Rate Limiting** | Rate Limiting & Throttling | `RATE-` | Missing rate limits, unbounded queries, backoff strategy |
 | **CI/CD** | CI/CD Pipeline & Deployment Safety | `CICD-` | Test infrastructure, lint config, Docker tags, build scripts |
-| **Code Structure** | Structural Analysis (AST) | `STRUCT-` | Cyclomatic complexity, nesting depth, function length, dead code, type safety |
+| **Code Structure** | Structural Analysis | `STRUCT-` | Cyclomatic complexity, nesting depth, function length, dead code, type safety |
 | **Agent Instructions** | Agent Instruction Markdown Quality & Safety | `AGENT-` | Instruction hierarchy, conflict detection, unsafe overrides, scope, validation, policy guidance |
-| **AI Code Safety** | AI-Generated Code Safety | `AICS-` | Prompt injection, insecure LLM output handling, debug defaults, missing validation, unsafe deserialization of AI responses |
-| **Framework Safety** | Framework-Specific Safety | `FW-` | React hooks ordering, Express middleware chains, Next.js SSR/SSG pitfalls, Angular/Vue lifecycle patterns, framework-specific anti-patterns |
+| **AI Code Safety** | AI-Generated Code Quality & Security | `AICS-` | Prompt injection, insecure LLM output handling, debug defaults, missing validation, unsafe deserialization of AI responses |
+| **Framework Safety** | Framework-Specific Security & Best Practices | `FW-` | React hooks ordering, Express middleware chains, Next.js SSR/SSG pitfalls, Angular/Vue lifecycle patterns, framework-specific anti-patterns |
 | **IaC Security** | Infrastructure as Code | `IAC-` | Terraform, Bicep, ARM template misconfigurations, hardcoded secrets, missing encryption, overly permissive network/IAM rules |
 | **Security** | General Security Posture | `SEC-` | Holistic security assessment — insecure data flows, weak cryptography, unsafe deserialization |
 | **Hallucination Detection** | AI-Hallucinated API & Import Validation | `HALLU-` | Detects hallucinated APIs, fabricated imports, and non-existent modules from AI code generators |
 | **Intent Alignment** | Code–Comment Alignment & Stub Detection | `INTENT-` | Detects mismatches between stated intent and implementation, placeholder stubs, TODO-only functions |
 | **API Contract Conformance** | API Design & REST Best Practices | `API-` | API endpoint input validation, REST conformance, request/response contract consistency |
 | **Multi-Turn Coherence** | Code Coherence & Consistency | `COH-` | Self-contradicting patterns, duplicate definitions, dead code, inconsistent naming |
-| **Model Fingerprint** | AI Code Provenance & Model Attribution | `MFPR-` | Detects stylistic fingerprints characteristic of specific AI code generators |
+| **Model Fingerprint Detection** | AI Code Provenance & Model Attribution | `MFPR-` | Detects stylistic fingerprints characteristic of specific AI code generators |
 | **Over-Engineering** | Simplicity & Pragmatism | `OVER-` | Unnecessary abstractions, wrapper-mania, premature generalization, over-complex patterns |
 | **False-Positive Review** | False Positive Detection & Finding Accuracy | `FPR-` | Meta-judge reviewing pattern-based findings for false positives: string literal context, comment/docstring matches, test scaffolding, IaC template gating |
+<!-- JUDGES_TABLE_END -->
 
 ---
 
@@ -951,6 +953,7 @@ Analyze a dependency manifest file for supply-chain risks, version pinning issue
 
 Each judge has a corresponding prompt for LLM-powered deep analysis:
 
+<!-- PROMPTS_TABLE_START -->
 | Prompt | Description |
 |--------|-------------|
 | `judge-data-security` | Deep data security review |
@@ -998,6 +1001,7 @@ Each judge has a corresponding prompt for LLM-powered deep analysis:
 | `judge-over-engineering` | Deep review of unnecessary abstractions, wrapper-mania, premature generalization |
 | `judge-false-positive-review` | Meta-judge review of pattern-based findings for false positive detection and accuracy |
 | `full-tribunal` | all 44 judges in a single prompt |
+<!-- PROMPTS_TABLE_END -->
 
 ---
 

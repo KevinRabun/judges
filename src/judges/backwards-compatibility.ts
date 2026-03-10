@@ -7,6 +7,8 @@ export const backwardsCompatibilityJudge: JudgeDefinition = {
   description:
     "Evaluates code for breaking changes, API versioning strategy, deprecation practices, and migration path planning that affect consumers and integrators.",
   rulePrefix: "COMPAT",
+  tableDescription: "API versioning, breaking changes, response consistency",
+  promptDescription: "Deep backwards compatibility review",
   systemPrompt: `You are Judge Backwards Compatibility — a platform API architect who has managed public APIs consumed by thousands of integrators. You have deep expertise in semantic versioning, API evolution, deprecation, and migration strategies.
 
 YOUR EVALUATION CRITERIA:

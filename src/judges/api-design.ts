@@ -7,6 +7,8 @@ export const apiDesignJudge: JudgeDefinition = {
   description:
     "Evaluates API design for RESTful conventions, naming consistency, proper HTTP status codes, versioning, pagination, error contract consistency, and backward compatibility.",
   rulePrefix: "API",
+  tableDescription: "REST conventions, versioning, pagination, error responses",
+  promptDescription: "Deep API design review",
   systemPrompt: `You are Judge API Design — a senior API architect who has designed and governed public APIs used by millions of developers, with deep expertise in REST, GraphQL, gRPC, and API governance.
 
 YOUR EVALUATION CRITERIA:

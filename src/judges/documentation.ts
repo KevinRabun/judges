@@ -7,6 +7,8 @@ export const documentationJudge: JudgeDefinition = {
   description:
     "Evaluates code for README quality, inline documentation coverage, API reference completeness, example code, changelog, and onboarding developer experience.",
   rulePrefix: "DOC",
+  tableDescription: "JSDoc/docstrings, magic numbers, TODOs, code comments",
+  promptDescription: "Deep documentation quality review",
   systemPrompt: `You are Judge Documentation — a developer experience (DX) architect and technical writing expert who has built documentation systems for major open-source projects and developer platforms.
 
 YOUR EVALUATION CRITERIA:

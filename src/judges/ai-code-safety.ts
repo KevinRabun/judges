@@ -7,6 +7,10 @@ export const aiCodeSafetyJudge: JudgeDefinition = {
   description:
     "Evaluates code for risks specifically common in AI-generated code — prompt injection, unsanitised LLM output, hallucinated patterns, debug-mode defaults, missing input validation, overly broad permissions, and insecure-by-default configurations.",
   rulePrefix: "AICS",
+  tableDescription:
+    "Prompt injection, insecure LLM output handling, debug defaults, missing validation, unsafe deserialization of AI responses",
+  promptDescription:
+    "Deep review of AI-generated code risks: prompt injection, insecure LLM output handling, debug defaults, missing validation",
   systemPrompt: `You are Judge AI Code Safety — a specialist in identifying security, quality, and reliability issues that are disproportionately common in AI-generated code produced by large language models and coding assistants.
 
 YOUR EVALUATION CRITERIA:

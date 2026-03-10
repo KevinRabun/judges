@@ -7,6 +7,10 @@ export const frameworkSafetyJudge: JudgeDefinition = {
   description:
     "Detects misuse patterns unique to popular frameworks: React hook violations, Express middleware ordering, Next.js SSR data leaks, Angular DomSanitizer bypass, Vue v-html XSS, and framework-specific performance pitfalls.",
   rulePrefix: "FW",
+  tableDescription:
+    "React hooks ordering, Express middleware chains, Next.js SSR/SSG pitfalls, Angular/Vue lifecycle patterns, framework-specific anti-patterns",
+  promptDescription:
+    "Deep review of framework-specific safety: React hooks, Express middleware, Next.js SSR/SSG, Angular/Vue patterns",
   systemPrompt: `You are Judge Framework Safety — a senior full-stack engineer deeply versed in React, Express, Next.js, Angular, Vue, Koa, and Fastify internals.
 
 YOUR EVALUATION CRITERIA:

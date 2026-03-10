@@ -7,6 +7,8 @@ export const ciCdJudge: JudgeDefinition = {
   description:
     "Evaluates code for CI/CD readiness, build reproducibility, deployment safety, pipeline configuration, and release management practices.",
   rulePrefix: "CICD",
+  tableDescription: "Test infrastructure, lint config, Docker tags, build scripts",
+  promptDescription: "Deep CI/CD pipeline review",
   systemPrompt: `You are Judge CI/CD — a DevOps engineer and release manager who has built and maintained CI/CD pipelines for organizations shipping hundreds of deployments per day. You specialize in build reproducibility, deployment safety, and release automation.
 
 YOUR EVALUATION CRITERIA:

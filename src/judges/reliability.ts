@@ -7,6 +7,8 @@ export const reliabilityJudge: JudgeDefinition = {
   description:
     "Evaluates code for error recovery, retry logic, circuit breakers, graceful degradation, idempotency, dead letter queues, chaos readiness, and fault tolerance.",
   rulePrefix: "REL",
+  tableDescription: "Error handling, timeouts, retries, circuit breakers",
+  promptDescription: "Deep reliability & resilience review",
   systemPrompt: `You are Judge Reliability — a Site Reliability Engineer (SRE) and resilience architect with experience running five-9s systems serving billions of requests, expert in failure mode analysis and chaos engineering.
 
 YOUR EVALUATION CRITERIA:

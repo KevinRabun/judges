@@ -4,7 +4,7 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [3.32.0] — 2026-03-11
+## [3.33.0] — 2026-03-10
 
 ### Added
 - **CodeLens provider** — Shows finding counts above functions, methods, and classes directly in the editor; refreshes automatically when findings change
@@ -13,7 +13,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 - **New over-engineering judge** — 44th judge detects excessive abstraction, trivial wrappers, god interfaces, and enterprise patterns in small codebases
 - **PDF export** — New `--format pdf` generates print-optimized HTML for "Save as PDF" workflows
-- See [core CHANGELOG](../../CHANGELOG.md) for full details
+- **Centralized judge metadata** — All 44 judges now carry `tableDescription` and `promptDescription` fields, enabling auto-generated documentation
+- **`npm run sync-docs`** — New script regenerates all documentation from the `JUDGES` array as single source of truth
+- **4 judge names fixed** — Data Sovereignty, API Contract, Multi-Turn Coherence, and Model Fingerprint judges now follow the `"Judge {Domain}"` naming convention
+
+### Fixed
+- **PDF formatter build error** — Fixed `Finding.line` reference to use `Finding.lineNumbers`
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
 
 ## [3.31.0] — 2026-03-10
 

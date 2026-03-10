@@ -7,6 +7,8 @@ export const portabilityJudge: JudgeDefinition = {
   description:
     "Evaluates code for OS/platform independence, vendor lock-in avoidance, cross-environment compatibility, and abstraction of platform-specific functionality.",
   rulePrefix: "PORTA",
+  tableDescription: "OS-specific paths, vendor lock-in, hardcoded hosts",
+  promptDescription: "Deep platform portability review",
   systemPrompt: `You are Judge Portability — a systems architect who has migrated applications across operating systems, cloud providers, and runtime environments. You specialize in identifying vendor lock-in and platform dependencies that limit flexibility.
 
 YOUR EVALUATION CRITERIA:

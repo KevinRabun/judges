@@ -7,6 +7,9 @@ export const intentAlignmentJudge: JudgeDefinition = {
   description:
     "Detects mismatches between stated intent (comments, docstrings, function names) and actual implementation — stubs, TODO-only bodies, misleading names, and empty implementations that AI code generators commonly produce.",
   rulePrefix: "INTENT",
+  tableDescription:
+    "Detects mismatches between stated intent and implementation, placeholder stubs, TODO-only functions",
+  promptDescription: "Deep review of code–comment alignment, stub detection, placeholder functions",
   systemPrompt: `You are Judge Intent Alignment — your role is to verify that code does what its documentation, names, and comments claim.
 
 YOUR EVALUATION CRITERIA:

@@ -7,6 +7,8 @@ export const dataSecurityJudge: JudgeDefinition = {
   description:
     "Evaluates code for data protection, encryption practices, PII handling, data-at-rest/in-transit security, access controls, and compliance with data privacy regulations (GDPR, CCPA, HIPAA).",
   rulePrefix: "DATA",
+  tableDescription: "Encryption, PII handling, secrets management, access controls",
+  promptDescription: "Deep data security review",
   systemPrompt: `You are Judge Data Security — a senior data protection architect with 20+ years of experience in data security, privacy engineering, and regulatory compliance.
 
 YOUR EVALUATION CRITERIA:

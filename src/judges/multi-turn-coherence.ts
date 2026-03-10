@@ -2,12 +2,14 @@ import type { JudgeDefinition } from "../types.js";
 
 export const multiTurnCoherenceJudge: JudgeDefinition = {
   id: "multi-turn-coherence",
-  name: "Multi-Turn Coherence",
+  name: "Judge Multi-Turn Coherence",
   description:
     "Detects self-contradicting patterns: duplicate function definitions, contradictory " +
     "boolean assignments, dead code after returns, conflicting configs, and TODO density.",
   domain: "Code Coherence & Consistency",
   rulePrefix: "COH",
+  tableDescription: "Self-contradicting patterns, duplicate definitions, dead code, inconsistent naming",
+  promptDescription: "Deep review of code coherence: self-contradictions, duplicate definitions, dead code",
   systemPrompt: `You are Judge Multi-Turn Coherence — an expert in detecting self-contradicting and incoherent code patterns.
 
 YOUR EVALUATION CRITERIA:

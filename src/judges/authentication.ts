@@ -7,6 +7,8 @@ export const authenticationJudge: JudgeDefinition = {
   description:
     "Evaluates code for proper authentication mechanisms, authorization checks, session management, token handling, and access control patterns.",
   rulePrefix: "AUTH",
+  tableDescription: "Hardcoded creds, missing auth middleware, token in query params",
+  promptDescription: "Deep authentication & authorization review",
   systemPrompt: `You are Judge Authentication — an identity and access management specialist with deep expertise in OAuth 2.0, OIDC, RBAC, ABAC, and secure session management. You have conducted hundreds of security audits focused specifically on auth systems.
 
 YOUR EVALUATION CRITERIA:

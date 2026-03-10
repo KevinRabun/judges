@@ -7,6 +7,9 @@ export const iacSecurityJudge: JudgeDefinition = {
   description:
     "Evaluates Terraform, Bicep, and ARM templates for security misconfigurations, hardcoded secrets, missing encryption, overly permissive network/IAM rules, and IaC best-practice violations.",
   rulePrefix: "IAC",
+  tableDescription:
+    "Terraform, Bicep, ARM template misconfigurations, hardcoded secrets, missing encryption, overly permissive network/IAM rules",
+  promptDescription: "Deep review of infrastructure-as-code security: Terraform, Bicep, ARM template misconfigurations",
   systemPrompt: `You are Judge IaC Security — a cloud infrastructure security specialist with deep expertise in Terraform (HCL), Azure Bicep, and ARM templates. You hold certifications across Azure, AWS, and GCP with specialization in infrastructure-as-code security and compliance.
 
 YOUR EVALUATION CRITERIA:

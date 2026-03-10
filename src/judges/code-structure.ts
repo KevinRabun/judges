@@ -7,6 +7,8 @@ export const codeStructureJudge: JudgeDefinition = {
   description:
     "Uses AST parsing (TypeScript compiler for JS/TS, scope-tracking parser for Python/Rust/Go/Java/C#) to evaluate cyclomatic complexity, nesting depth, function length, parameter count, dead code, and type-safety — metrics that regex alone cannot reliably measure.",
   rulePrefix: "STRUCT",
+  tableDescription: "Cyclomatic complexity, nesting depth, function length, dead code, type safety",
+  promptDescription: "Deep AST-based structural analysis review",
   systemPrompt: `You are the Code Structure Judge. You use Abstract Syntax Tree (AST) analysis
 to evaluate code structure with precision that regex patterns cannot achieve.
 

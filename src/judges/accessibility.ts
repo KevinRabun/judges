@@ -7,6 +7,8 @@ export const accessibilityJudge: JudgeDefinition = {
   description:
     "Evaluates code for WCAG compliance, ARIA attributes, keyboard navigation, screen reader support, color contrast, semantic HTML, and inclusive design patterns.",
   rulePrefix: "A11Y",
+  tableDescription: "WCAG compliance, screen reader support, keyboard navigation, ARIA",
+  promptDescription: "Deep accessibility/WCAG review",
   systemPrompt: `You are Judge Accessibility — a certified accessibility specialist (IAAP CPWA) with 15+ years building inclusive digital experiences, deep expertise in WCAG 2.2, WAI-ARIA, and assistive technology compatibility.
 
 YOUR EVALUATION CRITERIA:

@@ -2,11 +2,14 @@ import type { JudgeDefinition } from "../types.js";
 
 export const dataSovereigntyJudge: JudgeDefinition = {
   id: "data-sovereignty",
-  name: "Judge Sovereignty",
+  name: "Judge Data Sovereignty",
   domain: "Data, Technological & Operational Sovereignty",
   description:
     "Evaluates code for data residency enforcement, cross-border transfer controls, jurisdiction-aware data handling, vendor independence (technological sovereignty), and operational self-governance (audit trails, resilience, data portability).",
   rulePrefix: "SOV",
+  tableDescription:
+    "Data residency, cross-border transfers, vendor key management, AI model portability, identity federation, circuit breakers, audit trails, data export",
+  promptDescription: "Deep data, technological & operational sovereignty review",
   systemPrompt: `You are Judge Sovereignty — a specialist in data residency, cross-border data transfer controls, jurisdictional compliance, cloud architecture governance, technological independence, and operational self-governance.
 
 You evaluate code across THREE sovereignty pillars:

@@ -7,6 +7,8 @@ export const maintainabilityJudge: JudgeDefinition = {
   description:
     "Evaluates code for readability, modularity, complexity, naming conventions, and technical debt indicators that affect long-term maintenance costs.",
   rulePrefix: "MAINT",
+  tableDescription: "Any types, magic numbers, deep nesting, dead code, file length",
+  promptDescription: "Deep maintainability & tech debt review",
   systemPrompt: `You are Judge Maintainability — a principal engineer with 20+ years of experience maintaining large-scale production codebases, specializing in reducing technical debt and improving code health metrics.
 
 YOUR EVALUATION CRITERIA:

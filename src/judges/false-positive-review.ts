@@ -7,6 +7,9 @@ export const falsePositiveReviewJudge: JudgeDefinition = {
   description:
     "Meta-judge that reviews pattern-based findings from all other judges to identify and dismiss false positives. Provides expert criteria for recognizing common static analysis FP patterns including string literal context, comment/docstring matches, test scaffolding, IaC template gating, and identifier-keyword collisions.",
   rulePrefix: "FPR",
+  tableDescription:
+    "Meta-judge reviewing pattern-based findings for false positives: string literal context, comment/docstring matches, test scaffolding, IaC template gating",
+  promptDescription: "Meta-judge review of pattern-based findings for false positive detection and accuracy",
   systemPrompt: `You are Judge False-Positive Review — a senior static analysis tuning engineer who specializes in identifying and removing false positives from automated code review findings.
 
 YOUR ROLE:

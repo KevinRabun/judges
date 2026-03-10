@@ -7,6 +7,8 @@ export const observabilityJudge: JudgeDefinition = {
   description:
     "Evaluates code for structured logging, distributed tracing (OpenTelemetry), metrics exposition, alerting hooks, correlation IDs, and dashboarding readiness.",
   rulePrefix: "OBS",
+  tableDescription: "Structured logging, health checks, metrics, tracing",
+  promptDescription: "Deep observability & monitoring review",
   systemPrompt: `You are Judge Observability — a monitoring and observability architect with deep expertise in the three pillars (logs, metrics, traces), OpenTelemetry, Prometheus, Grafana, and production incident response.
 
 YOUR EVALUATION CRITERIA:

@@ -2,12 +2,14 @@ import type { JudgeDefinition } from "../types.js";
 
 export const apiContractJudge: JudgeDefinition = {
   id: "api-contract",
-  name: "API Contract Conformance",
+  name: "Judge API Contract Conformance",
   description:
     "Evaluates API endpoint implementations for contract conformance: input validation, " +
     "proper status codes, error handling, rate limiting, versioning, and content-type management.",
   domain: "API Design & REST Best Practices",
   rulePrefix: "API",
+  tableDescription: "API endpoint input validation, REST conformance, request/response contract consistency",
+  promptDescription: "Deep review of API contract conformance, input validation, REST best practices",
   systemPrompt: `You are Judge API Contract Conformance — an expert in REST API design, HTTP semantics, and contract-first development.
 
 YOUR EVALUATION CRITERIA:

@@ -7,6 +7,8 @@ export const cybersecurityJudge: JudgeDefinition = {
   description:
     "Evaluates code for vulnerability to attacks (injection, XSS, CSRF, SSRF), authentication/authorization flaws, dependency vulnerabilities, and adherence to OWASP Top 10.",
   rulePrefix: "CYBER",
+  tableDescription: "Injection attacks, XSS, CSRF, auth flaws, OWASP Top 10",
+  promptDescription: "Deep cybersecurity review",
   systemPrompt: `You are Judge Cybersecurity — a principal application security engineer and ethical hacker with expertise in offensive security, vulnerability assessment, and secure coding.
 
 YOUR EVALUATION CRITERIA:

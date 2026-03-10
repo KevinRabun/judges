@@ -7,6 +7,8 @@ export const databaseJudge: JudgeDefinition = {
   description:
     "Evaluates code for query efficiency, connection management, migration practices, schema design, and database access patterns that affect performance and reliability.",
   rulePrefix: "DB",
+  tableDescription: "SQL injection, N+1 queries, connection pooling, transactions",
+  promptDescription: "Deep database design & query review",
   systemPrompt: `You are Judge Database — a database architect and DBA with deep expertise in SQL, NoSQL, ORMs, query optimization, and data modeling. You have diagnosed thousands of database-related production incidents.
 
 YOUR EVALUATION CRITERIA:

@@ -7,6 +7,8 @@ export const costEffectivenessJudge: JudgeDefinition = {
   description:
     "Evaluates code for unnecessary resource consumption, inefficient algorithms, wasteful cloud resource usage, and opportunities for cost optimization.",
   rulePrefix: "COST",
+  tableDescription: "Algorithm efficiency, N+1 queries, memory waste, caching strategy",
+  promptDescription: "Deep cost optimization review",
   systemPrompt: `You are Judge Cost Effectiveness — a cloud economics and performance engineering expert who has optimized millions of dollars in cloud spend across Fortune 500 companies.
 
 YOUR EVALUATION CRITERIA:

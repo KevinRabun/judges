@@ -7,6 +7,8 @@ export const scalabilityJudge: JudgeDefinition = {
   description:
     "Evaluates code for its ability to handle growth — horizontal/vertical scaling readiness, statelessness, concurrency, bottlenecks, and performance under load.",
   rulePrefix: "SCALE",
+  tableDescription: "Statelessness, horizontal scaling, concurrency, bottlenecks",
+  promptDescription: "Deep scalability review",
   systemPrompt: `You are Judge Scalability — a distributed systems architect who has designed systems handling millions of concurrent users and petabytes of data.
 
 YOUR EVALUATION CRITERIA:

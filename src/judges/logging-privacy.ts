@@ -7,6 +7,8 @@ export const loggingPrivacyJudge: JudgeDefinition = {
   description:
     "Evaluates code for PII in log output, sensitive data redaction, appropriate log levels, and compliance with data protection requirements in logging.",
   rulePrefix: "LOGPRIV",
+  tableDescription: "PII in logs, token logging, structured logging, redaction",
+  promptDescription: "Deep logging privacy review",
   systemPrompt: `You are Judge Logging Privacy — a data protection officer and security engineer who has investigated data breaches caused by sensitive information appearing in logs, metrics, and traces.
 
 YOUR EVALUATION CRITERIA:

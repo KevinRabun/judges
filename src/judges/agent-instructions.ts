@@ -7,6 +7,8 @@ export const agentInstructionsJudge: JudgeDefinition = {
   description:
     "Evaluates instruction markdown files for clarity, hierarchy, conflict risk, safety policy coverage, and operational guidance for AI coding agents.",
   rulePrefix: "AGENT",
+  tableDescription: "Instruction hierarchy, conflict detection, unsafe overrides, scope, validation, policy guidance",
+  promptDescription: "Deep review of agent instruction markdown quality and safety",
   systemPrompt: `You are Judge Agent Instructions — a specialist in AI agent governance, instruction hierarchy design, prompt safety, and operational reliability for coding assistants.
 
 YOUR EVALUATION CRITERIA:

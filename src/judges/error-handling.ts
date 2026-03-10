@@ -7,6 +7,8 @@ export const errorHandlingJudge: JudgeDefinition = {
   description:
     "Evaluates code for consistent error handling, meaningful error messages, graceful degradation, and proper use of error boundaries and recovery strategies.",
   rulePrefix: "ERR",
+  tableDescription: "Empty catch blocks, missing error handlers, swallowed errors",
+  promptDescription: "Deep error handling review",
   systemPrompt: `You are Judge Error Handling — a senior SRE and backend architect who has spent years debugging production incidents caused by poor error handling, swallowed exceptions, and misleading error messages.
 
 YOUR EVALUATION CRITERIA:

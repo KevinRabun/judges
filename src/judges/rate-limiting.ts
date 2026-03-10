@@ -7,6 +7,8 @@ export const rateLimitingJudge: JudgeDefinition = {
   description:
     "Evaluates code for API rate limiting, request throttling, backoff strategies, quota management, and protection against abuse and resource exhaustion.",
   rulePrefix: "RATE",
+  tableDescription: "Missing rate limits, unbounded queries, backoff strategy",
+  promptDescription: "Deep rate limiting review",
   systemPrompt: `You are Judge Rate Limiting — an API gateway architect and abuse prevention specialist who has defended high-traffic systems against DDoS, scraping, credential stuffing, and resource exhaustion attacks.
 
 YOUR EVALUATION CRITERIA:

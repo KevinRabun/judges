@@ -703,6 +703,10 @@ export interface JudgeDefinition {
   systemPrompt: string;
   /** Rule prefixes this judge uses (e.g. "SEC", "CYBER") */
   rulePrefix: string;
+  /** Short focus-area keywords for documentation tables (e.g. "Encryption, PII handling, secrets management") */
+  tableDescription: string;
+  /** Human-readable prompt description for documentation (e.g. "Deep data security review") */
+  promptDescription: string;
   /**
    * The analyzer function for this judge. Each judge carries its own analysis
    * logic, eliminating the need for a central dispatch switch. Wired up

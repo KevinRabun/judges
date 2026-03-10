@@ -2,7 +2,7 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
-## [3.32.0] — 2026-03-11
+## [3.33.0] — 2026-03-10
 
 ### Added
 - **Over-engineering detector judge** — New 44th judge (`over-engineering`) with 6 rules detecting excessive abstraction layers, trivial wrappers, god interfaces, builder pattern overuse, enterprise patterns in small codebases, and excessive generic type parameters
@@ -14,6 +14,16 @@ All notable changes to **@kevinrabun/judges** are documented here.
 - **Per-judge timing metrics** — Each `JudgeEvaluation` includes `durationMs`; `TribunalVerdict` includes `timing` with total and per-judge breakdown; text output shows timing and slowest judges
 - **OWASP LLM Top 10 mapping** — Findings are automatically mapped to OWASP LLM Top 10 categories (LLM01–LLM10) where applicable
 - **VS Code CodeLens provider** — Shows finding counts above functions, methods, and classes in the editor
+- **Centralized judge metadata** — Extended `JudgeDefinition` with `tableDescription` and `promptDescription` fields; all 44 judges now carry documentation metadata as part of their definition
+- **`npm run sync-docs` script** — New `scripts/sync-docs.ts` regenerates the README judge table, prompts table, `docs/index.html` JS array, and judge counts across 15+ files from the `JUDGES` array as single source of truth
+- **Adding-a-judge instructions** — `.github/instructions/adding-a-judge.instructions.md` codifies the full step-by-step workflow for adding new judges
+
+### Changed
+- **README and docs auto-generated** — Judge table and prompts table in README use marker-delimited sections (`JUDGES_TABLE_START`/`END`, `PROMPTS_TABLE_START`/`END`); `docs/index.html` uses `JUDGES_ARRAY_START`/`END` markers
+
+### Fixed
+- **4 inconsistent judge names** — Data Sovereignty, API Contract, Multi-Turn Coherence, and Model Fingerprint judges now follow the `"Judge {Domain}"` naming convention
+- **PDF formatter build error** — Fixed `Finding.line` reference to use `Finding.lineNumbers`
 
 ### Tests
 - 1075 tests passing, Benchmark Grade A

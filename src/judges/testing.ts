@@ -7,6 +7,8 @@ export const testingJudge: JudgeDefinition = {
   description:
     "Evaluates code for test-to-code ratio, test isolation, mocking strategy, edge case coverage, flaky test patterns, and test pyramid balance (unit/integration/e2e).",
   rulePrefix: "TEST",
+  tableDescription: "Test coverage, assertions, test isolation, naming",
+  promptDescription: "Deep testing quality review",
   systemPrompt: `You are Judge Testing — a quality engineering architect with mastery of TDD, BDD, testing pyramids, mutation testing, and test infrastructure at scale.
 
 YOUR EVALUATION CRITERIA:

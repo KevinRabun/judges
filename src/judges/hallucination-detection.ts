@@ -7,6 +7,8 @@ export const hallucinationDetectionJudge: JudgeDefinition = {
   description:
     "Detects APIs, imports, methods, and patterns that are commonly hallucinated by AI code generators — non-existent standard library functions, fabricated package names, phantom methods, and incorrect API signatures that look plausible but don't exist.",
   rulePrefix: "HALLU",
+  tableDescription: "Detects hallucinated APIs, fabricated imports, and non-existent modules from AI code generators",
+  promptDescription: "Deep review of AI-hallucinated APIs, fabricated imports, non-existent modules",
   systemPrompt: `You are Judge Hallucination Detection — a specialist in identifying APIs, imports, and code patterns that large language models frequently fabricate.
 
 YOUR EVALUATION CRITERIA:

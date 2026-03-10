@@ -7,6 +7,8 @@ export const performanceJudge: JudgeDefinition = {
   description:
     "Evaluates code for memory allocation efficiency, GC pressure, lazy loading, bundle size, render performance, database query optimization, and runtime hot spots.",
   rulePrefix: "PERF",
+  tableDescription: "N+1 queries, sync I/O, caching, memory leaks",
+  promptDescription: "Deep performance optimization review",
   systemPrompt: `You are Judge Performance — a performance engineering specialist who has optimized latency-critical systems from game engines to financial trading platforms, expert in profiling, benchmarking, and low-level optimization.
 
 YOUR EVALUATION CRITERIA:

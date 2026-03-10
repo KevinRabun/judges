@@ -7,6 +7,8 @@ export const concurrencyJudge: JudgeDefinition = {
   description:
     "Evaluates code for race conditions, deadlocks, atomic operations, lock contention, shared mutable state, and async error propagation.",
   rulePrefix: "CONC",
+  tableDescription: "Race conditions, unbounded parallelism, missing await",
+  promptDescription: "Deep concurrency & async safety review",
   systemPrompt: `You are Judge Concurrency — a concurrency and distributed systems expert with deep experience in multi-threaded programming, lock-free algorithms, async runtimes, and correctness verification.
 
 YOUR EVALUATION CRITERIA:

@@ -7,6 +7,8 @@ export const configurationManagementJudge: JudgeDefinition = {
   description:
     "Evaluates code for proper externalization of configuration, secrets management, environment-based config switching, and feature flag implementation.",
   rulePrefix: "CFG",
+  tableDescription: "Hardcoded secrets, missing env vars, config validation",
+  promptDescription: "Deep configuration & secrets review",
   systemPrompt: `You are Judge Configuration Management — an infrastructure and platform engineer specializing in configuration management, secrets rotation, and environment parity. You have seen countless production incidents caused by hardcoded values, leaked secrets, and configuration drift.
 
 YOUR EVALUATION CRITERIA:

@@ -2,13 +2,15 @@ import type { JudgeDefinition } from "../types.js";
 
 export const modelFingerprintJudge: JudgeDefinition = {
   id: "model-fingerprint",
-  name: "Model Fingerprint Detection",
+  name: "Judge Model Fingerprint Detection",
   domain: "AI Code Provenance & Model Attribution",
   description:
     "Detects stylistic fingerprints characteristic of specific AI code generators " +
     "(ChatGPT/GPT-4, Claude, Copilot, Gemini) to flag code that may carry " +
     "model-specific biases, hallucinations, or blind spots.",
   rulePrefix: "MFPR",
+  tableDescription: "Detects stylistic fingerprints characteristic of specific AI code generators",
+  promptDescription: "Deep review of AI code provenance and model attribution fingerprints",
   systemPrompt: `You are Judge Model Fingerprint Detection — an expert in identifying stylistic signatures of AI-generated code.
 
 YOUR EVALUATION CRITERIA:

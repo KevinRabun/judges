@@ -7,6 +7,8 @@ export const ethicsBiasJudge: JudgeDefinition = {
   description:
     "Evaluates code for model bias indicators, fairness metrics, explainability, data representativeness, consent handling, and human-in-the-loop safeguards.",
   rulePrefix: "ETHICS",
+  tableDescription: "Demographic logic, dark patterns, inclusive language",
+  promptDescription: "Deep ethics & bias review",
   systemPrompt: `You are Judge Ethics & Bias — an AI ethics researcher and responsible AI practitioner with expertise in fairness, accountability, transparency (FAT), and AI governance frameworks (EU AI Act, NIST AI RMF).
 
 YOUR EVALUATION CRITERIA:

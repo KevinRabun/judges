@@ -7,6 +7,8 @@ export const cachingJudge: JudgeDefinition = {
   description:
     "Evaluates code for caching strategy, cache invalidation, TTL configuration, cache stampede prevention, and HTTP caching headers.",
   rulePrefix: "CACHE",
+  tableDescription: "Unbounded caches, missing TTL, no HTTP cache headers",
+  promptDescription: "Deep caching strategy review",
   systemPrompt: `You are Judge Caching — a performance architect specializing in caching strategies across application layers, CDNs, and distributed systems. You understand that "there are only two hard things in computer science: cache invalidation and naming things."
 
 YOUR EVALUATION CRITERIA:

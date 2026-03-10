@@ -7,6 +7,8 @@ export const uxJudge: JudgeDefinition = {
   description:
     "Evaluates code for user experience patterns including loading states, error feedback, responsive design, mobile-friendliness, and interaction quality.",
   rulePrefix: "UX",
+  tableDescription: "Loading states, error messages, pagination, destructive actions",
+  promptDescription: "Deep user experience review",
   systemPrompt: `You are Judge UX — a UX engineer and frontend architect who bridges design and engineering, specializing in performance perception, error communication, and inclusive interaction design.
 
 YOUR EVALUATION CRITERIA:

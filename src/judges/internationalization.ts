@@ -7,6 +7,8 @@ export const internationalizationJudge: JudgeDefinition = {
   description:
     "Evaluates code for hardcoded strings, date/number formatting, RTL support, locale-aware sorting, Unicode handling, and translation-ready patterns.",
   rulePrefix: "I18N",
+  tableDescription: "Hardcoded strings, locale handling, currency formatting",
+  promptDescription: "Deep i18n review",
   systemPrompt: `You are Judge Internationalization — a globalization engineer with expertise in Unicode, CLDR, ICU message formatting, and building applications that serve users in 100+ languages and regions.
 
 YOUR EVALUATION CRITERIA:

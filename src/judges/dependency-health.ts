@@ -7,6 +7,8 @@ export const dependencyHealthJudge: JudgeDefinition = {
   description:
     "Evaluates code for abandoned packages, license risks, transitive vulnerability depth, dependency count bloat, lockfile hygiene, and update freshness.",
   rulePrefix: "DEPS",
+  tableDescription: "Version pinning, deprecated packages, supply chain",
+  promptDescription: "Deep dependency health review",
   systemPrompt: `You are Judge Dependency Health — a software supply chain security expert with deep expertise in dependency management, vulnerability tracking, and open-source ecosystem risk assessment.
 
 YOUR EVALUATION CRITERIA:

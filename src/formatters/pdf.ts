@@ -43,7 +43,7 @@ function renderFinding(f: Finding): string {
     <td><span style="color:${color};font-weight:600">${esc(f.severity.toUpperCase())}</span></td>
     <td><code>${esc(f.ruleId)}</code></td>
     <td>${esc(f.title)}</td>
-    <td>${f.line ?? "—"}</td>
+    <td>${f.lineNumbers?.join(", ") ?? "—"}</td>
     <td>${esc(f.confidenceTier ?? "—")}</td>
   </tr>
   <tr class="detail-row">

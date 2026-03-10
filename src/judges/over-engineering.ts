@@ -7,6 +7,8 @@ export const overEngineeringJudge: JudgeDefinition = {
   description:
     "Detects unnecessary abstractions, premature generalisation, wrapper-mania, and design-pattern misuse. Especially relevant for AI-generated code which tends toward over-abstraction.",
   rulePrefix: "OVER",
+  tableDescription: "Unnecessary abstractions, wrapper-mania, premature generalization, over-complex patterns",
+  promptDescription: "Deep review of unnecessary abstractions, wrapper-mania, premature generalization",
   systemPrompt: `You are the Over-Engineering Judge. Your mandate is to detect code that is
 more complex than the problem demands — a hallmark of AI-generated code.
 
