@@ -5,6 +5,7 @@ import { JudgesCodeLensProvider } from "./codelens";
 import { JudgesFindingsPanel } from "./findings-panel";
 import { registerChatParticipant } from "./chat-participant";
 import { registerLmTools } from "./lm-tool";
+import type { Finding } from "@kevinrabun/judges/api";
 
 let diagnosticProvider: JudgesDiagnosticProvider;
 let findingsPanel: JudgesFindingsPanel;
@@ -373,11 +374,51 @@ export function activate(context: vscode.ExtensionContext): void {
   statusBar.show();
   context.subscriptions.push(statusBar);
 
+  // Update status bar when findings change for the active editor
+  diagnosticProvider.onFindingsChanged((e) => {
+    const activeUri = vscode.window.activeTextEditor?.document.uri.toString();
+    if (activeUri === e.uri.toString()) {
+      updateStatusBar(statusBar, e.findings);
+    }
+  });
+
+  // Update status bar when user switches editors
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (!editor) {
+        statusBar.text = "$(shield) Judges";
+        statusBar.tooltip = "Click to evaluate with Judges Panel";
+        return;
+      }
+      const findings = diagnosticProvider.getCachedFindings(editor.document.uri);
+      if (findings) {
+        updateStatusBar(statusBar, findings);
+      } else {
+        statusBar.text = "$(shield) Judges";
+        statusBar.tooltip = "Click to evaluate with Judges Panel";
+      }
+    }),
+  );
+
   context.subscriptions.push(diagnosticCollection);
 }
 
 export function deactivate(): void {
   // Cleanup handled by disposables
+}
+
+// ─── Status Bar Helper ────────────────────────────────────────────────
+
+function updateStatusBar(statusBar: vscode.StatusBarItem, findings: Finding[]): void {
+  const fixable = findings.filter((f) => (f as { patch?: unknown }).patch).length;
+  if (findings.length === 0) {
+    statusBar.text = "$(shield) Judges ✅";
+    statusBar.tooltip = "No findings — click to re-evaluate";
+  } else {
+    const fixSuffix = fixable > 0 ? `, ${fixable} fixable` : "";
+    statusBar.text = `$(shield) Judges: ${findings.length} finding(s)${fixSuffix}`;
+    statusBar.tooltip = `${findings.length} finding(s)${fixSuffix} — click to re-evaluate`;
+  }
 }
 
 // ─── MCP Server Registration ──────────────────────────────────────────────

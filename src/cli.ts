@@ -614,6 +614,7 @@ function formatTribunalOutput(
 function formatTextOutput(verdict: ReturnType<typeof evaluateWithTribunal>): string {
   const lines: string[] = [];
   const totalFindings = verdict.evaluations.reduce((s, e) => s + e.findings.length, 0);
+  const fixableCount = verdict.evaluations.reduce((s, e) => s + e.findings.filter((f) => f.patch).length, 0);
 
   lines.push("╔══════════════════════════════════════════════════════════════╗");
   lines.push("║              Judges Panel — Evaluation Result               ║");
@@ -623,7 +624,7 @@ function formatTextOutput(verdict: ReturnType<typeof evaluateWithTribunal>): str
   lines.push(`  Score    : ${verdict.overallScore}/100`);
   lines.push(`  Critical : ${verdict.criticalCount}`);
   lines.push(`  High     : ${verdict.highCount}`);
-  lines.push(`  Findings : ${totalFindings}`);
+  lines.push(`  Findings : ${totalFindings}${fixableCount > 0 ? ` (${fixableCount} auto-fixable)` : ""}`);
   lines.push(`  Judges   : ${verdict.evaluations.length}`);
   lines.push("");
 
@@ -682,7 +683,8 @@ function formatTextOutput(verdict: ReturnType<typeof evaluateWithTribunal>): str
     lines.push("  Critical & High Findings:");
     lines.push("  " + "─".repeat(60));
     for (const f of critical.slice(0, 20)) {
-      lines.push(`  [${f.severity.toUpperCase().padEnd(8)}] ${f.ruleId}: ${f.title}`);
+      const fixTag = f.patch ? " 🔧" : "";
+      lines.push(`  [${f.severity.toUpperCase().padEnd(8)}] ${f.ruleId}: ${f.title}${fixTag}`);
       if (f.lineNumbers && f.lineNumbers.length > 0) {
         lines.push(`             Line ${f.lineNumbers[0]}: ${f.description.slice(0, 100)}`);
       }
@@ -700,6 +702,10 @@ function formatTextOutput(verdict: ReturnType<typeof evaluateWithTribunal>): str
     lines.push("  ⚠️  WARNING — Review findings above before proceeding.");
   } else {
     lines.push("  ✅ PASS — No critical issues detected.");
+  }
+
+  if (fixableCount > 0) {
+    lines.push(`  🔧 ${fixableCount} finding(s) can be auto-fixed. Run: judges eval <file> --fix`);
   }
   lines.push("");
 
@@ -1045,6 +1051,7 @@ export async function runCli(argv: string[]): Promise<void> {
       let totalHigh = 0;
       let failCount = 0;
       let totalFixed = 0;
+      let totalFixable = 0;
 
       for (let idx = 0; idx < files.length; idx++) {
         const filePath = files[idx];
@@ -1070,14 +1077,17 @@ export async function runCli(argv: string[]): Promise<void> {
         }
 
         const fileFindings = verdict.evaluations.reduce((s, e) => s + e.findings.length, 0);
+        const fileFixable = verdict.evaluations.reduce((s, e) => s + e.findings.filter((f) => f.patch).length, 0);
         totalFindings += fileFindings;
+        totalFixable += fileFixable;
         totalCritical += verdict.criticalCount;
         totalHigh += verdict.highCount;
         if (verdict.overallVerdict === "fail") failCount++;
 
         if (!args.quiet) {
           const icon = verdict.overallVerdict === "pass" ? "✅" : verdict.overallVerdict === "warning" ? "⚠️" : "❌";
-          process.stderr.write(` ${icon} ${verdict.overallScore}/100 (${fileFindings} findings)\n`);
+          const fixSuffix = fileFixable > 0 ? `, ${fileFixable} fixable` : "";
+          process.stderr.write(` ${icon} ${verdict.overallScore}/100 (${fileFindings} findings${fixSuffix})\n`);
         }
 
         // Auto-fix in multi-file mode
@@ -1109,7 +1119,7 @@ export async function runCli(argv: string[]): Promise<void> {
       console.log("╚══════════════════════════════════════════════════════════════╝");
       console.log("");
       console.log(`  Files    : ${files.length}`);
-      console.log(`  Findings : ${totalFindings}`);
+      console.log(`  Findings : ${totalFindings}${totalFixable > 0 ? ` (${totalFixable} auto-fixable)` : ""}`);
       console.log(`  Critical : ${totalCritical}`);
       console.log(`  High     : ${totalHigh}`);
       console.log(`  Failed   : ${failCount} file(s)`);
@@ -1156,7 +1166,12 @@ export async function runCli(argv: string[]): Promise<void> {
       const elapsed = Date.now() - startTime;
 
       if (args.summary) {
-        printSummaryLine(evaluation.verdict, evaluation.score, evaluation.findings.length);
+        printSummaryLine(
+          evaluation.verdict,
+          evaluation.score,
+          evaluation.findings.length,
+          evaluation.findings.filter((f) => f.patch).length,
+        );
       } else if (args.format === "json") {
         console.log(JSON.stringify(evaluation, null, 2));
       } else if (args.format === "markdown") {
@@ -1256,7 +1271,8 @@ export async function runCli(argv: string[]): Promise<void> {
 
       if (args.summary) {
         const totalFindings = verdict.evaluations.reduce((s, e) => s + e.findings.length, 0);
-        printSummaryLine(verdict.overallVerdict, verdict.overallScore, totalFindings);
+        const totalFixable = verdict.evaluations.reduce((s, e) => s + e.findings.filter((f) => f.patch).length, 0);
+        printSummaryLine(verdict.overallVerdict, verdict.overallScore, totalFindings, totalFixable);
       } else if (args.format === "html") {
         console.log(verdictToHtml(verdict, resolvedPath || args.file));
       } else if (args.format === "pdf") {
@@ -1322,9 +1338,10 @@ export async function runCli(argv: string[]): Promise<void> {
 
 // ─── Summary Line Output ───────────────────────────────────────────────────
 
-function printSummaryLine(verdict: string, score: number, findings: number): void {
+function printSummaryLine(verdict: string, score: number, findings: number, fixable = 0): void {
   const icon = verdict === "pass" ? "✅" : verdict === "warning" ? "⚠️" : "❌";
-  console.log(`${icon} ${verdict.toUpperCase()} ${score}/100 (${findings} findings)`);
+  const fixSuffix = fixable > 0 ? `, ${fixable} auto-fixable` : "";
+  console.log(`${icon} ${verdict.toUpperCase()} ${score}/100 (${findings} findings${fixSuffix})`);
 }
 
 // ─── Config / Preset Loader ────────────────────────────────────────────────
@@ -1386,6 +1403,17 @@ function loadEvalConfig(args: CliArgs): JudgesConfig | undefined {
         }
         break;
       }
+    }
+  }
+
+  // 3b. No config found anywhere — apply onboarding preset for first-time users
+  if (!config && !args.config && !args.preset) {
+    const onboarding = getPreset("onboarding");
+    if (onboarding) {
+      config = { ...onboarding.config };
+      console.error(
+        "ℹ No .judgesrc found — using onboarding preset (high-severity only). Run 'judges init' for full control.",
+      );
     }
   }
 

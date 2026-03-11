@@ -288,6 +288,14 @@ export class JudgesDiagnosticProvider {
   }
 
   /**
+   * Get cached findings by VS Code Uri (used by status bar updates).
+   */
+  getCachedFindings(uri: vscode.Uri): FindingWithPatch[] | undefined {
+    const key = uri.toString();
+    return this.findingsMap.has(key) ? this.findingsMap.get(key) : undefined;
+  }
+
+  /**
    * Send current deterministic findings to the VS Code Language Model API
    * for false-positive review. The LLM examines each finding against the
    * actual code context and removes those it identifies as false positives.

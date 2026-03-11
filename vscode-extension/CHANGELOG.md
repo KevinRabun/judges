@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.37.0] — 2026-03-10
+
+### Added
+- **Live status bar** — Status bar updates dynamically after evaluations showing finding count and auto-fixable count (e.g., `Judges: 5 finding(s), 2 fixable`) instead of static label; updates when switching editor tabs
+- **Auto-onboarding** — CLI automatically applies onboarding preset for first-time users with no config file, reducing initial noise
+- **Fix rate visibility** — CLI summary output now shows auto-fixable counts and fix guidance across all output modes
+- See [core CHANGELOG](../../CHANGELOG.md) for full details
+
 ## [3.36.0] — 2026-03-10
 
 ### Added

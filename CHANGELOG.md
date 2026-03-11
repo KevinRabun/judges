@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.37.0] — 2026-03-10
+
+### Added
+- **Auto-onboarding preset** — When no `.judgesrc` config file exists and no `--preset` or `--config` flag is provided, the CLI automatically applies the `onboarding` preset (high-severity only, 9 noisy judges disabled) with a guidance message to run `judges init` for full control. Reduces noise for first-time users.
+- **Fix rate visibility (CLI)** — Findings summary now shows auto-fixable count everywhere: verdict summary (`Findings : 12 (4 auto-fixable)`), `--summary` one-liner, multi-file per-file progress, multi-file summary, and critical/high findings list (tagged with 🔧). New guidance line after verdict: `🔧 N finding(s) can be auto-fixed. Run: judges eval <file> --fix`.
+
+### Changed (VS Code Extension)
+- **Live status bar** — Status bar now updates dynamically after evaluations, showing finding count and fixable count (e.g., `Judges: 5 finding(s), 2 fixable`) instead of the static "Judges" label. Also updates when switching between editor tabs.
+- **`getCachedFindings()` API** — New method on `JudgesDiagnosticProvider` for retrieving cached findings by URI, used by the status bar.
+
+### Tests
+- 1,082 tests pass across 218 suites
+
 ## [3.36.0] — 2026-03-10
 
 ### Added
