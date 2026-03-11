@@ -153,7 +153,7 @@ export async function storeSessionRecording(userId: string, recording: Buffer) {
   // Full session recordings stored indefinitely
   // No lifecycle policy, no user deletion capability
 }`,
-    expectedRuleIds: ["MAINT-001"],
+    expectedRuleIds: ["COMP-001"],
     category: "compliance",
     difficulty: "hard",
   },
@@ -286,7 +286,7 @@ export async function storeUserData(userId: string, region: string, data: UserDa
   });
   // EU users' personal data stored in US without SCCs or adequacy decision
 }`,
-    expectedRuleIds: ["MAINT-001"],
+    expectedRuleIds: ["SOV-001"],
     category: "sovereignty",
     difficulty: "medium",
   },
@@ -884,7 +884,7 @@ app.post("/api/orders", async (req, res) => {
 app.put("/api/profile", async (req, res) => {
   if (!req.body.name) return res.status(500).json({ error: "Name required" }); // Wrong status code
 });`,
-    expectedRuleIds: ["UX-001"],
+    expectedRuleIds: ["UX-001", "SEC-001"],
     category: "ux",
     difficulty: "medium",
   },
@@ -2073,7 +2073,7 @@ export function compareStrings(a: string, b: string): number {
   // Locale-unaware comparison
   // Should use Intl.Collator for proper locale ordering
 }`,
-    expectedRuleIds: ["DOC-001"],
+    expectedRuleIds: ["I18N-001"],
     category: "internationalization",
     difficulty: "hard",
   },

@@ -52,11 +52,17 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
   });
 
   const hasRegionPolicy =
-    /allow(ed)?Regions|approvedRegions|regionPolicy|dataResidencyPolicy|sovereignty|approvedJurisdictions|allowedJurisdictions|jurisdictionPolicy|exportPolicy|egressPolicy|jurisdictionGuard|regionConfig|deploymentRegion|regionConstraint|regionAllowlist|regionDenylist|dataLocality|geoFence|geoRestrict/i.test(
+    /allow(ed)?Regions|approvedRegions|regionPolicy|dataResidency(?:Policy|Region)?|residencyRegion|sovereignty|approvedJurisdictions|allowedJurisdictions|jurisdictionPolicy|exportPolicy|egressPolicy|jurisdictionGuard|regionConfig|deploymentRegion|regionConstraint|regionAllowlist|regionDenylist|dataLocality|geoFence|geoRestrict/i.test(
       code,
     );
 
-  if (hardcodedGlobalOrForeignLines.length >= 1 && !hasRegionPolicy && !iacTemplate) {
+  // Also recognize explicit region validation patterns: checking a region
+  // variable against an endpoint map and throwing on invalid regions.
+  const hasRegionValidation =
+    hasRegionPolicy ||
+    (/REGION_ENDPOINTS|regionEndpoints|region_endpoints/i.test(code) && /throw\s+new\s+Error.*region/i.test(code));
+
+  if (hardcodedGlobalOrForeignLines.length >= 1 && !hasRegionValidation && !iacTemplate) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",
@@ -79,6 +85,10 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     /assertAllowedEgress|approvedJurisdictions|egressPolicy|egressGate|allowedEgress|jurisdictionCheck|checkJurisdiction|validateDestination|transferControl|crossBorder.*check|egress.*guard/i.test(
       code,
     );
+  // Also recognize consent-based transfer controls: requiring user consent
+  // before cross-border data transfer is a valid GDPR Art. 49 derogation.
+  const hasConsentGate =
+    hasEgressGate || (/consent/i.test(code) && /throw|reject|deny|block/i.test(code)) || hasRegionValidation;
   lines.forEach((line, index) => {
     const trimmed = line.trim();
     if (/^\/\/|^\*|^\/\*|^#(?!\[)|^"""|^'''/.test(trimmed)) return;
@@ -100,7 +110,7 @@ export function analyzeDataSovereignty(code: string, _language: string): Finding
     /(?:user|customer|patient|email|phone|ssn|passport|payment|credit.?card|personal.?data|\bpii\b|sensitive|address|profile|account|identity|subscriber)/i.test(
       code,
     );
-  if (crossBorderEgressLines.length >= 2 && !hasEgressGate && handlesPersonalData) {
+  if (crossBorderEgressLines.length >= 2 && !hasConsentGate && handlesPersonalData) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
       severity: "high",

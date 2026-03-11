@@ -81,7 +81,27 @@ export function analyzeInternationalization(code: string, language: string): Fin
     if (/\.toLocaleDateString\s*\(\s*\)|\.toLocaleString\s*\(\s*\)|new\s+Date\(\)\.toString\(\)/i.test(line)) {
       localeSensitiveLines.push(i + 1);
     }
+    // Sort with comparison callback using < or > (locale-unaware string ordering)
     if (/\.sort\s*\(\s*\(.*\)\s*=>\s*\w+\s*[<>]\s*\w+/i.test(line) && /name|label|title/i.test(line)) {
+      localeSensitiveLines.push(i + 1);
+    }
+    // Bare .sort() without arguments — uses UTF-16 code unit order, not locale-aware
+    if (/\.sort\s*\(\s*\)/.test(line) && !/Intl\.Collator|localeCompare/i.test(line)) {
+      localeSensitiveLines.push(i + 1);
+    }
+    // toLowerCase()/toUpperCase() for comparison — locale-sensitive (Turkish İ/i issue)
+    if (
+      /\.(?:toLowerCase|toUpperCase)\s*\(\s*\)/.test(line) &&
+      /filter|search|find|includes|compare|match|query/i.test(line) &&
+      !/Intl|locale|toLocale/i.test(line)
+    ) {
+      localeSensitiveLines.push(i + 1);
+    }
+    // Standalone locale-unaware string comparison function
+    if (
+      /\w+\s*[<>]\s*\w+\s*\?/.test(line) &&
+      /compare|sort|order/i.test(lines.slice(Math.max(0, i - 3), i + 1).join("\n"))
+    ) {
       localeSensitiveLines.push(i + 1);
     }
   });
@@ -108,7 +128,7 @@ export function analyzeInternationalization(code: string, language: string): Fin
   const currencyLines: number[] = [];
   lines.forEach((line, i) => {
     if (isCommentLine(line)) return;
-    if (/["']\$\d|`\s*\$\s*\$\{|["`']\s*€|["`']\s*£|["`']\s*¥/i.test(line)) {
+    if (/["']\$\d|["']\$["']\s*\+|`\s*\$\s*\$\{|["`']\s*€|["`']\s*£|["`']\s*¥/i.test(line)) {
       currencyLines.push(i + 1);
     }
   });
@@ -132,9 +152,17 @@ export function analyzeInternationalization(code: string, language: string): Fin
   const ltrAssumptionLines: number[] = [];
   lines.forEach((line, i) => {
     if (isCommentLine(line)) return;
+    // CSS syntax: text-align: left, padding-left, margin-left
     if (
       /text-align\s*:\s*left|padding-left|margin-left:\s*auto|float\s*:\s*left/i.test(line) &&
       /header|nav|menu|sidebar/i.test(lines.slice(Math.max(0, i - 3), i + 1).join("\n"))
+    ) {
+      ltrAssumptionLines.push(i + 1);
+    }
+    // JSX inline style: textAlign: "left", paddingLeft, marginLeft, marginRight
+    if (
+      /\b(?:textAlign)\s*:\s*["']left["']|\b(?:paddingLeft|marginRight)\s*:\s*\d/i.test(line) &&
+      !/paddingRight|marginLeft/i.test(line) // only flag if not bidirectional
     ) {
       ltrAssumptionLines.push(i + 1);
     }
@@ -262,26 +290,32 @@ export function analyzeInternationalization(code: string, language: string): Fin
   }
 
   // Detect raw number formatting without locale awareness
+  // Skip entirely when the code already uses Intl plural/number/date APIs —
+  // template literals like `${count} items` inside Intl.PluralRules plural
+  // forms are the correct i18n pattern, not raw formatting.
+  const usesIntlApis = /Intl\.(?:PluralRules|NumberFormat|DateTimeFormat)/i.test(code);
   const rawNumberLines: number[] = [];
-  lines.forEach((line, i) => {
-    if (isCommentLine(line)) return;
-    // Detect Number().toString(), String(number), or template literals with numeric variables without Intl
-    if (
-      /(?:\.toString\(\)|String\(\w+\)|\$\{\w+\})\s*/.test(line) &&
-      /(?:price|amount|cost|total|quantity|count|balance|salary|revenue)/i.test(line) &&
-      !/Intl|toLocaleString|NumberFormat|i18n|formatNumber/i.test(line)
-    ) {
-      rawNumberLines.push(i + 1);
-    }
-    // Detect manual thousand separators or decimal formatting
-    if (
-      /\.replace\(\s*\/\\B\(?=\(\\d\{3\}\)\+\(?!\\d\)\)\/|\.toFixed\s*\(\s*\d\s*\)\s*(?!\s*\))/.test(line) &&
-      /(?:price|amount|cost|total|balance)/i.test(line) &&
-      !/Intl|NumberFormat/i.test(line)
-    ) {
-      rawNumberLines.push(i + 1);
-    }
-  });
+  if (!usesIntlApis) {
+    lines.forEach((line, i) => {
+      if (isCommentLine(line)) return;
+      // Detect Number().toString(), String(number), or template literals with numeric variables without Intl
+      if (
+        /(?:\.toString\(\)|String\(\w+\)|\$\{\w+\})\s*/.test(line) &&
+        /(?:price|amount|cost|total|quantity|count|balance|salary|revenue)/i.test(line) &&
+        !/Intl|toLocaleString|NumberFormat|i18n|formatNumber/i.test(line)
+      ) {
+        rawNumberLines.push(i + 1);
+      }
+      // Detect manual thousand separators or decimal formatting
+      if (
+        /\.replace\(\s*\/\\B\(?=\(\\d\{3\}\)\+\(?!\\d\)\)\/|\.toFixed\s*\(\s*\d\s*\)\s*(?!\s*\))/.test(line) &&
+        /(?:price|amount|cost|total|balance)/i.test(line) &&
+        !/Intl|NumberFormat/i.test(line)
+      ) {
+        rawNumberLines.push(i + 1);
+      }
+    });
+  }
   if (rawNumberLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,

@@ -233,8 +233,11 @@ function applyAstRefinements(findings: Finding[], structure: CodeStructure, tain
 
   return findings
     .filter((f) => {
-      // Remove findings where ALL referenced lines are dead code
+      // Remove findings where ALL referenced lines are dead code — except for
+      // findings that ARE about dead code detection (e.g., LOGIC dead-code
+      // reports). Those findings intentionally reference unreachable lines.
       if (f.lineNumbers && f.lineNumbers.length > 0 && f.lineNumbers.every((l) => deadSet.has(l))) {
+        if (/dead\s*code|unreachable/i.test(f.title)) return true;
         return false;
       }
       return true;

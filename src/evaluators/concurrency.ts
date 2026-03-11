@@ -83,11 +83,21 @@ export function analyzeConcurrency(code: string, language: string): Finding[] {
         const varName = line.match(/var\s+(\w+)/)?.[1];
         if (!varName) continue;
         const restOfFile = lines.slice(i + 1).join("\n");
-        // Check if accessed from HTTP handler or goroutine context
+        // Check if accessed from HTTP handler, goroutine context, or exported functions
         const hasHttpHandler = /func\s+\w+\s*\(\s*\w+\s+http\.ResponseWriter/.test(restOfFile);
         const hasGoroutine = /\bgo\s+func\b/.test(restOfFile);
+        // Exported functions (capitalized names) on package-level maps are
+        // callable from any goroutine — inherently concurrent.
+        const hasExportedAccessor = new RegExp(
+          `func\\s+[A-Z]\\w*\\s*\\([^)]*\\)[^{]*\\{[^}]*\\b${varName}\\b`,
+          "s",
+        ).test(restOfFile);
         const hasMutex = /sync\.(RW)?Mutex|sync\.Map/.test(code);
-        if ((hasHttpHandler || hasGoroutine) && !hasMutex && new RegExp(`\\b${varName}\\b`).test(restOfFile)) {
+        if (
+          (hasHttpHandler || hasGoroutine || hasExportedAccessor) &&
+          !hasMutex &&
+          new RegExp(`\\b${varName}\\b`).test(restOfFile)
+        ) {
           goMapLines.push(i + 1);
         }
       }

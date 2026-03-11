@@ -674,8 +674,10 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
   // ── IAC: Missing resource tags ────────────────────────────────────────
   if (lang === "terraform") {
     const hasResources = /resource\s+"[^"]+"\s+"[^"]+"\s*\{/i.test(code);
-    const hasTags = /tags\s*=\s*\{/i.test(code) || /tags\s*=\s*merge\(/i.test(code);
-    if (hasResources && !hasTags) {
+    const hasTags = /tags\s*=\s*\{/i.test(code) || /tags\s*=\s*merge\(/i.test(code) || /default_tags\s*\{/i.test(code);
+    // Count distinct resource blocks — skip on small configs with ≤3 resources
+    const resourceCount = (code.match(/resource\s+"[^"]+"\s+"[^"]+"\s*\{/gi) || []).length;
+    if (hasResources && !hasTags && resourceCount >= 4) {
       const resourceDefLines: number[] = [];
       const tfLines2 = code.split("\n");
       for (let i = 0; i < tfLines2.length; i++) {

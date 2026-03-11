@@ -3925,7 +3925,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   return Response.json(apiResult);
 }`,
-    expectedRuleIds: ["SWDEV-001"],
+    expectedRuleIds: ["SWDEV-001", "AICS-001"],
     category: "ai-code-safety",
     difficulty: "easy",
   },

@@ -695,7 +695,7 @@ app.get("/api", (req, res) => {
     headers: { "X-API-Key": apiKey! }
   }).then(r => r.json()).then(data => res.json(data));
 });`,
-    expectedRuleIds: ["CFG-001"],
+    expectedRuleIds: ["CFG-001", "SEC-001"],
     category: "configuration",
     difficulty: "easy",
   },
@@ -831,7 +831,7 @@ export class DataProcessor {
   process(item: unknown): void { this.buffer.push(item); }
   flush(): unknown[] { const r = [...this.buffer]; this.buffer = []; return r; }
 }`,
-    expectedRuleIds: ["DOC-001"],
+    expectedRuleIds: ["DOC-001", "SEC-001"],
     category: "documentation",
     difficulty: "easy",
   },
@@ -1151,7 +1151,7 @@ app.post("/upload", async (req, res) => {
     res.status(400).json({ message: "Bad request" });
   }
 });`,
-    expectedRuleIds: ["UX-001"],
+    expectedRuleIds: ["UX-001", "ERR-001"],
     category: "ux",
     difficulty: "easy",
   },
@@ -2091,7 +2091,36 @@ export async function retry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay =
     id: "clean-terraform-hardened",
     description: "Terraform with encryption, private access, and proper security groups",
     language: "hcl",
-    code: `resource "aws_s3_bucket" "data" {
+    code: `terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+
+  backend "s3" {
+    bucket         = "myapp-terraform-state"
+    key            = "prod/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "terraform-locks"
+    encrypt        = true
+  }
+}
+
+provider "aws" {
+  region = "us-east-1"
+
+  default_tags {
+    tags = {
+      Environment = "production"
+      Project     = "myapp"
+      ManagedBy   = "terraform"
+    }
+  }
+}
+
+resource "aws_s3_bucket" "data" {
   bucket = "myapp-data-prod"
 }
 

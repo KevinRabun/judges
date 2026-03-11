@@ -1033,7 +1033,7 @@ export function updCfg(k: string, v: any, ns: string): boolean {
 export function bchPrc(items: any[], opts: any): any[] {
   return items.map(i => prcItm(i, opts));
 }`,
-    expectedRuleIds: ["DOC-001"],
+    expectedRuleIds: ["DOC-001", "TEST-001"],
     category: "documentation",
     difficulty: "medium",
   },
@@ -2125,7 +2125,7 @@ def old_transform_a(item):
 
 def old_transform_b(item):
     pass  # deprecated but still in codebase`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["LOGIC-001"],
     category: "maintainability",
     difficulty: "easy",
   },
@@ -2851,7 +2851,7 @@ function processPayment(a: number, t: string) { return {}; }
 function updateProfile(id: string, data: any) { return {}; }
 function getDashboard(id: string) { return {}; }
 function saveFile(f: any) { return {}; }`,
-    expectedRuleIds: ["UX-001"],
+    expectedRuleIds: ["UX-001", "SEC-001"],
     category: "ux",
     difficulty: "easy",
   },

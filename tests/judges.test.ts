@@ -1428,9 +1428,12 @@ function hasDeadCode(): string {
   });
 
   it("should produce STRUCT-005 findings", () => {
+    // STRUCT-005 (dead code) is disabled in the code-structure evaluator — dead
+    // code detection is now handled by the LOGIC evaluator's indentation-aware
+    // checker which avoids false positives on multi-line expressions.
     const findings = analyzeCodeStructure(deadCode, "typescript");
     const dead = findings.filter((f) => f.ruleId === "STRUCT-005");
-    assert.ok(dead.length > 0, "Should flag dead code");
+    assert.strictEqual(dead.length, 0, "STRUCT-005 is disabled; dead code handled by LOGIC evaluator");
   });
 });
 

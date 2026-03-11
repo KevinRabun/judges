@@ -124,11 +124,29 @@ export function analyzeDocumentation(code: string, language: string): Finding[] 
     }
     return false;
   });
+  // Check if ALL undocumented functions have cryptic naming — if so, apply a
+  // lower threshold since the code is objectively hard to understand.
+  const allCryptic =
+    undocFnLines.length > 0 &&
+    undocFnLines.every((ln) => {
+      const fnLine = lines[ln - 1] || "";
+      const nameMatch = fnLine.match(/(?:function\s+|def\s+|func\s+(?:\([^)]*\)\s+)?)([a-zA-Z_$][\w$]*)\s*[(<]/);
+      if (nameMatch && nameMatch[1].length <= 3) return true;
+      const parenContent = fnLine.match(/\(([^)]*)\)/)?.[1];
+      if (parenContent) {
+        const cleanedParams = parenContent.replace(/:\s*[^,)]+/g, "");
+        const singleLetterParams = cleanedParams.match(/\b[a-zA-Z]\b/g) || [];
+        if (singleLetterParams.length >= 2) return true;
+      }
+      return false;
+    });
+  const minUndoc = allCryptic ? 2 : 4;
+  const minLines = allCryptic ? 10 : 30;
   if (
-    undocFnLines.length >= 4 &&
+    undocFnLines.length >= minUndoc &&
     totalExportedFns > 0 &&
     undocFnLines.length / totalExportedFns > 0.9 &&
-    lines.length > 30 &&
+    lines.length > minLines &&
     hasCrypticNaming
   ) {
     findings.push({

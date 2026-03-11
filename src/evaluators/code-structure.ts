@@ -120,24 +120,13 @@ export function analyzeCodeStructure(code: string, language: string): Finding[] 
   }
 
   // ─── STRUCT-005: Dead / unreachable code ──────────────────────────────────
-  // Require at least 3 unreachable lines to avoid false positives from
-  // parser artefacts, switch-case fall-through patterns, and intentional
-  // early-return guard clauses.
-  if (structure.deadCodeLines.length > 2) {
-    findings.push({
-      ruleId: `${prefix}-005`,
-      severity: "low",
-      title: "Dead / unreachable code detected",
-      description: `${structure.deadCodeLines.length} line(s) of code appear after return, throw, break, or continue statements and will never execute.`,
-      lineNumbers: structure.deadCodeLines.slice(0, 10),
-      recommendation:
-        "Remove unreachable code. Enable linter rules for unreachable code detection (no-unreachable in ESLint, dead_code in Rust).",
-      reference: "Code Quality — Dead Code Elimination",
-      suggestedFix:
-        "Delete the unreachable statements after return/throw/break/continue, or restructure control flow so the code is reachable.",
-      confidence: 0.7,
-    });
-  }
+  // Disabled: the scope-tracking structural parser misclassifies multi-line
+  // expression continuations (chained method calls, list comprehensions,
+  // object literals) as dead code, producing only false positives.
+  // Real dead-code detection is handled by the LOGIC evaluator's
+  // indentation-aware dead-code checker which correctly handles these
+  // patterns. Re-enable once the AST parser properly tracks multi-line
+  // expression boundaries.
 
   // ─── STRUCT-006: Weak / dynamic type usage (AST-detected) ────────────────
   if (structure.typeAnyLines.length >= 8) {

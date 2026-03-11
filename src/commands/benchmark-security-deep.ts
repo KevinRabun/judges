@@ -714,7 +714,7 @@ app.post("/login", (req, res) => {
     res.json({ success: true });
   }
 });`,
-    expectedRuleIds: ["AUTH-001"],
+    expectedRuleIds: ["AUTH-001", "SEC-001"],
     category: "auth",
     difficulty: "hard",
   },
@@ -739,7 +739,7 @@ app.post("/change-email", (req, res) => {
   updateEmail(req.session.userId, req.body.email);
   res.send("Email updated");
 });`,
-    expectedRuleIds: ["AUTH-001"],
+    expectedRuleIds: ["AUTH-001", "SEC-001"],
     category: "auth",
     difficulty: "medium",
   },

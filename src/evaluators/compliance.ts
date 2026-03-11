@@ -45,7 +45,7 @@ export function analyzeCompliance(code: string, language: string): Finding[] {
       if (isCommentLikeLine(line)) return;
 
       if (
-        /(?:ssn|social_security|tax_id|passport|national_id|driver_license)/i.test(line) &&
+        /(?:ssn|social_security|tax_id|passport|national_id|driver_license|ip_address)/i.test(line) &&
         !/encrypt|hash|mask|redact/i.test(line)
       ) {
         const context = lines.slice(Math.max(0, i - 4), Math.min(lines.length, i + 5)).join("\n");

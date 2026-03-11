@@ -245,9 +245,21 @@ export function classifyFile(code: string, language: string, filePath?: string):
   if (cliScore >= 2 && !serverSignals.test(code)) {
     return "cli";
   }
+  // Client-side web / frontend components (React, Vue, Angular, Svelte) are
+  // app code, not utility modules — they can have XSS, framework safety,
+  // accessibility, and i18n issues. Check BEFORE the utility fallback.
+  const hasFrontendPatterns =
+    /<\w+[\s>]/.test(code) &&
+    /\b(?:className|onClick|onChange|onSubmit|useState|useEffect|useRef|useCallback|useMemo|useContext|dangerouslySetInnerHTML|React\.(?:createElement|Component|Fragment|memo|forwardRef))\b/i.test(
+      code,
+    );
+  if (hasFrontendPatterns) {
+    return "unknown";
+  }
+
   // Small utility with no I/O
   const hasIO =
-    /\b(?:fetch|axios|http|https|net|fs\.|readFile|writeFile|database|query|exec|spawn|child_process|socket)\b/i.test(
+    /\b(?:fetch|axios|http|https|net|fs\.|readFile|writeFile|database|query|exec|spawn|child_process|socket|s3\.|putObject|getObject|dynamodb|cosmosdb|BigQuery|DatastoreClient|firestore|redis\.|mongodb|mongoose|pg\.|mysql|sequelize|prisma|knex|typeorm|drizzle|supabase|blob\.|BlobServiceClient|SQS|SNS|pubsub|EventHub|kafka)\b/i.test(
       code,
     );
   if (!hasIO && lineCount >= 8 && lineCount < 200) {
@@ -1310,6 +1322,10 @@ export function looksLikeIaCSecretValue(value: string): boolean {
 
   // Placeholder / example markers
   if (isLikelyPlaceholderCredentialValue(v)) return false;
+
+  // File paths (e.g. "prod/terraform.tfstate", "path/to/config.json")
+  // are not secrets — common in backend/storage configuration.
+  if (/\//.test(v) && /\.\w{2,10}$/.test(v)) return false;
 
   return true;
 }

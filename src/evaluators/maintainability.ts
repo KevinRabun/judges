@@ -261,9 +261,37 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   }
 
   // Functions with excessive parameters (>5)
-  const manyParamsPattern = /function\s+\w+\s*\(\s*(?:\w+\s*[,:]\s*){5,}/g;
-  const arrowManyParams = /(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?\(\s*(?:\w+\s*[,:]\s*){5,}/g;
-  const manyParamLines = [...getLineNumbers(code, manyParamsPattern), ...getLineNumbers(code, arrowManyParams)];
+  // Count commas to determine param count — avoids double-counting TypeScript
+  // type annotations where `:` previously inflated the count.
+  const manyParamLines: number[] = [];
+  const funcDeclPattern = /(?:function\s+\w+|(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?)\s*\(/g;
+  let fdm: RegExpExecArray | null;
+  while ((fdm = funcDeclPattern.exec(code)) !== null) {
+    // Extract parameter text between the opening ( and closing )
+    let depth = 1;
+    let paramText = "";
+    for (let ci = fdm.index + fdm[0].length; ci < code.length && depth > 0; ci++) {
+      if (code[ci] === "(") depth++;
+      else if (code[ci] === ")") {
+        depth--;
+        if (depth === 0) break;
+      }
+      paramText += code[ci];
+    }
+    // Count commas at depth 0 within the param text (skip nested parens/generics)
+    let commaCount = 0;
+    let nestedDepth = 0;
+    for (const ch of paramText) {
+      if (ch === "(" || ch === "<" || ch === "{" || ch === "[") nestedDepth++;
+      else if (ch === ")" || ch === ">" || ch === "}" || ch === "]") nestedDepth--;
+      else if (ch === "," && nestedDepth === 0) commaCount++;
+    }
+    if (commaCount >= 5) {
+      // 5 commas = 6+ params
+      const lineNum = code.slice(0, fdm.index).split("\n").length;
+      manyParamLines.push(lineNum);
+    }
+  }
   if (manyParamLines.length > 0) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -386,6 +414,50 @@ export function analyzeMaintainability(code: string, language: string): Finding[
         confidence: 0.8,
       });
     }
+  }
+
+  // Boolean trap: functions with 2+ boolean parameters create confusing call sites
+  const boolTrapLines: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (isCommentLine(line)) continue;
+    // Match function declarations with typed boolean parameters (TS, Java, C#)
+    const funcSigMatch = /(?:function\s+\w+|(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?)\s*\(/.exec(line);
+    if (!funcSigMatch) continue;
+    // Extract the parameter list from this line (and possibly next few lines)
+    const sigText = lines.slice(i, Math.min(i + 5, lines.length)).join(" ");
+    const parenStart = sigText.indexOf("(");
+    if (parenStart < 0) continue;
+    let depth = 1;
+    let paramText = "";
+    for (let ci = parenStart + 1; ci < sigText.length && depth > 0; ci++) {
+      if (sigText[ci] === "(") depth++;
+      else if (sigText[ci] === ")") {
+        depth--;
+        if (depth === 0) break;
+      }
+      paramText += sigText[ci];
+    }
+    // Count boolean-typed parameters
+    const boolCount = (paramText.match(/:\s*boolean\b/gi) || []).length;
+    if (boolCount >= 2) {
+      boolTrapLines.push(i + 1);
+    }
+  }
+  if (boolTrapLines.length > 0) {
+    findings.push({
+      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      severity: "medium",
+      title: "Boolean trap — multiple boolean parameters",
+      description: `Found ${boolTrapLines.length} function(s) with 2+ boolean parameters. Call sites like f(true, false, true) are unreadable and error-prone.`,
+      lineNumbers: boolTrapLines,
+      recommendation:
+        "Replace boolean parameters with an options object (e.g., { admin: true, active: false }) or use named constants / enums.",
+      reference: "Clean Code / Boolean Trap Anti-Pattern",
+      suggestedFix:
+        "Refactor: function create(opts: { admin: boolean; active: boolean }) instead of create(admin: boolean, active: boolean).",
+      confidence: 0.8,
+    });
   }
 
   return findings;

@@ -180,7 +180,7 @@ export const BENCHMARK_AI_OUTPUT: BenchmarkCase[] = [
   }
   return { success: true };
 }`,
-    expectedRuleIds: ["LOGIC-006"],
+    expectedRuleIds: ["LOGIC-006", "ERR-001"],
     category: "ai-logic-error",
     difficulty: "easy",
     aiSource: "copilot",

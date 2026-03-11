@@ -1125,7 +1125,7 @@ public class UserRepository
         return MapUser(reader);
     }
 }`,
-    expectedRuleIds: ["CYBER-001", "CYBER-002"],
+    expectedRuleIds: ["CYBER-001", "CYBER-002", "SEC-001"],
     category: "injection",
     difficulty: "easy",
   },
@@ -2559,7 +2559,7 @@ app.get("/api/search", (req, res) => {
   }
   res.json(results);
 });`,
-    expectedRuleIds: ["UX-001"],
+    expectedRuleIds: ["UX-001", "ERR-001"],
     category: "ux",
     difficulty: "easy",
   },

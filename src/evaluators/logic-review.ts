@@ -19,6 +19,14 @@ export function analyzeLogicReview(code: string, language: string): Finding[] {
         "A negated security check appears to guard an allow/grant path. This may grant access when the user is NOT authenticated.",
     },
     {
+      // Python: `if not request.user.is_admin:` or `if not is_authenticated:`
+      pattern: /if\s+not\s+(?:\w+\.)*(?:is_)?(?:authenticated|authorized|valid|admin|logged_?in|verified)\s*:/i,
+      context: /(?:grant|allow|proceed|continue|return\s+func|return\s+True|next\()/i,
+      title: "Possibly inverted security condition",
+      description:
+        "A negated security check appears to guard an allow/grant path. This may grant access when the user is NOT authenticated.",
+    },
+    {
       pattern: /if\s*\(\s*(?:err(?:or)?|failure|invalid)\s*(?:===?\s*(?:null|undefined|false))\s*\)/i,
       context: /(?:throw|reject|return\s+(?:null|false)|abort)/i,
       title: "Inverted error check",
@@ -93,56 +101,58 @@ export function analyzeLogicReview(code: string, language: string): Finding[] {
   }
 
   // ── 3. Dead code after return/throw ──────────────────────────────────────
-  let inFunction = false;
-  let afterTerminal = false;
-  let terminalLine = -1;
-  let braceDepth = 0;
-
+  // Use indentation-based scoping instead of brace tracking to avoid false
+  // positives caused by braces inside string literals.  Only flag the very
+  // next executable line when it sits at the *same* indentation as the
+  // terminal statement (meaning it's in the same block and truly unreachable).
   for (let i = 0; i < lines.length; i++) {
     if (isCommentLine(lines[i])) continue;
-    const line = lines[i].trim();
+    const raw = lines[i];
+    const trimmed = raw.trim();
 
-    // Track brace depth to reset dead-code detection at block boundaries
-    for (const ch of line) {
-      if (ch === "{") {
-        braceDepth++;
-        inFunction = true;
-      }
-      if (ch === "}") {
-        braceDepth--;
-        afterTerminal = false;
-      }
-    }
+    // Only detect bare return/throw at start of statement (not in ternaries/arrows)
+    if (!/^(?:return\b|throw\b)/.test(trimmed) || trimmed.includes("=>")) continue;
 
-    if (afterTerminal && line.length > 0 && line !== "}" && line !== "});") {
-      // Skip common legitimate patterns: case labels, catch blocks, closing patterns
-      if (!/^\s*(?:case\s|default:|catch|finally|\}|\/\/|\/\*|\*|else|break)/.test(line)) {
+    const terminalIndent = raw.search(/\S/);
+    if (terminalIndent < 0) continue;
+
+    // Scan the next few lines for unreachable code at the same indentation
+    for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+      if (isCommentLine(lines[j])) continue;
+      const nextRaw = lines[j];
+      const nextTrimmed = nextRaw.trim();
+      if (nextTrimmed.length === 0) continue;
+
+      const nextIndent = nextRaw.search(/\S/);
+
+      // If next line is at lower indentation, we've left the block — not dead code
+      if (nextIndent < terminalIndent) break;
+
+      // Same indentation: potentially dead code if it's executable (not a block delimiter)
+      if (
+        nextIndent === terminalIndent &&
+        !/^(?:[{}]|case\s|default:|catch\b|finally\b|else\b|break\b)/.test(nextTrimmed)
+      ) {
         findings.push({
           ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
           severity: "medium",
           title: "Unreachable code after return/throw",
-          description: `Code at line ${i + 1} appears unreachable after a return/throw statement at line ${terminalLine + 1}.`,
-          lineNumbers: [i + 1],
+          description: `Code at line ${j + 1} appears unreachable after a return/throw statement at line ${i + 1}.`,
+          lineNumbers: [j + 1],
           recommendation: "Remove unreachable code or restructure the control flow.",
           reference: "Dead Code Detection",
-          confidence: 0.7,
+          confidence: 0.75,
           provenance: "control-flow-analysis",
         });
-        afterTerminal = false; // Only report once per block
       }
-    }
-
-    // Detect terminal statements (but not in ternaries or arrow functions)
-    if (inFunction && /^\s*(?:return\b|throw\b)/.test(line) && !line.includes("=>")) {
-      afterTerminal = true;
-      terminalLine = i;
+      break; // Only check the first non-empty line after the terminal
     }
   }
 
   // ── 4. Name-body mismatch heuristics ─────────────────────────────────────
   // Detect functions named "validate*" that never throw/return false/return error
   const funcPattern =
-    /(?:function\s+|const\s+|let\s+|var\s+)(\w+)\s*(?:=\s*(?:async\s*)?\(|(?:=\s*)?(?:async\s+)?function|\()/;
+    /(?:function\s+|def\s+|const\s+|let\s+|var\s+)(\w+)\s*(?:=\s*(?:async\s*)?\(|(?:=\s*)?(?:async\s+)?function|\()/;
 
   for (let i = 0; i < lines.length; i++) {
     if (isCommentLine(lines[i])) continue;
@@ -170,12 +180,28 @@ export function analyzeLogicReview(code: string, language: string): Finding[] {
       }
       if (started && depth === 0) break;
     }
+    // Python: indentation-based body detection for def functions
+    if (bodyEnd === 0 && /^\s*def\s+/.test(lines[i])) {
+      const defIndent = lines[i].match(/^(\s*)/)?.[1].length ?? 0;
+      for (let j = i + 1; j < Math.min(i + 40, lines.length); j++) {
+        const lineText = lines[j];
+        if (lineText.trim() === "") continue; // skip blank lines
+        const indent = lineText.match(/^(\s*)/)?.[1].length ?? 0;
+        if (indent <= defIndent) {
+          bodyEnd = j - 1;
+          break;
+        }
+        bodyEnd = j; // extend to this line
+      }
+    }
     if (bodyEnd === 0) continue;
     const funcBody = lines.slice(i + 1, bodyEnd + 1).join("\n");
 
     // "validate*" should reject invalid input
     if (/^validate/i.test(fname) && funcBody.length > 50) {
-      const hasRejection = /\b(?:throw\b|return\s+false|return\s+null|reject\b|Error\(|Invalid|invalid)/.test(funcBody);
+      const hasRejection = /\b(?:throw\b|return\s+false|return\s+null|reject\b|Error\(|Invalid|invalid|\.test\()/.test(
+        funcBody,
+      );
       if (!hasRejection) {
         findings.push({
           ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -194,8 +220,15 @@ export function analyzeLogicReview(code: string, language: string): Finding[] {
 
     // "delete*"/"remove*" should actually delete something
     if (/^(?:delete|remove)/i.test(fname) && funcBody.length > 30) {
-      const hasDelete = /\b(?:delete\b|remove\b|splice|pop|shift|destroy|drop|unlink|\.delete|\.remove)/.test(funcBody);
-      if (!hasDelete) {
+      const hasDelete =
+        /\b(?:delete\b|remove\b|splice|pop|shift|destroy|drop|unlink|\.delete|\.remove|\.execute|DELETE\b)/.test(
+          funcBody,
+        );
+      // Recognize intentional soft-delete patterns (e.g., Django's is_active = False)
+      const hasSoftDelete = /is_active\s*=\s*(?:False|false|0)|#\s*[Ss]oft.?[Dd]elete|\/\/\s*[Ss]oft.?[Dd]elete/.test(
+        funcBody,
+      );
+      if (!hasDelete && !hasSoftDelete) {
         findings.push({
           ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
           severity: "medium",

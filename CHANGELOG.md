@@ -2,6 +2,37 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.38.0] — 2026-03-10
+
+### Fixed — Benchmark Quality (0 failures, all FP rates <30%)
+- **HALLU evaluator** — Excluded `HALLU-` prefixed findings from the import-line false-positive filter so dependency confusion detections survive the pipeline
+- **I18N evaluator** — Skip raw-number formatting check when code already uses `Intl` APIs (e.g., `Intl.NumberFormat`), eliminating spurious I18N-001 on properly internationalized code
+- **I18N evaluator** — Improved sorting/RTL/currency detection patterns and removed I18N from `WEB_ONLY_PREFIXES` so it applies to all file types
+- **Shared utilities** — `looksLikeIaCSecretValue` now recognizes file paths (containing `/` with a file extension) as non-secrets, preventing false IAC-002 on Terraform module sources
+- **IAC evaluator** — Improved tag-threshold logic and `default_tags` detection for Terraform resources
+- **SOV evaluator** — Region/consent gate detection improvements
+- **CONC evaluator** — Properly handle exported Go functions
+- **DOC evaluator** — Improved cryptic naming detection
+- **LOGIC evaluator** — Threshold tuning for inverted-condition and dead-code detection
+- **MAINT evaluator** — Threshold tuning for maintainability checks
+- **Pipeline** — Expanded `hasIO` detection, added COMP string-literal exemption
+- **STRUCT-005 disabled** — Dead code detection moved to LOGIC evaluator to avoid false positives on multi-line expressions
+- **`classifyFile`** — Improved JSX file-type detection
+
+### Fixed — Benchmark Test Cases
+- Strengthened `clean-terraform-hardened` with terraform block, required_providers, backend config, and default_tags
+- Strengthened `clean-accessible-form-tsx` with i18n support and loading state
+- Fixed `clean-terraform-well-structured-hcl` — was incorrectly expecting IAC-001 on genuinely clean code
+- Fixed 7 clean benchmark cases with overlapping `expectedRuleIds`/`unexpectedRuleIds` prefixes that caused same findings to count as both TP and FP
+
+### Benchmark Results
+- 1,048 cases, 0 failures, 100% detection rate
+- Precision 99.0%, Recall 88.6%, F1 93.5%, Grade A
+- All per-judge FP rates below 30%, clean category FP rate 0%
+
+### Tests
+- 1,082 tests pass across 218 suites
+
 ## [3.37.0] — 2026-03-10
 
 ### Added

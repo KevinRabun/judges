@@ -905,6 +905,50 @@ export function analyzeHallucinationDetection(code: string, language: string): F
         });
       }
     }
+
+    // 5b. Dependency confusion risk — unscoped packages with names suggesting
+    //     they should be org-scoped (@company/pkg). Internal-looking names like
+    //     "auth-service-internal" or "config-core-api" are supply-chain attack vectors.
+    const internalSuffixes =
+      /[-_](?:internal|private|corp|enterprise|backend|service|api|sdk|platform|infra|core-api|core-sdk|backend-sdk)$/i;
+    const internalPrefixes =
+      /^(?:auth|config|logging|analytics|billing|payment|identity|user|account|notification|messaging|telemetry)[-_]/i;
+    for (let i = 0; i < lines.length; i++) {
+      if (isCommentLine(lines[i])) continue;
+      const line = lines[i];
+      const importMatch = line.match(/\bfrom\s+['"]([^'"@./][^'"]*)['"]/);
+      if (!importMatch) continue;
+      const pkgName = importMatch[1].split("/")[0];
+      if (internalPrefixes.test(pkgName) && internalSuffixes.test(pkgName)) {
+        findings.push({
+          ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+          severity: "high",
+          title: `Dependency confusion risk: "${pkgName}"`,
+          description:
+            `The unscoped package "${pkgName}" has a name suggesting it should be an org-scoped package ` +
+            `(e.g., @company/${pkgName}). AI code generators often fabricate internal-looking package names ` +
+            "that don't exist on npm, creating a dependency confusion attack vector.",
+          lineNumbers: [i + 1],
+          recommendation:
+            "Verify this package exists on npmjs.com. If it's an internal package, use org scoping (@yourorg/package-name) " +
+            "and configure your .npmrc to route scoped packages to your private registry.",
+          reference: "Dependency Confusion Attack / npm Security Best Practices",
+          confidence: 0.75,
+          provenance: "regex-pattern-match",
+          evidenceChain: {
+            steps: [
+              {
+                observation: `Package "${pkgName}" has an internal-service naming pattern`,
+                source: "pattern-match",
+                line: i + 1,
+              },
+            ],
+            impactStatement: `Possible dependency confusion attack: "${pkgName}" looks like a private/internal package name used without org scope`,
+          },
+          evidenceBasis: "Internal-naming-heuristic (+0.40), unscoped-private-pattern (+0.35)",
+        });
+      }
+    }
   }
 
   if (lang === "python") {

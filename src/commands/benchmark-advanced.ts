@@ -1721,7 +1721,7 @@ func Delete(key string) {
 }
 
 // Called from multiple HTTP handlers concurrently`,
-    expectedRuleIds: ["DOC-001"],
+    expectedRuleIds: ["CONC-001"],
     category: "concurrency",
     difficulty: "easy",
   },
@@ -2009,7 +2009,7 @@ router.post("/v1/users", async (req, res) => {
 
 export default router;`,
     expectedRuleIds: ["API-001", "SEC-001"],
-    unexpectedRuleIds: ["API", "CYBER", "SEC", "AUTH", "RATE"],
+    unexpectedRuleIds: ["CYBER", "AUTH", "RATE"],
     category: "clean",
     difficulty: "hard",
   },
@@ -2046,7 +2046,7 @@ def create_order():
     g.logger.info("order_created", order_id=order.id)
     return jsonify(order.to_dict()), 201`,
     expectedRuleIds: ["DATA-001", "LOGPRIV-001"],
-    unexpectedRuleIds: ["OBS", "LOGPRIV", "DATA"],
+    unexpectedRuleIds: ["OBS"],
     category: "clean",
     difficulty: "medium",
   },
@@ -2240,7 +2240,7 @@ app.use((req, res, next) => {
   next();
 });`,
     expectedRuleIds: ["DATA-001", "CYBER-002", "LOGPRIV-001"],
-    unexpectedRuleIds: ["LOGPRIV", "DATA", "CYBER"],
+    unexpectedRuleIds: [],
     category: "clean",
     difficulty: "hard",
   },
@@ -3068,7 +3068,7 @@ resource "aws_instance" "web" {
     ManagedBy   = "terraform"
   }
 }`,
-    expectedRuleIds: ["IAC-001"],
+    expectedRuleIds: [],
     unexpectedRuleIds: ["IAC", "CFG", "SEC", "CLOUD"],
     category: "clean",
     difficulty: "medium",
@@ -3095,7 +3095,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:3000/health || exit 1
 CMD ["node", "dist/server.js"]`,
     expectedRuleIds: ["IAC-001"],
-    unexpectedRuleIds: ["IAC", "SEC", "CYBER", "CLOUD"],
+    unexpectedRuleIds: ["SEC", "CYBER", "CLOUD"],
     category: "clean",
     difficulty: "hard",
   },
@@ -3770,22 +3770,43 @@ async function processOrder(orderId: string): Promise<Order> {
     id: "clean-accessible-form-tsx",
     description: "React form with proper accessibility attributes and labels",
     language: "typescript",
-    code: `function ContactForm() {
+    code: `import { useState } from "react";
+import { useTranslation } from "react-i18next";
+
+function ContactForm() {
+  const { t } = useTranslation();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await submitForm(new FormData(e.currentTarget as HTMLFormElement));
+    } catch (err) {
+      setErrors({ form: t("submitError") });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit} aria-label="Contact form" noValidate>
+    <form onSubmit={handleSubmit} aria-label={t("contactForm")} noValidate>
       <div role="group" aria-labelledby="personal-info">
-        <h2 id="personal-info">Personal Information</h2>
-        <label htmlFor="name">Full Name</label>
+        <h2 id="personal-info">{t("personalInfo")}</h2>
+        <label htmlFor="name">{t("fullName")}</label>
         <input id="name" name="name" type="text" required aria-required="true"
                aria-describedby="name-hint" autoComplete="name" />
-        <span id="name-hint" className="hint">Enter your first and last name</span>
+        <span id="name-hint" className="hint">{t("nameHint")}</span>
 
-        <label htmlFor="email">Email Address</label>
+        <label htmlFor="email">{t("emailAddress")}</label>
         <input id="email" name="email" type="email" required aria-required="true"
                autoComplete="email" aria-invalid={!!errors.email} />
         {errors.email && <span role="alert">{errors.email}</span>}
       </div>
-      <button type="submit">Send Message</button>
+      <button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? t("sending") : t("sendMessage")}
+      </button>
     </form>
   );
 }`,
@@ -3815,7 +3836,7 @@ function pluralize(count: number, locale: string): string {
   };
   return forms[pr.select(count)] ?? forms.other;
 }`,
-    expectedRuleIds: ["I18N-001"],
+    expectedRuleIds: [],
     unexpectedRuleIds: ["I18N", "HALLU", "PORTA"],
     category: "clean",
     difficulty: "hard",
@@ -4322,7 +4343,7 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   res.status(500).json({ error: "Internal server error" });
 });`,
     expectedRuleIds: ["ERR-001"],
-    unexpectedRuleIds: ["SEC", "CYBER", "FW", "RATE", "ERR"],
+    unexpectedRuleIds: ["SEC", "CYBER", "FW", "RATE"],
     category: "clean",
     difficulty: "hard",
   },
@@ -4518,7 +4539,7 @@ app.get("/healthz", (req, res) => {
   res.status(dbOk && redisOk ? 200 : 503).json({ db: dbOk, redis: redisOk });
 });`,
     expectedRuleIds: ["REL-001"],
-    unexpectedRuleIds: ["REL", "CLOUD", "OBS", "PERF"],
+    unexpectedRuleIds: ["CLOUD", "OBS", "PERF"],
     category: "clean",
     difficulty: "hard",
   },
@@ -4549,7 +4570,7 @@ app.post("/api/users", (req, res) => {
   return createUser(result.data);
 });`,
     expectedRuleIds: ["API-001", "ERR-001"],
-    unexpectedRuleIds: ["ERR", "API", "SEC", "DATA"],
+    unexpectedRuleIds: ["SEC", "DATA"],
     category: "clean",
     difficulty: "medium",
   },

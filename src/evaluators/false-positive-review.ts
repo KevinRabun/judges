@@ -786,7 +786,9 @@ function getFpReason(
   if (finding.lineNumbers && finding.lineNumbers.length > 0) {
     // DEPS-* rules specifically target dependency declarations in package manifests
     // where string literal values ARE the finding (e.g., '"express": "^3.0.0"').
-    if (!finding.ruleId.startsWith("DEPS-")) {
+    // COMP-* rules detect PII fields inside SQL/query strings — the string literal
+    // IS the data-handling code, not inert data.
+    if (!finding.ruleId.startsWith("DEPS-") && !finding.ruleId.startsWith("COMP-")) {
       const allStrings = finding.lineNumbers.every((ln) => {
         const line = lines[ln - 1];
         return line !== undefined && isStringLiteralLine(line);
@@ -801,7 +803,9 @@ function getFpReason(
   if (finding.lineNumbers && finding.lineNumbers.length > 0) {
     // DEPS-* rules specifically target import declarations of deprecated/risky packages —
     // import lines ARE the finding, so skip this filter for them.
-    if (!finding.ruleId.startsWith("DEPS-")) {
+    // HALLU-* rules detect dependency confusion via suspicious import specifiers —
+    // import lines ARE the finding for hallucination/confusion checks.
+    if (!finding.ruleId.startsWith("DEPS-") && !finding.ruleId.startsWith("HALLU-")) {
       const allImportsOrTypes = finding.lineNumbers.every((ln) => {
         const line = lines[ln - 1];
         if (!line) return false;
@@ -867,9 +871,10 @@ function getFpReason(
   }
 
   // ── 9. Web-only rules on non-web code ──
-  // Accessibility, UX, and i18n rendering rules are only meaningful on files
+  // Accessibility and UX rendering rules are only meaningful on files
   // that contain web-facing patterns (HTML, JSX, routes, templates, CSS, or HTTP API responses).
-  const WEB_ONLY_PREFIXES = ["A11Y-", "UX-", "I18N-"];
+  // I18N is NOT web-only — locale formatting (currency, dates, numbers) applies to any user-facing code.
+  const WEB_ONLY_PREFIXES = ["A11Y-", "UX-"];
   const isWebOnly = WEB_ONLY_PREFIXES.some((p) => finding.ruleId.startsWith(p));
   if (isWebOnly) {
     const hasWebPatterns =

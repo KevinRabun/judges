@@ -1911,7 +1911,7 @@ rm -rf /tmp/$3
 
 # Search with user input
 grep "$4" /var/log/syslog | mail -s "Results" admin@example.com`,
-    expectedRuleIds: ["I18N-001"],
+    expectedRuleIds: ["CYBER-001"],
     category: "security",
     difficulty: "easy",
   },

@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.38.0] — 2026-03-10
+
+### Fixed
+- **Evaluator accuracy improvements** — HALLU, I18N, IAC, SOV, CONC, DOC, LOGIC, MAINT evaluators tuned to reduce false positives while preserving true detection
+- **Benchmark quality** — 0 failed cases, all per-judge FP rates below 30%, clean category FP rate 0%
+- See [core CHANGELOG](../../CHANGELOG.md) for full details
+
 ## [3.37.0] — 2026-03-10
 
 ### Added
