@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.66.0] — 2026-03-14
+
+### Added
+- Verification: fix-verify, review-comment
+- Tracking: finding-timeline, review-schedule
+- Discovery: rule-catalog, review-scope
+- Export: review-export, setup-wizard
+
 ## [3.65.0] — 2026-03-14
 
 ### Added

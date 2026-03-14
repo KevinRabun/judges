@@ -514,6 +514,14 @@ USAGE:
   judges review-merge                 Merge multiple review results
   judges review-filter                Advanced multi-criteria finding filter
   judges code-health                  Overall codebase health score
+  judges fix-verify                   Verify fixes resolved findings
+  judges review-comment               Generate inline code comments from findings
+  judges finding-timeline             Track finding trends across commits
+  judges rule-catalog                 Browse and search available rules
+  judges review-scope                 Define review scope boundaries
+  judges review-schedule              Configure scheduled review cadences
+  judges review-export                Export results to CSV, markdown, HTML
+  judges setup-wizard                 Guided setup for new users
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2668,6 +2676,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "code-health") {
     const { runCodeHealth } = await import("./commands/code-health.js");
     runCodeHealth(argv);
+    return;
+  }
+
+  // ─── Fix Verify Command ───────────────────────────────────────
+  if (args.command === "fix-verify") {
+    const { runFixVerify } = await import("./commands/fix-verify.js");
+    runFixVerify(argv);
+    return;
+  }
+
+  // ─── Review Comment Command ───────────────────────────────────
+  if (args.command === "review-comment") {
+    const { runReviewComment } = await import("./commands/review-comment.js");
+    runReviewComment(argv);
+    return;
+  }
+
+  // ─── Finding Timeline Command ─────────────────────────────────
+  if (args.command === "finding-timeline") {
+    const { runFindingTimeline } = await import("./commands/finding-timeline.js");
+    runFindingTimeline(argv);
+    return;
+  }
+
+  // ─── Rule Catalog Command ─────────────────────────────────────
+  if (args.command === "rule-catalog") {
+    const { runRuleCatalog } = await import("./commands/rule-catalog.js");
+    runRuleCatalog(argv);
+    return;
+  }
+
+  // ─── Review Scope Command ─────────────────────────────────────
+  if (args.command === "review-scope") {
+    const { runReviewScope } = await import("./commands/review-scope.js");
+    runReviewScope(argv);
+    return;
+  }
+
+  // ─── Review Schedule Command ──────────────────────────────────
+  if (args.command === "review-schedule") {
+    const { runReviewSchedule } = await import("./commands/review-schedule.js");
+    runReviewSchedule(argv);
+    return;
+  }
+
+  // ─── Review Export Command ────────────────────────────────────
+  if (args.command === "review-export") {
+    const { runReviewExport } = await import("./commands/review-export.js");
+    runReviewExport(argv);
+    return;
+  }
+
+  // ─── Setup Wizard Command ─────────────────────────────────────
+  if (args.command === "setup-wizard") {
+    const { runSetupWizard } = await import("./commands/setup-wizard.js");
+    runSetupWizard(argv);
     return;
   }
 

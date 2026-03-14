@@ -2,6 +2,14 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.66.0] — 2026-03-14
+
+### Added
+- Verification: fix-verify (confirm fixes resolved findings), review-comment (generate inline code comments from findings)
+- Tracking: finding-timeline (track finding trends across commits), review-schedule (configure scheduled review cadences)
+- Discovery: rule-catalog (browse and search available rules), review-scope (define review scope boundaries)
+- Export: review-export (unified export to CSV, markdown, HTML), setup-wizard (guided setup for new users/teams)
+
 ## [3.65.0] — 2026-03-14
 
 ### Added
