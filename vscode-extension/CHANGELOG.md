@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.52.0] — 2025-07-25
+
+### Added
+- File watch with auto-evaluation, cross-file impact scanning, AI model scorecards
+- Adaptive trust scoring, feedback-driven judge generation, chat platform notifications
+- Design coherence auditing, remediation template library with voting
+
 ## [3.51.0] — 2025-07-25
 
 ### Added

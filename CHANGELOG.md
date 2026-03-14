@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.52.0] — 2025-07-25
+
+### Added
+- **`judges watch-judge`** — Continuously monitor files and auto-evaluate on change (live feedback with configurable polling interval and score threshold; single-pass `--once` mode for CI)
+- **`judges impact-scan`** — Cross-file ripple effect detection (broken imports, unused exports, naming conflicts, dependency chain analysis, fragile API signatures)
+- **`judges model-report`** — AI model scorecard and comparison (track evaluations per model, pass rates, failure categories, trend detection; side-by-side model comparison)
+- **`judges trust-adaptive`** — Adaptive trust scoring for developers and AI models (high-trust actors skip non-critical judges, low-trust get strict evaluation with human escalation)
+- **`judges judge-learn`** — Generate custom judges from feedback (record false positives/negatives, extract patterns, auto-generate detection rules with confidence calibration)
+- **`judges chat-notify`** — Publish findings to Slack, Teams, Discord, or custom webhooks (rich formatting with attachments/embeds, critical mention routing, webhook config stored locally)
+- **`judges design-audit`** — Detect code breaking project conventions (convention adherence, abstraction level, orphaned imports, async pattern consistency, error handling, naming coherence)
+- **`judges remediation-lib`** — Proven fix templates ranked by effectiveness (built-in templates for empty catch, SQL injection, XSS, hardcoded secrets; team voting, auto-apply with rollback)
+
 ## [3.51.0] — 2025-07-25
 
 ### Added

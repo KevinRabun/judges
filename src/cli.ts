@@ -402,6 +402,14 @@ USAGE:
   judges vendor-lock-detect           Detect vendor-specific API lock-in
   judges clarity-score                Code readability and self-documentation score
   judges arch-audit                   Architecture quality audit
+  judges watch-judge                  Continuously watch and auto-evaluate files
+  judges impact-scan                  Cross-file ripple effect detection
+  judges model-report                 AI model scorecard and comparison
+  judges trust-adaptive               Adaptive trust scoring for actors
+  judges judge-learn                  Generate custom judges from feedback
+  judges chat-notify                  Publish findings to chat platforms
+  judges design-audit                 Detect code breaking project conventions
+  judges remediation-lib              Proven fix templates for common findings
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1772,6 +1780,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "arch-audit") {
     const { runArchAudit } = await import("./commands/arch-audit.js");
     runArchAudit(argv);
+    return;
+  }
+
+  // ─── Watch Judge Command ─────────────────────────────────────
+  if (args.command === "watch-judge") {
+    const { runWatchJudge } = await import("./commands/watch-judge.js");
+    runWatchJudge(argv);
+    return;
+  }
+
+  // ─── Impact Scan Command ─────────────────────────────────────
+  if (args.command === "impact-scan") {
+    const { runImpactScan } = await import("./commands/impact-scan.js");
+    runImpactScan(argv);
+    return;
+  }
+
+  // ─── Model Report Command ───────────────────────────────────
+  if (args.command === "model-report") {
+    const { runModelReport } = await import("./commands/model-report.js");
+    runModelReport(argv);
+    return;
+  }
+
+  // ─── Trust Adaptive Command ──────────────────────────────────
+  if (args.command === "trust-adaptive") {
+    const { runTrustAdaptive } = await import("./commands/trust-adaptive.js");
+    runTrustAdaptive(argv);
+    return;
+  }
+
+  // ─── Judge Learn Command ─────────────────────────────────────
+  if (args.command === "judge-learn") {
+    const { runJudgeLearn } = await import("./commands/judge-learn.js");
+    runJudgeLearn(argv);
+    return;
+  }
+
+  // ─── Chat Notify Command ─────────────────────────────────────
+  if (args.command === "chat-notify") {
+    const { runChatNotify } = await import("./commands/chat-notify.js");
+    runChatNotify(argv);
+    return;
+  }
+
+  // ─── Design Audit Command ───────────────────────────────────
+  if (args.command === "design-audit") {
+    const { runDesignAudit } = await import("./commands/design-audit.js");
+    runDesignAudit(argv);
+    return;
+  }
+
+  // ─── Remediation Lib Command ─────────────────────────────────
+  if (args.command === "remediation-lib") {
+    const { runRemediationLib } = await import("./commands/remediation-lib.js");
+    runRemediationLib(argv);
     return;
   }
 
