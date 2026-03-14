@@ -562,6 +562,14 @@ USAGE:
   judges review-onboard               Guided onboarding for new team members
   judges review-parallel              Batch review multiple files
   judges finding-context              Enrich findings with surrounding code context
+  judges review-approval              Approval workflows for review results
+  judges finding-severity-override    Override finding severity per project
+  judges review-config-export         Export / import review configurations
+  judges review-pr-comment            Generate PR comment summaries from reviews
+  judges review-ignore-path           Manage path ignore lists for reviews
+  judges finding-deduplicate          Detect and deduplicate similar findings
+  judges review-score-history         Track review scores over time
+  judges review-feedback              Collect user feedback on review quality
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3052,6 +3060,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-context") {
     const { runFindingContext } = await import("./commands/finding-context.js");
     runFindingContext(argv);
+    return;
+  }
+
+  // ─── Review Approval Command ──────────────────────────────────────
+  if (args.command === "review-approval") {
+    const { runReviewApproval } = await import("./commands/review-approval.js");
+    runReviewApproval(argv);
+    return;
+  }
+
+  // ─── Finding Severity Override Command ────────────────────────────
+  if (args.command === "finding-severity-override") {
+    const { runFindingSeverityOverride } = await import("./commands/finding-severity-override.js");
+    runFindingSeverityOverride(argv);
+    return;
+  }
+
+  // ─── Review Config Export Command ─────────────────────────────────
+  if (args.command === "review-config-export") {
+    const { runReviewConfigExport } = await import("./commands/review-config-export.js");
+    runReviewConfigExport(argv);
+    return;
+  }
+
+  // ─── Review PR Comment Command ────────────────────────────────────
+  if (args.command === "review-pr-comment") {
+    const { runReviewPrComment } = await import("./commands/review-pr-comment.js");
+    runReviewPrComment(argv);
+    return;
+  }
+
+  // ─── Review Ignore Path Command ───────────────────────────────────
+  if (args.command === "review-ignore-path") {
+    const { runReviewIgnorePath } = await import("./commands/review-ignore-path.js");
+    runReviewIgnorePath(argv);
+    return;
+  }
+
+  // ─── Finding Deduplicate Command ──────────────────────────────────
+  if (args.command === "finding-deduplicate") {
+    const { runFindingDeduplicate } = await import("./commands/finding-deduplicate.js");
+    runFindingDeduplicate(argv);
+    return;
+  }
+
+  // ─── Review Score History Command ─────────────────────────────────
+  if (args.command === "review-score-history") {
+    const { runReviewScoreHistory } = await import("./commands/review-score-history.js");
+    runReviewScoreHistory(argv);
+    return;
+  }
+
+  // ─── Review Feedback Command ──────────────────────────────────────
+  if (args.command === "review-feedback") {
+    const { runReviewFeedback } = await import("./commands/review-feedback.js");
+    runReviewFeedback(argv);
     return;
   }
 

@@ -4,6 +4,16 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.72.0] — 2026-03-14
+
+### Added
+- Approval workflows: review-approval
+- Severity customization: finding-severity-override
+- Config sharing: review-config-export
+- PR integration: review-pr-comment
+- Path management: review-ignore-path, finding-deduplicate
+- Tracking & feedback: review-score-history, review-feedback
+
 ## [3.71.0] — 2026-03-14
 
 ### Added

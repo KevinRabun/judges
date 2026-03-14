@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.72.0] — 2026-03-14
+
+### Added
+- Approval workflows: review-approval (request, approve, reject review results)
+- Severity customization: finding-severity-override (per-project severity overrides)
+- Config sharing: review-config-export (export and import review configurations)
+- PR integration: review-pr-comment (generate PR comment summaries from reviews)
+- Path management: review-ignore-path (manage path ignore lists for reviews)
+- Deduplication: finding-deduplicate (detect and deduplicate similar findings)
+- Score tracking: review-score-history (track review scores over time)
+- Feedback: review-feedback (collect user feedback on review quality)
+
 ## [3.71.0] — 2026-03-14
 
 ### Added
