@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.82.0] — 2026-03-14
+
+### Added
+- Scope lock: review-scope-lock (lock review scope to files/directories)
+- Duplicate rule: finding-duplicate-rule (detect duplicate/overlapping rules)
+- Watch mode: review-watch-mode (watch files and auto-trigger reviews)
+- Export PDF: review-export-pdf (export results as PDF-ready markdown)
+- Line blame: finding-line-blame (map findings to git blame)
+- Age tracker: finding-age-tracker (track finding ages over time)
+- Parallel files: review-parallel-files (batch files for parallel review)
+- Summary digest: finding-summary-digest (concise finding digests)
+- Code owner: review-code-owner (map findings to CODEOWNERS entries)
+
 ## [3.81.0] — 2026-03-14
 
 ### Added

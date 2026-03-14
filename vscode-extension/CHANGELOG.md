@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.82.0] — 2026-03-14
+
+### Added
+- Scope lock: review-scope-lock (scope locking)
+- Duplicate rule: finding-duplicate-rule (overlap detection)
+- Watch mode: review-watch-mode (file watching)
+- Export PDF: review-export-pdf (PDF export)
+- Line blame: finding-line-blame (git blame mapping)
+- Age tracker: finding-age-tracker (age tracking)
+- Parallel files: review-parallel-files (batch processing)
+- Summary digest: finding-summary-digest (executive digests)
+- Code owner: review-code-owner (CODEOWNERS mapping)
+
 ## [3.81.0] — 2026-03-14
 
 ### Added

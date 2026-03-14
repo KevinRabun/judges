@@ -645,6 +645,15 @@ USAGE:
   judges review-file-stats            Per-file review statistics
   judges finding-false-neg-check      Check for potential false negatives
   judges review-rule-filter           Filter review results by rule criteria
+  judges review-scope-lock            Lock review scope to specific files/directories
+  judges finding-duplicate-rule       Detect duplicate or overlapping rules
+  judges review-watch-mode            Watch files and auto-trigger reviews
+  judges review-export-pdf            Export review results as PDF-ready markdown
+  judges finding-line-blame           Map findings to git blame information
+  judges finding-age-tracker          Track the age of findings over time
+  judges review-parallel-files        Batch files for parallel review
+  judges finding-summary-digest       Generate concise finding digests
+  judges review-code-owner            Map findings to CODEOWNERS entries
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3716,6 +3725,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-rule-filter") {
     const { runReviewRuleFilter } = await import("./commands/review-rule-filter.js");
     runReviewRuleFilter(argv);
+    return;
+  }
+
+  // ─── Review Scope Lock Command ──────────────────────────────────
+  if (args.command === "review-scope-lock") {
+    const { runReviewScopeLock } = await import("./commands/review-scope-lock.js");
+    runReviewScopeLock(argv);
+    return;
+  }
+
+  // ─── Finding Duplicate Rule Command ─────────────────────────────
+  if (args.command === "finding-duplicate-rule") {
+    const { runFindingDuplicateRule } = await import("./commands/finding-duplicate-rule.js");
+    runFindingDuplicateRule(argv);
+    return;
+  }
+
+  // ─── Review Watch Mode Command ──────────────────────────────────
+  if (args.command === "review-watch-mode") {
+    const { runReviewWatchMode } = await import("./commands/review-watch-mode.js");
+    runReviewWatchMode(argv);
+    return;
+  }
+
+  // ─── Review Export PDF Command ──────────────────────────────────
+  if (args.command === "review-export-pdf") {
+    const { runReviewExportPdf } = await import("./commands/review-export-pdf.js");
+    runReviewExportPdf(argv);
+    return;
+  }
+
+  // ─── Finding Line Blame Command ─────────────────────────────────
+  if (args.command === "finding-line-blame") {
+    const { runFindingLineBlame } = await import("./commands/finding-line-blame.js");
+    runFindingLineBlame(argv);
+    return;
+  }
+
+  // ─── Finding Age Tracker Command ────────────────────────────────
+  if (args.command === "finding-age-tracker") {
+    const { runFindingAgeTracker } = await import("./commands/finding-age-tracker.js");
+    runFindingAgeTracker(argv);
+    return;
+  }
+
+  // ─── Review Parallel Files Command ──────────────────────────────
+  if (args.command === "review-parallel-files") {
+    const { runReviewParallelFiles } = await import("./commands/review-parallel-files.js");
+    runReviewParallelFiles(argv);
+    return;
+  }
+
+  // ─── Finding Summary Digest Command ─────────────────────────────
+  if (args.command === "finding-summary-digest") {
+    const { runFindingSummaryDigest } = await import("./commands/finding-summary-digest.js");
+    runFindingSummaryDigest(argv);
+    return;
+  }
+
+  // ─── Review Code Owner Command ──────────────────────────────────
+  if (args.command === "review-code-owner") {
+    const { runReviewCodeOwner } = await import("./commands/review-code-owner.js");
+    runReviewCodeOwner(argv);
     return;
   }
 
