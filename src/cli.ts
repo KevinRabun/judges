@@ -603,6 +603,14 @@ USAGE:
   judges finding-age-report           Report on finding ages and staleness
   judges review-rule-stats            Per-rule statistics across reviews
   judges review-parallel-diff         Review multiple diff hunks
+  judges review-auto-merge            Auto-merge reviews that pass checks
+  judges finding-correlate            Correlate related findings across files
+  judges review-dry-run               Simulate review without persisting
+  judges finding-suppress-pattern     Suppress findings by pattern
+  judges review-cache-clear           Clear review caches selectively
+  judges finding-impact-score         Score findings by estimated impact
+  judges review-compliance-check      Check findings against compliance frameworks
+  judges finding-root-cause           Identify root causes of recurring findings
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3380,6 +3388,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-parallel-diff") {
     const { runReviewParallelDiff } = await import("./commands/review-parallel-diff.js");
     runReviewParallelDiff(argv);
+    return;
+  }
+
+  // ─── Review Auto Merge Command ────────────────────────────────────
+  if (args.command === "review-auto-merge") {
+    const { runReviewAutoMerge } = await import("./commands/review-auto-merge.js");
+    runReviewAutoMerge(argv);
+    return;
+  }
+
+  // ─── Finding Correlate Command ────────────────────────────────────
+  if (args.command === "finding-correlate") {
+    const { runFindingCorrelate } = await import("./commands/finding-correlate.js");
+    runFindingCorrelate(argv);
+    return;
+  }
+
+  // ─── Review Dry Run Command ───────────────────────────────────────
+  if (args.command === "review-dry-run") {
+    const { runReviewDryRun } = await import("./commands/review-dry-run.js");
+    runReviewDryRun(argv);
+    return;
+  }
+
+  // ─── Finding Suppress Pattern Command ─────────────────────────────
+  if (args.command === "finding-suppress-pattern") {
+    const { runFindingSuppressPattern } = await import("./commands/finding-suppress-pattern.js");
+    runFindingSuppressPattern(argv);
+    return;
+  }
+
+  // ─── Review Cache Clear Command ───────────────────────────────────
+  if (args.command === "review-cache-clear") {
+    const { runReviewCacheClear } = await import("./commands/review-cache-clear.js");
+    runReviewCacheClear(argv);
+    return;
+  }
+
+  // ─── Finding Impact Score Command ─────────────────────────────────
+  if (args.command === "finding-impact-score") {
+    const { runFindingImpactScore } = await import("./commands/finding-impact-score.js");
+    runFindingImpactScore(argv);
+    return;
+  }
+
+  // ─── Review Compliance Check Command ──────────────────────────────
+  if (args.command === "review-compliance-check") {
+    const { runReviewComplianceCheck } = await import("./commands/review-compliance-check.js");
+    runReviewComplianceCheck(argv);
+    return;
+  }
+
+  // ─── Finding Root Cause Command ───────────────────────────────────
+  if (args.command === "finding-root-cause") {
+    const { runFindingRootCause } = await import("./commands/finding-root-cause.js");
+    runFindingRootCause(argv);
     return;
   }
 

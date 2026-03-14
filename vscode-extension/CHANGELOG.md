@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.77.0] — 2026-03-14
+
+### Added
+- Auto-merge: review-auto-merge (policy-based merge gating)
+- Correlation: finding-correlate (group related findings)
+- Dry run: review-dry-run (simulation mode)
+- Suppress: finding-suppress-pattern (pattern-based suppression)
+- Cache: review-cache-clear (selective cache cleanup)
+- Impact: finding-impact-score (impact scoring)
+- Compliance: review-compliance-check (OWASP/CWE mapping)
+- Root cause: finding-root-cause (recurring pattern analysis)
+
 ## [3.76.0] — 2026-03-14
 
 ### Added

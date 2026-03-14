@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.77.0] — 2026-03-14
+
+### Added
+- Auto-merge: review-auto-merge (auto-merge reviews passing all checks)
+- Finding correlation: finding-correlate (correlate related findings across files)
+- Dry run: review-dry-run (simulate reviews without persisting results)
+- Suppress patterns: finding-suppress-pattern (suppress findings by glob pattern)
+- Cache management: review-cache-clear (clear review caches selectively)
+- Impact scoring: finding-impact-score (score findings by estimated impact)
+- Compliance checks: review-compliance-check (OWASP/CWE compliance mapping)
+- Root cause analysis: finding-root-cause (identify root causes of recurring findings)
+
 ## [3.76.0] — 2026-03-14
 
 ### Added
