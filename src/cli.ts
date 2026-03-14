@@ -663,6 +663,15 @@ USAGE:
   judges review-changelog-entry       Generate changelog from findings
   judges review-branch-compare        Compare reviews between branches
   judges finding-category-stats       Finding category statistics
+  judges finding-trend-report         Generate trend reports from findings
+  judges review-commit-hook           Install/manage git commit hooks
+  judges finding-noise-filter         Filter out noisy/low-value findings
+  judges finding-fix-priority         Prioritize findings for fixing
+  judges review-quota-check           Check review quotas and limits
+  judges finding-cluster-analysis     Cluster findings by similarity
+  judges review-session-save          Save/restore review sessions
+  judges finding-evidence-chain       Build evidence chains across findings
+  judges review-file-complexity       Analyze file complexity metrics
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3860,6 +3869,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-category-stats") {
     const { runFindingCategoryStats } = await import("./commands/finding-category-stats.js");
     runFindingCategoryStats(argv);
+    return;
+  }
+
+  // ─── Finding Trend Report Command ─────────────────────────────────
+  if (args.command === "finding-trend-report") {
+    const { runFindingTrendReport } = await import("./commands/finding-trend-report.js");
+    runFindingTrendReport(argv);
+    return;
+  }
+
+  // ─── Review Commit Hook Command ───────────────────────────────────
+  if (args.command === "review-commit-hook") {
+    const { runReviewCommitHook } = await import("./commands/review-commit-hook.js");
+    runReviewCommitHook(argv);
+    return;
+  }
+
+  // ─── Finding Noise Filter Command ─────────────────────────────────
+  if (args.command === "finding-noise-filter") {
+    const { runFindingNoiseFilter } = await import("./commands/finding-noise-filter.js");
+    runFindingNoiseFilter(argv);
+    return;
+  }
+
+  // ─── Finding Fix Priority Command ─────────────────────────────────
+  if (args.command === "finding-fix-priority") {
+    const { runFindingFixPriority } = await import("./commands/finding-fix-priority.js");
+    runFindingFixPriority(argv);
+    return;
+  }
+
+  // ─── Review Quota Check Command ───────────────────────────────────
+  if (args.command === "review-quota-check") {
+    const { runReviewQuotaCheck } = await import("./commands/review-quota-check.js");
+    runReviewQuotaCheck(argv);
+    return;
+  }
+
+  // ─── Finding Cluster Analysis Command ─────────────────────────────
+  if (args.command === "finding-cluster-analysis") {
+    const { runFindingClusterAnalysis } = await import("./commands/finding-cluster-analysis.js");
+    runFindingClusterAnalysis(argv);
+    return;
+  }
+
+  // ─── Review Session Save Command ──────────────────────────────────
+  if (args.command === "review-session-save") {
+    const { runReviewSessionSave } = await import("./commands/review-session-save.js");
+    runReviewSessionSave(argv);
+    return;
+  }
+
+  // ─── Finding Evidence Chain Command ───────────────────────────────
+  if (args.command === "finding-evidence-chain") {
+    const { runFindingEvidenceChain } = await import("./commands/finding-evidence-chain.js");
+    runFindingEvidenceChain(argv);
+    return;
+  }
+
+  // ─── Review File Complexity Command ───────────────────────────────
+  if (args.command === "review-file-complexity") {
+    const { runReviewFileComplexity } = await import("./commands/review-file-complexity.js");
+    runReviewFileComplexity(argv);
     return;
   }
 

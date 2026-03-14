@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.84.0] — 2026-03-14
+
+### Added
+- Trend report: finding-trend-report (generate trend reports from historical findings)
+- Commit hook: review-commit-hook (install/manage git commit hooks for reviews)
+- Noise filter: finding-noise-filter (filter out noisy/low-value findings)
+- Fix priority: finding-fix-priority (prioritize findings for fixing by impact)
+- Quota check: review-quota-check (check review quotas and rate limits)
+- Cluster analysis: finding-cluster-analysis (cluster findings by similarity)
+- Session save: review-session-save (save and restore review sessions)
+- Evidence chain: finding-evidence-chain (build evidence chains across findings)
+- File complexity: review-file-complexity (analyze file complexity metrics)
+
 ## [3.83.0] — 2026-03-14
 
 ### Added

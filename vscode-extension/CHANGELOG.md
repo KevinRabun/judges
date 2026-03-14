@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.84.0] — 2026-03-14
+
+### Added
+- Trend report: finding-trend-report (historical trend reports)
+- Commit hook: review-commit-hook (git hook management)
+- Noise filter: finding-noise-filter (noise filtering)
+- Fix priority: finding-fix-priority (fix prioritization)
+- Quota check: review-quota-check (quota management)
+- Cluster analysis: finding-cluster-analysis (finding clustering)
+- Session save: review-session-save (session management)
+- Evidence chain: finding-evidence-chain (evidence chaining)
+- File complexity: review-file-complexity (complexity analysis)
+
 ## [3.83.0] — 2026-03-14
 
 ### Added
