@@ -62,6 +62,7 @@ import { runDoctor } from "./commands/doctor.js";
 import { runTriage } from "./commands/triage.js";
 import { formatComparisonReport, formatFullComparisonMatrix, TOOL_PROFILES } from "./comparison.js";
 import { runOverride, loadOverrideStore, applyOverrides } from "./commands/override.js";
+import { runNotify } from "./commands/notify.js";
 
 // ─── Language Detection from Extension ──────────────────────────────────────
 
@@ -289,6 +290,7 @@ USAGE:
   judges init                         Interactive project setup wizard
   judges fix <file> [--apply]         Preview / apply auto-fixes
                                      --rule <id>  --severity <level>  --lines <start>-<end>
+  judges fix-pr <path>               Create a PR with auto-fix patches (like Dependabot)
   judges watch <path>                 Watch files and re-evaluate on save
   judges lsp                          Start LSP server for editor integration
   judges trend [file]                 Show findings trend from snapshots
@@ -310,6 +312,14 @@ USAGE:
   judges compare                      Compare judges vs other tools
   judges review                       Post inline review comments on a GitHub PR
   judges app serve                    Start GitHub App webhook server (zero-config PR reviews)
+  judges notify                       Send results to Slack, Teams, or webhook endpoints
+  judges quality-gate                 Evaluate composite quality gate policies
+  judges auto-calibrate               Auto-tune thresholds from feedback history
+  judges dep-audit                    Correlate dependency vulnerabilities with code findings
+  judges monorepo                     Discover and evaluate monorepo packages
+  judges config-migrate               Migrate .judgesrc to current schema
+  judges deprecated                   List deprecated rules with migration guidance
+  judges dedup-report                 Cross-run finding deduplication report
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -881,6 +891,13 @@ export async function runCli(argv: string[]): Promise<void> {
     return; // runFix calls process.exit internally
   }
 
+  // ─── Fix-PR Command ──────────────────────────────────────────────────
+  if (args.command === "fix-pr") {
+    const { runFixPr } = await import("./commands/fix-pr.js");
+    await runFixPr(argv);
+    return;
+  }
+
   // ─── Watch Command ────────────────────────────────────────────────────
   if (args.command === "watch") {
     const { runWatch } = await import("./commands/watch.js");
@@ -1009,6 +1026,19 @@ export async function runCli(argv: string[]): Promise<void> {
     return;
   }
 
+  // ─── Quality-Gate Command ─────────────────────────────────────────────
+  if (args.command === "quality-gate") {
+    const { runQualityGate } = await import("./commands/quality-gate.js");
+    runQualityGate(argv);
+    return;
+  }
+
+  // ─── Notify Command ─────────────────────────────────────────────────
+  if (args.command === "notify") {
+    await runNotify(argv);
+    return;
+  }
+
   // ─── Benchmark Command ────────────────────────────────────────────────
   if (args.command === "benchmark") {
     runBenchmark(argv);
@@ -1044,6 +1074,48 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "app") {
     const { runAppCommand } = await import("./github-app.js");
     runAppCommand(argv.slice(3));
+    return;
+  }
+
+  // ─── Auto-Calibrate Command ────────────────────────────────────────
+  if (args.command === "auto-calibrate") {
+    const { runAutoCalibrate } = await import("./commands/auto-calibrate.js");
+    runAutoCalibrate(argv);
+    return;
+  }
+
+  // ─── Dep-Audit Command ─────────────────────────────────────────────
+  if (args.command === "dep-audit") {
+    const { runDepAuditCommand } = await import("./commands/dep-audit.js");
+    runDepAuditCommand(argv);
+    return;
+  }
+
+  // ─── Monorepo Command ─────────────────────────────────────────────
+  if (args.command === "monorepo") {
+    const { runMonorepoCommand } = await import("./commands/monorepo.js");
+    runMonorepoCommand(argv);
+    return;
+  }
+
+  // ─── Config-Migrate Command ───────────────────────────────────────
+  if (args.command === "config-migrate") {
+    const { runConfigMigrate } = await import("./commands/config-migrate.js");
+    runConfigMigrate(argv);
+    return;
+  }
+
+  // ─── Deprecated Rules Command ─────────────────────────────────────
+  if (args.command === "deprecated") {
+    const { runDeprecatedCommand } = await import("./commands/deprecated.js");
+    runDeprecatedCommand(argv);
+    return;
+  }
+
+  // ─── Dedup Report Command ─────────────────────────────────────────
+  if (args.command === "dedup-report") {
+    const { runDedupReport } = await import("./commands/dedup-report.js");
+    runDedupReport(argv);
     return;
   }
 

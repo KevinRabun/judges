@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.41.0] — 2026-03-12
+
+### Added
+- **Interactive fix mode** — Per-finding accept/skip/all/quit flow with colored diff display in terminal
+- **Framework-aware detection** — 10 framework profiles (React, Next.js, Express, Django, etc.) with auto-detection and FP-reducing severity adjustments
+- **Quality gate evaluations** — Composite quality gate definitions configurable via `.judgesrc`
+- **7 new CLI commands** — `notify`, `fix-pr`, `quality-gate`, `auto-calibrate`, `dep-audit`, `monorepo`, `config-migrate`, `deprecated`, `dedup-report`
+- See [core CHANGELOG](../../CHANGELOG.md) for full details (12 new adoption features)
+
 ## [3.40.0] — 2026-03-11
 
 ### Added

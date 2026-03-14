@@ -2,6 +2,28 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.41.0] — 2026-03-12
+
+### Added — Adoption Gap Closure (12 features)
+- **Webhook notification system** (`judges notify`) — Send evaluation results to Slack, Teams, or generic webhook endpoints; configurable via `.judgesrc` `notifications.channels[]`; HTTPS-only enforcement
+- **Auto-fix PR creation** (`judges fix-pr`) — Evaluate files, apply auto-fix patches on a new git branch, push, and create a GitHub PR via `gh` CLI or REST API; supports `--dry-run`, `--branch`, `--severity`, `--repo`
+- **Configurable quality gates** (`judges quality-gate`) — Composite quality gate definitions with `maxFindings`, `minScore`, `requiredJudges`, `blockerRules`, `maxFpRate`, `minFixRate`, `minConfidence`; configurable via `.judgesrc` `qualityGates`
+- **Parallel file processing** (`src/parallel.ts`) — Async promise pool for concurrent multi-file evaluation; `evaluateParallel()`, `evaluateSequential()`, `batchEvaluate()` with configurable concurrency; auto-detects CPU count
+- **Interactive fix mode** (`judges fix --interactive`) — Per-finding accept/skip/all/quit flow with colored inline diff display and severity-colored headers
+- **Framework-aware detection** (`src/evaluators/framework-rules.ts`) — 10 framework profiles (React, Next.js, Express, Fastify, Django, Flask, FastAPI, Spring, Rails, Angular) with auto-detection, framework-specific rules (FW-REACT-001..003, FW-EXPRESS-001..002, FW-DJANGO-001..002, FW-FLASK-001, FW-SPRING-001, FW-RAILS-001, FW-NEXT-001), and severity adjustments to reduce false positives
+- **Auto-calibration from feedback** (`judges auto-calibrate`) — CLI wrapper for auto-tune engine; analyzes accumulated feedback to recommend threshold adjustments and rule overrides; `--apply` writes to `.judgesrc`
+- **Dependency vulnerability correlation** (`judges dep-audit`) — Runs `npm audit` / `pip-audit` and correlates dependency CVEs with code findings via CWE mapping; supports `--correlate` with existing results
+- **Monorepo workspace support** (`judges monorepo`) — Discovers packages via pnpm-workspace.yaml, lerna.json, turbo.json, npm workspaces, nx.json, or heuristic; per-package cascading config resolution
+- **Config migration assistant** (`judges config-migrate`) — Detects deprecated fields, renamed keys, and structural changes with 10 migration rules; `--apply` flag writes migrated config; `--dry-run` shows changes
+- **Rule deprecation lifecycle** (`judges deprecated`) — Registry of deprecated rules with version info, migration guidance, and replacement rules; `--check` validates `.judgesrc` for stale references
+- **Cross-run finding dedup report** (`judges dedup-report`) — Surfaces new vs recurring vs fixed findings from `.judges-findings.json` with stats, severity breakdown, and filtering (`--new`, `--recurring`, `--fixed`)
+
+### Fixed
+- ESLint: removed all unused import warnings across 7 files (cli.ts, fix-pr.ts, quality-gate.ts, parallel.ts, auto-calibrate.ts, monorepo.ts, dedup-report.ts)
+
+### Tests
+- 2,267 tests passing (1,082 main + 1,185 additional suites), 0 failures
+
 ## [3.40.0] — 2026-03-11
 
 ### Added — Adoption & Enterprise Features
