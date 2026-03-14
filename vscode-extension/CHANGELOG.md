@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.47.0] — 2026-03-12
+
+### Added
+- **AI model trust** — Per-model confidence scoring with fingerprinting for Copilot, GPT-4o, Claude, Cursor, Gemini
+- **Team rules sync** — Fast onboarding with built-in team templates (security, frontend, backend, data, startup)
+- **Cost forecast** — Security debt projections with 30/60/90-day trend forecasting
+- **Team leaderboard** — Gamified engagement with badges, streaks, and rankings
+- **Code owner suggest** — Auto-recommend CODEOWNERS from developer resolution history
+- **PR quality gate** — Automated pass/fail gate with configurable thresholds
+- **AI prompt audit** — Prompt injection risk detection (SQL, shell, SSRF, eval, XSS patterns)
+- **Adoption report** — Executive dashboard with adoption score, trends, and cost savings
+
 ## [3.46.0] — 2026-03-12
 
 ### Added

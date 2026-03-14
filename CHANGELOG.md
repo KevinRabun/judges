@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.47.0] — 2026-03-12
+
+### Added
+- **`judges ai-model-trust`** — AI model confidence scoring with LLM source fingerprinting and per-model trust profiles
+- **`judges team-rules-sync`** — Fast team onboarding by applying shared rule templates (security-team, frontend-team, backend-team, etc.)
+- **`judges cost-forecast`** — Security debt cost projections with 30/60/90-day trend forecasting and industry cost-per-finding benchmarks
+- **`judges team-leaderboard`** — Gamified security review engagement tracking with badges, streaks, and team rankings
+- **`judges code-owner-suggest`** — Auto-recommend CODEOWNERS entries based on developer finding resolution history
+- **`judges pr-quality-gate`** — Automated PR pass/fail quality gate with configurable thresholds and decision history
+- **`judges ai-prompt-audit`** — Scan AI-generated code for prompt injection risks (SQL injection, shell injection, SSRF, etc.)
+- **`judges adoption-report`** — Team adoption metrics dashboard with executive summary, trends, and cost savings tracking
+
 ## [3.46.0] — 2026-03-12
 
 ### Added

@@ -362,6 +362,14 @@ USAGE:
   judges reg-watch                    Regulatory standard coverage monitor
   judges learn                        Personalized developer learning paths
   judges generate                     Secure code template generator
+  judges ai-model-trust               AI model confidence scoring
+  judges team-rules-sync              Fast team onboarding with shared rules
+  judges cost-forecast                Security debt cost projections
+  judges team-leaderboard             Gamified security review engagement
+  judges code-owner-suggest           Auto-recommend CODEOWNERS entries
+  judges pr-quality-gate              Automated PR pass/fail quality gate
+  judges ai-prompt-audit              Scan for prompt injection risks
+  judges adoption-report              Team adoption metrics dashboard
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1452,6 +1460,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "generate") {
     const { runGenerate } = await import("./commands/generate.js");
     runGenerate(argv);
+    return;
+  }
+
+  // ─── AI Model Trust Command ──────────────────────────────────
+  if (args.command === "ai-model-trust") {
+    const { runAiModelTrust } = await import("./commands/ai-model-trust.js");
+    runAiModelTrust(argv);
+    return;
+  }
+
+  // ─── Team Rules Sync Command ─────────────────────────────────
+  if (args.command === "team-rules-sync") {
+    const { runTeamRulesSync } = await import("./commands/team-rules-sync.js");
+    runTeamRulesSync(argv);
+    return;
+  }
+
+  // ─── Cost Forecast Command ───────────────────────────────────
+  if (args.command === "cost-forecast") {
+    const { runCostForecast } = await import("./commands/cost-forecast.js");
+    runCostForecast(argv);
+    return;
+  }
+
+  // ─── Team Leaderboard Command ────────────────────────────────
+  if (args.command === "team-leaderboard") {
+    const { runTeamLeaderboard } = await import("./commands/team-leaderboard.js");
+    runTeamLeaderboard(argv);
+    return;
+  }
+
+  // ─── Code Owner Suggest Command ──────────────────────────────
+  if (args.command === "code-owner-suggest") {
+    const { runCodeOwnerSuggest } = await import("./commands/code-owner-suggest.js");
+    runCodeOwnerSuggest(argv);
+    return;
+  }
+
+  // ─── PR Quality Gate Command ─────────────────────────────────
+  if (args.command === "pr-quality-gate") {
+    const { runPrQualityGate } = await import("./commands/pr-quality-gate.js");
+    runPrQualityGate(argv);
+    return;
+  }
+
+  // ─── AI Prompt Audit Command ─────────────────────────────────
+  if (args.command === "ai-prompt-audit") {
+    const { runAiPromptAudit } = await import("./commands/ai-prompt-audit.js");
+    runAiPromptAudit(argv);
+    return;
+  }
+
+  // ─── Adoption Report Command ─────────────────────────────────
+  if (args.command === "adoption-report") {
+    const { runAdoptionReport } = await import("./commands/adoption-report.js");
+    runAdoptionReport(argv);
     return;
   }
 
