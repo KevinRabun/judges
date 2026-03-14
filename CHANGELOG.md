@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.54.0] — 2025-07-25
+
+### Added
+- **prompt-replay** — Reverse-engineer AI prompts that generated flagged code and suggest improved prompts
+- **review-replay** — Record, export, and replay full evaluation runs as step-by-step walkthroughs
+- **context-inject** — Feed project-specific context (architecture docs, coding standards) into evaluation
+- **habit-tracker** — Track recurring finding patterns per developer/AI-model with improvement suggestions
+- **finding-contest** — Gamified challenge mode for competitive fix sprints with leaderboards
+- **approve-chain** — Multi-stage approval workflows based on finding severity and code sensitivity
+- **snippet-eval** — Evaluate code snippets from clipboard/stdin without project setup (zero-friction entry)
+- **coach-mode** — Interactive teaching mode with real-world breach examples and secure alternatives
+
 ## [3.53.0] — 2025-07-25
 
 ### Added

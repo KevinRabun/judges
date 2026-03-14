@@ -418,6 +418,14 @@ USAGE:
   judges resource-cleanup             Validate resource cleanup patterns
   judges refactor-safety              Analyze refactoring safety
   judges compliance-weight            Re-weight findings by compliance framework
+  judges prompt-replay                Reverse-engineer AI prompts and suggest improvements
+  judges review-replay                Record and replay evaluation runs
+  judges context-inject               Feed project context into evaluation
+  judges habit-tracker                Track recurring finding patterns per author
+  judges finding-contest              Gamified fix challenge mode
+  judges approve-chain                Multi-stage approval workflows
+  judges snippet-eval                 Evaluate code snippets instantly
+  judges coach-mode                   Educational security coaching
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1900,6 +1908,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "compliance-weight") {
     const { runComplianceWeight } = await import("./commands/compliance-weight.js");
     runComplianceWeight(argv);
+    return;
+  }
+
+  // ─── Prompt Replay Command ──────────────────────────────────
+  if (args.command === "prompt-replay") {
+    const { runPromptReplay } = await import("./commands/prompt-replay.js");
+    runPromptReplay(argv);
+    return;
+  }
+
+  // ─── Review Replay Command ──────────────────────────────────
+  if (args.command === "review-replay") {
+    const { runReviewReplay } = await import("./commands/review-replay.js");
+    runReviewReplay(argv);
+    return;
+  }
+
+  // ─── Context Inject Command ─────────────────────────────────
+  if (args.command === "context-inject") {
+    const { runContextInject } = await import("./commands/context-inject.js");
+    runContextInject(argv);
+    return;
+  }
+
+  // ─── Habit Tracker Command ──────────────────────────────────
+  if (args.command === "habit-tracker") {
+    const { runHabitTracker } = await import("./commands/habit-tracker.js");
+    runHabitTracker(argv);
+    return;
+  }
+
+  // ─── Finding Contest Command ────────────────────────────────
+  if (args.command === "finding-contest") {
+    const { runFindingContest } = await import("./commands/finding-contest.js");
+    runFindingContest(argv);
+    return;
+  }
+
+  // ─── Approve Chain Command ──────────────────────────────────
+  if (args.command === "approve-chain") {
+    const { runApproveChain } = await import("./commands/approve-chain.js");
+    runApproveChain(argv);
+    return;
+  }
+
+  // ─── Snippet Eval Command ──────────────────────────────────
+  if (args.command === "snippet-eval") {
+    const { runSnippetEval } = await import("./commands/snippet-eval.js");
+    runSnippetEval(argv);
+    return;
+  }
+
+  // ─── Coach Mode Command ────────────────────────────────────
+  if (args.command === "coach-mode") {
+    const { runCoachMode } = await import("./commands/coach-mode.js");
+    runCoachMode(argv);
     return;
   }
 

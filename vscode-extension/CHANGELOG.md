@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.54.0] — 2025-07-25
+
+### Added
+- Developer experience: prompt-replay (AI prompt coaching), snippet-eval (zero-friction evaluation), coach-mode (security teaching)
+- Workflow: review-replay (evaluation walkthroughs), context-inject (project-aware evaluation), habit-tracker (improvement tracking)
+- Enterprise: approve-chain (multi-stage approvals), finding-contest (gamified fix sprints)
+
 ## [3.53.0] — 2025-07-25
 
 ### Added
