@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.59.0] — 2025-07-25
+
+### Added
+- **logic-lint** — Detect common logic errors AI generates: tautological comparisons, off-by-one loops, constant conditions, invalid typeof
+- **phantom-import** — Find hallucinated imports, non-existent modules, and wrong export names AI invents
+- **example-leak** — Detect AI-copied placeholder URLs, example data, tutorial names, and stub code left in production
+- **completion-audit** — Verify AI code completeness: unmatched brackets, truncation markers, TODO stubs, ellipsis placeholders
+- **spec-conform** — Auto-detect project conventions (semicolons, quotes, indent, naming) and flag AI-generated deviations
+- **cross-file-consistency** — Verify naming, error handling, import styles, and return types are consistent across files
+- **api-misuse** — Detect incorrect API usage: async forEach, unprotected JSON.parse, fetch without status check, Promise anti-patterns
+- **review-focus** — Prioritize human review attention by file risk score (security, payment, DB, complexity, nesting)
+
 ## [3.58.0] — 2025-07-25
 
 ### Added

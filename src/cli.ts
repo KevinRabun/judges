@@ -458,6 +458,14 @@ USAGE:
   judges encoding-safety              Detect encoding/serialization hazards
   judges assertion-density            Audit defensive checks & preconditions
   judges state-integrity              Validate state machines & flag impossible states
+  judges logic-lint                   Detect common logic errors AI generates
+  judges phantom-import               Find hallucinated imports & missing modules
+  judges example-leak                 Detect AI-copied placeholder code in production
+  judges completion-audit             Verify AI code is complete, not truncated
+  judges spec-conform                 Check conformance to project conventions
+  judges cross-file-consistency       Verify naming & pattern consistency across files
+  judges api-misuse                   Detect incorrect API usage patterns
+  judges review-focus                 Prioritize review attention by file risk
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2220,6 +2228,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "state-integrity") {
     const { runStateIntegrity } = await import("./commands/state-integrity.js");
     runStateIntegrity(argv);
+    return;
+  }
+
+  // ─── Logic Lint Command ───────────────────────────────────────────
+  if (args.command === "logic-lint") {
+    const { runLogicLint } = await import("./commands/logic-lint.js");
+    runLogicLint(argv);
+    return;
+  }
+
+  // ─── Phantom Import Command ───────────────────────────────────────
+  if (args.command === "phantom-import") {
+    const { runPhantomImport } = await import("./commands/phantom-import.js");
+    runPhantomImport(argv);
+    return;
+  }
+
+  // ─── Example Leak Command ────────────────────────────────────────
+  if (args.command === "example-leak") {
+    const { runExampleLeak } = await import("./commands/example-leak.js");
+    runExampleLeak(argv);
+    return;
+  }
+
+  // ─── Completion Audit Command ─────────────────────────────────────
+  if (args.command === "completion-audit") {
+    const { runCompletionAudit } = await import("./commands/completion-audit.js");
+    runCompletionAudit(argv);
+    return;
+  }
+
+  // ─── Spec Conform Command ────────────────────────────────────────
+  if (args.command === "spec-conform") {
+    const { runSpecConform } = await import("./commands/spec-conform.js");
+    runSpecConform(argv);
+    return;
+  }
+
+  // ─── Cross-File Consistency Command ───────────────────────────────
+  if (args.command === "cross-file-consistency") {
+    const { runCrossFileConsistency } = await import("./commands/cross-file-consistency.js");
+    runCrossFileConsistency(argv);
+    return;
+  }
+
+  // ─── API Misuse Command ──────────────────────────────────────────
+  if (args.command === "api-misuse") {
+    const { runApiMisuse } = await import("./commands/api-misuse.js");
+    runApiMisuse(argv);
+    return;
+  }
+
+  // ─── Review Focus Command ────────────────────────────────────────
+  if (args.command === "review-focus") {
+    const { runReviewFocus } = await import("./commands/review-focus.js");
+    runReviewFocus(argv);
     return;
   }
 

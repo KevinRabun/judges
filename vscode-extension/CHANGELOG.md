@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.59.0] — 2025-07-25
+
+### Added
+- AI correctness: logic-lint, phantom-import, example-leak, completion-audit
+- Conventions: spec-conform, cross-file-consistency
+- Workflow: api-misuse, review-focus
+
 ## [3.58.0] — 2025-07-25
 
 ### Added
