@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.55.0] — 2025-07-25
+
+### Added
+- **commit-hygiene** — Audit commit messages and diff structure for AI-generated code submission quality
+- **deploy-readiness** — Pre-deployment production readiness checklist (health checks, graceful shutdown, env validation, rate limiting, CORS, probes)
+- **rollback-safety** — Detect changes unsafe or impossible to roll back (destructive migrations, API removals, encryption changes)
+- **test-quality** — Score test suites for assertion density, boundary coverage, flakiness patterns, and mutation-testing readiness
+- **build-optimize** — Detect build-time inefficiencies (unused imports, barrel re-exports, dynamic require, circular dependencies)
+- **secret-age** — Credential lifecycle and rotation analysis (hardcoded secrets, missing vault refs, disabled rotation)
+- **observability-gap** — Detect missing instrumentation at critical code paths (silent catches, untraced calls, no heartbeats)
+- **migration-safety** — Validate framework/language migration PRs for compatibility gaps and data-loss risks
+
 ## [3.54.0] — 2025-07-25
 
 ### Added

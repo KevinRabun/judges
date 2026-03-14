@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.55.0] — 2025-07-25
+
+### Added
+- Operations: commit-hygiene, deploy-readiness, rollback-safety — production-ready code submission and deployment validation
+- Quality: test-quality, build-optimize — test suite scoring and build-time inefficiency detection
+- Security: secret-age — credential lifecycle and rotation analysis beyond simple detection
+- Observability: observability-gap — detect missing metrics, traces, and logs at critical paths
+- Migration: migration-safety — framework/language migration validation with confidence scoring
+
 ## [3.54.0] — 2025-07-25
 
 ### Added

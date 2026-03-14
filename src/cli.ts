@@ -426,6 +426,14 @@ USAGE:
   judges approve-chain                Multi-stage approval workflows
   judges snippet-eval                 Evaluate code snippets instantly
   judges coach-mode                   Educational security coaching
+  judges commit-hygiene               Audit commit messages & diff structure
+  judges deploy-readiness             Pre-deployment production readiness checklist
+  judges rollback-safety              Detect changes unsafe to roll back
+  judges test-quality                 Score test suites beyond coverage %
+  judges build-optimize               Detect build-time inefficiencies
+  judges secret-age                   Credential lifecycle & rotation analysis
+  judges observability-gap            Detect missing instrumentation
+  judges migration-safety             Validate migration PRs for risks
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1964,6 +1972,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "coach-mode") {
     const { runCoachMode } = await import("./commands/coach-mode.js");
     runCoachMode(argv);
+    return;
+  }
+
+  // ─── Commit Hygiene Command ─────────────────────────────────────
+  if (args.command === "commit-hygiene") {
+    const { runCommitHygiene } = await import("./commands/commit-hygiene.js");
+    runCommitHygiene(argv);
+    return;
+  }
+
+  // ─── Deploy Readiness Command ──────────────────────────────────
+  if (args.command === "deploy-readiness") {
+    const { runDeployReadiness } = await import("./commands/deploy-readiness.js");
+    runDeployReadiness(argv);
+    return;
+  }
+
+  // ─── Rollback Safety Command ───────────────────────────────────
+  if (args.command === "rollback-safety") {
+    const { runRollbackSafety } = await import("./commands/rollback-safety.js");
+    runRollbackSafety(argv);
+    return;
+  }
+
+  // ─── Test Quality Command ─────────────────────────────────────
+  if (args.command === "test-quality") {
+    const { runTestQuality } = await import("./commands/test-quality.js");
+    runTestQuality(argv);
+    return;
+  }
+
+  // ─── Build Optimize Command ───────────────────────────────────
+  if (args.command === "build-optimize") {
+    const { runBuildOptimize } = await import("./commands/build-optimize.js");
+    runBuildOptimize(argv);
+    return;
+  }
+
+  // ─── Secret Age Command ───────────────────────────────────────
+  if (args.command === "secret-age") {
+    const { runSecretAge } = await import("./commands/secret-age.js");
+    runSecretAge(argv);
+    return;
+  }
+
+  // ─── Observability Gap Command ────────────────────────────────
+  if (args.command === "observability-gap") {
+    const { runObservabilityGap } = await import("./commands/observability-gap.js");
+    runObservabilityGap(argv);
+    return;
+  }
+
+  // ─── Migration Safety Command ─────────────────────────────────
+  if (args.command === "migration-safety") {
+    const { runMigrationSafety } = await import("./commands/migration-safety.js");
+    runMigrationSafety(argv);
     return;
   }
 
