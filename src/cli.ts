@@ -628,6 +628,14 @@ USAGE:
   judges review-multi-repo            Review across multiple repositories
   judges finding-trace                Trace findings to origin commits
   judges review-preset-save           Save and load review preset configurations
+  judges review-blame-map             Map findings to git blame authors
+  judges finding-autofix-preview      Preview auto-fix patches before applying
+  judges review-config-diff           Diff two review configurations
+  judges finding-severity-trend       Track severity distribution trends
+  judges review-batch-files           Batch-review multiple files at once
+  judges finding-context-expand       Expand finding context with surrounding code
+  judges review-output-format         Configure and manage output formats
+  judges finding-merge-results        Merge results from multiple review runs
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3580,6 +3588,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-preset-save") {
     const { runReviewPresetSave } = await import("./commands/review-preset-save.js");
     runReviewPresetSave(argv);
+    return;
+  }
+
+  // ─── Review Blame Map Command ────────────────────────────────────
+  if (args.command === "review-blame-map") {
+    const { runReviewBlameMap } = await import("./commands/review-blame-map.js");
+    runReviewBlameMap(argv);
+    return;
+  }
+
+  // ─── Finding Autofix Preview Command ─────────────────────────────
+  if (args.command === "finding-autofix-preview") {
+    const { runFindingAutofixPreview } = await import("./commands/finding-autofix-preview.js");
+    runFindingAutofixPreview(argv);
+    return;
+  }
+
+  // ─── Review Config Diff Command ──────────────────────────────────
+  if (args.command === "review-config-diff") {
+    const { runReviewConfigDiff } = await import("./commands/review-config-diff.js");
+    runReviewConfigDiff(argv);
+    return;
+  }
+
+  // ─── Finding Severity Trend Command ──────────────────────────────
+  if (args.command === "finding-severity-trend") {
+    const { runFindingSeverityTrend } = await import("./commands/finding-severity-trend.js");
+    runFindingSeverityTrend(argv);
+    return;
+  }
+
+  // ─── Review Batch Files Command ──────────────────────────────────
+  if (args.command === "review-batch-files") {
+    const { runReviewBatchFiles } = await import("./commands/review-batch-files.js");
+    runReviewBatchFiles(argv);
+    return;
+  }
+
+  // ─── Finding Context Expand Command ──────────────────────────────
+  if (args.command === "finding-context-expand") {
+    const { runFindingContextExpand } = await import("./commands/finding-context-expand.js");
+    runFindingContextExpand(argv);
+    return;
+  }
+
+  // ─── Review Output Format Command ────────────────────────────────
+  if (args.command === "review-output-format") {
+    const { runReviewOutputFormat } = await import("./commands/review-output-format.js");
+    runReviewOutputFormat(argv);
+    return;
+  }
+
+  // ─── Finding Merge Results Command ───────────────────────────────
+  if (args.command === "finding-merge-results") {
+    const { runFindingMergeResults } = await import("./commands/finding-merge-results.js");
+    runFindingMergeResults(argv);
     return;
   }
 

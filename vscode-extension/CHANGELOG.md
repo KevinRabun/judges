@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.80.0] — 2026-03-14
+
+### Added
+- Blame map: review-blame-map (git author attribution)
+- Autofix preview: finding-autofix-preview (patch preview)
+- Config diff: review-config-diff (configuration comparison)
+- Severity trend: finding-severity-trend (trend tracking)
+- Batch files: review-batch-files (multi-file batch review)
+- Context expand: finding-context-expand (source context expansion)
+- Output format: review-output-format (format management)
+- Merge results: finding-merge-results (multi-run merging)
+
 ## [3.79.0] — 2026-03-14
 
 ### Added

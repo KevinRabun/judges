@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.80.0] — 2026-03-14
+
+### Added
+- Blame map: review-blame-map (map findings to git blame authors)
+- Autofix preview: finding-autofix-preview (preview patches before applying)
+- Config diff: review-config-diff (diff two review configurations)
+- Severity trend: finding-severity-trend (track severity trends over time)
+- Batch files: review-batch-files (batch-review multiple files)
+- Context expand: finding-context-expand (expand finding context with source)
+- Output format: review-output-format (configure and manage output formats)
+- Merge results: finding-merge-results (merge results from multiple runs)
+
 ## [3.79.0] — 2026-03-14
 
 ### Added
