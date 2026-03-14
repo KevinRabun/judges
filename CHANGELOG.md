@@ -2,6 +2,52 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.40.0] — 2026-03-11
+
+### Added — Adoption & Enterprise Features
+- **DataAdapter persistence layer** — All stores (feedback, finding-lifecycle, fix-history, calibration, snapshot) now flow through the pluggable `DataAdapter` interface; users can wire custom backends (REST, DB, cloud) via `.judgesrc` without judges ever hosting their data
+- **Auto-fix verification loop** (`judges fix --verify`) — Re-evaluates code after applying patches; tracks fix success/regression rates per judge
+- **Override/exception workflow** (`judges override`) — Accept-risk, false-positive, and time-limited suppression with audit logging; `override list` and `override audit` subcommands
+- **Evidence-backed explanations** — Every finding now includes an `evidence` array in both text and SARIF output, citing specific AST/pattern matches and confidence scores
+- **Cross-file import context** — `project` evaluator resolves ES/TS/Python/Go imports to detect cross-module issues (unused exports, circular deps, re-export of internals)
+- **Auto-activate model profiles** — Evaluator index detects LLM watermarks (Codex, Copilot, Claude, GPT, Gemini, Cursor) and applies tuned thresholds automatically
+- **Feedback-to-rule pipeline** (`judges feedback-rules`) — Aggregates user feedback to generate candidate custom rules; `--apply` flag writes to `.judgesrc`
+- **IDE fix diff preview** — VS Code extension shows inline diff previews before applying auto-fixes with accept/reject actions
+- **Enhanced `--explain` output** — Layer 2 evidence details with AST node types, pattern matcher names, and confidence breakdowns
+- **Trend regression alerts** — `judges snapshot --check` compares latest snapshot to baseline and exits non-zero on regression; configurable thresholds
+- **Multi-repo governance dashboard** (`judges governance`) — Aggregates findings across repos with risk scoring, trend tracking, and HTML/JSON output
+- **Language pattern parity audit** (`judges parity`) — Compares rule coverage across languages and reports gaps
+- **Semantic intent-drift detection** — Four new evaluator rules (INTENT-007 through INTENT-010): scope creep, naming drift, contract violation, dead intent
+- **Compliance evidence reports** (`judges compliance-report`) — Generates audit-ready evidence packages for SOC 2, ISO 27001, OWASP, PCI DSS frameworks
+- **Staged-only pre-commit** (`--staged-only`) — Single-pass mode for `judges hook` that scans only `git diff --cached` files
+- **Plugin discovery** (`judges plugin-search`) — Enhanced with `list`, `info`, and `init` subcommands for community plugin ecosystem
+
+### Fixed
+- ESLint: removed forbidden `import()` type annotation in CLI compliance-report handler
+- ESLint: removed unused imports (`FeedbackEntry` in data-adapter, `Severity` in org-metrics)
+- ESLint: prefixed unused dashboard variables to satisfy no-unused-vars rule
+
+### Tests
+- 2,267 tests passing (1,082 main + 1,185 additional suites), 0 failures
+
+## [3.39.0] — 2026-03-10
+
+### Added — LLM Prompt Benchmark (Layer 2)
+- **`src/commands/llm-benchmark.ts`** — New module with types, rule-ID parser, prompt construction, stratified sampling, scoring, and markdown formatting for LLM-based benchmark results
+- **`scripts/run-llm-benchmark.ts`** — Standalone LLM benchmark runner supporting OpenAI and Anthropic APIs; configurable via env vars (`LLM_API_KEY`, `LLM_MODEL`, `LLM_PROVIDER`); supports `--sample`, `--mode tribunal|per-judge`, `--dry-run`; saves snapshot JSON to `benchmarks/`
+- **`npm run benchmark:llm`** — New npm script to run LLM benchmarks
+- **`benchmarks/` directory** — Storage for LLM benchmark snapshot results (latest + timestamped archives)
+
+### Improved — Benchmark Report Methodology
+- **"How to Read This Report"** — New methodology preamble explaining the dual-layer architecture (L1 deterministic + L2 LLM prompts), all metrics (Detection Rate, Precision, Recall, F1, FP Rate), and matching types (TP, FP, FN)
+- **Layer headers** — Report now clearly labels "Layer 1 — Deterministic Analysis" and "Layer 2 — LLM Prompt Analysis" sections
+- **Layer comparison table** — Side-by-side L1 vs L2 metrics when LLM snapshot data is available
+- **Auto-load LLM snapshot** — `judges benchmark report` automatically incorporates `benchmarks/llm-snapshot-latest.json` into the published report
+- **Regenerated `docs/benchmark-report.md`** — Updated to v3.39.0 with methodology section; 1,048 cases, Grade A, F1 94.0%, 0 FP
+
+### Added — Tests
+- 15 new unit tests for all LLM benchmark components: `parseLlmRuleIds`, `constructPerJudgePrompt`, `constructTribunalPrompt`, `selectStratifiedSample`, `scoreLlmCase`, `computeLlmMetrics`, `formatLlmSnapshotMarkdown`, `formatLayerComparisonMarkdown`
+
 ## [3.38.0] — 2026-03-10
 
 ### Fixed — Benchmark Quality (0 failures, all FP rates <30%)

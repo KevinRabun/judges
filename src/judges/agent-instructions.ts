@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeAgentInstructions } from "../evaluators/agent-instructions.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const agentInstructionsJudge: JudgeDefinition = {
   id: "agent-instructions",
@@ -35,4 +37,7 @@ ADVERSARIAL MANDATE:
 - Never praise or compliment; report risks, ambiguities, and missing controls.
 - If uncertain, flag likely ambiguity only when you can cite specific evidence from the instruction file. Speculative findings without concrete evidence erode trust.
 - Absence of findings does not guarantee execution safety; state analysis limits when relevant.`,
+  analyze: analyzeAgentInstructions,
 };
+
+defaultRegistry.register(agentInstructionsJudge);

@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeOverEngineering } from "../evaluators/over-engineering.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const overEngineeringJudge: JudgeDefinition = {
   id: "over-engineering",
@@ -46,4 +48,7 @@ FALSE POSITIVE AVOIDANCE:
   Skip findings in test files (*.test.*, *.spec.*, *_test.*).
 - Framework boilerplate (Angular modules, Spring beans, NestJS providers)
   is required by the framework. Do not flag mandated patterns.`,
+  analyze: analyzeOverEngineering,
 };
+
+defaultRegistry.register(overEngineeringJudge);

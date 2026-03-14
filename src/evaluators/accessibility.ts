@@ -613,7 +613,7 @@ export function analyzeAccessibility(code: string, language: string): Finding[] 
     );
     if (!hasMain && !hasLandmarks && lines.length > 20) {
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "medium",
         title: "Page lacks landmark regions",
         description:

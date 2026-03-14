@@ -836,7 +836,7 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       // Static/hardcoded IV
-      if (/(?:static\s*IV|\b(?:iv|IV)\b\s*[:=]\s*(?:\[\]byte\s*\(|["'\[])|var\s+\w*[Ii][Vv]\s*=)/i.test(line)) {
+      if (/(?:static\s*IV|\b(?:iv|IV)\b\s*[:=]\s*(?:\[\]byte\s*\(|["'[])|var\s+\w*[Ii][Vv]\s*=)/i.test(line)) {
         cryptoMiscLines.push(i + 1);
       }
       // ECB-like mode: manual block-by-block encryption without chain/GCM
@@ -926,7 +926,7 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
     }
     if (fmtLines.length > 0) {
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "high",
         title: "Format string attack with user-controlled template",
         description:

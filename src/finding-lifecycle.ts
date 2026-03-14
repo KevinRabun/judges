@@ -13,6 +13,7 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import type { Finding, Severity } from "./types.js";
+import { getDataAdapter, type DataAdapter } from "./data-adapter.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -122,6 +123,26 @@ export function loadFindingStore(dir: string = "."): FindingStore {
 export function saveFindingStore(store: FindingStore, dir: string = "."): void {
   const filePath = resolve(dir, FINDINGS_FILE);
   writeFileSync(filePath, JSON.stringify(store, null, 2) + "\n", "utf-8");
+}
+
+/**
+ * Load finding store via the configured DataAdapter.
+ */
+export async function loadFindingsViaAdapter(projectDir: string, adapter?: DataAdapter): Promise<FindingStore> {
+  const da = adapter ?? getDataAdapter();
+  return da.loadFindings(projectDir);
+}
+
+/**
+ * Save finding store via the configured DataAdapter.
+ */
+export async function saveFindingsViaAdapter(
+  store: FindingStore,
+  projectDir: string,
+  adapter?: DataAdapter,
+): Promise<void> {
+  const da = adapter ?? getDataAdapter();
+  return da.saveFindings(store, projectDir);
 }
 
 // ─── Lifecycle Operations ────────────────────────────────────────────────────

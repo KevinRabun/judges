@@ -1141,7 +1141,8 @@ judges/
 │   ├── config.ts             # .judgesrc configuration parser and validation
 │   ├── errors.ts             # Custom error types (ConfigError, EvaluationError, ParseError)
 │   ├── language-patterns.ts  # Multi-language regex pattern constants and helpers
-│   ├── plugins.ts            # Plugin system for custom rules
+│   ├── judge-registry.ts     # Unified JudgeRegistry — single source of truth for all judges
+│   ├── plugins.ts            # Plugin API façade (delegates to JudgeRegistry)
 │   ├── scoring.ts            # Confidence scoring and calibration
 │   ├── dedup.ts              # Finding deduplication engine
 │   ├── fingerprint.ts        # Finding fingerprint generation
@@ -1196,8 +1197,8 @@ judges/
 │   ├── reports/
 │   │   └── public-repo-report.ts   # Public repo clone + full tribunal report generation
 │   └── judges/               # Judge definitions (id, name, domain, system prompt)
-│       ├── index.ts          # JUDGES array, getJudge(), getJudgeSummaries()
-│       └── *.ts              # One definition per judge (39 files)
+│       ├── index.ts          # Side-effect imports + re-exports (JUDGES, getJudge, getJudgeSummaries)
+│       └── *.ts              # One self-registering definition per judge (45 files)
 ├── scripts/
 │   ├── generate-public-repo-report.ts  # Run: npm run report:public-repo -- --repoUrl <url>
 │   ├── daily-popular-repo-autofix.ts   # Run: npm run automation:daily-popular
@@ -1337,7 +1338,7 @@ const sarif = findingsToSarif(verdict.evaluations.flatMap(e => e.findings));
 | `@kevinrabun/judges/codeclimate` | CodeClimate/GitLab Code Quality JSON |
 | `@kevinrabun/judges/badge` | SVG and text badge generator |
 | `@kevinrabun/judges/diagnostics` | Diagnostics formatter |
-| `@kevinrabun/judges/plugins` | Plugin system API |
+| `@kevinrabun/judges/plugins` | Plugin system API (see [Plugin Guide](docs/plugin-guide.md)) |
 | `@kevinrabun/judges/fingerprint` | Finding fingerprint utilities |
 | `@kevinrabun/judges/comparison` | Tool comparison benchmarks |
 

@@ -20,18 +20,20 @@ import { JUDGES } from "../judges/index.js";
 // ──────────────────────────────────────────────────────────────────────────────
 
 /** Adversarial evaluation stance — shared across all judges. */
-const SHARED_ADVERSARIAL_MANDATE = `ADVERSARIAL MANDATE (applies to ALL judges):
+export const SHARED_ADVERSARIAL_MANDATE = `ADVERSARIAL MANDATE (applies to ALL judges):
 - Your role is adversarial: assume the code has problems and actively hunt for them. Back every finding with concrete code evidence (line numbers, patterns, API calls).
 - Never praise or compliment the code. Report only problems, risks, and deficiencies.
 - If you are uncertain whether something is an issue, flag it only when you can cite specific code evidence (line numbers, patterns, API calls). Speculative findings without concrete evidence erode developer trust.
-- Absence of findings does not mean the code is good. It means your analysis reached its limits. State this explicitly.`;
+- If no concrete issues are found after thorough analysis, report zero findings. Do not pad the report with speculative issues.`;
 
 /** Precision override — ensures evidence-based findings. */
-const PRECISION_MANDATE = `PRECISION MANDATE (overrides adversarial stance when in conflict):
+export const PRECISION_MANDATE = `PRECISION MANDATE (overrides adversarial stance when in conflict):
 - Every finding MUST cite specific code evidence: exact line numbers, API calls, variable names, or patterns. Findings without concrete evidence must be discarded.
 - Do NOT flag the absence of a feature or pattern unless you can identify the specific code location where it SHOULD have been implemented and explain WHY it is required for THIS code.
 - Speculative, hypothetical, or "just in case" findings erode developer trust. Only flag issues you are confident exist in the actual code.
-- Prefer fewer, high-confidence findings over many uncertain ones. Quality of findings matters more than quantity.`;
+- Prefer fewer, high-confidence findings over many uncertain ones. Quality of findings matters more than quantity.
+- If the code is genuinely well-written with no real issues, reporting ZERO findings is the correct and expected behavior. Do not manufacture findings to avoid an empty report.
+- Clean, well-structured code exists. Acknowledge it by not forcing false issues.`;
 
 // ─── Criteria Extraction ─────────────────────────────────────────────────────
 

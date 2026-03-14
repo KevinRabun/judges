@@ -1,7 +1,6 @@
 import type { Finding } from "../types.js";
 import {
   getLineNumbers,
-  getLangLineNumbers,
   getLangFamily,
   isIaCTemplate,
   testCode,
@@ -482,7 +481,7 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
 
   if (toolResultLines.length > 0 && !hasResultValidation && hasLlmCall) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "high",
       title: "Tool-call results used without validation",
       description:
@@ -495,8 +494,6 @@ export function analyzeAiCodeSafety(code: string, language: string): Finding[] {
         "Validate tool results: const parsed = schema.parse(toolResult); and sanitize string content before injecting into prompts or rendering.",
       confidence: 0.7,
     });
-  } else {
-    ruleNum++;
   }
 
   // ── AICS-017–022 removed — these are generic security findings (weak hash,

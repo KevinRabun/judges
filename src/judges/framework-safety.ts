@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeFrameworkSafety } from "../evaluators/framework-safety.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const frameworkSafetyJudge: JudgeDefinition = {
   id: "framework-safety",
@@ -40,4 +42,7 @@ ADVERSARIAL MANDATE:
 - Never praise or compliment the code. Report only problems, risks, and deficiencies.
 - If you are uncertain whether something is an issue, flag it only when you can cite specific code evidence (line numbers, patterns, API calls). Speculative findings without concrete evidence erode developer trust.
 - Absence of findings does not mean the code follows framework best practices. It means your analysis reached its limits. State this explicitly.`,
+  analyze: analyzeFrameworkSafety,
 };
+
+defaultRegistry.register(frameworkSafetyJudge);

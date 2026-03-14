@@ -64,10 +64,10 @@ const FUNC_PATTERNS: Record<string, RegExp> = {
   kotlin:
     /^\s*(?:(?:public|private|protected|internal|open|override|abstract|suspend|inline)\s+)*fun\s+(?:<[^>]*>\s*)?(\w+)\s*\(([^)]*)\)/,
   swift:
-    /^\s*(?:(?:public|private|internal|open|fileprivate|static|class|override|mutating|@\w+\s*)\s+)*func\s+(\w+)\s*\(([^)]*)\)/,
+    /^\s*(?:(?:public|private|internal|open|fileprivate|static|class|override|mutating|@\w+)\s+)*func\s+(\w+)\s*\(([^)]*)\)/,
   typescript: /^\s*(?:(?:export|default|async)\s+)*function\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)/,
   javascript: /^\s*(?:(?:export|default|async)\s+)*function\s+(\w+)\s*\(([^)]*)\)/,
-  dart: /^\s*(?:(?:static|abstract|override|Future|Stream|void|int|double|String|bool|dynamic|\w+)\s+)*(\w+)\s*\(([^)]*)\)\s*(?:async)?\s*\{/,
+  dart: /^\s*(?:(?:static|abstract|override|Future|Stream|void|int|double|String|bool|dynamic)\s+)*(?:\w+\s+)?(?:\w+\s+)?(\w+)\s*\(([^)]*)\)\s*(?:async)?\s*\{/,
   bash: /^\s*(?:function\s+(\w+)|([\w]+)\s*\(\s*\))\s*\{/,
 };
 
@@ -760,7 +760,7 @@ function extractImports(lines: string[], language: string): string[] {
       /^\s*import\s+(\w+)/, // import Foundation
     ],
     dart: [
-      /^\s*import\s+['"]package:([\w\/]+)/, // import 'package:flutter/material.dart'
+      /^\s*import\s+['"]package:([\w/]+)/, // import 'package:flutter/material.dart'
       /^\s*import\s+['"]([^'"]+)/, // import 'src/helper.dart'
     ],
     bash: [

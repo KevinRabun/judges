@@ -393,7 +393,7 @@ export function analyzeUx(code: string, language: string): Finding[] {
   const hasTimeDisplay = testCode(code, /\.toISOString|\.toUTCString|createdAt|updatedAt|timestamp|date.?format/gi);
   if (hasDateRendering && hasTimeDisplay && !hasTimezone && hasUIRenderingContext) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "low",
       title: "Time/date display without timezone awareness",
       description:

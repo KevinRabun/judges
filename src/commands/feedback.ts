@@ -18,6 +18,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { resolve, dirname } from "path";
 import { generateAutoTuneReport, formatAutoTuneReport, formatAutoTuneReportJson } from "../auto-tune.js";
+import { getDataAdapter, type DataAdapter } from "../data-adapter.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,8 @@ export interface FeedbackEntry {
    * - "pr-review"    — captured from PR review interaction
    */
   source?: "manual" | "l2-dismissal" | "pr-review";
+  /** AI model that generated the code being evaluated (from MFPR detection) */
+  model?: string;
 }
 
 export interface FeedbackStore {
@@ -164,6 +167,27 @@ export function saveFeedbackStore(store: FeedbackStore, feedbackPath?: string): 
   }
   store.metadata.lastUpdated = new Date().toISOString();
   writeFileSync(filePath, JSON.stringify(store, null, 2), "utf-8");
+}
+
+/**
+ * Load feedback store via the configured DataAdapter.
+ * Falls back to direct filesystem if adapter is not configured.
+ */
+export async function loadFeedbackViaAdapter(projectDir: string, adapter?: DataAdapter): Promise<FeedbackStore> {
+  const da = adapter ?? getDataAdapter();
+  return da.loadFeedback(projectDir);
+}
+
+/**
+ * Save feedback store via the configured DataAdapter.
+ */
+export async function saveFeedbackViaAdapter(
+  store: FeedbackStore,
+  projectDir: string,
+  adapter?: DataAdapter,
+): Promise<void> {
+  const da = adapter ?? getDataAdapter();
+  return da.saveFeedback(store, projectDir);
 }
 
 export function addFeedback(store: FeedbackStore, entry: FeedbackEntry): FeedbackStore {

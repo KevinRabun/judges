@@ -12,6 +12,10 @@ import { isCommentLine } from "./shared.js";
  *   INTENT-004  Placeholder return (hardcoded value despite dynamic name)
  *   INTENT-005  Docstring param mismatch
  *   INTENT-006  Misleading function name (promises behavior it doesn't perform)
+ *   INTENT-007  Semantic drift: error handler that swallows errors silently
+ *   INTENT-008  Semantic drift: async function that never awaits
+ *   INTENT-009  Semantic drift: loop body that ignores iteration variable
+ *   INTENT-010  Semantic drift: branching that always takes one path
  */
 export function analyzeIntentAlignment(code: string, _language: string): Finding[] {
   const findings: Finding[] = [];
@@ -265,6 +269,182 @@ export function analyzeIntentAlignment(code: string, _language: string): Finding
           provenance: "intent-alignment",
         });
       }
+    }
+  }
+
+  // ── INTENT-007: Error handler that swallows errors silently ──────────────
+  // AI-generated code often wraps things in try/catch but leaves the catch empty
+  // or logs without re-throwing. This is "intent drift" — the developer intended
+  // error handling but the generated code silently swallows failures.
+  const catchPattern = /catch\s*\(\s*(\w+)\s*\)/g;
+  let catchMatch;
+  while ((catchMatch = catchPattern.exec(code)) !== null) {
+    const catchLine = code.slice(0, catchMatch.index).split("\n").length;
+    const errVar = catchMatch[1];
+    // Collect catch body (up to 8 lines)
+    const afterCatch = code.slice(
+      catchMatch.index + catchMatch[0].length,
+      catchMatch.index + catchMatch[0].length + 500,
+    );
+    const catchBody = afterCatch.match(/\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/s);
+    if (!catchBody) continue;
+
+    const body = catchBody[1].trim();
+    // Empty catch or comment-only catch
+    if (body === "" || /^\/[/*]/.test(body.replace(/\s/g, ""))) {
+      findings.push({
+        ruleId: `${prefix}-007`,
+        severity: "high",
+        title: `Silent error swallowing in catch(${errVar})`,
+        description:
+          `The catch block for \`${errVar}\` is empty or contains only a comment. ` +
+          "Errors are silently discarded, which can mask failures and make debugging impossible.",
+        lineNumbers: [catchLine],
+        recommendation:
+          "Log the error, re-throw it, or handle it explicitly. If intentionally ignoring errors, add a comment explaining why.",
+        reference: "Error Handling Best Practices — Silent Catch Anti-pattern",
+        confidence: 0.82,
+        provenance: "intent-alignment",
+      });
+    }
+    // Catch that logs but never re-throws (outside test files)
+    else if (
+      /console\.(?:log|warn|error)|logger\.|log\./i.test(body) &&
+      !/throw\s|reject\s*\(|process\.exit/i.test(body) &&
+      !/\.test\.|\.spec\.|__tests__|test_/i.test(code.slice(0, 50))
+    ) {
+      findings.push({
+        ruleId: `${prefix}-007`,
+        severity: "medium",
+        title: `Catch logs but never re-throws (${errVar})`,
+        description:
+          `The catch block for \`${errVar}\` logs the error but never re-throws or propagates it. ` +
+          "Callers won't know an error occurred.",
+        lineNumbers: [catchLine],
+        recommendation:
+          "Consider re-throwing the error after logging, or return an error indicator so callers can react.",
+        reference: "Error Handling Best Practices — Error Propagation",
+        confidence: 0.55,
+        provenance: "intent-alignment",
+      });
+    }
+  }
+
+  // ── INTENT-008: Async function that never awaits ────────────────────────
+  // AI models sometimes mark functions async without actually using await,
+  // meaning the function returns a resolved promise and any async operations
+  // inside are fire-and-forget.
+  const asyncFnPattern =
+    /(?:async\s+function\s+(\w+)|(\w+)\s*=\s*async\s*(?:\([^)]*\)|[^=])\s*=>|async\s+(\w+)\s*\([^)]*\)\s*(?::\s*[^{]+)?\{)/g;
+  let asyncMatch;
+  while ((asyncMatch = asyncFnPattern.exec(code)) !== null) {
+    const fnName = asyncMatch[1] || asyncMatch[2] || asyncMatch[3];
+    if (!fnName) continue;
+
+    const startIdx = asyncMatch.index + asyncMatch[0].length;
+    // Collect body until we find the matching close brace
+    let depth = 1;
+    let end = startIdx;
+    for (let ci = startIdx; ci < code.length && depth > 0; ci++) {
+      if (code[ci] === "{") depth++;
+      if (code[ci] === "}") depth--;
+      end = ci;
+    }
+    if (depth !== 0) continue;
+
+    const body = code.slice(startIdx, end);
+    // Check if there's any await or yield in the body
+    if (body.length > 20 && !/\bawait\b|\byield\b/.test(body)) {
+      // Skip very short bodies / testing mocks
+      if (!/mock|stub|fake|noop|test/i.test(fnName)) {
+        const fnLine = code.slice(0, asyncMatch.index).split("\n").length;
+        findings.push({
+          ruleId: `${prefix}-008`,
+          severity: "medium",
+          title: `Async function \`${fnName}()\` never awaits`,
+          description:
+            `Function \`${fnName}()\` is declared async but its body contains no \`await\` expressions. ` +
+            "This means all operations run synchronously and the async keyword is misleading, or async " +
+            "calls inside are fire-and-forget (won't catch errors).",
+          lineNumbers: [fnLine],
+          recommendation:
+            "Add `await` to async calls inside the function, or remove the `async` keyword if it's not needed.",
+          reference: "Async Programming — Intent vs. Implementation",
+          confidence: 0.72,
+          provenance: "intent-alignment",
+        });
+      }
+    }
+  }
+
+  // ── INTENT-009: Loop that ignores its iteration variable ─────────────────
+  // AI-generated code sometimes creates loops for "iteration" but the body
+  // never uses the loop variable, doing the same thing each iteration.
+  const forOfInPattern = /for\s*\(\s*(?:const|let|var)\s+(\w+)\s+(?:of|in)\s+\S[^)]*\)\s*\{/g;
+  let forMatch;
+  while ((forMatch = forOfInPattern.exec(code)) !== null) {
+    const iterVar = forMatch[1];
+    if (iterVar === "_" || iterVar.startsWith("_")) continue; // intentionally unused
+
+    const startIdx = forMatch.index + forMatch[0].length;
+    let depth = 1;
+    let end = startIdx;
+    for (let ci = startIdx; ci < code.length && depth > 0; ci++) {
+      if (code[ci] === "{") depth++;
+      if (code[ci] === "}") depth--;
+      end = ci;
+    }
+    if (depth !== 0) continue;
+
+    const loopBody = code.slice(startIdx, end);
+    // Check if the iteration variable is used in the body
+    const varRegex = new RegExp(`\\b${iterVar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
+    if (loopBody.length > 10 && !varRegex.test(loopBody)) {
+      const loopLine = code.slice(0, forMatch.index).split("\n").length;
+      findings.push({
+        ruleId: `${prefix}-009`,
+        severity: "medium",
+        title: `Loop variable \`${iterVar}\` is never used in body`,
+        description:
+          `The for-of/for-in loop declares \`${iterVar}\` but never references it in the loop body. ` +
+          "The loop repeats the same operation N times without varying by element, which may indicate an " +
+          "AI-generated loop that looks correct structurally but doesn't actually iterate over the data.",
+        lineNumbers: [loopLine],
+        recommendation:
+          "Use the iteration variable in the loop body, or if repeating N times is intentional, use a " +
+          "counting loop and rename the variable with an underscore prefix (`_item`).",
+        reference: "Code Quality — Semantic Loop Correctness",
+        confidence: 0.75,
+        provenance: "intent-alignment",
+      });
+    }
+  }
+
+  // ── INTENT-010: Branching that always takes one path ─────────────────────
+  // Detect if/else where both branches do the same thing (AI copy-paste drift)
+  const ifElsePattern = /if\s*\([^)]+\)\s*\{([^}]*)\}\s*else\s*\{([^}]*)\}/g;
+  let ifMatch;
+  while ((ifMatch = ifElsePattern.exec(code)) !== null) {
+    const thenBranch = ifMatch[1].trim();
+    const elseBranch = ifMatch[2].trim();
+
+    if (thenBranch.length > 5 && thenBranch === elseBranch) {
+      const ifLine = code.slice(0, ifMatch.index).split("\n").length;
+      findings.push({
+        ruleId: `${prefix}-010`,
+        severity: "medium",
+        title: "If/else branches are identical",
+        description:
+          "Both the `if` and `else` branches contain identical code. The conditional has no effect " +
+          "and may indicate AI-generated code that was duplicated rather than properly differentiated.",
+        lineNumbers: [ifLine],
+        recommendation:
+          "Remove the conditional and keep just the body, or differentiate the branches to handle the " +
+          "condition correctly.",
+        reference: "Code Quality — Dead Branch Detection",
+        confidence: 0.9,
+        provenance: "intent-alignment",
+      });
     }
   }
 

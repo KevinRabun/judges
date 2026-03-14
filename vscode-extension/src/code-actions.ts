@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { JudgesDiagnosticProvider } from "./diagnostics";
+import type { Finding } from "@kevinrabun/judges/api";
 
 /**
  * Provides quick-fix code actions for Judges findings that have patches.
@@ -50,6 +51,16 @@ export class JudgesCodeActionProvider implements vscode.CodeActionProvider {
           action.diagnostics = [diag];
           action.isPreferred = finding.severity === "critical" || finding.severity === "high";
           actions.push(action);
+
+          // Preview diff action — shows before/after in a diff editor
+          const previewAction = new vscode.CodeAction(`Preview Fix: ${finding.ruleId}`, vscode.CodeActionKind.QuickFix);
+          previewAction.command = {
+            command: "judges.previewFixDiff",
+            title: "Preview fix diff",
+            arguments: [document.uri, patchRange, patch.oldText, patch.newText, finding.ruleId],
+          };
+          previewAction.diagnostics = [diag];
+          actions.push(previewAction);
         }
       }
 
@@ -62,6 +73,29 @@ export class JudgesCodeActionProvider implements vscode.CodeActionProvider {
       };
       learnAction.diagnostics = [diag];
       actions.push(learnAction);
+
+      // Thumbs up — mark as true positive
+      const tpAction = new vscode.CodeAction(`$(thumbsup) True Positive: ${diag.code}`, vscode.CodeActionKind.QuickFix);
+      tpAction.command = {
+        command: "judges.feedbackTp",
+        title: "Mark as true positive",
+        arguments: [String(diag.code), document.uri, diag.range.start.line + 1, finding],
+      };
+      tpAction.diagnostics = [diag];
+      actions.push(tpAction);
+
+      // Thumbs down — mark as false positive
+      const fpAction = new vscode.CodeAction(
+        `$(thumbsdown) False Positive: ${diag.code}`,
+        vscode.CodeActionKind.QuickFix,
+      );
+      fpAction.command = {
+        command: "judges.feedbackFp",
+        title: "Mark as false positive",
+        arguments: [String(diag.code), document.uri, diag.range.start.line + 1, finding],
+      };
+      fpAction.diagnostics = [diag];
+      actions.push(fpAction);
 
       // "Report false positive" — opens a pre-filled GitHub issue
       const reportAction = new vscode.CodeAction(`Report false positive: ${diag.code}`, vscode.CodeActionKind.QuickFix);

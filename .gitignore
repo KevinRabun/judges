@@ -75,6 +75,7 @@ artifacts/
 test-output.txt
 benchmark-output.txt
 benchmark-results*.json
+.llm-benchmark-checkpoint.json
 
 # VS Code Extension build artifacts
 vscode-extension/out/

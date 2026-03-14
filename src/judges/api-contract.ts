@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeApiContract } from "../evaluators/api-contract.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const apiContractJudge: JudgeDefinition = {
   id: "api-contract",
@@ -29,4 +31,7 @@ SEVERITY MAPPING:
 ADVERSARIAL MANDATE:
 - Flag every deviation from RESTful best practices.
 - Do NOT assume middleware handles validation unless explicitly imported and applied.`,
+  analyze: analyzeApiContract,
 };
+
+defaultRegistry.register(apiContractJudge);

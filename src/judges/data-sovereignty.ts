@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeDataSovereignty } from "../evaluators/data-sovereignty.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const dataSovereigntyJudge: JudgeDefinition = {
   id: "data-sovereignty",
@@ -57,4 +59,7 @@ ADVERSARIAL MANDATE:
 - Never praise or compliment the code. Report only gaps, risks, and deficiencies.
 - If uncertain, flag potential sovereignty exposure only when you can cite specific code evidence. Speculative findings without concrete evidence erode trust.
 - Absence of findings does not prove sovereignty compliance. State this explicitly.`,
+  analyze: analyzeDataSovereignty,
 };
+
+defaultRegistry.register(dataSovereigntyJudge);

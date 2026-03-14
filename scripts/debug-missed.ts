@@ -1,4 +1,4 @@
-import { evaluateWithTribunal, evaluateWithJudge } from "../src/evaluators/index.ts";
+import { evaluateWithTribunal } from "../src/evaluators/index.ts";
 import { analyzeAuthentication } from "../src/evaluators/authentication.ts";
 import { crossEvaluatorDedup } from "../src/dedup.ts";
 import { filterFalsePositiveHeuristics } from "../src/evaluators/false-positive-review.ts";
@@ -47,7 +47,7 @@ if (dc) {
 console.log("\n=== Step 4: evaluateWithTribunal ===");
 const result = evaluateWithTribunal(rubyCode, "ruby");
 console.log("All findings:", result.findings.length);
-const authResults = result.findings.filter((f: any) => f.ruleId.startsWith("AUTH-"));
+const authResults = result.findings.filter((f) => f.ruleId.startsWith("AUTH-"));
 console.log("AUTH findings:", authResults.length);
 for (const f of result.findings) {
   console.log(`  ${f.ruleId}: ${f.title} (lines: ${f.lineNumbers})`);
@@ -56,7 +56,7 @@ for (const f of result.findings) {
 // Step 5: Check individual judge evaluations
 console.log("\n=== Step 5: Per-judge evaluations in tribunal ===");
 for (const e of result.evaluations) {
-  const authF = e.findings.filter((f: any) => f.ruleId.startsWith("AUTH-"));
+  const authF = e.findings.filter((f) => f.ruleId.startsWith("AUTH-"));
   if (e.judgeId.includes("auth") || authF.length > 0) {
     console.log(`  Judge: ${e.judgeId} (${e.judgeName})`);
     console.log(`    All findings: ${e.findings.length}`);
@@ -79,7 +79,7 @@ for (const e of result.evaluations) {
 
 // Step 7: Manual dedup + FP filtering
 console.log("\n=== Step 7: Manual dedup and FP filtering ===");
-const allRaw = result.evaluations.flatMap((e: any) => e.findings);
+const allRaw = result.evaluations.flatMap((e) => e.findings);
 console.log(`  Raw findings from all judges: ${allRaw.length}`);
 for (const f of allRaw) {
   console.log(`    ${f.ruleId}: "${f.title}" lines:${f.lineNumbers}`);
@@ -99,7 +99,8 @@ for (const f of fpFiltered) {
 
 // Step 8: Check WHY FP filter removed the deduped finding
 console.log("\n=== Step 8: FP filter details ===");
-const { isStringLiteralLine, isCommentLine } = await import("../src/evaluators/shared.ts");
+const { isStringLiteralLine: _isStringLiteralLine, isCommentLine: _isCommentLine } =
+  await import("../src/evaluators/shared.ts");
 
 const secretTrigger = /\bsecret\b/i;
 const secretIdentifierCtx =

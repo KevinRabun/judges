@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeCodeStructure } from "../evaluators/code-structure.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const codeStructureJudge: JudgeDefinition = {
   id: "code-structure",
@@ -46,4 +48,7 @@ FALSE POSITIVE AVOIDANCE:
 - **Dict[str, Any] at serialization boundaries**: When code deserializes JSON (json.loads, JSON.parse, API responses), Dict[str, Any] / Record<string, any> is the correct type until schema validation narrows it. Do not flag dynamic types at JSON I/O boundaries when the schema is defined elsewhere (Pydantic model, TypedDict, Zod schema).
 - **Large single-responsibility files**: A file that implements one cohesive loader/parser/handler (single class, one public entry point) does not violate SRP even if it is >300 lines. Only flag STRUCT-007 when a file handles multiple unrelated concerns.
 - **Async nesting**: async/await with try/except adds inherent nesting depth. If nesting is <=4 and follows a standard async error-handling pattern, do not flag it as excessive.`,
+  analyze: analyzeCodeStructure,
 };
+
+defaultRegistry.register(codeStructureJudge);

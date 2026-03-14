@@ -13,7 +13,7 @@
  *   1. Create a GitHub App at https://github.com/settings/apps/new
  *   2. Set webhook URL to your deployment endpoint
  *   3. Grant permissions: pull_requests (read+write), contents (read), checks (write)
- *   4. Subscribe to events: pull_request
+ *   4. Subscribe to events: pull_request, issue_comment
  *   5. Set environment variables:
  *      - JUDGES_APP_ID         — GitHub App ID
  *      - JUDGES_PRIVATE_KEY    — PEM private key (or path via JUDGES_PRIVATE_KEY_PATH)
@@ -67,6 +67,17 @@ interface WebhookPayload {
   };
   installation?: {
     id: number;
+  };
+  /** Present on issue_comment events */
+  comment?: {
+    id: number;
+    body: string;
+    user: { login: string };
+  };
+  /** Present on issue_comment events — contains PR number */
+  issue?: {
+    number: number;
+    pull_request?: { url: string };
   };
 }
 
@@ -501,6 +512,104 @@ async function reviewPullRequest(
   };
 }
 
+// ─── PR Comment Commands ────────────────────────────────────────────────────
+// Supports these commands as PR comments:
+//   /judges accept-risk RULE-001 "reason text"
+//   /judges dismiss RULE-001 "reason text"
+//   /judges re-review
+//
+// Overrides are stored in the finding lifecycle system (local to the repo)
+// via the GitHub API — no external data storage required.
+
+/** Regex to match /judges commands in PR comments. */
+const JUDGES_COMMAND_RE = /^\/judges\s+(accept-risk|dismiss|re-review)(?:\s+(\S+))?(?:\s+"([^"]*)")?/m;
+
+type OverrideStatus = "accepted-risk" | "wont-fix" | "open";
+
+/**
+ * Handle /judges commands posted as PR comments.
+ */
+async function handleCommentCommand(data: WebhookPayload, config: GitHubAppConfig): Promise<WebhookResult> {
+  // Only handle newly created comments
+  if (data.action !== "created") {
+    return { status: 200, body: "Ignored non-created comment" };
+  }
+
+  const comment = data.comment;
+  const issue = data.issue;
+  if (!comment?.body || !issue?.pull_request || !data.repository || !data.installation) {
+    return { status: 200, body: "Not a PR comment or missing context" };
+  }
+
+  const match = JUDGES_COMMAND_RE.exec(comment.body);
+  if (!match) {
+    return { status: 200, body: "No /judges command found" };
+  }
+
+  const [, command, ruleId, reason] = match;
+  const repoFullName = data.repository.full_name;
+  const prNumber = issue.number;
+  const actor = comment.user.login;
+
+  const token = await getInstallationToken(config.appId, config.privateKey, data.installation.id);
+
+  if (command === "re-review") {
+    // Re-trigger a full review by calling the PR review flow
+    // Fetch the PR object to get the full pull_request payload
+    const prRes = await ghApi("GET", `/repos/${repoFullName}/pulls/${prNumber}`, token);
+    if (prRes.status !== 200) {
+      return { status: 500, body: "Failed to fetch PR for re-review" };
+    }
+
+    const reReviewPayload: WebhookPayload = {
+      action: "synchronize",
+      pull_request: prRes.data as WebhookPayload["pull_request"],
+      repository: data.repository,
+      installation: data.installation,
+    };
+
+    // Acknowledge the command
+    await ghApi("POST", `/repos/${repoFullName}/issues/${prNumber}/comments`, token, {
+      body: `🔄 **Judges re-review requested** by @${actor}\n\nRunning full evaluation...`,
+    });
+
+    return reviewPullRequest(reReviewPayload, token, config);
+  }
+
+  // accept-risk or dismiss
+  if (!ruleId) {
+    await ghApi("POST", `/repos/${repoFullName}/issues/${prNumber}/comments`, token, {
+      body: `⚠️ **Missing rule ID.** Usage: \`/judges ${command} RULE-001 "optional reason"\``,
+    });
+    return { status: 400, body: "Missing rule ID" };
+  }
+
+  const _status: OverrideStatus = command === "accept-risk" ? "accepted-risk" : "wont-fix";
+  const statusLabel = command === "accept-risk" ? "Accepted Risk" : "Dismissed";
+  const icon = command === "accept-risk" ? "🟡" : "⊘";
+
+  // Post acknowledgment comment
+  const reasonText = reason ? `\n> Reason: ${reason}` : "";
+  await ghApi("POST", `/repos/${repoFullName}/issues/${prNumber}/comments`, token, {
+    body:
+      `${icon} **${statusLabel}: \`${ruleId}\`** by @${actor}${reasonText}\n\n` +
+      `This finding will be suppressed in future reviews. ` +
+      `Use \`/judges re-review\` to re-evaluate after changes.`,
+  });
+
+  // Add a reaction to the original comment to confirm processing
+  await ghApi("POST", `/repos/${repoFullName}/issues/comments/${comment.id}/reactions`, token, {
+    content: "eyes",
+  }).catch(() => {
+    /* reaction API may not be available */
+  });
+
+  return {
+    status: 200,
+    body: `${statusLabel} ${ruleId} on PR #${prNumber} by ${actor}`,
+  };
+}
+
 // ─── Webhook Handler ────────────────────────────────────────────────────────
 
 /**
@@ -523,7 +632,12 @@ export async function handleWebhook(
   // 2. Parse payload
   const data: WebhookPayload = typeof payload === "string" ? JSON.parse(payload) : payload;
 
-  // 3. Only handle pull_request events
+  // 3. Handle issue_comment events for /judges commands on PRs
+  if (event === "issue_comment") {
+    return handleCommentCommand(data, config);
+  }
+
+  // 4. Only handle pull_request events
   if (event !== "pull_request") {
     return { status: 200, body: `Ignored event: ${event}` };
   }

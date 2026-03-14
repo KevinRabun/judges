@@ -10053,6 +10053,8 @@ describe("Deep Review — Single Judge Prompt", () => {
     domain: "Test Domain",
     description: "A test judge",
     rulePrefix: "TST",
+    tableDescription: "Test judge for unit tests",
+    promptDescription: "Test judge prompt description",
     systemPrompt: "You are a test judge.",
   };
 
@@ -10105,6 +10107,8 @@ describe("Deep Review — Tribunal Prompt", () => {
       domain: "Domain A",
       description: "First judge",
       rulePrefix: "A",
+      tableDescription: "Judge A for tests",
+      promptDescription: "Judge A prompt",
       systemPrompt: "You are judge A.",
     },
     {
@@ -10113,6 +10117,8 @@ describe("Deep Review — Tribunal Prompt", () => {
       domain: "Domain B",
       description: "Second judge",
       rulePrefix: "B",
+      tableDescription: "Judge B for tests",
+      promptDescription: "Judge B prompt",
       systemPrompt: "You are judge B.",
     },
   ];

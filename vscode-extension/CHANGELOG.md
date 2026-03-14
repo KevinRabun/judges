@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.40.0] — 2026-03-11
+
+### Added
+- **IDE fix diff preview** — Inline diff preview before applying auto-fixes; accept/reject actions directly in the editor
+- **Evidence-backed diagnostics** — Findings now include evidence arrays (AST match details, confidence scores) surfaced in hover tooltips
+- **Auto model profile detection** — Extension detects LLM watermarks and applies tuned thresholds automatically
+- **Enhanced explain output** — Layer 2 evidence details with AST node types and pattern matchers in diagnostic detail views
+- See [core CHANGELOG](../../CHANGELOG.md) for full details (16 new features including DataAdapter, governance, compliance reports, and more)
+
 ## [3.38.0] — 2026-03-10
 
 ### Fixed

@@ -39,7 +39,7 @@ export function analyzeOverEngineering(code: string, language: string): Finding[
   // Functions that simply delegate to a builtin with no added logic
   const wrapperPatterns =
     /(?:function|const|export\s+(?:function|const))\s+\w*(?:wrapper|wrap|helper|util)\w*\s*(?:=\s*(?:\([^)]*\)\s*=>|function)|\()/gi;
-  const wrapperLines = getLineNumbers(code, wrapperPatterns);
+  const _wrapperLines = getLineNumbers(code, wrapperPatterns);
 
   // Also detect trivial fetch/fs/crypto wrappers (functions that return the builtin call directly)
   const trivialDelegation =
@@ -96,7 +96,7 @@ export function analyzeOverEngineering(code: string, language: string): Finding[
   const builderPattern = /class\s+\w*Builder\w*\s*[{<]/g;
   const factoryPattern = /class\s+\w*Factory\w*\s*[{<]/g;
   const builderLines = getLineNumbers(code, builderPattern);
-  const factoryLines = getLineNumbers(code, factoryPattern);
+  const _factoryLines = getLineNumbers(code, factoryPattern);
 
   // Check if the built object has few fields (≤ 3 setters in the builder)
   if (builderLines.length > 0) {
@@ -170,7 +170,7 @@ export function analyzeOverEngineering(code: string, language: string): Finding[
   );
   if (genericHeavy.length >= 3) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "Excessive generic type parameters",
       description: `Found ${genericHeavy.length} declaration(s) with 3+ generic type parameters. Deeply parameterised types are hard to read and often indicate over-generalisation.`,

@@ -483,6 +483,47 @@ export function runFix(argv: string[]): void {
   if (overlapped > 0) {
     console.log(`  ⚠  Skipped ${overlapped} fix(es) (overlapping regions — re-run to apply individually)`);
   }
+
+  // ── Verification loop: re-evaluate to confirm fixes resolved findings ──
+  if (applied > 0) {
+    console.log("");
+    console.log("  🔄 Verifying fixes...");
+    const fixedCode = readFileSync(filePath, "utf-8");
+    const postVerdict = evaluateWithTribunal(fixedCode, language);
+    const postFindings = postVerdict.evaluations.flatMap((e) => e.findings);
+
+    // Check which fixed rule IDs are still present
+    const fixedRuleIds = new Set(fixable.map((p) => p.ruleId));
+    const remainingFixed = postFindings.filter((f) => fixedRuleIds.has(f.ruleId));
+    const resolved = applied - remainingFixed.length;
+    const stillPresent = remainingFixed.length;
+
+    if (stillPresent === 0) {
+      console.log(`  ✅ Verification passed: all ${applied} fixed finding(s) resolved.`);
+    } else {
+      console.log(`  ⚠  Verification: ${resolved} resolved, ${stillPresent} still detected after fix.`);
+      for (const f of remainingFixed.slice(0, 5)) {
+        console.log(`     - ${f.ruleId}: ${f.title}`);
+      }
+    }
+
+    // Check for regressions: new findings not present before the fix
+    const preRuleIds = new Set(findings.map((f) => `${f.ruleId}:${f.lineNumbers?.[0] ?? 0}`));
+    const regressions = postFindings.filter(
+      (f) => !preRuleIds.has(`${f.ruleId}:${f.lineNumbers?.[0] ?? 0}`) && !fixedRuleIds.has(f.ruleId),
+    );
+    if (regressions.length > 0) {
+      console.log(`  ⚠  ${regressions.length} new finding(s) introduced by fixes:`);
+      for (const r of regressions.slice(0, 5)) {
+        console.log(`     - ${r.ruleId}: ${r.title} (line ${r.lineNumbers?.[0] ?? "?"})`);
+      }
+    }
+
+    // Summary
+    console.log(
+      `  📊 Post-fix: ${postFindings.length} findings (was ${findings.length}), score ${postVerdict.overallScore}/100`,
+    );
+  }
+
   console.log("");
-  console.log("  Run 'judges eval' to verify the remaining findings.\n");
 }

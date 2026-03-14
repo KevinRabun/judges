@@ -446,7 +446,7 @@ export function analyzeMaintainability(code: string, language: string): Finding[
   }
   if (boolTrapLines.length > 0) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "medium",
       title: "Boolean trap — multiple boolean parameters",
       description: `Found ${boolTrapLines.length} function(s) with 2+ boolean parameters. Call sites like f(true, false, true) are unreadable and error-prone.`,

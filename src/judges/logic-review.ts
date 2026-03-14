@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeLogicReview } from "../evaluators/logic-review.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const logicReviewJudge: JudgeDefinition = {
   id: "logic-review",
@@ -32,4 +34,7 @@ FALSE POSITIVE AVOIDANCE:
 - Feature flags intentionally create "dead" branches — skip if flag-guarded
 - Test files may intentionally test edge cases with unusual conditions
 - Framework-required patterns (e.g., exhaustive switch in Redux) are intentional`,
+  analyze: analyzeLogicReview,
 };
+
+defaultRegistry.register(logicReviewJudge);

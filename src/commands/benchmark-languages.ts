@@ -1407,7 +1407,7 @@ end
 post '/users' do
   data = JSON.parse(request.body.read)
   halt 400, { error: 'name required' }.to_json unless data['name']&.length&.between?(1, 100)
-  halt 400, { error: 'invalid email' }.to_json unless data['email']&.match?(/\A[^@]+@[^@]+\z/)
+  halt 400, { error: 'invalid email' }.to_json unless data['email']&.match?(/\\A[^@]+@[^@]+\\z/)
 
   id = DB[:users].insert(name: data['name'], email: data['email'])
   status 201
@@ -1659,7 +1659,7 @@ class ApiClient {
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await http.post(
-      Uri.parse('\$baseUrl/auth/login'),
+      Uri.parse('$baseUrl/auth/login'),
       body: jsonEncode({'email': email, 'password': password}),
     );
     return jsonDecode(response.body);
@@ -1667,8 +1667,8 @@ class ApiClient {
 
   Future<Map<String, dynamic>> getProfile(String token) async {
     final response = await http.get(
-      Uri.parse('\$baseUrl/profile'),
-      headers: {'Authorization': 'Bearer \$token'},
+      Uri.parse('$baseUrl/profile'),
+      headers: {'Authorization': 'Bearer $token'},
     );
     return jsonDecode(response.body);
   }

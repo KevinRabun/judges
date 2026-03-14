@@ -121,14 +121,43 @@ Returns the list of available policy profiles: `default`, `startup`, `regulated`
 
 ## Judge Registry
 
+All judges — built-in and plugin — are managed by the unified `JudgeRegistry`. The `defaultRegistry` singleton is the shared instance used throughout the system.
+
 ### `JUDGES`
-Array of all 39 built-in `JudgeDefinition` objects.
+Array of all 45 built-in `JudgeDefinition` objects (snapshot taken at module load).
 
 ### `getJudge(id)`
 Look up a judge by ID. Returns `JudgeDefinition | undefined`.
 
 ### `getJudgeSummaries()`
-Returns `Array<{ id, name, domain, rulePrefix, description }>` for all judges.
+Returns `Array<{ id, name, domain, description }>` for all judges.
+
+### `JudgeRegistry` class
+
+The unified registry that manages all judges and plugins. Import the singleton:
+
+```typescript
+import { JudgeRegistry, defaultRegistry } from "@kevinrabun/judges/api";
+```
+
+| Method | Description |
+|--------|-------------|
+| `register(judge)` | Register a `JudgeDefinition`. Replaces if ID exists. |
+| `unregister(id)` | Remove a judge by ID. Returns `boolean`. |
+| `getJudge(id)` | Look up by ID. Returns `JudgeDefinition \| undefined`. |
+| `getJudges()` | All judges as array (false-positive-review always last). |
+| `getJudgeSummaries()` | Short summaries for display. |
+| `registerPlugin(plugin)` | Register a `JudgesPlugin`. Returns `PluginRegistration`. |
+| `unregisterPlugin(name)` | Remove a plugin and its rules/judges. |
+| `getRegisteredPlugins()` | List all registered plugins. |
+| `getCustomRules()` | All custom rules from plugins. |
+| `getPluginJudges()` | Judges contributed by plugins (not built-in). |
+| `evaluateCustomRules(code, lang)` | Run custom rules, return `Finding[]`. |
+| `runBeforeHooks(code, lang)` | Run all `beforeEvaluate` hooks. |
+| `runAfterHooks(findings)` | Run all `afterEvaluate` hooks. |
+| `runTransformHooks(findings)` | Run all `transformFindings` hooks. |
+| `clearPlugins()` | Remove all plugins (preserves built-in judges). |
+| `clear()` | Remove everything (for testing). |
 
 ---
 

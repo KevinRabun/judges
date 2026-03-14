@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeSecurity } from "../evaluators/security.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const securityJudge: JudgeDefinition = {
   id: "security",
@@ -30,4 +32,7 @@ RULES FOR YOUR EVALUATION:
 - Provide concrete remediation with code examples.
 - Reference CWE IDs where applicable.
 - Score from 0-100 where 100 means excellent security posture.`,
+  analyze: analyzeSecurity,
 };
+
+defaultRegistry.register(securityJudge);

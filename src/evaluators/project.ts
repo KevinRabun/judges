@@ -517,6 +517,113 @@ function detectScatteredEnvAccess(files: Array<{ path: string; content: string; 
 // ─── Project Evaluation ───────────────────────────────────────────────────────
 
 /**
+ * Build a module dependency graph mapping each file to the files it imports
+ * and the files that import it.
+ */
+export function buildImportGraph(files: Array<{ path: string; content: string; language: string }>): {
+  imports: Map<string, string[]>;
+  importedBy: Map<string, string[]>;
+} {
+  const imports = new Map<string, string[]>();
+  const importedBy = new Map<string, string[]>();
+
+  const filePathSet = new Set(files.map((f) => f.path));
+  const normalizedToOriginal = new Map<string, string>();
+  for (const f of files) {
+    normalizedToOriginal.set(f.path.replace(/\.[^.]+$/, ""), f.path);
+    normalizedToOriginal.set(f.path, f.path);
+  }
+
+  const relativeImportPattern = /(?:import|from|require)[\s(]+['"](\.\/?[^'"]+)['"]/g;
+
+  for (const f of files) {
+    const dir = f.path.replace(/\/[^/]+$/, "") || ".";
+    const fileImports: string[] = [];
+    let match;
+    relativeImportPattern.lastIndex = 0;
+
+    while ((match = relativeImportPattern.exec(f.content)) !== null) {
+      const resolved = resolveRelativePath(dir, match[1]);
+      const resolvedNoExt = resolved.replace(/\.[^.]+$/, "");
+      const target = normalizedToOriginal.get(resolved) ?? normalizedToOriginal.get(resolvedNoExt);
+      if (target && filePathSet.has(target)) {
+        fileImports.push(target);
+        const rev = importedBy.get(target) ?? [];
+        rev.push(f.path);
+        importedBy.set(target, rev);
+      }
+    }
+
+    imports.set(f.path, fileImports);
+  }
+
+  return { imports, importedBy };
+}
+
+/**
+ * Enrich findings with cross-file import context when the finding relates to
+ * a security category that's provided by an imported or importing module.
+ * Adds evidence chain steps showing the cross-file mitigation context.
+ */
+function enrichFindingsWithImportContext(
+  findings: Finding[],
+  filePath: string,
+  graph: { imports: Map<string, string[]>; importedBy: Map<string, string[]> },
+  files: Array<{ path: string; content: string; language: string }>,
+): Finding[] {
+  const depFiles = graph.imports.get(filePath) ?? [];
+  const reverseDepFiles = importedBy(filePath, graph);
+  if (depFiles.length === 0 && reverseDepFiles.length === 0) return findings;
+
+  const fileContentMap = new Map(files.map((f) => [f.path, f.content]));
+
+  return findings.map((f) => {
+    const title = f.title + " " + (f.ruleId ?? "");
+    const relatedFiles: string[] = [];
+
+    for (const cat of CROSS_FILE_SECURITY_CATEGORIES) {
+      if (!cat.findingPattern.test(title)) continue;
+
+      for (const dep of [...depFiles, ...reverseDepFiles]) {
+        const content = fileContentMap.get(dep);
+        if (content && cat.contentPattern.test(content)) {
+          relatedFiles.push(dep);
+        }
+      }
+    }
+
+    if (relatedFiles.length === 0) return f;
+
+    const chain = f.evidenceChain ?? { steps: [], impactStatement: "" };
+    const newSteps = [...chain.steps];
+    for (const rf of relatedFiles.slice(0, 3)) {
+      const direction = depFiles.includes(rf) ? "imports" : "imported by";
+      newSteps.push({
+        observation: `Related security logic found in ${rf} (${direction} this file)`,
+        source: "cross-file" as const,
+      });
+    }
+
+    return {
+      ...f,
+      evidenceChain: {
+        steps: newSteps,
+        impactStatement:
+          chain.impactStatement ||
+          `Cross-file context: related security patterns in ${relatedFiles.length} dependent file(s)`,
+      },
+    };
+  });
+}
+
+function importedBy(
+  filePath: string,
+  graph: { imports: Map<string, string[]>; importedBy: Map<string, string[]> },
+): string[] {
+  return graph.importedBy.get(filePath) ?? [];
+}
+
+/**
  * Evaluate multiple files as a project. Runs the full tribunal on each file,
  * then detects cross-file architectural issues.
  */
@@ -528,6 +635,9 @@ export function evaluateProject(
 ): ProjectVerdict {
   // Resolve cross-file imports to detect security mitigations from imported modules
   const crossFileMitigations = resolveProjectImports(files);
+
+  // Build the full import dependency graph for cross-file context enrichment
+  const importGraph = buildImportGraph(files);
 
   // Scan all project files for security patterns (regardless of import relationships)
   const projectWideCategories = scanProjectWideSecurityPatterns(files);
@@ -574,6 +684,8 @@ export function evaluateProject(
         mitigated && mitigated.size > 0 ? applyCrossFileAdjustments(verdict.findings, mitigated) : verdict.findings;
       // Apply project-wide absence resolution for categories found anywhere
       adjustedFindings = applyProjectWideAbsenceResolution(adjustedFindings, projectWideCategories);
+      // Enrich findings with cross-file import context
+      adjustedFindings = enrichFindingsWithImportContext(adjustedFindings, f.path, importGraph, files);
       fileResults.push({
         path: f.path,
         language: f.language,

@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzePerformance } from "../evaluators/performance.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const performanceJudge: JudgeDefinition = {
   id: "performance",
@@ -42,4 +44,7 @@ ADVERSARIAL MANDATE:
 - Never praise or compliment the code. Report only problems, risks, and deficiencies.
 - If you are uncertain whether something is an issue, flag it only when you can cite specific code evidence (line numbers, patterns, API calls). Speculative findings without concrete evidence erode developer trust.
 - Absence of findings does not mean the code is performant. It means your analysis reached its limits. State this explicitly.`,
+  analyze: analyzePerformance,
 };
+
+defaultRegistry.register(performanceJudge);

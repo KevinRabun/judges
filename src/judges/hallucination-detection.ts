@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeHallucinationDetection } from "../evaluators/hallucination-detection.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const hallucinationDetectionJudge: JudgeDefinition = {
   id: "hallucination-detection",
@@ -31,4 +33,7 @@ Each finding must include:
 - The exact hallucinated API/import
 - Why it doesn't exist or is incorrect
 - The correct alternative to use`,
+  analyze: analyzeHallucinationDetection,
 };
+
+defaultRegistry.register(hallucinationDetectionJudge);

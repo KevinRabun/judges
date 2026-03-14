@@ -162,7 +162,7 @@ export function analyzeLogicReview(code: string, language: string): Finding[] {
 
     // Find the function body (scan next ~30 lines or until matching brace)
     const bodyLines = lines.slice(i + 1, Math.min(i + 40, lines.length));
-    const body = bodyLines.join("\n");
+    const _body = bodyLines.join("\n");
     let bodyEnd = 0;
     let depth = 0;
     let started = false;

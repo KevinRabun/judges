@@ -49,8 +49,10 @@ import { runDocs } from "./commands/docs.js";
 import { generateGitLabCi, generateAzurePipelines, generateBitbucketPipelines } from "./commands/ci-templates.js";
 import { getPreset, listPresets, composePresets } from "./presets.js";
 import { parseConfig } from "./config.js";
-import type { JudgesConfig } from "./types.js";
+import type { Finding, JudgesConfig, TribunalVerdict } from "./types.js";
 import { applyPatches, type PatchCandidate } from "./commands/fix.js";
+import { DiskCache } from "./disk-cache.js";
+import { contentHash } from "./cache.js";
 import { runFeedback } from "./commands/feedback.js";
 import { runBenchmark } from "./commands/benchmark.js";
 import { runRule } from "./commands/rule.js";
@@ -59,6 +61,7 @@ import { runConfig } from "./commands/config-share.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runTriage } from "./commands/triage.js";
 import { formatComparisonReport, formatFullComparisonMatrix, TOOL_PROFILES } from "./comparison.js";
+import { runOverride, loadOverrideStore, applyOverrides } from "./commands/override.js";
 
 // ─── Language Detection from Extension ──────────────────────────────────────
 
@@ -129,8 +132,12 @@ interface CliArgs {
   include: string[];
   maxFiles: number | undefined;
   changedOnly: boolean;
+  stagedOnly: boolean;
   explain: boolean;
   sample: boolean;
+  trace: boolean;
+  incremental: boolean;
+  noCache: boolean;
 }
 
 function parseCliArgs(argv: string[]): CliArgs {
@@ -155,8 +162,12 @@ function parseCliArgs(argv: string[]): CliArgs {
     include: [],
     maxFiles: undefined,
     changedOnly: false,
+    stagedOnly: false,
     explain: false,
     sample: false,
+    trace: false,
+    incremental: false,
+    noCache: false,
   };
 
   // First non-flag arg is the command
@@ -225,6 +236,9 @@ function parseCliArgs(argv: string[]): CliArgs {
       case "--changed-only":
         args.changedOnly = true;
         break;
+      case "--staged-only":
+        args.stagedOnly = true;
+        break;
       case "--explain":
         args.explain = true;
         break;
@@ -241,6 +255,15 @@ function parseCliArgs(argv: string[]): CliArgs {
         break;
       case "--sample":
         args.sample = true;
+        break;
+      case "--trace":
+        args.trace = true;
+        break;
+      case "--incremental":
+        args.incremental = true;
+        break;
+      case "--no-cache":
+        args.noCache = true;
         break;
       default:
         // If it looks like a file path (not a flag), treat as --file
@@ -316,6 +339,7 @@ EVAL OPTIONS:
   --fix                      Auto-fix findings after evaluation (applies patches in-place)
   --changed-only             Only evaluate files changed since last commit (uses git diff)
   --explain                  Enrich findings with OWASP/CWE learning context
+  --trace                    Show detailed decision trace for every finding
   --help, -h                 Show this help
 
 FIX OPTIONS:
@@ -586,6 +610,23 @@ function getGitChangedFiles(cwd: string): string[] {
   }
 }
 
+function getStagedFiles(cwd: string): string[] {
+  try {
+    const resolvedCwd = resolve(cwd);
+    const output = execSync("git diff --cached --name-only --diff-filter=ACM", {
+      cwd: resolvedCwd,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    return output
+      .split("\n")
+      .filter(Boolean)
+      .map((f) => resolve(resolvedCwd, f));
+  } catch {
+    return [];
+  }
+}
+
 // ─── Format Output ──────────────────────────────────────────────────────────
 
 function formatTribunalOutput(
@@ -684,9 +725,32 @@ function formatTextOutput(verdict: ReturnType<typeof evaluateWithTribunal>): str
     lines.push("  " + "─".repeat(60));
     for (const f of critical.slice(0, 20)) {
       const fixTag = f.patch ? " 🔧" : "";
-      lines.push(`  [${f.severity.toUpperCase().padEnd(8)}] ${f.ruleId}: ${f.title}${fixTag}`);
+      const confTag = f.confidence !== undefined ? ` (${Math.round(f.confidence * 100)}% confidence)` : "";
+      lines.push(`  [${f.severity.toUpperCase().padEnd(8)}] ${f.ruleId}: ${f.title}${fixTag}${confTag}`);
       if (f.lineNumbers && f.lineNumbers.length > 0) {
         lines.push(`             Line ${f.lineNumbers[0]}: ${f.description.slice(0, 100)}`);
+      }
+      if (f.provenance) {
+        lines.push(`             Evidence: ${f.provenance}`);
+      }
+      if (f.evidenceBasis) {
+        lines.push(`             Basis: ${f.evidenceBasis}`);
+      }
+      if (f.evidenceChain && f.evidenceChain.steps.length > 0) {
+        lines.push(`             Impact: ${f.evidenceChain.impactStatement}`);
+        for (const step of f.evidenceChain.steps.slice(0, 3)) {
+          const loc = step.line ? ` (L${step.line})` : "";
+          lines.push(`               → [${step.source}]${loc} ${step.observation}`);
+        }
+      }
+      if (f.cweIds && f.cweIds.length > 0) {
+        lines.push(`             CWE: ${f.cweIds.join(", ")}`);
+      }
+      if (f.owaspLlmTop10) {
+        lines.push(`             OWASP LLM: ${f.owaspLlmTop10}`);
+      }
+      if (f.learnMoreUrl) {
+        lines.push(`             📖 Learn more: ${f.learnMoreUrl}`);
       }
     }
     if (critical.length > 20) {
@@ -725,12 +789,22 @@ function formatSingleJudgeTextOutput(evaluation: ReturnType<typeof evaluateWithJ
   lines.push("");
 
   for (const f of evaluation.findings) {
-    lines.push(`  [${f.severity.toUpperCase().padEnd(8)}] ${f.ruleId}: ${f.title}`);
+    const confTag = f.confidence !== undefined ? ` (${Math.round(f.confidence * 100)}%)` : "";
+    lines.push(`  [${f.severity.toUpperCase().padEnd(8)}] ${f.ruleId}: ${f.title}${confTag}`);
     if (f.lineNumbers && f.lineNumbers.length > 0) {
       lines.push(`             Line ${f.lineNumbers[0]}: ${f.description.slice(0, 120)}`);
     }
+    if (f.provenance) {
+      lines.push(`             Evidence: ${f.provenance}`);
+    }
+    if (f.evidenceChain && f.evidenceChain.steps.length > 0) {
+      lines.push(`             Impact: ${f.evidenceChain.impactStatement}`);
+    }
     if (f.suggestedFix) {
       lines.push(`             Fix: ${f.suggestedFix.slice(0, 120)}`);
+    }
+    if (f.learnMoreUrl) {
+      lines.push(`             📖 ${f.learnMoreUrl}`);
     }
   }
   lines.push("");
@@ -881,6 +955,54 @@ export async function runCli(argv: string[]): Promise<void> {
     return;
   }
 
+  // ─── Override Command ─────────────────────────────────────────────────
+  if (args.command === "override") {
+    runOverride(argv);
+    return;
+  }
+
+  // ─── Feedback-Rules Command ───────────────────────────────────────────
+  if (args.command === "feedback-rules") {
+    const { runFeedbackRules } = await import("./commands/feedback-rules.js");
+    runFeedbackRules(argv);
+    return;
+  }
+
+  // ─── Governance Command ───────────────────────────────────────────────
+  if (args.command === "governance") {
+    const { runGovernance } = await import("./commands/governance.js");
+    runGovernance(argv);
+    return;
+  }
+
+  // ─── Parity Command ──────────────────────────────────────────────────
+  if (args.command === "parity") {
+    const { runParity } = await import("./commands/parity.js");
+    runParity(argv);
+    return;
+  }
+
+  // ─── Compliance-Report Command ────────────────────────────────────────
+  if (args.command === "compliance-report") {
+    const { buildComplianceReport, formatComplianceReportText } = await import("./commands/compliance-report.js");
+    const target = args.file || ".";
+    const code = args.file ? (await import("fs")).readFileSync(args.file, "utf-8") : "";
+    let findings: Finding[] = [];
+    if (code) {
+      const lang = detectLanguage(args.file) || "typescript";
+      const result = evaluateWithTribunal(code, lang);
+      findings = result.findings;
+    }
+    const framework = argv.find((a, i) => argv[i - 1] === "--framework") || undefined;
+    const report = buildComplianceReport(target, findings, framework);
+    if (argv.includes("--json")) {
+      console.log(JSON.stringify(report, null, 2));
+    } else {
+      console.log(formatComplianceReportText(report));
+    }
+    return;
+  }
+
   // ─── Triage Command ───────────────────────────────────────────────────
   if (args.command === "triage") {
     runTriage(argv);
@@ -946,6 +1068,13 @@ export async function runCli(argv: string[]): Promise<void> {
     process.exit(0);
   }
 
+  // ─── Calibration Share Command ───────────────────────────────────────
+  if (args.command === "calibration-share") {
+    const { runCalibrationShare } = await import("./commands/calibration-share.js");
+    runCalibrationShare(argv);
+    process.exit(0);
+  }
+
   // ─── Compare Command ─────────────────────────────────────────────────
   if (args.command === "compare") {
     const toolName = argv[3];
@@ -965,22 +1094,47 @@ export async function runCli(argv: string[]): Promise<void> {
 
   // ─── Trend Command ───────────────────────────────────────────────────
   if (args.command === "trend") {
-    const { loadSnapshotStore, computeTrend, formatTrendReport, formatTrendReportHtml } =
-      await import("./commands/snapshot.js");
-    const snapshotFile = argv.find((a, i) => i >= 3 && !a.startsWith("-")) || ".judges-snapshots.json";
+    const {
+      loadSnapshotStore,
+      computeTrend,
+      formatTrendReport,
+      formatTrendReportHtml,
+      detectRegressions,
+      formatRegressionAlerts,
+    } = await import("./commands/snapshot.js");
+    const snapshotFile =
+      argv.find((a, i) => i >= 3 && !a.startsWith("-") && !["html", "json", "text"].includes(a)) ||
+      ".judges-snapshots.json";
     const formatArg = argv.includes("--format") ? argv[argv.indexOf("--format") + 1] : "text";
+    const outputArg = argv.includes("--output") ? argv[argv.indexOf("--output") + 1] : undefined;
     const store = loadSnapshotStore(snapshotFile);
     if (store.snapshots.length === 0) {
       console.log("No snapshot data found. Run evaluations with --snapshot to collect trend data.");
       console.log(`  Expected file: ${snapshotFile}`);
     } else {
       const report = computeTrend(store);
+      let output: string;
       if (formatArg === "html") {
-        console.log(formatTrendReportHtml(report));
+        output = formatTrendReportHtml(report);
       } else if (formatArg === "json") {
-        console.log(JSON.stringify(report, null, 2));
+        output = JSON.stringify(report, null, 2);
       } else {
-        console.log(formatTrendReport(report));
+        output = formatTrendReport(report);
+      }
+      if (outputArg) {
+        writeFileSync(outputArg, output, "utf-8");
+        console.log(`  ✅ Trend report written to ${outputArg}`);
+      } else {
+        console.log(output);
+      }
+
+      // Regression alerts
+      const regressions = detectRegressions(store);
+      if (regressions.length > 0) {
+        console.log(formatRegressionAlerts(regressions));
+        if (args.failOnFindings && regressions.some((r) => r.severity === "error")) {
+          process.exit(1);
+        }
       }
     }
     process.exit(0);
@@ -990,6 +1144,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "scaffold-plugin") {
     const { runScaffoldPlugin } = await import("./commands/scaffold-plugin.js");
     runScaffoldPlugin(argv);
+    process.exit(0);
+  }
+
+  // ─── Plugin Search Command ───────────────────────────────────────────
+  if (args.command === "plugin") {
+    const { runPluginSearch } = await import("./commands/plugin-search.js");
+    runPluginSearch(argv);
+    process.exit(0);
+  }
+
+  // ─── Trust Ramp Command ──────────────────────────────────────────────
+  if (args.command === "trust-ramp") {
+    const { runTrustRamp } = await import("./commands/trust-ramp.js");
+    runTrustRamp(argv);
+    process.exit(0);
+  }
+
+  // ─── Metrics Command ────────────────────────────────────────────────
+  if (args.command === "metrics") {
+    const { runMetrics } = await import("./commands/metrics.js");
+    runMetrics(argv);
+    process.exit(0);
+  }
+
+  // ─── Metrics Dashboard Command ────────────────────────────────────────
+  if (args.command === "metrics-dashboard") {
+    const { runMetricsDashboard } = await import("./commands/metrics-dashboard.js");
+    runMetricsDashboard(argv);
+    process.exit(0);
+  }
+
+  // ─── Help Command ────────────────────────────────────────────────────
+  if (args.command === "help") {
+    const { runHelp } = await import("./commands/help.js");
+    runHelp(argv);
+    process.exit(0);
+  }
+
+  // ─── Onboard Command ─────────────────────────────────────────────────
+  if (args.command === "onboard") {
+    const { runOnboard } = await import("./commands/onboard.js");
+    await runOnboard(argv);
+    process.exit(0);
+  }
+
+  // ─── Org Metrics Command ──────────────────────────────────────────────
+  if (args.command === "org-metrics") {
+    const { runOrgMetrics } = await import("./commands/org-metrics.js");
+    runOrgMetrics(argv);
+    process.exit(0);
+  }
+
+  // ─── Plugins Command ──────────────────────────────────────────────────
+  if (args.command === "plugins") {
+    const { runPlugins } = await import("./commands/plugins.js");
+    runPlugins(argv);
     process.exit(0);
   }
 
@@ -1037,6 +1247,13 @@ export async function runCli(argv: string[]): Promise<void> {
         files = files.filter((f) => changedSet.has(resolve(f)));
       }
 
+      // ── --staged-only: scope to git-staged files ──
+      if (args.stagedOnly) {
+        const stagedFiles = getStagedFiles(target);
+        const stagedSet = new Set(stagedFiles.map((f) => resolve(f)));
+        files = files.filter((f) => stagedSet.has(resolve(f)));
+      }
+
       if (files.length === 0) {
         console.error(`No supported source files found in: ${target}${args.changedOnly ? " (changed-only)" : ""}`);
         process.exit(1);
@@ -1052,6 +1269,10 @@ export async function runCli(argv: string[]): Promise<void> {
       let failCount = 0;
       let totalFixed = 0;
       let totalFixable = 0;
+      let cacheHits = 0;
+
+      // Incremental evaluation: use disk cache to skip unchanged files
+      const diskCache = args.noCache ? undefined : new DiskCache<TribunalVerdict>();
 
       for (let idx = 0; idx < files.length; idx++) {
         const filePath = files[idx];
@@ -1064,7 +1285,20 @@ export async function runCli(argv: string[]): Promise<void> {
         const fileCode = readFileSync(filePath, "utf-8");
         const fileLang = args.language || detectLanguage(filePath) || "typescript";
 
-        const verdict = evaluateWithTribunal(fileCode, fileLang, undefined, evalOptions);
+        // Check disk cache for incremental mode (always when cache available)
+        const hash = contentHash(fileCode, fileLang);
+        let verdict: TribunalVerdict | undefined;
+        if (diskCache) {
+          verdict = diskCache.get(hash);
+        }
+        if (verdict) {
+          cacheHits++;
+        } else {
+          verdict = evaluateWithTribunal(fileCode, fileLang, undefined, evalOptions);
+          if (diskCache) {
+            diskCache.set(hash, verdict, relPath);
+          }
+        }
 
         // Apply baseline suppression
         if (loadedBaseline) {
@@ -1074,6 +1308,19 @@ export async function runCli(argv: string[]): Promise<void> {
             );
           }
           verdict.findings = verdict.findings.filter((f) => !isBaselined(f, loadedBaseline!, fileCode, relPath));
+        }
+
+        // Apply override suppressions for multi-file mode
+        {
+          const overrideStore = loadOverrideStore();
+          if (overrideStore.overrides.length > 0) {
+            for (const evaluation of verdict.evaluations) {
+              const result = applyOverrides(evaluation.findings, overrideStore, relPath);
+              evaluation.findings = result.active;
+            }
+            const topResult = applyOverrides(verdict.findings, overrideStore, relPath);
+            verdict.findings = topResult.active;
+          }
         }
 
         const fileFindings = verdict.evaluations.reduce((s, e) => s + e.findings.length, 0);
@@ -1125,6 +1372,9 @@ export async function runCli(argv: string[]): Promise<void> {
       console.log(`  Failed   : ${failCount} file(s)`);
       if (args.fix && totalFixed > 0) {
         console.log(`  Fixed    : ${totalFixed} patch(es) applied`);
+      }
+      if (cacheHits > 0) {
+        console.log(`  Cached   : ${cacheHits} file(s) unchanged (skipped re-evaluation)`);
       }
       console.log(`  Time     : ${elapsed}ms`);
       console.log("");
@@ -1209,6 +1459,27 @@ export async function runCli(argv: string[]): Promise<void> {
         console.log(`  ⏱  Evaluated in ${elapsed}ms`);
       }
 
+      // Trace output — show pipeline decision trace
+      if (args.trace) {
+        const { buildEvaluationTrace, formatTraceText } = await import("./commands/trace.js");
+        const wrappedForTrace = {
+          overallVerdict: evaluation.verdict,
+          overallScore: evaluation.score,
+          summary: evaluation.summary,
+          evaluations: [evaluation],
+          findings: evaluation.findings,
+          criticalCount: evaluation.findings.filter((f: Finding) => f.severity === "critical").length,
+          highCount: evaluation.findings.filter((f: Finding) => f.severity === "high").length,
+          timestamp: new Date().toISOString(),
+        };
+        const trace = buildEvaluationTrace(wrappedForTrace, resolvedPath || args.file, language);
+        if (args.format === "json") {
+          console.log(JSON.stringify(trace, null, 2));
+        } else {
+          console.log(formatTraceText(trace));
+        }
+      }
+
       // Exit code — fail-on-findings or min-score
       if (args.failOnFindings && evaluation.verdict === "fail") process.exit(1);
       if (args.minScore !== undefined && evaluation.score < args.minScore) {
@@ -1259,6 +1530,23 @@ export async function runCli(argv: string[]): Promise<void> {
         verdict.findings = filterBySeverity(verdict.findings, evalConfig.minSeverity);
       }
 
+      // Apply override suppressions
+      {
+        const overrideStore = loadOverrideStore();
+        if (overrideStore.overrides.length > 0) {
+          const fileSrc = resolvedPath || args.file;
+          for (const evaluation of verdict.evaluations) {
+            const result = applyOverrides(evaluation.findings, overrideStore, fileSrc);
+            evaluation.findings = result.active;
+          }
+          const topResult = applyOverrides(verdict.findings, overrideStore, fileSrc);
+          verdict.findings = topResult.active;
+          if (topResult.overridden.length > 0 && !args.quiet) {
+            console.log(`  ℹ️  ${topResult.overridden.length} finding(s) suppressed by overrides`);
+          }
+        }
+      }
+
       // Enrich with learning context when --explain is set
       if (args.explain) {
         for (const evaluation of verdict.evaluations) {
@@ -1288,6 +1576,17 @@ export async function runCli(argv: string[]): Promise<void> {
       if (args.verbose) {
         console.log(`  ⏱  Evaluated in ${elapsed}ms`);
         console.log(`  📊 ${verdict.evaluations.length} judges, ${verdict.findings.length} total findings`);
+      }
+
+      // Trace output — show pipeline decision trace
+      if (args.trace) {
+        const { buildEvaluationTrace, formatTraceText } = await import("./commands/trace.js");
+        const trace = buildEvaluationTrace(verdict, resolvedPath || args.file, language);
+        if (args.format === "json") {
+          console.log(JSON.stringify(trace, null, 2));
+        } else {
+          console.log(formatTraceText(trace));
+        }
       }
 
       // Exit code — fail-on-findings or min-score
@@ -1542,21 +1841,52 @@ const RULE_PREFIX_CONTEXT: Record<string, { owasp?: string; cwe?: string; learn:
   },
 };
 
-function enrichWithExplanations<T extends { ruleId: string; description: string; reference?: string }>(
-  findings: T[],
-): T[] {
+function enrichWithExplanations<
+  T extends {
+    ruleId: string;
+    description: string;
+    reference?: string;
+    confidence?: number;
+    provenance?: string;
+    evidenceBasis?: string;
+    evidenceChain?: { steps: Array<{ observation: string; source: string; line?: number }>; impactStatement: string };
+  },
+>(findings: T[]): T[] {
   return findings.map((f) => {
     const prefix = f.ruleId.replace(/-\d+$/, "");
     const ctx = RULE_PREFIX_CONTEXT[prefix];
-    if (!ctx) return f;
     const parts: string[] = [f.description];
-    if (ctx.owasp) parts.push(`\n📚 OWASP: ${ctx.owasp}`);
-    if (ctx.cwe) parts.push(`CWE: ${ctx.cwe}`);
-    parts.push(`💡 ${ctx.learn}`);
+
+    // Layer 2: evidence-based explanation
+    if (f.confidence !== undefined) {
+      parts.push(`\n🎯 Confidence: ${Math.round(f.confidence * 100)}%`);
+    }
+    if (f.provenance) {
+      parts.push(`🔍 Detection: ${f.provenance}`);
+    }
+    if (f.evidenceBasis) {
+      parts.push(`📊 Evidence: ${f.evidenceBasis}`);
+    }
+    if (f.evidenceChain && f.evidenceChain.steps.length > 0) {
+      parts.push(`\n⚡ Why this matters: ${f.evidenceChain.impactStatement}`);
+      parts.push("   Evidence chain:");
+      for (const step of f.evidenceChain.steps.slice(0, 5)) {
+        const loc = step.line ? ` (L${step.line})` : "";
+        parts.push(`   → [${step.source}]${loc} ${step.observation}`);
+      }
+    }
+
+    // Layer 1: OWASP/CWE reference context
+    if (ctx) {
+      if (ctx.owasp) parts.push(`\n📚 OWASP: ${ctx.owasp}`);
+      if (ctx.cwe) parts.push(`CWE: ${ctx.cwe}`);
+      parts.push(`💡 ${ctx.learn}`);
+    }
+
     return {
       ...f,
       description: parts.join("  "),
-      reference: f.reference || [ctx.owasp, ctx.cwe].filter(Boolean).join(" / ") || f.reference,
+      reference: f.reference || (ctx ? [ctx.owasp, ctx.cwe].filter(Boolean).join(" / ") : undefined) || f.reference,
     };
   });
 }

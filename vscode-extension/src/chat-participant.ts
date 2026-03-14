@@ -10,6 +10,7 @@ import {
 } from "@kevinrabun/judges/api";
 import type { Finding } from "@kevinrabun/judges/api";
 import type { JudgesDiagnosticProvider } from "./diagnostics";
+import { runLlmBenchmark, saveResultsToWorkspace } from "./llm-benchmark-runner";
 
 // ─── Language Map ────────────────────────────────────────────────────────────
 
@@ -65,6 +66,7 @@ export function registerChatParticipant(
 
     // Store reference so handlers can populate diagnostics
     _diagnosticProvider = diagnosticProvider;
+    _extensionContext = context;
 
     const participant = vscode.chat.createChatParticipant("judges-panel.judges", handleChatRequest);
     participant.iconPath = new vscode.ThemeIcon("shield");
@@ -105,6 +107,7 @@ export function registerChatParticipant(
 
 /** Module-level reference to the diagnostic provider, set during registration. */
 let _diagnosticProvider: JudgesDiagnosticProvider | undefined;
+let _extensionContext: vscode.ExtensionContext | undefined;
 
 const handleChatRequest: vscode.ChatRequestHandler = async (
   request: vscode.ChatRequest,
@@ -124,6 +127,8 @@ const handleChatRequest: vscode.ChatRequestHandler = async (
       return await handleShallowReview(request, stream, token, "security-only");
     case "fix":
       return await handleFix(stream, token);
+    case "benchmark":
+      return await handleBenchmark(request, stream, token);
     case "help":
       return handleHelp(stream);
     default:
@@ -140,6 +145,7 @@ const handleChatRequest: vscode.ChatRequestHandler = async (
 function inferCommand(prompt: string): string {
   const lower = prompt.toLowerCase();
   if (/\bfix\b/.test(lower)) return "fix";
+  if (/\bbenchmark\b/.test(lower)) return "benchmark";
   if (/\bshallow\s*review\b/.test(lower)) return "shallowreview";
   if (/\bpattern\s*(only|analysis)\b/.test(lower)) return "shallowreview";
   if (/\bsecur/.test(lower)) return "security";
@@ -800,6 +806,85 @@ async function handleDeepReview(
   return { metadata: { showReEvaluate: true, reviewCommand: "deepreview" } };
 }
 
+// ─── /benchmark Handler ──────────────────────────────────────────────────────
+
+async function handleBenchmark(
+  request: vscode.ChatRequest,
+  stream: vscode.ChatResponseStream,
+  token: vscode.CancellationToken,
+): Promise<vscode.ChatResult | void> {
+  stream.progress("Initializing LLM benchmark…");
+
+  if (!_extensionContext) {
+    stream.markdown("**Error:** Extension context not initialized.");
+    return;
+  }
+
+  const storageUri = _extensionContext.globalStorageUri;
+
+  try {
+    // Resolve the model from the chat context
+    let chatModel: vscode.LanguageModelChat | undefined;
+    try {
+      const models = await vscode.lm.selectChatModels();
+      chatModel = models[0];
+    } catch {
+      // will fall back inside runner
+    }
+
+    const result = await runLlmBenchmark(
+      token,
+      (p) => {
+        stream.progress(`[${p.completed}/${p.total}] ${p.message}`);
+      },
+      storageUri,
+      chatModel,
+    );
+
+    if (token.isCancellationRequested) {
+      stream.markdown("### ⚠️ Benchmark Cancelled\n\nPartial results have been saved.\n");
+      return;
+    }
+
+    // Stream the executive summary
+    stream.markdown("### ✅ LLM Benchmark Complete\n\n");
+
+    if (result.perJudge && result.tribunal) {
+      const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+      stream.markdown(
+        `| Mode | F1 | Precision | Recall | Detection Rate |\n` +
+          `|------|----|-----------|--------|----------------|\n` +
+          `| Per-Judge | ${pct(result.perJudge.f1Score)} | ${pct(result.perJudge.precision)} | ${pct(result.perJudge.recall)} | ${pct(result.perJudge.detectionRate)} |\n` +
+          `| Tribunal | ${pct(result.tribunal.f1Score)} | ${pct(result.tribunal.precision)} | ${pct(result.tribunal.recall)} | ${pct(result.tribunal.detectionRate)} |\n\n`,
+      );
+    } else {
+      const s = result.perJudge ?? result.tribunal;
+      if (s) {
+        const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+        stream.markdown(
+          `**F1:** ${pct(s.f1Score)} · **Precision:** ${pct(s.precision)} · ` +
+            `**Recall:** ${pct(s.recall)} · **Detection Rate:** ${pct(s.detectionRate)}\n\n`,
+        );
+      }
+    }
+
+    stream.markdown(
+      "📄 Results saved to extension storage.\n\n" +
+        "Use **Save to Workspace** to copy results to `benchmarks/` for committing.\n",
+    );
+
+    // Offer buttons
+    stream.button({
+      command: "judges.saveBenchmarkToWorkspace",
+      title: "$(folder) Save to Workspace",
+      arguments: [],
+    });
+  } catch (error) {
+    if (error instanceof vscode.CancellationError) return;
+    stream.markdown(`### ❌ Benchmark Failed\n\n` + `${error instanceof Error ? error.message : String(error)}\n`);
+  }
+}
+
 // ─── /fix Handler ────────────────────────────────────────────────────────────
 
 async function handleFix(
@@ -872,6 +957,7 @@ function handleHelp(stream: vscode.ChatResponseStream): vscode.ChatResult | void
       `| \`@judges /shallowreview\` | Pattern analysis only (Layer 1 — no AI deep review) |\n` +
       `| \`@judges /security\` | Security-focused pattern review only |\n` +
       `| \`@judges /fix\` | Auto-fix findings that have patches (not all findings are auto-fixable) |\n` +
+      `| \`@judges /benchmark\` | Run LLM benchmark — evaluates all judges against test cases |\n` +
       `| \`@judges /help\` | Show this help |\n\n` +
       `### Verdict Bands\n\n` +
       `| Verdict | Score | Meaning |\n` +

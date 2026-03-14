@@ -81,6 +81,8 @@ jobs:
           path: |
             benchmark-results.json
             docs/benchmark-report.md
+            benchmarks/llm-benchmark-report.md
+            benchmarks/llm-snapshot-latest.json
 
       - name: Post benchmark report to Job Summary
         if: always()
@@ -93,9 +95,12 @@ jobs:
         run: |
           git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.wiki.git" wiki
           cp docs/benchmark-report.md wiki/Benchmark-Report.md
+          if [ -f benchmarks/llm-benchmark-report.md ]; then
+            cp benchmarks/llm-benchmark-report.md wiki/LLM-Benchmark-Report.md
+          fi
           cd wiki
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Benchmark-Report.md
+          git add -A
           git diff --cached --quiet || git commit -m "Update benchmark report — $(date -u +'%Y-%m-%d %H:%M UTC')"
           git push

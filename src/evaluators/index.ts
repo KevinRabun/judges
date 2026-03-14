@@ -51,12 +51,13 @@ import {
 import { enrichWithPatches } from "../patches/index.js";
 import { crossEvaluatorDedup, severityRank } from "../dedup.js";
 import { filterFalsePositiveHeuristics } from "./false-positive-review.js";
-import { calibrateFindings, loadCalibrationProfile } from "../calibration.js";
+import { calibrateFindings, loadCalibrationProfile, buildModelCalibrationProfile } from "../calibration.js";
 import type { CalibrationOptions } from "../calibration.js";
 import { applyAutoTune } from "../auto-tune.js";
 import { loadFeedbackStore } from "../commands/feedback.js";
 import { CROSS_FILE_SECURITY_CATEGORIES } from "./project.js";
 import { applyTriageFeedback, loadFindingStore } from "../finding-lifecycle.js";
+import { enrichWithSecurityIds } from "../security-ids.js";
 
 // ─── Individual Analyzers ────────────────────────────────────────────────────
 // NOTE: Analyzer functions are now registered directly on each JudgeDefinition
@@ -368,7 +369,7 @@ function parseInlineSuppressions(code: string): {
   const activeBlocks = new Map<string, { commentLine: number; reason?: string }>();
 
   // Pattern: // judges-ignore[-next-line|-block] RULE-ID [, RULE-ID ...] [-- reason]
-  const suppressPattern = /(?:\/\/|#|\/\*)\s*judges-ignore(?:-(next-line|block))?\s+([^\n]*?)(?:\s*\*\/)?$/gi;
+  const suppressPattern = /(?:\/\/|#|\/\*)\s*judges-ignore(?:-(next-line|block))?\s+(.+)$/gi;
   const endBlockPattern = /(?:\/\/|#|\/\*)\s*judges-end-block/i;
 
   for (let i = 0; i < lines.length; i++) {
@@ -392,7 +393,7 @@ function parseInlineSuppressions(code: string): {
     suppressPattern.lastIndex = 0;
     while ((match = suppressPattern.exec(line)) !== null) {
       const modifier = match[1]?.toLowerCase(); // "next-line", "block", or undefined
-      const rawContent = match[2];
+      const rawContent = match[2].replace(/\s*\*\/\s*$/, "");
       const dashSplit = rawContent.split(/\s+--\s+/);
       const ruleIds = dashSplit[0].split(/[,\s]+/).filter(Boolean);
       const reason = dashSplit[1]?.trim() || undefined;
@@ -416,11 +417,11 @@ function parseInlineSuppressions(code: string): {
     }
 
     // File-level suppression: // judges-file-ignore RULE-ID [-- reason]
-    const filePattern = /(?:\/\/|#|\/\*)\s*judges-file-ignore\s+([^\n]*?)(?:\s*\*\/)?$/gi;
+    const filePattern = /(?:\/\/|#|\/\*)\s*judges-file-ignore\s+(.+)$/gi;
     let fileMatch;
     filePattern.lastIndex = 0;
     while ((fileMatch = filePattern.exec(line)) !== null) {
-      const rawFileContent = fileMatch[1];
+      const rawFileContent = fileMatch[1].replace(/\s*\*\/\s*$/, "");
       const fileDashSplit = rawFileContent.split(/\s+--\s+/);
       const ruleIds = fileDashSplit[0].split(/[,\s]+/).filter(Boolean);
       const reason = fileDashSplit[1]?.trim() || undefined;
@@ -919,6 +920,29 @@ export function evaluateWithTribunal(
     }
   }
 
+  // ── Auto-activate model-specific calibration profile ──
+  // If the model-fingerprint judge detected a model, apply the model-specific
+  // calibration profile automatically (when feedback data exists).
+  try {
+    const modelFindings = calibrated.filter((f) => f.ruleId.startsWith("MFPR-"));
+    if (modelFindings.length > 0) {
+      // Extract detected model name from the finding title
+      const modelMatch = modelFindings[0].title.match(/matches\s+(.+?)\s+generation/);
+      if (modelMatch) {
+        const detectedModel = modelMatch[1];
+        const feedbackStore = loadFeedbackStore();
+        if (feedbackStore.entries.length > 0) {
+          const modelProfile = buildModelCalibrationProfile(feedbackStore, detectedModel);
+          if (modelProfile.isActive) {
+            calibrated = calibrateFindings(calibrated, modelProfile);
+          }
+        }
+      }
+    }
+  } catch {
+    // Model-specific calibration failure is non-fatal
+  }
+
   // ── Triage feedback: adjust confidence based on historical false positive rates ──
   let triageAdjusted = calibrated;
   try {
@@ -953,9 +977,12 @@ export function evaluateWithTribunal(
     };
   });
 
-  const mustFixGate = evaluateMustFixGate(allFindings, options?.mustFixGate);
-  const criticalCount = allFindings.filter((f) => f.severity === "critical").length;
-  const highCount = allFindings.filter((f) => f.severity === "high").length;
+  // ── Structured CWE/OWASP IDs and Learn More URLs ──
+  const enrichedFindings = enrichWithSecurityIds(allFindings);
+
+  const mustFixGate = evaluateMustFixGate(enrichedFindings, options?.mustFixGate);
+  const criticalCount = enrichedFindings.filter((f) => f.severity === "critical").length;
+  const highCount = enrichedFindings.filter((f) => f.severity === "high").length;
 
   const effectiveVerdict: Verdict = mustFixGate?.triggered ? "fail" : overallVerdict;
 
@@ -973,7 +1000,7 @@ export function evaluateWithTribunal(
     overallScore,
     summary,
     evaluations,
-    findings: allFindings,
+    findings: enrichedFindings,
     criticalCount,
     highCount,
     timestamp: new Date().toISOString(),
@@ -987,8 +1014,32 @@ export function evaluateWithTribunal(
         durationMs: e.durationMs ?? 0,
       })),
     },
-    reviewDecision: synthesizeReviewDecision(allFindings),
+    reviewDecision: synthesizeReviewDecision(enrichedFindings),
   };
+
+  // ── AI model detection escalation ──
+  // When the model-fingerprint judge (MFPR-* rules) fires, attach escalation
+  // metadata so downstream consumers can trigger deeper review or add
+  // provenance annotations automatically.
+  const mfprFindings = enrichedFindings.filter((f) => f.ruleId.startsWith("MFPR"));
+  if (mfprFindings.length > 0) {
+    const modelMap = new Map<string, number>();
+    for (const f of mfprFindings) {
+      // Extract model name from description patterns like "ChatGPT/GPT-4 fingerprint"
+      const modelMatch = /^([\w/\-.]+)\s+fingerprint/i.exec(f.title) ?? /model:\s*([\w/\-.]+)/i.exec(f.description);
+      const model = modelMatch?.[1] ?? "unknown";
+      const existing = modelMap.get(model) ?? 0;
+      modelMap.set(model, Math.max(existing, f.confidence ?? 0.5));
+    }
+    result.aiEscalation = {
+      detected: true,
+      models: [...modelMap.entries()].map(([model, confidence]) => ({ model, confidence })),
+      triggerRules: [...new Set(mfprFindings.map((f) => f.ruleId))],
+      recommendation: mfprFindings.some((f) => (f.confidence ?? 0) >= 0.8)
+        ? "AI-generated code detected with high confidence — consider requiring human review sign-off"
+        : "AI-generated code patterns detected — review for model-specific biases",
+    };
+  }
 
   // ── Disk cache: persist for future runs ──
   if (diskCache) {

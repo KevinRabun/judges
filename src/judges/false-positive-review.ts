@@ -1,4 +1,5 @@
 import type { JudgeDefinition } from "../types.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const falsePositiveReviewJudge: JudgeDefinition = {
   id: "false-positive-review",
@@ -73,3 +74,5 @@ RULES FOR YOUR REVIEW:
 - If you are uncertain, err on the side of keeping the finding (prefer false negatives over missed true positives in your own review).
 - Your review should make the final finding set PRECISE and ACTIONABLE — no developer time should be wasted investigating false alarms.`,
 };
+
+defaultRegistry.register(falsePositiveReviewJudge);

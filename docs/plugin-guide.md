@@ -4,11 +4,31 @@ Build custom rules, judges, and evaluation hooks that extend the Judges Panel pl
 
 ## Overview
 
+The plugin system is built on the **unified `JudgeRegistry`** — the same registration mechanism used by all 45 built-in judges. This means your custom judges go through the exact same code path as built-in ones, ensuring consistent behavior, validation, and discoverability.
+
 The plugin system supports three extension points:
 
 1. **Custom Rules** — pattern-based or AST-driven rules that run under an existing judge
 2. **Custom Judges** — entirely new evaluation domains
 3. **Hooks** — lifecycle hooks that modify evaluation behavior
+
+---
+
+## Architecture
+
+All judges — built-in and custom — register with a central `JudgeRegistry`. The `defaultRegistry` singleton is the shared instance used by the evaluation pipeline:
+
+```typescript
+import { JudgeRegistry, defaultRegistry } from "@kevinrabun/judges/api";
+
+// Inspect registered judges
+console.log(defaultRegistry.getJudges().length); // 45 built-in + any plugins
+
+// Look up a specific judge
+const judge = defaultRegistry.getJudge("cybersecurity");
+```
+
+Plugins register through the same API — `registerPlugin()` is a convenience wrapper around `defaultRegistry.registerPlugin()`.
 
 ---
 
@@ -233,6 +253,7 @@ import {
   getCustomRules,
   getPluginJudges,
   clearPlugins,
+  defaultRegistry,
 } from "@kevinrabun/judges/api";
 
 // Register
@@ -240,7 +261,7 @@ registerPlugin(myPlugin);
 
 // List registered plugins
 const plugins = getRegisteredPlugins();
-// => [{ name: "my-org-rules", version: "1.0.0", ruleCount: 3 }]
+// => [{ name: "my-org-rules", version: "1.0.0", rulesRegistered: 3, judgesRegistered: 1 }]
 
 // Get all custom rules across plugins
 const rules = getCustomRules();
@@ -253,6 +274,10 @@ unregisterPlugin("my-org-rules");
 
 // Clear all plugins (useful in tests)
 clearPlugins();
+
+// Advanced: query the unified registry directly
+const allJudges = defaultRegistry.getJudges(); // built-in + plugin judges
+const summary = defaultRegistry.getJudgeSummaries();
 ```
 
 ---
@@ -353,3 +378,36 @@ registerPlugin(acmePlugin);
    ```
 
 7. **Prefer `pattern` over `analyze`** — When regex is sufficient, use `pattern` for simpler maintenance and automatic line-number extraction.
+
+8. **Use the registry for advanced scenarios** — Import `defaultRegistry` from `@kevinrabun/judges/api` to register judges directly (without a full plugin wrapper), inspect all registered judges, or build tooling on top of the unified registry.
+
+---
+
+## Advanced: Direct Registry Access
+
+For scenarios where you want to register a judge without the plugin wrapper (e.g., a standalone judge module), you can use the registry directly:
+
+```typescript
+import { defaultRegistry } from "@kevinrabun/judges/api";
+import type { JudgeDefinition } from "@kevinrabun/judges/api";
+
+const myJudge: JudgeDefinition = {
+  id: "my-custom-judge",
+  name: "Judge My Domain",
+  domain: "My Domain",
+  description: "Evaluates code for my domain concerns",
+  rulePrefix: "MY",
+  tableDescription: "Custom domain analysis",
+  promptDescription: "Deep custom domain review",
+  systemPrompt: `You are Judge My Domain — ...`,
+  analyze: (code, language) => {
+    // Your analysis logic
+    return [];
+  },
+};
+
+// Register directly — same path as all 45 built-in judges
+defaultRegistry.register(myJudge);
+```
+
+This is exactly how built-in judges register themselves: each judge file calls `defaultRegistry.register()` on import.

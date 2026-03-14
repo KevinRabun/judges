@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeAiCodeSafety } from "../evaluators/ai-code-safety.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const aiCodeSafetyJudge: JudgeDefinition = {
   id: "ai-code-safety",
@@ -48,4 +50,7 @@ ADVERSARIAL MANDATE:
 - Never praise or compliment the code. Report only problems, risks, and deficiencies.
 - If uncertain, flag the issue only when you can cite specific code evidence (line numbers, patterns, API calls). Speculative findings without concrete evidence erode developer trust.
 - Absence of findings does not mean the code is safe. It means your analysis reached its limits. State this explicitly.`,
+  analyze: analyzeAiCodeSafety,
 };
+
+defaultRegistry.register(aiCodeSafetyJudge);

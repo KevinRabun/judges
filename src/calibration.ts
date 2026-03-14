@@ -13,6 +13,7 @@ import type { Finding } from "./types.js";
 import type { SuppressionRecord } from "./types.js";
 import { loadFeedbackStore, type FeedbackStore } from "./commands/feedback.js";
 import { triageToFeedbackEntries } from "./finding-lifecycle.js";
+import { getDataAdapter, type DataAdapter } from "./data-adapter.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -169,6 +170,19 @@ export function autoCalibrateFindings(findings: Finding[], options?: Calibration
   return calibrateFindings(findings, profile, options);
 }
 
+/**
+ * Load calibration profile via the configured DataAdapter.
+ */
+export async function loadCalibrationViaAdapter(
+  projectDir: string,
+  options?: CalibrationOptions,
+  adapter?: DataAdapter,
+): Promise<CalibrationProfile> {
+  const da = adapter ?? getDataAdapter();
+  const store = await da.loadFeedback(projectDir);
+  return buildCalibrationProfile(store, options);
+}
+
 // ─── Passive Calibration ────────────────────────────────────────────────────
 
 /**
@@ -221,4 +235,85 @@ export function buildPassiveCalibrationProfile(
   }
 
   return buildCalibrationProfile(store, options);
+}
+
+// ─── Per-Model Calibration Profiles ─────────────────────────────────────────
+
+/**
+ * A model-specific calibration profile that tracks FP rates per AI model.
+ * Different AI models (GPT-4o, Claude, Gemini, etc.) produce different
+ * patterns of code quality issues. Per-model profiles allow Judges to
+ * adapt its confidence thresholds based on the detected model.
+ */
+export interface ModelCalibrationStore {
+  version: 1;
+  models: Record<
+    string,
+    {
+      feedbackCount: number;
+      fpRateByRule: Record<string, number>;
+      fpRateByPrefix: Record<string, number>;
+      lastUpdated: string;
+    }
+  >;
+}
+
+/**
+ * Build a calibration profile scoped to a specific AI model.
+ * Filters feedback entries by model tag (from MFPR judge detection).
+ */
+export function buildModelCalibrationProfile(
+  store: FeedbackStore,
+  modelId: string,
+  options?: CalibrationOptions,
+): CalibrationProfile {
+  const modelEntries = store.entries.filter((e) => e.model === modelId);
+
+  if (modelEntries.length === 0) {
+    return {
+      name: `model:${modelId}`,
+      fpRateByRule: new Map(),
+      fpRateByPrefix: new Map(),
+      isActive: false,
+      feedbackCount: 0,
+    };
+  }
+
+  const filteredStore: FeedbackStore = { ...store, entries: modelEntries };
+  const profile = buildCalibrationProfile(filteredStore, options);
+  return { ...profile, name: `model:${modelId}` };
+}
+
+/**
+ * Load all per-model calibration profiles from a feedback store.
+ * Returns a map of model ID → CalibrationProfile.
+ */
+export function buildAllModelProfiles(
+  store: FeedbackStore,
+  options?: CalibrationOptions,
+): Map<string, CalibrationProfile> {
+  const models = new Set<string>();
+  for (const entry of store.entries) {
+    if (entry.model) models.add(entry.model);
+  }
+
+  const profiles = new Map<string, CalibrationProfile>();
+  for (const modelId of models) {
+    profiles.set(modelId, buildModelCalibrationProfile(store, modelId, options));
+  }
+  return profiles;
+}
+
+/**
+ * Calibrate findings using a model-specific profile, falling back to
+ * the general profile when no model-specific data is available.
+ */
+export function calibrateFindingsForModel(
+  findings: Finding[],
+  generalProfile: CalibrationProfile,
+  modelProfile: CalibrationProfile | undefined,
+  options?: CalibrationOptions,
+): Finding[] {
+  const profile = modelProfile?.isActive ? modelProfile : generalProfile;
+  return calibrateFindings(findings, profile, options);
 }

@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeModelFingerprint } from "../evaluators/model-fingerprint.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const modelFingerprintJudge: JudgeDefinition = {
   id: "model-fingerprint",
@@ -31,4 +33,7 @@ FALSE POSITIVE AVOIDANCE:
 ADVERSARIAL MANDATE:
 - Flag AI-generated code that may carry model-specific biases or blind spots.
 - Treat provenance transparency as a code quality concern.`,
+  analyze: analyzeModelFingerprint,
 };
+
+defaultRegistry.register(modelFingerprintJudge);

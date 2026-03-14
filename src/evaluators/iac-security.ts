@@ -810,7 +810,7 @@ export function analyzeIacSecurity(code: string, language: string): Finding[] {
     }
     if (latestTagLines.length > 0) {
       findings.push({
-        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
         severity: "medium",
         title: "Dockerfile FROM uses latest or untagged image",
         description:

@@ -36,6 +36,7 @@ interface SarifRule {
   shortDescription: { text: string };
   defaultConfiguration: { level: SarifLevel };
   helpUri?: string;
+  properties?: { tags?: string[] };
 }
 
 interface SarifResult {
@@ -77,11 +78,17 @@ function buildRules(findings: Finding[]): SarifRule[] {
   const seen = new Map<string, SarifRule>();
   for (const f of findings) {
     if (!seen.has(f.ruleId)) {
+      const tags: string[] = [];
+      if (f.cweIds) tags.push(...f.cweIds);
+      if (f.owaspIds) tags.push(...f.owaspIds.map((id) => `OWASP-${id}`));
+
       seen.set(f.ruleId, {
         id: f.ruleId,
         name: f.title,
         shortDescription: { text: f.recommendation },
         defaultConfiguration: { level: severityToLevel(f.severity) },
+        ...(f.learnMoreUrl ? { helpUri: f.learnMoreUrl } : {}),
+        ...(tags.length > 0 ? { properties: { tags } } : {}),
       });
     }
   }
@@ -98,19 +105,32 @@ function buildRules(findings: Finding[]): SarifRule[] {
  * @param version   - The judges version string (default "2.3.0").
  */
 export function findingsToSarif(findings: Finding[], filePath = "source.ts", version = "2.3.0"): SarifLog {
-  const results: SarifResult[] = findings.map((f) => ({
-    ruleId: f.ruleId,
-    level: severityToLevel(f.severity),
-    message: { text: `${f.title}: ${f.recommendation}` },
-    locations: [
-      {
-        physicalLocation: {
-          artifactLocation: { uri: filePath },
-          region: { startLine: f.lineNumbers?.[0] ?? 1 },
+  const results: SarifResult[] = findings.map((f) => {
+    const props: Record<string, unknown> = {};
+    if (f.confidence !== undefined) props.confidence = f.confidence;
+    if (f.provenance) props.provenance = f.provenance;
+    if (f.evidenceBasis) props.evidenceBasis = f.evidenceBasis;
+    if (f.evidenceChain) props.evidenceChain = f.evidenceChain;
+    if (f.owaspLlmTop10) props.owaspLlmTop10 = f.owaspLlmTop10;
+
+    const result: SarifResult = {
+      ruleId: f.ruleId,
+      level: severityToLevel(f.severity),
+      message: { text: `${f.title}: ${f.recommendation}` },
+      locations: [
+        {
+          physicalLocation: {
+            artifactLocation: { uri: filePath },
+            region: { startLine: f.lineNumbers?.[0] ?? 1 },
+          },
         },
-      },
-    ],
-  }));
+      ],
+    };
+    if (Object.keys(props).length > 0) {
+      (result as unknown as Record<string, unknown>).properties = props;
+    }
+    return result;
+  });
 
   return {
     $schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",

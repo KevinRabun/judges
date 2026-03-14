@@ -155,6 +155,9 @@ export {
 } from "./plugins.js";
 export type { CustomRule, JudgesPlugin, PluginRegistration } from "./plugins.js";
 
+// ─── Judge Registry ──────────────────────────────────────────────────────────
+export { JudgeRegistry, defaultRegistry } from "./judge-registry.js";
+
 // ─── AI Code Fingerprinting ─────────────────────────────────────────────────
 export { fingerprintCode, fingerprintToFindings } from "./fingerprint.js";
 export type { AiFingerprint, AiSignal } from "./fingerprint.js";
@@ -240,8 +243,10 @@ export {
   formatL2CoverageReport,
   ingestFindingsAsBenchmarkCases,
   deduplicateIngestCases,
+  BENCHMARK_CASES,
 } from "./commands/benchmark.js";
 export type {
+  BenchmarkCase,
   BenchmarkResult,
   BenchmarkGateOptions,
   BenchmarkGateResult,
@@ -249,6 +254,19 @@ export type {
   L2JudgeCoverage,
   L2CategoryCoverage,
 } from "./commands/benchmark.js";
+
+// ─── LLM Benchmark ──────────────────────────────────────────────────────────
+export {
+  parseLlmRuleIds,
+  constructPerJudgePrompt,
+  constructTribunalPrompt,
+  selectStratifiedSample,
+  scoreLlmCase,
+  computeLlmMetrics,
+  formatLlmSnapshotMarkdown,
+  formatLayerComparisonMarkdown,
+} from "./commands/llm-benchmark.js";
+export type { LlmBenchmarkSnapshot, LlmCaseResult } from "./commands/llm-benchmark.js";
 
 // ─── Config Sharing & Policy ─────────────────────────────────────────────────
 export {

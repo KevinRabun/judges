@@ -610,7 +610,7 @@ interface CommentMeta {
 
 function parseCommentMeta(comment: ReviewComment): CommentMeta | undefined {
   // Body format: `🔴 **CRITICAL** — Title here (\`RULE-001\`)`
-  const match = comment.body.match(/\*\*(\w+)\*\*\s*—\s*([^(`]+)\(`([^`]+)`\)/);
+  const match = comment.body.match(/\*\*(\w+)\*\*\s*\u2014([^(`]+)\(`([^`]+)`\)/);
   if (!match) return undefined;
   return {
     severity: match[1].toLowerCase(),

@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeIntentAlignment } from "../evaluators/intent-alignment.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const intentAlignmentJudge: JudgeDefinition = {
   id: "intent-alignment",
@@ -30,4 +32,7 @@ Each finding must include:
 - The specific function/method name and its declared intent
 - What the implementation actually does (or doesn't do)
 - A concrete recommendation for fixing the gap`,
+  analyze: analyzeIntentAlignment,
 };
+
+defaultRegistry.register(intentAlignmentJudge);

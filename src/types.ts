@@ -79,6 +79,21 @@ export interface Finding {
    * e.g. "LLM01: Prompt Injection", "LLM02: Insecure Output Handling"
    */
   owaspLlmTop10?: string;
+  /**
+   * CWE identifiers associated with this finding.
+   * e.g. ["CWE-79", "CWE-89"]
+   */
+  cweIds?: string[];
+  /**
+   * OWASP Top 10 identifiers associated with this finding.
+   * e.g. ["A03:2021"]
+   */
+  owaspIds?: string[];
+  /**
+   * URL for "Learn More" — links to documentation explaining this finding
+   * category, remediation strategies, and real-world examples.
+   */
+  learnMoreUrl?: string;
 }
 
 /**
@@ -295,6 +310,47 @@ export interface JudgesConfig {
    * ```
    */
   customRules?: CustomRule[];
+  /**
+   * Org-level policy: rules that child configs cannot un-disable or suppress.
+   * When set in a parent config (via `extends`), downstream `.judgesrc` files
+   * cannot remove these from `disabledRules` — they are always enabled.
+   *
+   * Example: `{ "lockedRules": ["SEC-001", "SEC-003"] }`
+   */
+  lockedRules?: string[];
+  /**
+   * Org-level policy: judges that child configs cannot disable.
+   * When set in a parent config, these judges will always run regardless
+   * of `disabledJudges` in child configs.
+   *
+   * Example: `{ "lockedJudges": ["cybersecurity", "compliance"] }`
+   */
+  lockedJudges?: string[];
+  /**
+   * Org-level policy: minimum severity floor that child configs cannot relax.
+   * A child config can set a stricter `minSeverity` but not a more lenient one.
+   *
+   * Example: `{ "lockedMinSeverity": "medium" }` prevents children from
+   * setting `minSeverity: "low"` or `minSeverity: "info"`.
+   */
+  lockedMinSeverity?: Severity;
+  /**
+   * Data adapter configuration. Judges never directly hosts or processes
+   * user data — this setting lets users point to their own backend.
+   *
+   * - `"filesystem"` (default): reads/writes local `.judges-*.json` files
+   * - `"http"`: sends data to a user-hosted REST endpoint
+   *
+   * Example:
+   * ```json
+   * { "dataAdapter": { "type": "http", "url": "https://my-judges-backend.internal/api" } }
+   * ```
+   */
+  dataAdapter?: {
+    type: "filesystem" | "http";
+    url?: string;
+    headers?: Record<string, string>;
+  };
 }
 
 /**
@@ -660,6 +716,22 @@ export interface TribunalVerdict {
    * act as a primary code reviewer rather than just a warning list.
    */
   reviewDecision?: ReviewDecision;
+  /**
+   * AI model detection escalation. Present when the model-fingerprint judge
+   * detects AI-generated code patterns (MFPR-* rules). Downstream consumers
+   * can use this to trigger deeper review, require human sign-off, or add
+   * provenance annotations to PRs.
+   */
+  aiEscalation?: {
+    /** Whether AI-generated code was detected */
+    detected: boolean;
+    /** Detected model(s) with confidence scores */
+    models: Array<{ model: string; confidence: number }>;
+    /** Rule IDs that triggered the detection */
+    triggerRules: string[];
+    /** Recommended action */
+    recommendation: string;
+  };
 }
 
 /**

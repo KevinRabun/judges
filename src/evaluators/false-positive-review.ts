@@ -871,10 +871,10 @@ function getFpReason(
   }
 
   // ── 9. Web-only rules on non-web code ──
-  // Accessibility and UX rendering rules are only meaningful on files
-  // that contain web-facing patterns (HTML, JSX, routes, templates, CSS, or HTTP API responses).
-  // I18N is NOT web-only — locale formatting (currency, dates, numbers) applies to any user-facing code.
-  const WEB_ONLY_PREFIXES = ["A11Y-", "UX-"];
+  // Accessibility, UX rendering, and internationalization rules are only
+  // meaningful on files that contain web-facing patterns (HTML, JSX, routes,
+  // templates, CSS, or HTTP API responses).
+  const WEB_ONLY_PREFIXES = ["A11Y-", "UX-", "I18N-"];
   const isWebOnly = WEB_ONLY_PREFIXES.some((p) => finding.ruleId.startsWith(p));
   if (isWebOnly) {
     const hasWebPatterns =

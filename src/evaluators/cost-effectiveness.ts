@@ -500,7 +500,7 @@ export function analyzeCostEffectiveness(code: string, language: string): Findin
   const isReactFile = testCode(code, /import\s+.*(?:React|useState|useEffect)\s+from|from\s+['"]react['"]/i);
   if (inlineObjLines.length > 5 && isReactFile) {
     findings.push({
-      ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+      ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
       severity: "low",
       title: "Inline objects/functions in JSX props cause re-renders",
       description: `Found ${inlineObjLines.length} inline object or function expressions in JSX props. Each creates a new reference on every render, defeating React.memo and causing unnecessary child re-renders.`,

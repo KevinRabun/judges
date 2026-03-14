@@ -12,6 +12,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import type { Finding, Severity } from "../types.js";
+import { getDataAdapter, type DataAdapter, type SnapshotData } from "../data-adapter.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -108,6 +109,26 @@ export function loadSnapshotStore(filePath: string): SnapshotStore {
 export function saveSnapshotStore(store: SnapshotStore, filePath: string): void {
   store.metadata.lastUpdated = new Date().toISOString();
   writeFileSync(filePath, JSON.stringify(store, null, 2), "utf-8");
+}
+
+/**
+ * Load snapshot store via the configured DataAdapter.
+ */
+export async function loadSnapshotsViaAdapter(projectDir: string, adapter?: DataAdapter): Promise<SnapshotData> {
+  const da = adapter ?? getDataAdapter();
+  return da.loadSnapshots(projectDir);
+}
+
+/**
+ * Save snapshot store via the configured DataAdapter.
+ */
+export async function saveSnapshotsViaAdapter(
+  data: SnapshotData,
+  projectDir: string,
+  adapter?: DataAdapter,
+): Promise<void> {
+  const da = adapter ?? getDataAdapter();
+  return da.saveSnapshots(data, projectDir);
 }
 
 // ─── Recording ──────────────────────────────────────────────────────────────
@@ -516,4 +537,109 @@ export function computeMetrics(store: SnapshotStore): MetricsSummary {
     resolvedRules,
     newRules,
   };
+}
+
+// ─── Regression Detection ───────────────────────────────────────────────────
+
+export interface RegressionAlert {
+  type: "spike" | "new-critical" | "trend-reversal" | "new-rule";
+  severity: "error" | "warning" | "info";
+  message: string;
+  detail: string;
+}
+
+/**
+ * Detect regressions by comparing the latest snapshot against recent history.
+ * Returns alerts that can be surfaced in CI, CLI, or IDE.
+ */
+export function detectRegressions(
+  store: SnapshotStore,
+  options?: { spikeThreshold?: number; windowSize?: number },
+): RegressionAlert[] {
+  const alerts: RegressionAlert[] = [];
+  if (store.snapshots.length < 2) return alerts;
+
+  const sorted = [...store.snapshots].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const latest = sorted[sorted.length - 1];
+  const previous = sorted[sorted.length - 2];
+
+  const spikeThreshold = options?.spikeThreshold ?? 0.2; // 20% increase
+  const windowSize = Math.min(options?.windowSize ?? 5, sorted.length - 1);
+  const window = sorted.slice(-windowSize - 1, -1);
+  const windowAvg = window.reduce((s, snap) => s + snap.totalFindings, 0) / window.length;
+
+  // Spike detection: significant increase vs recent average
+  if (windowAvg > 0 && latest.totalFindings > windowAvg * (1 + spikeThreshold)) {
+    const increase = Math.round(((latest.totalFindings - windowAvg) / windowAvg) * 100);
+    alerts.push({
+      type: "spike",
+      severity: "error",
+      message: `Finding count spiked ${increase}% above recent average`,
+      detail: `Current: ${latest.totalFindings}, avg of last ${windowSize}: ${Math.round(windowAvg)}`,
+    });
+  }
+
+  // New critical/high findings introduced
+  const prevCritHigh = (previous.bySeverity.critical ?? 0) + (previous.bySeverity.high ?? 0);
+  const currCritHigh = (latest.bySeverity.critical ?? 0) + (latest.bySeverity.high ?? 0);
+  if (currCritHigh > prevCritHigh) {
+    alerts.push({
+      type: "new-critical",
+      severity: "error",
+      message: `${currCritHigh - prevCritHigh} new critical/high finding(s) introduced`,
+      detail:
+        `Critical: ${previous.bySeverity.critical ?? 0}→${latest.bySeverity.critical ?? 0}, ` +
+        `High: ${previous.bySeverity.high ?? 0}→${latest.bySeverity.high ?? 0}`,
+    });
+  }
+
+  // Trend reversal: was improving but latest run shows increase
+  if (sorted.length >= 4) {
+    const recent3 = sorted.slice(-4, -1);
+    const wasImproving = recent3.every((s, i) => i === 0 || s.totalFindings <= recent3[i - 1].totalFindings);
+    if (wasImproving && latest.totalFindings > previous.totalFindings) {
+      alerts.push({
+        type: "trend-reversal",
+        severity: "warning",
+        message: "Improving trend reversed — findings increasing again",
+        detail: `Previous 3 runs showed improvement, but latest run has ${latest.totalFindings} (was ${previous.totalFindings})`,
+      });
+    }
+  }
+
+  // New rules not seen before
+  const allPreviousRules = new Set<string>();
+  for (const snap of sorted.slice(0, -1)) {
+    for (const r of snap.ruleIds) allPreviousRules.add(r);
+  }
+  const newRules = latest.ruleIds.filter((r) => !allPreviousRules.has(r));
+  if (newRules.length > 0) {
+    alerts.push({
+      type: "new-rule",
+      severity: "info",
+      message: `${newRules.length} new rule(s) triggered for first time`,
+      detail: `New rules: ${newRules.slice(0, 5).join(", ")}${newRules.length > 5 ? ` (+${newRules.length - 5} more)` : ""}`,
+    });
+  }
+
+  return alerts;
+}
+
+/**
+ * Format regression alerts for CLI/CI output.
+ */
+export function formatRegressionAlerts(alerts: RegressionAlert[]): string {
+  if (alerts.length === 0) return "  ✅ No regressions detected.\n";
+
+  const lines: string[] = [];
+  lines.push("  ⚠️  Regression Alerts:");
+  lines.push("  " + "─".repeat(58));
+
+  for (const a of alerts) {
+    const icon = a.severity === "error" ? "🔴" : a.severity === "warning" ? "🟡" : "🔵";
+    lines.push(`  ${icon} [${a.type}] ${a.message}`);
+    lines.push(`     ${a.detail}`);
+  }
+  lines.push("");
+  return lines.join("\n");
 }

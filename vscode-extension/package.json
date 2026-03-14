@@ -2,7 +2,7 @@
   "name": "judges-panel",
   "displayName": "Judges Panel",
   "description": "45 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.38.0",
+  "version": "3.40.0",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -101,6 +101,11 @@
         "icon": "$(wrench)"
       },
       {
+        "command": "judges.fixAll",
+        "title": "Judges: Accept All Safe Fixes",
+        "icon": "$(check-all)"
+      },
+      {
         "command": "judges.clearDiagnostics",
         "title": "Judges: Clear Diagnostics"
       },
@@ -131,6 +136,11 @@
         "command": "judges.deepReview",
         "title": "Judges: Deep Review (Layer 1 + Layer 2)",
         "icon": "$(rocket)"
+      },
+      {
+        "command": "judges.runLlmBenchmark",
+        "title": "Judges: Run LLM Benchmark",
+        "icon": "$(beaker)"
       },
       {
         "command": "judges.sortBySeverity",
@@ -171,6 +181,21 @@
         "command": "judges.filterMedium",
         "title": "Filter: Medium+",
         "icon": "$(info)"
+      },
+      {
+        "command": "judges.feedbackTp",
+        "title": "Judges: Mark as True Positive",
+        "icon": "$(thumbsup)"
+      },
+      {
+        "command": "judges.feedbackFp",
+        "title": "Judges: Mark as False Positive",
+        "icon": "$(thumbsdown)"
+      },
+      {
+        "command": "judges.feedbackWontfix",
+        "title": "Judges: Mark as Won't Fix",
+        "icon": "$(circle-slash)"
       }
     ],
     "menus": {
@@ -374,6 +399,10 @@
           {
             "name": "fix",
             "description": "Auto-fix all fixable findings in the current file"
+          },
+          {
+            "name": "benchmark",
+            "description": "Run LLM benchmark — evaluate all judges against test cases using the current model"
           },
           {
             "name": "help",

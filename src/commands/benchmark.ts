@@ -16,6 +16,8 @@ import { resolve, dirname } from "path";
 import { evaluateWithTribunal, evaluateWithJudge } from "../evaluators/index.js";
 import { getJudge, JUDGES } from "../judges/index.js";
 import type { Finding } from "../types.js";
+import type { LlmBenchmarkSnapshot } from "./llm-benchmark.js";
+import { formatLlmSnapshotMarkdown, formatLayerComparisonMarkdown } from "./llm-benchmark.js";
 import { EXPANDED_BENCHMARK_CASES } from "./benchmark-expanded.js";
 import { EXPANDED_BENCHMARK_CASES_2 } from "./benchmark-expanded-2.js";
 import { BENCHMARK_SECURITY_DEEP } from "./benchmark-security-deep.js";
@@ -2819,7 +2821,7 @@ export function formatBenchmarkReport(result: BenchmarkResult): string {
 
 // ─── Markdown Report for GitHub Publishing ─────────────────────────────────
 
-export function formatBenchmarkMarkdown(result: BenchmarkResult): string {
+export function formatBenchmarkMarkdown(result: BenchmarkResult, llmSnapshot?: LlmBenchmarkSnapshot): string {
   const lines: string[] = [];
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
   const grade =
@@ -2837,6 +2839,56 @@ export function formatBenchmarkMarkdown(result: BenchmarkResult): string {
   lines.push("# Judges Panel — Benchmark Report");
   lines.push("");
   lines.push(`> Auto-generated on ${result.timestamp} · v${result.version}`);
+  lines.push("");
+
+  // ── Methodology ──
+  lines.push("## How to Read This Report");
+  lines.push("");
+  lines.push("The Judges Panel uses a **dual-layer architecture** for code analysis:");
+  lines.push("");
+  lines.push("### Layer 1 — Deterministic Analysis (Pattern Matching)");
+  lines.push("The first layer uses deterministic evaluators — regex patterns, AST analysis, and heuristic");
+  lines.push("rules — to identify code issues instantly, offline, and with zero LLM costs. Each of the 45");
+  lines.push("judges has a built-in `analyze()` function that scans code for known patterns. This layer is:");
+  lines.push("- **Fast** — millisecond response times");
+  lines.push("- **Reproducible** — same input always produces the same output");
+  lines.push("- **Free** — no API calls or external dependencies");
+  lines.push("");
+  lines.push("Layer 1 is benchmarked on every commit via automated CI.");
+  lines.push("");
+  lines.push("### Layer 2 — LLM Deep Review (AI-Powered Prompts)");
+  lines.push("The second layer uses expert persona prompts served via MCP (Model Context Protocol) to");
+  lines.push("LLM-based clients like GitHub Copilot and Claude Desktop. When invoked, the calling LLM");
+  lines.push("applies the judge's evaluation criteria to perform a deeper, context-aware analysis that can");
+  lines.push("catch issues pattern matching cannot — such as logical flaws, architectural concerns, and");
+  lines.push("nuanced security vulnerabilities.");
+  lines.push("");
+  lines.push("Layer 2 is benchmarked periodically by sending test cases to an LLM API and scoring the");
+  lines.push("results against expected findings. Because LLM outputs are probabilistic, L2 scores may");
+  lines.push("vary across runs and models.");
+  lines.push("");
+  lines.push("### Metrics Explained");
+  lines.push("| Metric | Description |");
+  lines.push("|--------|-------------|");
+  lines.push(
+    "| **Precision** | Of all findings reported, what percentage are real issues? Higher = fewer false alarms. |",
+  );
+  lines.push("| **Recall** | Of all known issues, what percentage are detected? Higher = fewer missed issues. |");
+  lines.push(
+    "| **F1 Score** | Harmonic mean of precision and recall — the single best indicator of overall accuracy. |",
+  );
+  lines.push("| **Detection Rate** | Percentage of test cases where at least one expected issue was found. |");
+  lines.push("| **FP Rate** | False Positive Rate — percentage of findings that are not real issues. |");
+  lines.push(
+    "| **Lenient matching** | A finding matches if its rule prefix matches (e.g., CYBER-005 matches expected CYBER-001). |",
+  );
+  lines.push("| **Strict matching** | A finding matches only with the exact rule ID. |");
+  lines.push("");
+  lines.push("---");
+  lines.push("");
+
+  // ── Layer 1 Results ──
+  lines.push("## Layer 1 — Deterministic Analysis");
   lines.push("");
 
   // Summary badges
@@ -2953,6 +3005,18 @@ export function formatBenchmarkMarkdown(result: BenchmarkResult): string {
       lines.push(`| ${c.caseId} | ${c.difficulty} | ${c.category} | ${missed} | ${fps} |`);
     }
     lines.push("");
+  }
+
+  // ── Layer 2 Results (if LLM snapshot available) ──
+  if (llmSnapshot) {
+    lines.push("---");
+    lines.push("");
+    lines.push(formatLlmSnapshotMarkdown(llmSnapshot));
+
+    // Layer comparison table
+    lines.push("---");
+    lines.push("");
+    lines.push(formatLayerComparisonMarkdown(result, llmSnapshot));
   }
 
   lines.push("---");
@@ -3127,6 +3191,20 @@ CI GATE OPTIONS:
       result = runBenchmarkSuite(undefined, judgeId);
     }
 
+    // Load LLM snapshot if available
+    let llmSnapshot: LlmBenchmarkSnapshot | undefined;
+    const llmSnapshotPath = resolve("benchmarks/llm-snapshot-latest.json");
+    if (existsSync(llmSnapshotPath)) {
+      try {
+        llmSnapshot = JSON.parse(readFileSync(llmSnapshotPath, "utf-8"));
+        console.log(
+          `  Loaded LLM benchmark snapshot: ${llmSnapshot!.model} (${new Date(llmSnapshot!.timestamp).toLocaleDateString()})`,
+        );
+      } catch {
+        /* ignore malformed snapshot */
+      }
+    }
+
     if (reportFormat === "json") {
       const output = JSON.stringify(result, null, 2);
       if (reportOutputPath) {
@@ -3138,7 +3216,7 @@ CI GATE OPTIONS:
         console.log(output);
       }
     } else {
-      const md = formatBenchmarkMarkdown(result);
+      const md = formatBenchmarkMarkdown(result, llmSnapshot);
       if (reportOutputPath) {
         const rDir = dirname(resolve(reportOutputPath));
         if (!existsSync(rDir)) mkdirSync(rDir, { recursive: true });

@@ -41,7 +41,7 @@ function connect_db() {
   mysql -u root -p\${PASSWORD} -h \${DB_HOST}
 }
 
-eval "\$USER_INPUT"
+eval "$USER_INPUT"
 
 connect_db
 `;

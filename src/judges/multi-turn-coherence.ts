@@ -1,4 +1,6 @@
 import type { JudgeDefinition } from "../types.js";
+import { analyzeMultiTurnCoherence } from "../evaluators/multi-turn-coherence.js";
+import { defaultRegistry } from "../judge-registry.js";
 
 export const multiTurnCoherenceJudge: JudgeDefinition = {
   id: "multi-turn-coherence",
@@ -28,4 +30,7 @@ SEVERITY MAPPING:
 ADVERSARIAL MANDATE:
 - Treat every contradiction as a potential logic bug.
 - Do NOT assume dead code is intentionally left for debugging.`,
+  analyze: analyzeMultiTurnCoherence,
 };
+
+defaultRegistry.register(multiTurnCoherenceJudge);

@@ -189,7 +189,7 @@ const SECURITY_DELETION_PATTERNS: Array<{ pattern: RegExp; label: string; descri
  * Analyze removed lines for security-relevant deletions.
  * Returns findings for patterns that were deleted from the codebase.
  */
-function analyzeDeletions(removedLines: string[], filePath: string): Finding[] {
+function analyzeDeletions(removedLines: string[], _filePath: string): Finding[] {
   if (removedLines.length === 0) return [];
   const findings: Finding[] = [];
   const combinedRemoved = removedLines.join("\n");
@@ -247,8 +247,13 @@ function extractExportedSignatures(lines: string[]): Map<string, string> {
  */
 function countParams(paramStr: string): number {
   if (!paramStr.trim()) return 0;
-  // Handle generic type parameters by removing angle-bracket contents
-  const cleaned = paramStr.replace(/<[^>]*>/g, "");
+  // Handle generic type parameters by removing angle-bracket contents iteratively
+  let cleaned = paramStr;
+  let prev;
+  do {
+    prev = cleaned;
+    cleaned = cleaned.replace(/<[^>]*>/g, "");
+  } while (cleaned !== prev);
   return cleaned.split(",").length;
 }
 

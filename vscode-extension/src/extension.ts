@@ -5,6 +5,7 @@ import { JudgesCodeLensProvider } from "./codelens";
 import { JudgesFindingsPanel } from "./findings-panel";
 import { registerChatParticipant } from "./chat-participant";
 import { registerLmTools } from "./lm-tool";
+import { runLlmBenchmark, saveResultsToWorkspace } from "./llm-benchmark-runner";
 import type { Finding } from "@kevinrabun/judges/api";
 
 let diagnosticProvider: JudgesDiagnosticProvider;
@@ -98,6 +99,24 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }),
 
+    vscode.commands.registerCommand("judges.fixAll", async () => {
+      const result = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Judges: Applying all safe fixes…",
+          cancellable: false,
+        },
+        () => diagnosticProvider.fixAll(),
+      );
+      if (result.applied > 0) {
+        vscode.window.showInformationMessage(
+          `Judges: Applied ${result.applied} fix(es) across ${result.files} file(s).`,
+        );
+      } else {
+        vscode.window.showInformationMessage("Judges: No auto-fixable findings across open files.");
+      }
+    }),
+
     vscode.commands.registerCommand("judges.clearDiagnostics", () => {
       diagnosticCollection.clear();
       findingsPanel.clearAll();
@@ -165,6 +184,76 @@ export function activate(context: vscode.ExtensionContext): void {
       );
 
       cts.dispose();
+    }),
+
+    vscode.commands.registerCommand("judges.runLlmBenchmark", async () => {
+      const cts = new vscode.CancellationTokenSource();
+      const storageUri = context.globalStorageUri;
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Judges: Running LLM Benchmark…",
+          cancellable: true,
+        },
+        async (progress, progressToken) => {
+          progressToken.onCancellationRequested(() => cts.cancel());
+
+          try {
+            const result = await runLlmBenchmark(
+              cts.token,
+              (p) => {
+                progress.report({
+                  message: `[${p.completed}/${p.total}] ${p.message}`,
+                  increment: p.total > 0 ? (1 / p.total) * 100 : undefined,
+                });
+              },
+              storageUri,
+            );
+
+            if (cts.token.isCancellationRequested) {
+              vscode.window.showInformationMessage("Judges: LLM Benchmark cancelled — partial results saved.");
+              return;
+            }
+
+            // Open the report in a new markdown preview tab
+            const doc = await vscode.workspace.openTextDocument({
+              content: result.reportMarkdown,
+              language: "markdown",
+            });
+            await vscode.window.showTextDocument(doc, { preview: true });
+
+            const f1 = result.perJudge ? `Per-Judge F1: ${(result.perJudge.f1Score * 100).toFixed(1)}%` : "";
+            const f1t = result.tribunal ? `Tribunal F1: ${(result.tribunal.f1Score * 100).toFixed(1)}%` : "";
+
+            const action = await vscode.window.showInformationMessage(
+              `Judges: LLM Benchmark complete. ${[f1, f1t].filter(Boolean).join(" · ")}`,
+              "Save to Workspace",
+            );
+
+            if (action === "Save to Workspace") {
+              const reportUri = await saveResultsToWorkspace(storageUri);
+              if (reportUri) {
+                vscode.window.showInformationMessage("Benchmark results saved to benchmarks/ — ready to commit.");
+              }
+            }
+          } catch (error) {
+            if (error instanceof vscode.CancellationError) return;
+            vscode.window.showErrorMessage(
+              `Judges: LLM Benchmark failed — ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        },
+      );
+
+      cts.dispose();
+    }),
+
+    vscode.commands.registerCommand("judges.saveBenchmarkToWorkspace", async () => {
+      const reportUri = await saveResultsToWorkspace(context.globalStorageUri);
+      if (reportUri) {
+        vscode.window.showInformationMessage("Benchmark results saved to benchmarks/ — ready to commit.");
+      }
     }),
 
     vscode.commands.registerCommand("judges.showPanel", () => {
@@ -262,6 +351,67 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("judges.configureMcp", () => configureMcpManually()),
 
     vscode.commands.registerCommand("judges.addCiWorkflow", () => addCiWorkflow()),
+
+    // ─── Feedback Commands (Thumbs Up/Down) ──────────────────────────────
+    vscode.commands.registerCommand(
+      "judges.feedbackTp",
+      async (ruleId: string, uri: vscode.Uri, line: number, finding?: Finding) => {
+        await recordFeedbackEntry(uri, ruleId, "tp", line, finding);
+        vscode.window.showInformationMessage(`Judges: Marked ${ruleId} as true positive ✓`);
+      },
+    ),
+
+    vscode.commands.registerCommand(
+      "judges.feedbackFp",
+      async (ruleId: string, uri: vscode.Uri, line: number, finding?: Finding) => {
+        const comment = await vscode.window.showInputBox({
+          prompt: `Why is ${ruleId} a false positive here? (optional)`,
+          placeHolder: "Brief explanation…",
+        });
+        await recordFeedbackEntry(uri, ruleId, "fp", line, finding, comment);
+        vscode.window.showInformationMessage(`Judges: Marked ${ruleId} as false positive ✓`);
+      },
+    ),
+
+    vscode.commands.registerCommand(
+      "judges.feedbackWontfix",
+      async (ruleId: string, uri: vscode.Uri, line: number, finding?: Finding) => {
+        await recordFeedbackEntry(uri, ruleId, "wontfix", line, finding);
+        vscode.window.showInformationMessage(`Judges: Marked ${ruleId} as won't fix ✓`);
+      },
+    ),
+
+    // ─── Preview Fix Diff Command ──────────────────────────────────────
+    vscode.commands.registerCommand(
+      "judges.previewFixDiff",
+      async (uri: vscode.Uri, _range: vscode.Range, oldText: string, newText: string, ruleId: string) => {
+        const doc = await vscode.workspace.openTextDocument(uri);
+        const originalContent = doc.getText();
+        const fixedContent = originalContent.replace(oldText, newText);
+
+        // Create virtual documents for diff view
+        const originalUri = vscode.Uri.parse(`judges-original:${uri.path}?${Date.now()}`);
+        const fixedUri = vscode.Uri.parse(`judges-fixed:${uri.path}?${Date.now()}`);
+
+        const provider = new (class implements vscode.TextDocumentContentProvider {
+          provideTextDocumentContent(u: vscode.Uri): string {
+            return u.scheme === "judges-original" ? originalContent : fixedContent;
+          }
+        })();
+
+        context.subscriptions.push(
+          vscode.workspace.registerTextDocumentContentProvider("judges-original", provider),
+          vscode.workspace.registerTextDocumentContentProvider("judges-fixed", provider),
+        );
+
+        await vscode.commands.executeCommand(
+          "vscode.diff",
+          originalUri,
+          fixedUri,
+          `Fix Preview: ${ruleId} — ${vscode.workspace.asRelativePath(uri)}`,
+        );
+      },
+    ),
   );
 
   // ─── Code Action Provider ────────────────────────────────────────────
@@ -485,6 +635,59 @@ async function configureMcpManually(): Promise<void> {
   await vscode.workspace.fs.writeFile(mcpJsonUri, content);
 
   vscode.window.showInformationMessage("Judges: MCP server configured in .vscode/mcp.json ✓");
+}
+
+// ─── Feedback Persistence ─────────────────────────────────────────────────
+
+/**
+ * Record a feedback entry to the local .judges-feedback.json.
+ * Uses the data adapter pattern — judges never hosts user data;
+ * data stays in the user's project directory.
+ */
+async function recordFeedbackEntry(
+  uri: vscode.Uri,
+  ruleId: string,
+  verdict: "tp" | "fp" | "wontfix",
+  line: number,
+  finding?: Finding,
+  comment?: string,
+): Promise<void> {
+  const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+  const projectDir = workspaceFolder?.uri.fsPath ?? ".";
+  const feedbackFile = vscode.Uri.joinPath(vscode.Uri.file(projectDir), ".judges-feedback.json");
+
+  let store: {
+    version: 1;
+    entries: Array<Record<string, unknown>>;
+    metadata: { createdAt: string; lastUpdated: string; totalSubmissions: number };
+  };
+  try {
+    const raw = await vscode.workspace.fs.readFile(feedbackFile);
+    store = JSON.parse(Buffer.from(raw).toString("utf8"));
+  } catch {
+    const now = new Date().toISOString();
+    store = {
+      version: 1,
+      entries: [],
+      metadata: { createdAt: now, lastUpdated: now, totalSubmissions: 0 },
+    };
+  }
+
+  store.entries.push({
+    ruleId,
+    verdict,
+    filePath: vscode.workspace.asRelativePath(uri),
+    timestamp: new Date().toISOString(),
+    title: finding?.title,
+    severity: finding?.severity,
+    source: "manual",
+    ...(comment ? { comment } : {}),
+  });
+  store.metadata.totalSubmissions = store.entries.length;
+  store.metadata.lastUpdated = new Date().toISOString();
+
+  const content = Buffer.from(JSON.stringify(store, null, 2) + "\n", "utf8");
+  await vscode.workspace.fs.writeFile(feedbackFile, content);
 }
 
 // ─── CI Workflow Generation ───────────────────────────────────────────────

@@ -5630,8 +5630,8 @@ describe("getContextWindow — basic behavior", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("JUDGES array — count matches documentation", () => {
-  it("should contain exactly 44 judges", () => {
-    assert.equal(JUDGES.length, 44, `Expected 44 judges, got ${JUDGES.length}`);
+  it("should contain exactly 45 judges", () => {
+    assert.equal(JUDGES.length, 45, `Expected 45 judges, got ${JUDGES.length}`);
   });
 
   it("every judge should have an id, name, domain, and description", () => {
@@ -11381,5 +11381,322 @@ describe("Review Completeness — assessReviewCompleteness", () => {
     };
     const completeness = assessReviewCompleteness(prFiles, result);
     assert.strictEqual(completeness.status, "complete", "Non-code PR should be complete");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LLM Benchmark — rule ID parsing, prompt construction, scoring, sampling
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("LLM Benchmark — parseLlmRuleIds", () => {
+  it("extracts standard rule IDs from LLM response text", async () => {
+    const { parseLlmRuleIds } = await import("../src/commands/llm-benchmark.js");
+    const response = `
+**CYBER-001** (critical): SQL injection vulnerability found on line 5.
+The query uses string concatenation with user input.
+
+**SEC-003** (high): Missing input validation on req.body.term.
+    `;
+    const ids = parseLlmRuleIds(response);
+    assert.ok(ids.includes("CYBER-001"), "should find CYBER-001");
+    assert.ok(ids.includes("SEC-003"), "should find SEC-003");
+    assert.strictEqual(ids.length, 2, "should find exactly 2 rule IDs");
+  });
+
+  it("extracts rule IDs from various markdown formats", async () => {
+    const { parseLlmRuleIds } = await import("../src/commands/llm-benchmark.js");
+    const response = `
+### CYBER-001: SQL Injection
+- AUTH-002 — Missing authentication check
+Rule ID: DATA-005
+\`PERF-003\` performance issue
+    `;
+    const ids = parseLlmRuleIds(response);
+    assert.ok(ids.includes("CYBER-001"));
+    assert.ok(ids.includes("AUTH-002"));
+    assert.ok(ids.includes("DATA-005"));
+    assert.ok(ids.includes("PERF-003"));
+    assert.strictEqual(ids.length, 4);
+  });
+
+  it("deduplicates repeated rule IDs", async () => {
+    const { parseLlmRuleIds } = await import("../src/commands/llm-benchmark.js");
+    const response = "CYBER-001 found. Also CYBER-001 again. And CYBER-001 once more.";
+    const ids = parseLlmRuleIds(response);
+    assert.strictEqual(ids.length, 1);
+    assert.strictEqual(ids[0], "CYBER-001");
+  });
+
+  it("returns empty array for responses without rule IDs", async () => {
+    const { parseLlmRuleIds } = await import("../src/commands/llm-benchmark.js");
+    const response = "The code looks good. No issues found. Score: 95/100. Verdict: PASS.";
+    const ids = parseLlmRuleIds(response);
+    assert.strictEqual(ids.length, 0);
+  });
+});
+
+describe("LLM Benchmark — constructPerJudgePrompt", () => {
+  it("produces a prompt containing the judge systemPrompt and code", async () => {
+    const { constructPerJudgePrompt } = await import("../src/commands/llm-benchmark.js");
+    const judge = {
+      id: "test-judge",
+      name: "Judge Test",
+      domain: "Testing",
+      description: "A test judge",
+      rulePrefix: "TST",
+      tableDescription: "testing",
+      promptDescription: "test review",
+      systemPrompt: "You are Judge Test — an expert in testing.",
+    };
+    const prompt = constructPerJudgePrompt(judge, "const x = 1;", "typescript");
+    assert.ok(prompt.includes("You are Judge Test"), "should include judge systemPrompt");
+    assert.ok(prompt.includes("const x = 1;"), "should include the code");
+    assert.ok(prompt.includes("typescript"), "should include the language");
+    assert.ok(prompt.includes("TST-"), "should include the rule prefix");
+    assert.ok(prompt.includes("PRECISION MANDATE"), "should include precision mandate");
+  });
+});
+
+describe("LLM Benchmark — constructTribunalPrompt", () => {
+  it("produces a prompt with all judges and shared mandates", async () => {
+    const { constructTribunalPrompt } = await import("../src/commands/llm-benchmark.js");
+    const prompt = constructTribunalPrompt("const x = 1;", "javascript");
+    assert.ok(prompt.includes("Judges Panel"), "should reference the panel");
+    assert.ok(prompt.includes("ADVERSARIAL MANDATE"), "should include adversarial mandate");
+    assert.ok(prompt.includes("PRECISION MANDATE"), "should include precision mandate");
+    assert.ok(prompt.includes("const x = 1;"), "should include the code");
+    assert.ok(prompt.includes("javascript"), "should include the language");
+    // Should reference multiple judges
+    assert.ok(prompt.includes("CYBER-"), "should reference cybersecurity prefix");
+    assert.ok(prompt.includes("AUTH-"), "should reference auth prefix");
+  });
+});
+
+describe("LLM Benchmark — selectStratifiedSample", () => {
+  it("returns all cases when target >= total", async () => {
+    const { selectStratifiedSample } = await import("../src/commands/llm-benchmark.js");
+    const cases = [
+      {
+        id: "a",
+        description: "",
+        language: "ts",
+        code: "",
+        expectedRuleIds: ["X-001"],
+        category: "cat1",
+        difficulty: "easy" as const,
+      },
+      {
+        id: "b",
+        description: "",
+        language: "ts",
+        code: "",
+        expectedRuleIds: ["X-002"],
+        category: "cat2",
+        difficulty: "medium" as const,
+      },
+    ];
+    const result = selectStratifiedSample(cases, 10);
+    assert.strictEqual(result.length, 2, "should return all cases");
+  });
+
+  it("samples across categories and difficulties", async () => {
+    const { selectStratifiedSample } = await import("../src/commands/llm-benchmark.js");
+    const cases = [];
+    for (let i = 0; i < 100; i++) {
+      cases.push({
+        id: `case-${i}`,
+        description: "",
+        language: "ts",
+        code: "",
+        expectedRuleIds: ["X-001"],
+        category: i < 50 ? "catA" : "catB",
+        difficulty: (i % 3 === 0 ? "easy" : i % 3 === 1 ? "medium" : "hard") as "easy" | "medium" | "hard",
+      });
+    }
+    const result = selectStratifiedSample(cases, 20);
+    assert.ok(result.length <= 20, "should not exceed target size");
+    assert.ok(result.length >= 4, "should have at least a few cases");
+    // Should have cases from both categories
+    const cats = new Set(result.map((c) => c.category));
+    assert.ok(cats.has("catA"), "should include catA");
+    assert.ok(cats.has("catB"), "should include catB");
+  });
+});
+
+describe("LLM Benchmark — scoreLlmCase", () => {
+  it("scores a case with correct detections as passed", async () => {
+    const { scoreLlmCase } = await import("../src/commands/llm-benchmark.js");
+    const tc = {
+      id: "test-1",
+      description: "test",
+      language: "ts",
+      code: "",
+      expectedRuleIds: ["CYBER-001", "SEC-001"],
+      category: "injection",
+      difficulty: "easy" as const,
+    };
+    const result = scoreLlmCase(tc, ["CYBER-005", "SEC-002"], "some response");
+    assert.strictEqual(result.passed, true, "should pass with prefix matches");
+    assert.strictEqual(result.missedRuleIds.length, 0, "should have no misses");
+  });
+
+  it("scores a case with partial detections as passed", async () => {
+    const { scoreLlmCase } = await import("../src/commands/llm-benchmark.js");
+    const tc = {
+      id: "test-2",
+      description: "test",
+      language: "ts",
+      code: "",
+      expectedRuleIds: ["CYBER-001", "AUTH-001"],
+      category: "injection",
+      difficulty: "easy" as const,
+    };
+    const result = scoreLlmCase(tc, ["CYBER-003"], "some response");
+    assert.strictEqual(result.passed, true, "should pass with at least one match");
+    assert.strictEqual(result.missedRuleIds.length, 1, "should have one miss");
+    assert.ok(result.missedRuleIds.includes("AUTH-001"));
+  });
+
+  it("scores a case with no detections as failed", async () => {
+    const { scoreLlmCase } = await import("../src/commands/llm-benchmark.js");
+    const tc = {
+      id: "test-3",
+      description: "test",
+      language: "ts",
+      code: "",
+      expectedRuleIds: ["CYBER-001"],
+      category: "injection",
+      difficulty: "easy" as const,
+    };
+    const result = scoreLlmCase(tc, [], "No issues found.");
+    assert.strictEqual(result.passed, false, "should fail with no matches");
+    assert.strictEqual(result.missedRuleIds.length, 1);
+  });
+
+  it("scores clean cases correctly", async () => {
+    const { scoreLlmCase } = await import("../src/commands/llm-benchmark.js");
+    const tc = {
+      id: "clean-1",
+      description: "clean code",
+      language: "ts",
+      code: "",
+      expectedRuleIds: [],
+      category: "clean",
+      difficulty: "easy" as const,
+    };
+    const cleanResult = scoreLlmCase(tc, [], "No issues found.");
+    assert.strictEqual(cleanResult.passed, true, "clean case with no findings should pass");
+
+    const fpResult = scoreLlmCase({ ...tc, unexpectedRuleIds: ["CYBER-001"] }, ["CYBER-005"], "Found CYBER-005");
+    assert.strictEqual(fpResult.passed, false, "clean case with unexpected findings should fail");
+  });
+});
+
+describe("LLM Benchmark — computeLlmMetrics", () => {
+  it("computes aggregate metrics from case results", async () => {
+    const { computeLlmMetrics } = await import("../src/commands/llm-benchmark.js");
+    const cases = [
+      {
+        caseId: "c1",
+        category: "injection",
+        difficulty: "easy",
+        passed: true,
+        expectedRuleIds: ["CYBER-001"],
+        detectedRuleIds: ["CYBER-001"],
+        missedRuleIds: [],
+        falsePositiveRuleIds: [],
+        rawResponse: "found",
+      },
+      {
+        caseId: "c2",
+        category: "auth",
+        difficulty: "medium",
+        passed: false,
+        expectedRuleIds: ["AUTH-001"],
+        detectedRuleIds: [],
+        missedRuleIds: ["AUTH-001"],
+        falsePositiveRuleIds: [],
+        rawResponse: "nothing",
+      },
+    ];
+    const snapshot = computeLlmMetrics(cases, "3.38.0", "gpt-4o", "openai", "tribunal", 60);
+    assert.strictEqual(snapshot.totalCases, 2);
+    assert.strictEqual(snapshot.detected, 1);
+    assert.strictEqual(snapshot.truePositives, 1);
+    assert.strictEqual(snapshot.falseNegatives, 1);
+    assert.strictEqual(snapshot.falsePositives, 0);
+    assert.ok(snapshot.precision > 0, "precision should be positive");
+    assert.ok(snapshot.recall > 0, "recall should be positive");
+    assert.ok(snapshot.f1Score > 0, "F1 should be positive");
+    assert.strictEqual(snapshot.model, "gpt-4o");
+    assert.strictEqual(snapshot.provider, "openai");
+    assert.ok(snapshot.perCategory["injection"], "should have injection category");
+    assert.ok(snapshot.perCategory["auth"], "should have auth category");
+  });
+});
+
+describe("LLM Benchmark — formatLlmSnapshotMarkdown", () => {
+  it("produces markdown with model info and metrics", async () => {
+    const { formatLlmSnapshotMarkdown, computeLlmMetrics } = await import("../src/commands/llm-benchmark.js");
+    const cases = [
+      {
+        caseId: "c1",
+        category: "injection",
+        difficulty: "easy",
+        passed: true,
+        expectedRuleIds: ["CYBER-001"],
+        detectedRuleIds: ["CYBER-001"],
+        missedRuleIds: [],
+        falsePositiveRuleIds: [],
+        rawResponse: "found",
+      },
+    ];
+    const snapshot = computeLlmMetrics(cases, "3.38.0", "gpt-4o", "openai", "tribunal", 30);
+    const md = formatLlmSnapshotMarkdown(snapshot);
+    assert.ok(md.includes("Layer 2"), "should have Layer 2 heading");
+    assert.ok(md.includes("gpt-4o"), "should mention the model");
+    assert.ok(md.includes("Detection Rate"), "should include metrics");
+  });
+});
+
+describe("LLM Benchmark — formatLayerComparisonMarkdown", () => {
+  it("produces a comparison table with both layers", async () => {
+    const { formatLayerComparisonMarkdown } = await import("../src/commands/llm-benchmark.js");
+    const l1 = {
+      detectionRate: 0.99,
+      precision: 0.97,
+      recall: 0.96,
+      f1Score: 0.965,
+      falsePositives: 0,
+      totalCases: 1048,
+    };
+    const l2 = {
+      timestamp: new Date().toISOString(),
+      version: "3.38.0",
+      model: "gpt-4o",
+      provider: "openai",
+      promptMode: "tribunal" as const,
+      totalCases: 100,
+      detected: 85,
+      missed: 15,
+      totalExpected: 200,
+      truePositives: 170,
+      falseNegatives: 30,
+      falsePositives: 10,
+      precision: 0.944,
+      recall: 0.85,
+      f1Score: 0.895,
+      detectionRate: 0.85,
+      perCategory: {},
+      perJudge: {},
+      perDifficulty: {},
+      cases: [],
+      durationSeconds: 300,
+    };
+    const md = formatLayerComparisonMarkdown(l1, l2);
+    assert.ok(md.includes("Layer Comparison"), "should have comparison heading");
+    assert.ok(md.includes("L1 (Deterministic)"), "should label L1");
+    assert.ok(md.includes("gpt-4o"), "should label L2 with model");
+    assert.ok(md.includes("complementary"), "should explain layers are complementary");
   });
 });

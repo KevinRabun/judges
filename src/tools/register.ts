@@ -8,10 +8,11 @@ import { registerWorkflowTools } from "./register-workflow.js";
 import { registerFixTools } from "./register-fix.js";
 import { registerWorkspaceTools } from "./register-workspace.js";
 import { registerReviewTools } from "./register-review.js";
+import { registerScaffoldTools } from "./register-scaffold.js";
 
 /**
  * Register all MCP tools on the given server instance.
- * Delegates to focused modules for evaluation, workflow, fix, workspace, and review tools.
+ * Delegates to focused modules for evaluation, workflow, fix, workspace, review, and scaffold tools.
  */
 export function registerTools(server: McpServer): void {
   registerEvaluationTools(server);
@@ -19,4 +20,5 @@ export function registerTools(server: McpServer): void {
   registerFixTools(server);
   registerWorkspaceTools(server);
   registerReviewTools(server);
+  registerScaffoldTools(server);
 }

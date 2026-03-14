@@ -1,6 +1,6 @@
 {
   "name": "@kevinrabun/judges",
-  "version": "3.38.0",
+  "version": "3.40.0",
   "description": "45 specialized judges that evaluate AI-generated code for security, cost, and quality.",
   "mcpName": "io.github.KevinRabun/judges",
   "type": "module",
@@ -80,6 +80,7 @@
     "report:public-repo": "npx tsx scripts/generate-public-repo-report.ts",
     "report:quickstart": "npx tsx scripts/generate-public-repo-report.ts --quickStart",
     "automation:daily-popular": "npx tsx scripts/daily-popular-repo-autofix.ts",
+    "benchmark:llm": "npx tsx scripts/run-llm-benchmark.ts",
     "sync-docs": "npx tsx scripts/sync-docs.ts",
     "prepublishOnly": "npm run build",
     "prepare": "husky"
@@ -132,6 +133,6 @@
     "tsx": "^4.19.4"
   },
   "overrides": {
-    "hono": ">=4.12.2"
+    "hono": ">=4.12.7"
   }
 }

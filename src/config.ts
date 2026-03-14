@@ -14,6 +14,12 @@ import { normalizeLanguage } from "./language-patterns.js";
 const VALID_SEVERITIES = new Set<Severity>(["critical", "high", "medium", "low", "info"]);
 const VALID_FORMATS = new Set(["text", "json", "sarif", "markdown", "html", "junit", "codeclimate"]);
 
+/** Numeric rank for severity comparison (lower = stricter). */
+const SEVERITY_RANK: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+function severityRank(s: Severity): number {
+  return SEVERITY_RANK[s] ?? 4;
+}
+
 /**
  * Parse a JSON string into a JudgesConfig, with validation.
  */
@@ -274,6 +280,30 @@ export function parseConfig(jsonStr: string): JudgesConfig {
     config.customRules = obj.customRules as JudgesConfig["customRules"];
   }
 
+  // lockedRules
+  if (obj.lockedRules !== undefined) {
+    if (!Array.isArray(obj.lockedRules) || !obj.lockedRules.every((r: unknown) => typeof r === "string")) {
+      throw new ConfigError('Invalid .judgesrc: "lockedRules" must be an array of strings');
+    }
+    config.lockedRules = obj.lockedRules as string[];
+  }
+
+  // lockedJudges
+  if (obj.lockedJudges !== undefined) {
+    if (!Array.isArray(obj.lockedJudges) || !obj.lockedJudges.every((r: unknown) => typeof r === "string")) {
+      throw new ConfigError('Invalid .judgesrc: "lockedJudges" must be an array of strings');
+    }
+    config.lockedJudges = obj.lockedJudges as string[];
+  }
+
+  // lockedMinSeverity
+  if (obj.lockedMinSeverity !== undefined) {
+    if (typeof obj.lockedMinSeverity !== "string" || !VALID_SEVERITIES.has(obj.lockedMinSeverity as Severity)) {
+      throw new ConfigError('Invalid .judgesrc: "lockedMinSeverity" must be one of critical, high, medium, low, info');
+    }
+    config.lockedMinSeverity = obj.lockedMinSeverity as Severity;
+  }
+
   return config;
 }
 
@@ -335,11 +365,30 @@ export function discoverCascadingConfigs(startDir: string, rootDir?: string): Ju
  * concatenated (union). Scalars (minSeverity, maxFiles, preset, failOnFindings,
  * baseline, format) use the leaf value.
  * ruleOverrides are deep-merged.
+ *
+ * Org-level policy enforcement:
+ * - `lockedRules`: locked rules cannot be added to `disabledRules`
+ * - `lockedJudges`: locked judges cannot be added to `disabledJudges`
+ * - `lockedMinSeverity`: child configs cannot set a more lenient minSeverity
  */
 export function mergeConfigs(...configs: JudgesConfig[]): JudgesConfig {
   const merged: JudgesConfig = {};
 
   for (const cfg of configs) {
+    // Accumulate locked fields (union across all configs — once locked, always locked)
+    if (cfg.lockedRules) {
+      merged.lockedRules = [...new Set([...(merged.lockedRules ?? []), ...cfg.lockedRules])];
+    }
+    if (cfg.lockedJudges) {
+      merged.lockedJudges = [...new Set([...(merged.lockedJudges ?? []), ...cfg.lockedJudges])];
+    }
+    if (cfg.lockedMinSeverity !== undefined) {
+      // Keep the strictest lock (lowest severity index = strictest)
+      if (!merged.lockedMinSeverity || severityRank(cfg.lockedMinSeverity) < severityRank(merged.lockedMinSeverity)) {
+        merged.lockedMinSeverity = cfg.lockedMinSeverity;
+      }
+    }
+
     // Concatenate arrays (deduplicated)
     if (cfg.disabledRules) {
       merged.disabledRules = [...new Set([...(merged.disabledRules ?? []), ...cfg.disabledRules])];
@@ -382,6 +431,26 @@ export function mergeConfigs(...configs: JudgesConfig[]): JudgesConfig {
     // Overrides: concatenate (later entries take precedence naturally)
     if (cfg.overrides) {
       merged.overrides = [...(merged.overrides ?? []), ...cfg.overrides];
+    }
+  }
+
+  // ── Enforce org-level locked policies ──────────────────────────────
+  // Remove locked rules from disabledRules (they must stay enabled)
+  if (merged.lockedRules?.length && merged.disabledRules?.length) {
+    const locked = new Set(merged.lockedRules);
+    merged.disabledRules = merged.disabledRules.filter((r) => !locked.has(r));
+    if (merged.disabledRules.length === 0) delete merged.disabledRules;
+  }
+  // Remove locked judges from disabledJudges (they must stay enabled)
+  if (merged.lockedJudges?.length && merged.disabledJudges?.length) {
+    const locked = new Set(merged.lockedJudges);
+    merged.disabledJudges = merged.disabledJudges.filter((j) => !locked.has(j));
+    if (merged.disabledJudges.length === 0) delete merged.disabledJudges;
+  }
+  // Enforce minSeverity floor — child cannot be more lenient than the lock
+  if (merged.lockedMinSeverity && merged.minSeverity) {
+    if (severityRank(merged.minSeverity) > severityRank(merged.lockedMinSeverity)) {
+      merged.minSeverity = merged.lockedMinSeverity;
     }
   }
 

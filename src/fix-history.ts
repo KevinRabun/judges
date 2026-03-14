@@ -10,6 +10,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
+import { getDataAdapter, type DataAdapter } from "./data-adapter.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,26 @@ export function loadFixHistory(dir: string = "."): FixHistory {
 export function saveFixHistory(history: FixHistory, dir: string = "."): void {
   const filePath = resolve(dir, FIX_HISTORY_FILE);
   writeFileSync(filePath, JSON.stringify(history, null, 2) + "\n", "utf-8");
+}
+
+/**
+ * Load fix history via the configured DataAdapter.
+ */
+export async function loadFixHistoryViaAdapter(projectDir: string, adapter?: DataAdapter): Promise<FixHistory> {
+  const da = adapter ?? getDataAdapter();
+  return (await da.loadJson<FixHistory>("fix-history", projectDir)) ?? { version: "1.0.0", outcomes: [] };
+}
+
+/**
+ * Save fix history via the configured DataAdapter.
+ */
+export async function saveFixHistoryViaAdapter(
+  history: FixHistory,
+  projectDir: string,
+  adapter?: DataAdapter,
+): Promise<void> {
+  const da = adapter ?? getDataAdapter();
+  return da.saveJson("fix-history", history, projectDir);
 }
 
 // ─── Recording Outcomes ──────────────────────────────────────────────────────

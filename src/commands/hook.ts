@@ -16,29 +16,26 @@ const HOOK_MARKER = "# judges-panel-hook";
 function generateHookScript(): string {
   return `#!/usr/bin/env sh
 ${HOOK_MARKER}
-# Judges Panel pre-commit hook — automatically evaluate staged files.
+# Judges Panel pre-commit hook — evaluate staged files in a single pass.
 
-STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\\.(ts|tsx|js|jsx|py|go|rs|java|cs|cpp|cc|cxx)$')
-if [ -n "$STAGED" ]; then
+# Check if judges is available
+if ! command -v judges >/dev/null 2>&1; then
+  echo "  ⚠️  judges not found — skipping pre-commit review"
+  exit 0
+fi
+
+# Single-pass evaluation of all staged files
+judges eval . --staged-only --summary --fail-on-findings
+EXIT_CODE=$?
+
+if [ "$EXIT_CODE" -ne 0 ]; then
   echo ""
-  echo "  Judges Panel — checking staged files..."
+  echo "  ⛔ Judges found critical issues. Commit blocked."
+  echo "  Run 'judges eval . --staged-only' to see details."
+  echo "  Run 'judges fix <file> --apply' to auto-fix."
+  echo "  Use 'git commit --no-verify' to bypass."
   echo ""
-  FAILED=0
-  for f in $STAGED; do
-    judges eval "$f" --summary --fail-on-findings 2>/dev/null
-    if [ $? -ne 0 ]; then
-      FAILED=1
-    fi
-  done
-  if [ "$FAILED" -ne 0 ]; then
-    echo ""
-    echo "  ⛔ Judges found critical issues. Commit blocked."
-    echo "  Run 'judges eval <file>' to see details."
-    echo "  Run 'judges fix <file> --apply' to auto-fix."
-    echo "  Use 'git commit --no-verify' to bypass."
-    echo ""
-    exit 1
-  fi
+  exit 1
 fi
 `;
 }

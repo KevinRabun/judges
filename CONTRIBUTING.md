@@ -32,11 +32,12 @@ npm test
 ## Adding a New Judge
 
 1. Create the evaluator in `src/evaluators/your-judge.ts`
-2. Create the judge in `src/judges/your-judge.ts`
-3. Export from `src/evaluators/index.ts` and `src/judges/index.ts`
-4. Register the judge in `src/index.ts`
-5. Add tests in `tests/judges.test.ts`
-6. Include the **ADVERSARIAL MANDATE** block in the system prompt (see existing judges)
+2. Create the judge definition in `src/judges/your-judge.ts` — it must import its evaluator, set `analyze` on the definition, and call `defaultRegistry.register()` (self-registration)
+3. Add a side-effect import in `src/judges/index.ts`: `import "./your-judge.js";`
+4. Add tests in `tests/judges.test.ts`
+5. Include the **ADVERSARIAL MANDATE** block in the system prompt (see existing judges)
+
+See `.github/instructions/adding-a-judge.instructions.md` for the complete step-by-step guide.
 
 ### Adversarial Mandate (Required)
 

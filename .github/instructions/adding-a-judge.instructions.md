@@ -1,45 +1,12 @@
 # Adding a New Judge — Step-by-Step
 
 When adding a new judge to the Judges Panel, follow these steps exactly.
-The `JUDGES` array in `src/judges/index.ts` is the single source of truth — all documentation, tool descriptions, and counts are derived from it.
+All judges self-register with the unified `JudgeRegistry` via side-effect imports.
+The `src/judges/index.ts` barrel file triggers registration by importing each judge module.
 
 ---
 
-## 1. Create the Judge Definition
-
-Create `src/judges/{judge-id}.ts` with a `JudgeDefinition` export.
-
-All fields are **required** (except `analyze`, which is wired separately):
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | Kebab-case identifier (e.g. `"supply-chain"`) |
-| `name` | `string` | **Must** start with `"Judge "` (e.g. `"Judge Supply Chain"`) |
-| `domain` | `string` | Human-readable expertise area (e.g. `"Supply Chain Security"`) |
-| `description` | `string` | One-sentence summary of what this judge evaluates |
-| `rulePrefix` | `string` | Uppercase prefix for rule IDs (e.g. `"SCS"`). Must be unique across all judges |
-| `tableDescription` | `string` | Short comma-separated keywords for the README table (e.g. `"Dependency provenance, SBOM, build integrity"`) |
-| `promptDescription` | `string` | Short human-readable label for the prompts table (e.g. `"Deep supply chain security review"`) |
-| `systemPrompt` | `string` | The full persona + evaluation criteria prompt. Follow existing judges as a template |
-
-Example skeleton:
-
-```typescript
-import type { JudgeDefinition } from "../types.js";
-
-export const supplyChainJudge: JudgeDefinition = {
-  id: "supply-chain",
-  name: "Judge Supply Chain",
-  domain: "Supply Chain Security",
-  description: "Evaluates code for supply chain security risks...",
-  rulePrefix: "SCS",
-  tableDescription: "Dependency provenance, SBOM, build integrity",
-  promptDescription: "Deep supply chain security review",
-  systemPrompt: `You are Judge Supply Chain — ...`,
-};
-```
-
-## 2. Create the Evaluator
+## 1. Create the Evaluator
 
 Create `src/evaluators/{judge-id}.ts` with an `analyze` function:
 
@@ -60,39 +27,58 @@ Key requirements:
 - Import shared utilities from `./shared.js` as needed
 - Follow existing evaluators as templates (e.g. `data-security.ts`, `cybersecurity.ts`)
 
-## 3. Wire into the Judge Registry
+## 2. Create the Judge Definition (with self-registration)
 
-Edit `src/judges/index.ts` — three additions are needed:
+Create `src/judges/{judge-id}.ts`. The file must:
+1. Define the `JudgeDefinition` with all required fields
+2. Import and wire its own evaluator (`analyze` property)
+3. Import `defaultRegistry` and call `register()` at module scope
 
-### 3a. Add the judge import (top of file, judge imports section)
+All fields are **required** (except `analyze`, which is set inline):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Kebab-case identifier (e.g. `"supply-chain"`) |
+| `name` | `string` | **Must** start with `"Judge "` (e.g. `"Judge Supply Chain"`) |
+| `domain` | `string` | Human-readable expertise area (e.g. `"Supply Chain Security"`) |
+| `description` | `string` | One-sentence summary of what this judge evaluates |
+| `rulePrefix` | `string` | Uppercase prefix for rule IDs (e.g. `"SCS"`). Must be unique across all judges |
+| `tableDescription` | `string` | Short comma-separated keywords for the README table |
+| `promptDescription` | `string` | Short human-readable label for the prompts table |
+| `systemPrompt` | `string` | The full persona + evaluation criteria prompt. Follow existing judges as a template |
+| `analyze` | `function` | The evaluator function imported from `../evaluators/{judge-id}.js` |
+
+Example:
 
 ```typescript
-import { supplyChainJudge } from "./supply-chain.js";
-```
-
-### 3b. Add the evaluator import (after the `// ─── Analyzer Imports ───` comment)
-
-```typescript
+import type { JudgeDefinition } from "../types.js";
 import { analyzeSupplyChain } from "../evaluators/supply-chain.js";
+import { defaultRegistry } from "../judge-registry.js";
+
+export const supplyChainJudge: JudgeDefinition = {
+  id: "supply-chain",
+  name: "Judge Supply Chain",
+  domain: "Supply Chain Security",
+  description: "Evaluates code for supply chain security risks...",
+  rulePrefix: "SCS",
+  tableDescription: "Dependency provenance, SBOM, build integrity",
+  promptDescription: "Deep supply chain security review",
+  systemPrompt: `You are Judge Supply Chain — ...`,
+  analyze: analyzeSupplyChain,
+};
+
+defaultRegistry.register(supplyChainJudge);
 ```
 
-### 3c. Wire the analyzer (in the wiring section)
+## 3. Add the Side-Effect Import
+
+Edit `src/judges/index.ts` — add **one line** in the side-effect imports section:
 
 ```typescript
-supplyChainJudge.analyze = analyzeSupplyChain;
+import "./supply-chain.js";
 ```
 
-### 3d. Add to the `JUDGES` array
-
-Add the judge variable to the `JUDGES` array. Place it **before** `falsePositiveReviewJudge` (which is always last):
-
-```typescript
-export const JUDGES: JudgeDefinition[] = [
-  // ... existing judges ...
-  supplyChainJudge,       // ← new judge
-  falsePositiveReviewJudge,  // ← always last
-];
-```
+That's it. The import triggers the module, which registers the judge with `defaultRegistry`.
 
 ## 4. Add Test Coverage
 
@@ -129,11 +115,13 @@ All tests must pass. Typical test suites:
 
 Before committing, verify:
 
-- [ ] Judge file has all required `JudgeDefinition` fields (id, name, domain, description, rulePrefix, tableDescription, promptDescription, systemPrompt)
+- [ ] Judge file has all required `JudgeDefinition` fields (id, name, domain, description, rulePrefix, tableDescription, promptDescription, systemPrompt, analyze)
 - [ ] `name` starts with `"Judge "`
 - [ ] `rulePrefix` is unique (not used by any other judge)
+- [ ] Judge file imports its evaluator and sets `analyze` on the definition
+- [ ] Judge file calls `defaultRegistry.register()` at module scope
+- [ ] Side-effect import added to `src/judges/index.ts`
 - [ ] Evaluator produces findings against `sample-vulnerable-api.ts`
-- [ ] Judge is imported, wired, and added to `JUDGES` array in `src/judges/index.ts`
 - [ ] `npm run sync-docs` has been run
 - [ ] All tests pass
 
@@ -142,7 +130,10 @@ Before committing, verify:
 ## Architecture Notes
 
 - **`JudgeDefinition`** interface is defined in `src/types.ts`
-- **`JUDGES` array** in `src/judges/index.ts` is the canonical ordered list
+- **`JudgeRegistry`** in `src/judge-registry.ts` is the unified registry for all judges (built-in and plugin)
+- **`defaultRegistry`** is the singleton `JudgeRegistry` instance — all judges register here
+- **`src/judges/index.ts`** triggers registration via side-effect imports and re-exports `JUDGES`, `getJudge()`, and `getJudgeSummaries()` backed by the registry
+- **Self-registration pattern**: each judge file imports `defaultRegistry` and calls `register()` at module scope — no manual wiring in index.ts required
 - **`scripts/sync-docs.ts`** reads `JUDGES` at runtime and regenerates documentation markers
 - **Dynamic references** already exist in `src/tools/prompts.ts`, `src/commands/docs.ts`, and tool registration — these use `JUDGES.length` and iterate the array, so no manual updates are needed there
 - **Static files** (README, server.json, etc.) use marker-delimited sections or regex-based count replacement via `sync-docs`

@@ -288,6 +288,38 @@ export class JudgesDiagnosticProvider {
   }
 
   /**
+   * Apply all auto-fixes across all files with cached findings.
+   * Returns total patches applied and files modified.
+   */
+  async fixAll(): Promise<{ applied: number; files: number }> {
+    let totalApplied = 0;
+    let totalFiles = 0;
+
+    for (const [uriStr, findings] of this.findingsMap) {
+      const fixable = findings.filter((f) => f.patch);
+      if (fixable.length === 0) continue;
+
+      const uri = vscode.Uri.parse(uriStr);
+      const document = await vscode.workspace.openTextDocument(uri);
+      const applied = this.applyPatches(document, fixable);
+      if (applied > 0 && this.pendingEdit) {
+        const success = await vscode.workspace.applyEdit(this.pendingEdit);
+        this.pendingEdit = undefined;
+        if (success) {
+          totalApplied += applied;
+          totalFiles++;
+          // Re-evaluate after fixes
+          setTimeout(() => this.evaluate(document), 500);
+        }
+      } else {
+        this.pendingEdit = undefined;
+      }
+    }
+
+    return { applied: totalApplied, files: totalFiles };
+  }
+
+  /**
    * Get cached findings by VS Code Uri (used by status bar updates).
    */
   getCachedFindings(uri: vscode.Uri): FindingWithPatch[] | undefined {
