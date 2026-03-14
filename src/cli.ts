@@ -386,6 +386,14 @@ USAGE:
   judges incident-response            Incident response playbook generation
   judges risk-heatmap                 File/directory risk visualization
   judges learning-path                Personalized security learning
+  judges secret-scan                  Scan for hardcoded secrets and API keys
+  judges iac-lint                     Lint Dockerfiles and Kubernetes manifests
+  judges pii-scan                     Detect PII patterns in source code
+  judges api-audit                    API endpoint security audit
+  judges compliance-map               Multi-framework compliance mapping
+  judges perf-compare                 Before/after performance comparison
+  judges guided-tour                  Interactive onboarding tutorials
+  judges exec-report                  Executive security dashboard
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1644,6 +1652,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "learning-path") {
     const { runLearningPath } = await import("./commands/learning-path.js");
     runLearningPath(argv);
+    return;
+  }
+
+  // ─── Secret Scan Command ────────────────────────────────────────
+  if (args.command === "secret-scan") {
+    const { runSecretScan } = await import("./commands/secret-scan.js");
+    runSecretScan(argv);
+    return;
+  }
+
+  // ─── IaC Lint Command ──────────────────────────────────────────
+  if (args.command === "iac-lint") {
+    const { runIacLint } = await import("./commands/iac-lint.js");
+    runIacLint(argv);
+    return;
+  }
+
+  // ─── PII Scan Command ─────────────────────────────────────────
+  if (args.command === "pii-scan") {
+    const { runPiiScan } = await import("./commands/pii-scan.js");
+    runPiiScan(argv);
+    return;
+  }
+
+  // ─── API Audit Command ────────────────────────────────────────
+  if (args.command === "api-audit") {
+    const { runApiAudit } = await import("./commands/api-audit.js");
+    runApiAudit(argv);
+    return;
+  }
+
+  // ─── Compliance Map Command ───────────────────────────────────
+  if (args.command === "compliance-map") {
+    const { runComplianceMap } = await import("./commands/compliance-map.js");
+    runComplianceMap(argv);
+    return;
+  }
+
+  // ─── Perf Compare Command ─────────────────────────────────────
+  if (args.command === "perf-compare") {
+    const { runPerfCompare } = await import("./commands/perf-compare.js");
+    runPerfCompare(argv);
+    return;
+  }
+
+  // ─── Guided Tour Command ──────────────────────────────────────
+  if (args.command === "guided-tour") {
+    const { runGuidedTour } = await import("./commands/guided-tour.js");
+    runGuidedTour(argv);
+    return;
+  }
+
+  // ─── Exec Report Command ──────────────────────────────────────
+  if (args.command === "exec-report") {
+    const { runExecReport } = await import("./commands/exec-report.js");
+    runExecReport(argv);
     return;
   }
 

@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.50.0] — 2025-07-25
+
+### Added
+- **`judges secret-scan`** — Scan for hardcoded secrets and API keys (AWS, GitHub, Stripe, Slack, JWT, connection strings; 16 patterns with entropy-based detection)
+- **`judges iac-lint`** — Lint Dockerfiles, Kubernetes manifests, and Helm charts for security misconfigurations (privileged mode, host network, root user, missing resource limits)
+- **`judges pii-scan`** — Detect PII patterns in source code (SSN, credit card with Luhn validation, email, phone, passport, drivers license, PII in logging statements)
+- **`judges api-audit`** — API endpoint security audit (Express, Fastify, Flask, Spring, Django; rate limiting, CORS, authentication, input validation, SQL injection detection)
+- **`judges compliance-map`** — Map findings to compliance frameworks (HIPAA, SOC 2, PCI-DSS v4.0, ISO 27001:2022, NIST 800-53 Rev 5) with cross-walk matrix and gap analysis
+- **`judges perf-compare`** — Before/after performance comparison (loop nesting, allocations, async anti-patterns, Big-O estimation, recursive calls, regex operations)
+- **`judges guided-tour`** — Interactive onboarding tutorials (quick start, CI/CD integration, team adoption tracks with step-by-step guidance and starter .judgesrc generation)
+- **`judges exec-report`** — Executive security dashboard (HTML report with risk posture score, severity distribution, top recurring issues, actionable recommendations)
+
 ## [3.49.0] — 2026-03-12
 
 ### Added

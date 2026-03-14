@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.50.0] — 2025-07-25
+
+### Added
+- Secret scanning, IaC linting, PII detection, API security audit
+- Multi-framework compliance mapping (HIPAA, SOC 2, PCI-DSS, ISO 27001, NIST)
+- Performance comparison, interactive onboarding tours, executive reporting
+
 ## [3.49.0] — 2026-03-12
 
 ### Added
