@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.70.0] — 2026-03-14
+
+### Added
+- Organization: review-tag, review-archive
+- Impact analysis: finding-impact
+- Allow-listing: review-whitelist
+- Customization: review-custom-prompt, review-diff-context
+- CI & team: review-ci-status, review-team-summary
+
 ## [3.69.0] — 2026-03-14
 
 ### Added

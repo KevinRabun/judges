@@ -546,6 +546,14 @@ USAGE:
   judges finding-recurrence           Track recurring findings
   judges review-benchmark-self        Benchmark against your own history
   judges review-report-pdf            Generate printable review reports
+  judges review-tag                   Tag reviews for organization and filtering
+  judges finding-impact               Estimate business impact of findings
+  judges review-archive               Archive and retrieve old review results
+  judges review-whitelist             Allow-list safe patterns
+  judges review-custom-prompt         Customize review prompts for project needs
+  judges review-diff-context          Show diff hunks with surrounding context
+  judges review-ci-status             Check CI pipeline review status
+  judges review-team-summary          Aggregate team review metrics
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2924,6 +2932,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-report-pdf") {
     const { runReviewReportPdf } = await import("./commands/review-report-pdf.js");
     await runReviewReportPdf(argv);
+    return;
+  }
+
+  // ─── Review Tag Command ─────────────────────────────────────────────
+  if (args.command === "review-tag") {
+    const { runReviewTag } = await import("./commands/review-tag.js");
+    runReviewTag(argv);
+    return;
+  }
+
+  // ─── Finding Impact Command ─────────────────────────────────────────
+  if (args.command === "finding-impact") {
+    const { runFindingImpact } = await import("./commands/finding-impact.js");
+    runFindingImpact(argv);
+    return;
+  }
+
+  // ─── Review Archive Command ─────────────────────────────────────────
+  if (args.command === "review-archive") {
+    const { runReviewArchive } = await import("./commands/review-archive.js");
+    runReviewArchive(argv);
+    return;
+  }
+
+  // ─── Review Whitelist Command ───────────────────────────────────────
+  if (args.command === "review-whitelist") {
+    const { runReviewWhitelist } = await import("./commands/review-whitelist.js");
+    runReviewWhitelist(argv);
+    return;
+  }
+
+  // ─── Review Custom Prompt Command ───────────────────────────────────
+  if (args.command === "review-custom-prompt") {
+    const { runReviewCustomPrompt } = await import("./commands/review-custom-prompt.js");
+    runReviewCustomPrompt(argv);
+    return;
+  }
+
+  // ─── Review Diff Context Command ───────────────────────────────────
+  if (args.command === "review-diff-context") {
+    const { runReviewDiffContext } = await import("./commands/review-diff-context.js");
+    runReviewDiffContext(argv);
+    return;
+  }
+
+  // ─── Review CI Status Command ──────────────────────────────────────
+  if (args.command === "review-ci-status") {
+    const { runReviewCiStatus } = await import("./commands/review-ci-status.js");
+    runReviewCiStatus(argv);
+    return;
+  }
+
+  // ─── Review Team Summary Command ───────────────────────────────────
+  if (args.command === "review-team-summary") {
+    const { runReviewTeamSummary } = await import("./commands/review-team-summary.js");
+    runReviewTeamSummary(argv);
     return;
   }
 

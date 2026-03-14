@@ -2,6 +2,17 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.70.0] — 2026-03-14
+
+### Added
+- Organization: review-tag (tag reviews for filtering), review-archive (archive and retrieve old results)
+- Impact analysis: finding-impact (estimate business impact of findings)
+- Allow-listing: review-whitelist (allow-list safe patterns that shouldn't be flagged)
+- Customization: review-custom-prompt (customize review prompts for project needs)
+- Context: review-diff-context (show diff hunks with surrounding file context)
+- CI integration: review-ci-status (check CI pipeline review readiness)
+- Team metrics: review-team-summary (aggregate team review metrics)
+
 ## [3.69.0] — 2026-03-14
 
 ### Added
