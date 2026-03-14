@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.45.0] — 2026-03-12
+
+### Added — Intelligence, Collaboration & Analysis (8 features)
+- **Consensus voting** (`judges vote`) — Multi-developer voting on findings with agree/disagree/unsure verdicts; automatic consensus scoring; dispute detection; local `.judges-votes.json` storage
+- **Advanced finding query** (`judges query`) — Complex finding search with filter keys (severity, rule, confidence, has-patch); negation support; saved queries; aggregate grouping
+- **Judge reputation tracking** (`judges judge-reputation`) — Per-judge accuracy and FP rate tracking over time; confidence calibration scoring; trend analysis (improving/stable/declining); flagged judges alert
+- **Finding correlation** (`judges correlate`) — Link related findings and identify root causes; auto-correlate by rule ID and line overlap; manual root-cause records with severity
+- **Periodic digest** (`judges digest`) — Record point-in-time snapshots and generate daily/weekly/monthly digest reports with trend charts and severity distribution
+- **Rule sharing** (`judges rule-share`) — Export/import custom rule configurations as shareable packages; merge rule overrides, disabled rules, and disabled judges into `.judgesrc`
+- **Finding explanation** (`judges explain-finding`) — Rich context for individual findings with category info, common causes, remediation steps, and external references (OWASP, CWE, NIST)
+- **Run comparison** (`judges compare-runs`) — Save evaluation snapshots and compare side by side; shows added/removed findings, severity deltas, and per-rule changes
+
 ## [3.44.0] — 2026-03-12
 
 ### Added — Trust, Noise Reduction & Team Adoption (8 features)

@@ -346,6 +346,14 @@ USAGE:
   judges burndown                     Track finding resolution progress
   judges kb                           Team knowledge base for rule decisions
   judges recommend                    Analyze project and recommend judges
+  judges vote                         Consensus voting on findings
+  judges query                        Advanced finding search and filter
+  judges judge-reputation             Per-judge accuracy and FP tracking
+  judges correlate                    Finding correlation and root-cause analysis
+  judges digest                       Periodic finding digest and trend reports
+  judges rule-share                   Export/import custom rule configurations
+  judges explain-finding              Detailed finding explanation with context
+  judges compare-runs                 Compare evaluation runs side by side
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1324,6 +1332,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "recommend") {
     const { runRecommend } = await import("./commands/recommend.js");
     runRecommend(argv);
+    return;
+  }
+
+  // ─── Vote Command ────────────────────────────────────────────────
+  if (args.command === "vote") {
+    const { runVote } = await import("./commands/vote.js");
+    runVote(argv);
+    return;
+  }
+
+  // ─── Query Command ──────────────────────────────────────────────
+  if (args.command === "query") {
+    const { runQuery } = await import("./commands/query.js");
+    runQuery(argv);
+    return;
+  }
+
+  // ─── Judge Reputation Command ────────────────────────────────────
+  if (args.command === "judge-reputation") {
+    const { runJudgeReputation } = await import("./commands/judge-reputation.js");
+    runJudgeReputation(argv);
+    return;
+  }
+
+  // ─── Correlate Command ──────────────────────────────────────────
+  if (args.command === "correlate") {
+    const { runCorrelate } = await import("./commands/correlate.js");
+    runCorrelate(argv);
+    return;
+  }
+
+  // ─── Digest Command ─────────────────────────────────────────────
+  if (args.command === "digest") {
+    const { runDigest } = await import("./commands/digest.js");
+    runDigest(argv);
+    return;
+  }
+
+  // ─── Rule Share Command ─────────────────────────────────────────
+  if (args.command === "rule-share") {
+    const { runRuleShare } = await import("./commands/rule-share.js");
+    runRuleShare(argv);
+    return;
+  }
+
+  // ─── Explain Finding Command ────────────────────────────────────
+  if (args.command === "explain-finding") {
+    const { runExplainFinding } = await import("./commands/explain-finding.js");
+    runExplainFinding(argv);
+    return;
+  }
+
+  // ─── Compare Runs Command ──────────────────────────────────────
+  if (args.command === "compare-runs") {
+    const { runCompareRuns } = await import("./commands/compare-runs.js");
+    runCompareRuns(argv);
     return;
   }
 

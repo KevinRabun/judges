@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.45.0] — 2026-03-12
+
+### Added
+- **Consensus voting** — Multi-developer voting on findings with automatic consensus scoring
+- **Advanced finding query** — Complex search with severity/rule/confidence filters and saved queries
+- **Judge reputation tracking** — Per-judge accuracy, FP rate, and confidence calibration over time
+- **Finding correlation** — Link related findings and identify root causes with auto-correlation
+- **Periodic digest** — Snapshot recording and daily/weekly/monthly digest report generation
+- **Rule sharing** — Export/import custom rule configurations as shareable packages
+- **Finding explanation** — Rich context with category info, common causes, and remediation steps
+- **Run comparison** — Save and compare evaluation runs side by side with delta analysis
+
 ## [3.44.0] — 2026-03-12
 
 ### Added
