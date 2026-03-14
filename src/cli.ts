@@ -378,6 +378,14 @@ USAGE:
   judges doc-gen                      Generate security documentation
   judges dep-correlate                Dependency vulnerability correlation
   judges judge-author                 Custom judge authoring toolkit
+  judges sbom-export                  Generate Software Bill of Materials
+  judges license-scan                 Dependency license compliance
+  judges test-correlate               Test coverage × finding correlation
+  judges predict                      Forecast remediation timelines
+  judges org-policy                   Organization-wide policy management
+  judges incident-response            Incident response playbook generation
+  judges risk-heatmap                 File/directory risk visualization
+  judges learning-path                Personalized security learning
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1580,6 +1588,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "judge-author") {
     const { runJudgeAuthor } = await import("./commands/judge-author.js");
     runJudgeAuthor(argv);
+    return;
+  }
+
+  // ─── SBOM Export Command ─────────────────────────────────────
+  if (args.command === "sbom-export") {
+    const { runSbomExport } = await import("./commands/sbom-export.js");
+    runSbomExport(argv);
+    return;
+  }
+
+  // ─── License Scan Command ───────────────────────────────────
+  if (args.command === "license-scan") {
+    const { runLicenseScan } = await import("./commands/license-scan.js");
+    runLicenseScan(argv);
+    return;
+  }
+
+  // ─── Test Correlate Command ──────────────────────────────────
+  if (args.command === "test-correlate") {
+    const { runTestCorrelate } = await import("./commands/test-correlate.js");
+    runTestCorrelate(argv);
+    return;
+  }
+
+  // ─── Predict Command ────────────────────────────────────────
+  if (args.command === "predict") {
+    const { runPredict } = await import("./commands/predict.js");
+    runPredict(argv);
+    return;
+  }
+
+  // ─── Org Policy Command ─────────────────────────────────────
+  if (args.command === "org-policy") {
+    const { runOrgPolicy } = await import("./commands/org-policy.js");
+    runOrgPolicy(argv);
+    return;
+  }
+
+  // ─── Incident Response Command ──────────────────────────────
+  if (args.command === "incident-response") {
+    const { runIncidentResponse } = await import("./commands/incident-response.js");
+    runIncidentResponse(argv);
+    return;
+  }
+
+  // ─── Risk Heatmap Command ───────────────────────────────────
+  if (args.command === "risk-heatmap") {
+    const { runRiskHeatmap } = await import("./commands/risk-heatmap.js");
+    runRiskHeatmap(argv);
+    return;
+  }
+
+  // ─── Learning Path Command ──────────────────────────────────
+  if (args.command === "learning-path") {
+    const { runLearningPath } = await import("./commands/learning-path.js");
+    runLearningPath(argv);
     return;
   }
 

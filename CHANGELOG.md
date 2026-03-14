@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.49.0] — 2026-03-12
+
+### Added
+- `judges sbom-export` — Generate CycloneDX Software Bill of Materials from project manifests
+- `judges license-scan` — Dependency license compliance scanning with copyleft/unknown detection
+- `judges test-correlate` — Cross-reference test coverage (lcov/istanbul/cobertura) with security findings
+- `judges predict` — Forecast remediation timelines and regression-prone files via linear regression
+- `judges org-policy` — Organization-wide policy management with per-repo compliance checking
+- `judges incident-response` — Incident response playbook generation and tracking
+- `judges risk-heatmap` — File/directory risk visualization with HTML report output
+- `judges learning-path` — Personalized developer security learning with skill progression tracking
+
 ## [3.48.0] — 2026-03-12
 
 ### Added

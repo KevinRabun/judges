@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.49.0] — 2026-03-12
+
+### Added
+- **SBOM export** — CycloneDX Software Bill of Materials generation
+- **License scan** — Dependency license compliance with copyleft detection
+- **Test correlate** — Test coverage × security finding correlation
+- **Predict** — Remediation timeline forecasting and regression risk
+- **Org policy** — Organization-wide policy enforcement
+- **Incident response** — Security incident playbook generation
+- **Risk heatmap** — File/directory risk visualization
+- **Learning path** — Personalized security learning recommendations
+
 ## [3.48.0] — 2026-03-12
 
 ### Added
