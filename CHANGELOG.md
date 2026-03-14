@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.46.0] — 2026-03-12
+
+### Added
+- **`judges audit-bundle`** — Assembles auditor-ready evidence packages with SOC2/ISO27001 control mapping from local data files
+- **`judges dev-score`** — Developer security growth score tracking with leaderboard and streak tracking
+- **`judges model-risk`** — AI model vulnerability risk profiling for gpt-4o, gpt-4, claude, copilot, cursor with recommended judges
+- **`judges retro`** — Security incident retrospective analysis checking if Judges would have caught a vulnerability at a git commit
+- **`judges config-drift`** — Detects config divergence from org baseline with drift scoring and directory scanning
+- **`judges reg-watch`** — Regulatory standard coverage monitor for OWASP Top 10, CWE Top 25, NIST SSDF
+- **`judges learn`** — Personalized developer learning paths with module catalog, exercises, and progress tracking
+- **`judges generate`** — Secure code template generator with pre-hardened templates for Express, React, Flask, Go, and Node.js
+
 ## [3.45.0] — 2026-03-12
 
 ### Added — Intelligence, Collaboration & Analysis (8 features)

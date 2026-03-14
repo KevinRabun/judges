@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.46.0] — 2026-03-12
+
+### Added
+- **Audit bundle** — Assemble auditor-ready evidence packages with compliance control mapping
+- **Developer score** — Security growth tracking with leaderboard and streak tracking
+- **Model risk profiles** — AI model vulnerability risk analysis with recommended config overrides
+- **Incident retrospective** — Check if Judges would have caught a vulnerability at a git commit
+- **Config drift detection** — Detect config divergence from org baseline with drift scoring
+- **Regulatory watch** — Monitor OWASP/CWE/NIST standard coverage with gap identification
+- **Learning paths** — Personalized developer security learning with module catalog and exercises
+- **Code templates** — Secure pre-hardened code templates for Express, React, Flask, Go, and Node.js
+
 ## [3.45.0] — 2026-03-12
 
 ### Added

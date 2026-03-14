@@ -354,6 +354,14 @@ USAGE:
   judges rule-share                   Export/import custom rule configurations
   judges explain-finding              Detailed finding explanation with context
   judges compare-runs                 Compare evaluation runs side by side
+  judges audit-bundle                 Assemble auditor-ready evidence package
+  judges dev-score                    Developer security growth score
+  judges model-risk                   AI model vulnerability risk profiles
+  judges retro                        Security incident retrospective analysis
+  judges config-drift                 Detect config divergence from baseline
+  judges reg-watch                    Regulatory standard coverage monitor
+  judges learn                        Personalized developer learning paths
+  judges generate                     Secure code template generator
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1388,6 +1396,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "compare-runs") {
     const { runCompareRuns } = await import("./commands/compare-runs.js");
     runCompareRuns(argv);
+    return;
+  }
+
+  // ─── Audit Bundle Command ─────────────────────────────────────
+  if (args.command === "audit-bundle") {
+    const { runAuditBundle } = await import("./commands/audit-bundle.js");
+    runAuditBundle(argv);
+    return;
+  }
+
+  // ─── Dev Score Command ────────────────────────────────────────
+  if (args.command === "dev-score") {
+    const { runDevScore } = await import("./commands/dev-score.js");
+    runDevScore(argv);
+    return;
+  }
+
+  // ─── Model Risk Command ──────────────────────────────────────
+  if (args.command === "model-risk") {
+    const { runModelRisk } = await import("./commands/model-risk.js");
+    runModelRisk(argv);
+    return;
+  }
+
+  // ─── Retro Command ───────────────────────────────────────────
+  if (args.command === "retro") {
+    const { runRetro } = await import("./commands/retro.js");
+    runRetro(argv);
+    return;
+  }
+
+  // ─── Config Drift Command ────────────────────────────────────
+  if (args.command === "config-drift") {
+    const { runConfigDrift } = await import("./commands/config-drift.js");
+    runConfigDrift(argv);
+    return;
+  }
+
+  // ─── Reg Watch Command ───────────────────────────────────────
+  if (args.command === "reg-watch") {
+    const { runRegWatch } = await import("./commands/reg-watch.js");
+    runRegWatch(argv);
+    return;
+  }
+
+  // ─── Learn Command ───────────────────────────────────────────
+  if (args.command === "learn") {
+    const { runLearn } = await import("./commands/learn.js");
+    runLearn(argv);
+    return;
+  }
+
+  // ─── Generate Command ────────────────────────────────────────
+  if (args.command === "generate") {
+    const { runGenerate } = await import("./commands/generate.js");
+    runGenerate(argv);
     return;
   }
 
