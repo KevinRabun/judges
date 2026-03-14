@@ -2,6 +2,13 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.61.0] — 2026-03-14
+
+### Added
+- Trust & transparency: quick-check (sub-100ms pattern review), merge-verdict (single MERGE/HOLD decision), review-handoff (structured human escalation)
+- Evidence & provenance: evidence-chain (traversable reasoning chains), ai-provenance (AI-generated code detection), review-receipt (cryptographic attestation)
+- CI/CD depth: review-contract (versionable review policy), blame-review (git-blame finding attribution)
+
 ## [3.60.0] — 2026-03-14
 
 ### Added

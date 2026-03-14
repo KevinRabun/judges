@@ -474,6 +474,14 @@ USAGE:
   judges review-digest                Generate concise role-appropriate review summaries
   judges adoption-track               Measure team-level Judges adoption metrics
   judges finding-budget               Manage finding volume to prevent alert fatigue
+  judges quick-check                  Sub-100ms pattern-only review for real-time feedback
+  judges merge-verdict                Single MERGE/HOLD decision with structured rationale
+  judges review-handoff               Structured escalation to human reviewers
+  judges evidence-chain               Traversable reasoning chain for each finding
+  judges ai-provenance                Detect and annotate AI-generated code regions
+  judges review-receipt               Cryptographically signed review attestation
+  judges review-contract              Define and verify what Judges reviews
+  judges blame-review                 Git-blame integrated finding attribution
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2348,6 +2356,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-budget") {
     const { runFindingBudget } = await import("./commands/finding-budget.js");
     runFindingBudget(argv);
+    return;
+  }
+
+  // ─── Quick Check Command ─────────────────────────────────────────
+  if (args.command === "quick-check") {
+    const { runQuickCheck } = await import("./commands/quick-check.js");
+    runQuickCheck(argv);
+    return;
+  }
+
+  // ─── Merge Verdict Command ──────────────────────────────────────
+  if (args.command === "merge-verdict") {
+    const { runMergeVerdict } = await import("./commands/merge-verdict.js");
+    runMergeVerdict(argv);
+    return;
+  }
+
+  // ─── Review Handoff Command ─────────────────────────────────────
+  if (args.command === "review-handoff") {
+    const { runReviewHandoff } = await import("./commands/review-handoff.js");
+    runReviewHandoff(argv);
+    return;
+  }
+
+  // ─── Evidence Chain Command ─────────────────────────────────────
+  if (args.command === "evidence-chain") {
+    const { runEvidenceChain } = await import("./commands/evidence-chain.js");
+    runEvidenceChain(argv);
+    return;
+  }
+
+  // ─── AI Provenance Command ──────────────────────────────────────
+  if (args.command === "ai-provenance") {
+    const { runAiProvenance } = await import("./commands/ai-provenance.js");
+    runAiProvenance(argv);
+    return;
+  }
+
+  // ─── Review Receipt Command ─────────────────────────────────────
+  if (args.command === "review-receipt") {
+    const { runReviewReceipt } = await import("./commands/review-receipt.js");
+    runReviewReceipt(argv);
+    return;
+  }
+
+  // ─── Review Contract Command ────────────────────────────────────
+  if (args.command === "review-contract") {
+    const { runReviewContract } = await import("./commands/review-contract.js");
+    runReviewContract(argv);
+    return;
+  }
+
+  // ─── Blame Review Command ──────────────────────────────────────
+  if (args.command === "blame-review") {
+    const { runBlameReview } = await import("./commands/blame-review.js");
+    runBlameReview(argv);
     return;
   }
 
