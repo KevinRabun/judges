@@ -672,6 +672,15 @@ USAGE:
   judges review-session-save          Save/restore review sessions
   judges finding-evidence-chain       Build evidence chains across findings
   judges review-file-complexity       Analyze file complexity metrics
+  judges finding-dependency-risk      Assess dependency risk levels
+  judges review-pr-template           Generate PR templates from findings
+  judges finding-security-hotspot     Identify security-sensitive code
+  judges finding-suppression-log      Log and track suppressed findings
+  judges review-diff-highlight        Highlight review differences
+  judges finding-cve-lookup           Extract CVE references from findings
+  judges review-batch-run             Run batch review on multiple files
+  judges review-output-filter         Filter and transform review output
+  judges finding-timeline-view        Show findings on a timeline
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3932,6 +3941,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-file-complexity") {
     const { runReviewFileComplexity } = await import("./commands/review-file-complexity.js");
     runReviewFileComplexity(argv);
+    return;
+  }
+
+  // ─── Finding Dependency Risk Command ──────────────────────────────
+  if (args.command === "finding-dependency-risk") {
+    const { runFindingDependencyRisk } = await import("./commands/finding-dependency-risk.js");
+    runFindingDependencyRisk(argv);
+    return;
+  }
+
+  // ─── Review PR Template Command ───────────────────────────────────
+  if (args.command === "review-pr-template") {
+    const { runReviewPrTemplate } = await import("./commands/review-pr-template.js");
+    runReviewPrTemplate(argv);
+    return;
+  }
+
+  // ─── Finding Security Hotspot Command ─────────────────────────────
+  if (args.command === "finding-security-hotspot") {
+    const { runFindingSecurityHotspot } = await import("./commands/finding-security-hotspot.js");
+    runFindingSecurityHotspot(argv);
+    return;
+  }
+
+  // ─── Finding Suppression Log Command ──────────────────────────────
+  if (args.command === "finding-suppression-log") {
+    const { runFindingSuppressionLog } = await import("./commands/finding-suppression-log.js");
+    runFindingSuppressionLog(argv);
+    return;
+  }
+
+  // ─── Review Diff Highlight Command ────────────────────────────────
+  if (args.command === "review-diff-highlight") {
+    const { runReviewDiffHighlight } = await import("./commands/review-diff-highlight.js");
+    runReviewDiffHighlight(argv);
+    return;
+  }
+
+  // ─── Finding CVE Lookup Command ───────────────────────────────────
+  if (args.command === "finding-cve-lookup") {
+    const { runFindingCveLookup } = await import("./commands/finding-cve-lookup.js");
+    runFindingCveLookup(argv);
+    return;
+  }
+
+  // ─── Review Batch Run Command ─────────────────────────────────────
+  if (args.command === "review-batch-run") {
+    const { runReviewBatchRun } = await import("./commands/review-batch-run.js");
+    runReviewBatchRun(argv);
+    return;
+  }
+
+  // ─── Review Output Filter Command ────────────────────────────────
+  if (args.command === "review-output-filter") {
+    const { runReviewOutputFilter } = await import("./commands/review-output-filter.js");
+    runReviewOutputFilter(argv);
+    return;
+  }
+
+  // ─── Finding Timeline View Command ───────────────────────────────
+  if (args.command === "finding-timeline-view") {
+    const { runFindingTimelineView } = await import("./commands/finding-timeline-view.js");
+    runFindingTimelineView(argv);
     return;
   }
 

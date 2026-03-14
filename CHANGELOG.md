@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.85.0] — 2026-03-14
+
+### Added
+- Dependency risk: finding-dependency-risk (assess dependency risk levels)
+- PR template: review-pr-template (generate PR templates from findings)
+- Security hotspot: finding-security-hotspot (identify security-sensitive code)
+- Suppression log: finding-suppression-log (log and track suppressed findings)
+- Diff highlight: review-diff-highlight (highlight review differences)
+- CVE lookup: finding-cve-lookup (extract CVE references from findings)
+- Batch run: review-batch-run (run batch review on multiple files)
+- Output filter: review-output-filter (filter and transform review output)
+- Timeline view: finding-timeline-view (show findings on a timeline)
+
 ## [3.84.0] — 2026-03-14
 
 ### Added

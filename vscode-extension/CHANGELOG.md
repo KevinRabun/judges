@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.85.0] — 2026-03-14
+
+### Added
+- Dependency risk: finding-dependency-risk (dependency risk analysis)
+- PR template: review-pr-template (PR template generation)
+- Security hotspot: finding-security-hotspot (security hotspot detection)
+- Suppression log: finding-suppression-log (suppression tracking)
+- Diff highlight: review-diff-highlight (diff highlighting)
+- CVE lookup: finding-cve-lookup (CVE reference extraction)
+- Batch run: review-batch-run (batch file review)
+- Output filter: review-output-filter (output filtering)
+- Timeline view: finding-timeline-view (findings timeline)
+
 ## [3.84.0] — 2026-03-14
 
 ### Added
