@@ -498,6 +498,14 @@ USAGE:
   judges review-summary               Generate PR-ready review summary
   judges rule-test                    Test custom rules against sample code
   judges incremental-review           Review only changed files since last run
+  judges review-profile               Per-developer review preferences
+  judges review-template              Reusable review templates
+  judges auto-approve                 Auto-approve findings below threshold
+  judges diff-explain                 Explain why diff changes were flagged
+  judges review-stats                 Personal review statistics and trends
+  judges fix-suggest                  Generate concrete fix suggestions
+  judges review-priority              Smart finding prioritization
+  judges multi-lang-review            Cross-language consistency checking
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2540,6 +2548,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "incremental-review") {
     const { runIncrementalReview } = await import("./commands/incremental-review.js");
     runIncrementalReview(argv);
+    return;
+  }
+
+  // ─── Review Profile Command ───────────────────────────────────
+  if (args.command === "review-profile") {
+    const { runReviewProfile } = await import("./commands/review-profile.js");
+    runReviewProfile(argv);
+    return;
+  }
+
+  // ─── Review Template Command ──────────────────────────────────
+  if (args.command === "review-template") {
+    const { runReviewTemplate } = await import("./commands/review-template.js");
+    runReviewTemplate(argv);
+    return;
+  }
+
+  // ─── Auto Approve Command ────────────────────────────────────
+  if (args.command === "auto-approve") {
+    const { runAutoApprove } = await import("./commands/auto-approve.js");
+    runAutoApprove(argv);
+    return;
+  }
+
+  // ─── Diff Explain Command ────────────────────────────────────
+  if (args.command === "diff-explain") {
+    const { runDiffExplain } = await import("./commands/diff-explain.js");
+    runDiffExplain(argv);
+    return;
+  }
+
+  // ─── Review Stats Command ────────────────────────────────────
+  if (args.command === "review-stats") {
+    const { runReviewStats } = await import("./commands/review-stats.js");
+    runReviewStats(argv);
+    return;
+  }
+
+  // ─── Fix Suggest Command ─────────────────────────────────────
+  if (args.command === "fix-suggest") {
+    const { runFixSuggest } = await import("./commands/fix-suggest.js");
+    runFixSuggest(argv);
+    return;
+  }
+
+  // ─── Review Priority Command ─────────────────────────────────
+  if (args.command === "review-priority") {
+    const { runReviewPriority } = await import("./commands/review-priority.js");
+    runReviewPriority(argv);
+    return;
+  }
+
+  // ─── Multi-Lang Review Command ────────────────────────────────
+  if (args.command === "multi-lang-review") {
+    const { runMultiLangReview } = await import("./commands/multi-lang-review.js");
+    runMultiLangReview(argv);
     return;
   }
 

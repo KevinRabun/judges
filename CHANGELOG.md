@@ -2,6 +2,13 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.64.0] — 2026-03-14
+
+### Added
+- Personalization: review-profile (per-developer preferences), review-template (reusable workflow templates), review-stats (personal statistics and improvement trends)
+- Automation: auto-approve (auto-approve below threshold), fix-suggest (concrete fix suggestions with OWASP references)
+- Intelligence: diff-explain (explain why changes were flagged), review-priority (smart prioritization by context/impact), multi-lang-review (cross-language consistency checking)
+
 ## [3.63.0] — 2026-03-14
 
 ### Added

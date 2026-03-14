@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.64.0] — 2026-03-14
+
+### Added
+- Personalization: review-profile, review-template, review-stats
+- Automation: auto-approve, fix-suggest
+- Intelligence: diff-explain, review-priority, multi-lang-review
+
 ## [3.63.0] — 2026-03-14
 
 ### Added
