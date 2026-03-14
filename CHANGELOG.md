@@ -2,6 +2,14 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.67.0] — 2026-03-14
+
+### Added
+- Tracking: finding-age (track how long findings remain unresolved), finding-rank (rank findings by business impact and fix effort)
+- Insights: review-dashboard (terminal-based review health dashboard with ASCII charts), review-diff-summary (concise PR-ready change summaries)
+- Governance: config-lint (lint and validate .judgesrc configuration), review-quota (local review usage quota tracking)
+- Resilience: review-offline (offline mode support for air-gapped environments), review-notify (configurable local notification rules)
+
 ## [3.66.0] — 2026-03-14
 
 ### Added

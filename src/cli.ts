@@ -522,6 +522,14 @@ USAGE:
   judges review-schedule              Configure scheduled review cadences
   judges review-export                Export results to CSV, markdown, HTML
   judges setup-wizard                 Guided setup for new users
+  judges finding-age                  Track how long findings are unresolved
+  judges review-dashboard             Terminal dashboard of review health
+  judges config-lint                  Lint and validate .judgesrc configuration
+  judges review-quota                 Track review usage quotas
+  judges review-offline               Offline mode support
+  judges finding-rank                 Rank findings by impact and fix effort
+  judges review-diff-summary          Concise summary of changes + findings
+  judges review-notify                Configure local notifications
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2732,6 +2740,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "setup-wizard") {
     const { runSetupWizard } = await import("./commands/setup-wizard.js");
     runSetupWizard(argv);
+    return;
+  }
+
+  // ─── Finding Age Command ──────────────────────────────────────────
+  if (args.command === "finding-age") {
+    const { runFindingAge } = await import("./commands/finding-age.js");
+    await runFindingAge(argv);
+    return;
+  }
+
+  // ─── Review Dashboard Command ────────────────────────────────────
+  if (args.command === "review-dashboard") {
+    const { runReviewDashboard } = await import("./commands/review-dashboard.js");
+    await runReviewDashboard(argv);
+    return;
+  }
+
+  // ─── Config Lint Command ─────────────────────────────────────────
+  if (args.command === "config-lint") {
+    const { runConfigLint } = await import("./commands/config-lint.js");
+    await runConfigLint(argv);
+    return;
+  }
+
+  // ─── Review Quota Command ────────────────────────────────────────
+  if (args.command === "review-quota") {
+    const { runReviewQuota } = await import("./commands/review-quota.js");
+    await runReviewQuota(argv);
+    return;
+  }
+
+  // ─── Review Offline Command ──────────────────────────────────────
+  if (args.command === "review-offline") {
+    const { runReviewOffline } = await import("./commands/review-offline.js");
+    await runReviewOffline(argv);
+    return;
+  }
+
+  // ─── Finding Rank Command ────────────────────────────────────────
+  if (args.command === "finding-rank") {
+    const { runFindingRank } = await import("./commands/finding-rank.js");
+    await runFindingRank(argv);
+    return;
+  }
+
+  // ─── Review Diff Summary Command ─────────────────────────────────
+  if (args.command === "review-diff-summary") {
+    const { runReviewDiffSummary } = await import("./commands/review-diff-summary.js");
+    await runReviewDiffSummary(argv);
+    return;
+  }
+
+  // ─── Review Notify Command ───────────────────────────────────────
+  if (args.command === "review-notify") {
+    const { runReviewNotify } = await import("./commands/review-notify.js");
+    await runReviewNotify(argv);
     return;
   }
 

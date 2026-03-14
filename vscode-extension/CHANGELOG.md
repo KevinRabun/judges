@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.67.0] — 2026-03-14
+
+### Added
+- Tracking: finding-age, finding-rank
+- Insights: review-dashboard, review-diff-summary
+- Governance: config-lint, review-quota
+- Resilience: review-offline, review-notify
+
 ## [3.66.0] — 2026-03-14
 
 ### Added
