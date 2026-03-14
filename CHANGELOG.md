@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.81.0] — 2026-03-14
+
+### Added
+- Dependency graph: review-dependency-graph (visualize finding relationships)
+- Pattern match: finding-pattern-match (custom pattern matching for findings)
+- Diff stats: review-diff-stats (git diff statistics for reviews)
+- CWE map: finding-cwe-map (map findings to CWE identifiers)
+- Exclude vendor: review-exclude-vendor (exclude vendor/third-party code)
+- Risk matrix: finding-risk-matrix (generate risk matrices from findings)
+- File stats: review-file-stats (per-file review statistics)
+- False neg check: finding-false-neg-check (check for potential false negatives)
+- Rule filter: review-rule-filter (filter review results by rule criteria)
+
 ## [3.80.0] — 2026-03-14
 
 ### Added

@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.81.0] — 2026-03-14
+
+### Added
+- Dependency graph: review-dependency-graph (finding relationship visualization)
+- Pattern match: finding-pattern-match (custom pattern matching)
+- Diff stats: review-diff-stats (git diff statistics)
+- CWE map: finding-cwe-map (CWE identifier mapping)
+- Exclude vendor: review-exclude-vendor (vendor code exclusion)
+- Risk matrix: finding-risk-matrix (risk matrix generation)
+- File stats: review-file-stats (per-file statistics)
+- False neg check: finding-false-neg-check (false negative detection)
+- Rule filter: review-rule-filter (rule-based filtering)
+
 ## [3.80.0] — 2026-03-14
 
 ### Added

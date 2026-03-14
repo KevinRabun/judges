@@ -636,6 +636,15 @@ USAGE:
   judges finding-context-expand       Expand finding context with surrounding code
   judges review-output-format         Configure and manage output formats
   judges finding-merge-results        Merge results from multiple review runs
+  judges review-dependency-graph      Visualize finding dependency relationships
+  judges finding-pattern-match        Match findings against custom patterns
+  judges review-diff-stats            Show git diff statistics for reviews
+  judges finding-cwe-map              Map findings to CWE identifiers
+  judges review-exclude-vendor        Exclude vendor/third-party code from reviews
+  judges finding-risk-matrix           Generate risk matrices from findings
+  judges review-file-stats            Per-file review statistics
+  judges finding-false-neg-check      Check for potential false negatives
+  judges review-rule-filter           Filter review results by rule criteria
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3644,6 +3653,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-merge-results") {
     const { runFindingMergeResults } = await import("./commands/finding-merge-results.js");
     runFindingMergeResults(argv);
+    return;
+  }
+
+  // ─── Review Dependency Graph Command ─────────────────────────────
+  if (args.command === "review-dependency-graph") {
+    const { runReviewDependencyGraph } = await import("./commands/review-dependency-graph.js");
+    runReviewDependencyGraph(argv);
+    return;
+  }
+
+  // ─── Finding Pattern Match Command ───────────────────────────────
+  if (args.command === "finding-pattern-match") {
+    const { runFindingPatternMatch } = await import("./commands/finding-pattern-match.js");
+    runFindingPatternMatch(argv);
+    return;
+  }
+
+  // ─── Review Diff Stats Command ───────────────────────────────────
+  if (args.command === "review-diff-stats") {
+    const { runReviewDiffStats } = await import("./commands/review-diff-stats.js");
+    runReviewDiffStats(argv);
+    return;
+  }
+
+  // ─── Finding CWE Map Command ─────────────────────────────────────
+  if (args.command === "finding-cwe-map") {
+    const { runFindingCweMap } = await import("./commands/finding-cwe-map.js");
+    runFindingCweMap(argv);
+    return;
+  }
+
+  // ─── Review Exclude Vendor Command ───────────────────────────────
+  if (args.command === "review-exclude-vendor") {
+    const { runReviewExcludeVendor } = await import("./commands/review-exclude-vendor.js");
+    runReviewExcludeVendor(argv);
+    return;
+  }
+
+  // ─── Finding Risk Matrix Command ─────────────────────────────────
+  if (args.command === "finding-risk-matrix") {
+    const { runFindingRiskMatrix } = await import("./commands/finding-risk-matrix.js");
+    runFindingRiskMatrix(argv);
+    return;
+  }
+
+  // ─── Review File Stats Command ───────────────────────────────────
+  if (args.command === "review-file-stats") {
+    const { runReviewFileStats } = await import("./commands/review-file-stats.js");
+    runReviewFileStats(argv);
+    return;
+  }
+
+  // ─── Finding False Neg Check Command ─────────────────────────────
+  if (args.command === "finding-false-neg-check") {
+    const { runFindingFalseNegCheck } = await import("./commands/finding-false-neg-check.js");
+    runFindingFalseNegCheck(argv);
+    return;
+  }
+
+  // ─── Review Rule Filter Command ──────────────────────────────────
+  if (args.command === "review-rule-filter") {
+    const { runReviewRuleFilter } = await import("./commands/review-rule-filter.js");
+    runReviewRuleFilter(argv);
     return;
   }
 
