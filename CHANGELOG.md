@@ -2,6 +2,15 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.68.0] — 2026-03-14
+
+### Added
+- Engagement: review-streak (track consecutive clean review streaks with achievements), review-badge (generate status badges for project READMEs)
+- Pattern analysis: finding-cluster (cluster related findings to reveal systemic AI patterns), finding-hotspot (identify areas with highest finding density)
+- Compliance: review-audit-log (comprehensive local audit log for all review actions)
+- Experimentation: review-sandbox (test review configs safely without affecting real setup), review-ab-test (A/B test review configurations)
+- Onboarding: review-integration (verify CI/CD, IDE, and hook integrations are connected)
+
 ## [3.67.0] — 2026-03-14
 
 ### Added

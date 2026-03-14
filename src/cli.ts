@@ -530,6 +530,14 @@ USAGE:
   judges finding-rank                 Rank findings by impact and fix effort
   judges review-diff-summary          Concise summary of changes + findings
   judges review-notify                Configure local notifications
+  judges review-streak                Track consecutive clean review streaks
+  judges finding-cluster              Cluster findings to reveal patterns
+  judges review-badge                 Generate status badges for READMEs
+  judges review-audit-log             Comprehensive local audit log
+  judges review-sandbox               Test review configs safely
+  judges finding-hotspot              Identify areas with most findings
+  judges review-ab-test               A/B test review configurations
+  judges review-integration           Verify CI/IDE/hook integrations
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2796,6 +2804,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-notify") {
     const { runReviewNotify } = await import("./commands/review-notify.js");
     await runReviewNotify(argv);
+    return;
+  }
+
+  // ─── Review Streak Command ───────────────────────────────────────
+  if (args.command === "review-streak") {
+    const { runReviewStreak } = await import("./commands/review-streak.js");
+    await runReviewStreak(argv);
+    return;
+  }
+
+  // ─── Finding Cluster Command ─────────────────────────────────────
+  if (args.command === "finding-cluster") {
+    const { runFindingCluster } = await import("./commands/finding-cluster.js");
+    await runFindingCluster(argv);
+    return;
+  }
+
+  // ─── Review Badge Command ────────────────────────────────────────
+  if (args.command === "review-badge") {
+    const { runReviewBadge } = await import("./commands/review-badge.js");
+    await runReviewBadge(argv);
+    return;
+  }
+
+  // ─── Review Audit Log Command ────────────────────────────────────
+  if (args.command === "review-audit-log") {
+    const { runReviewAuditLog } = await import("./commands/review-audit-log.js");
+    await runReviewAuditLog(argv);
+    return;
+  }
+
+  // ─── Review Sandbox Command ──────────────────────────────────────
+  if (args.command === "review-sandbox") {
+    const { runReviewSandbox } = await import("./commands/review-sandbox.js");
+    await runReviewSandbox(argv);
+    return;
+  }
+
+  // ─── Finding Hotspot Command ─────────────────────────────────────
+  if (args.command === "finding-hotspot") {
+    const { runFindingHotspot } = await import("./commands/finding-hotspot.js");
+    await runFindingHotspot(argv);
+    return;
+  }
+
+  // ─── Review AB Test Command ──────────────────────────────────────
+  if (args.command === "review-ab-test") {
+    const { runReviewAbTest } = await import("./commands/review-ab-test.js");
+    await runReviewAbTest(argv);
+    return;
+  }
+
+  // ─── Review Integration Command ──────────────────────────────────
+  if (args.command === "review-integration") {
+    const { runReviewIntegration } = await import("./commands/review-integration.js");
+    await runReviewIntegration(argv);
     return;
   }
 

@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.68.0] — 2026-03-14
+
+### Added
+- Engagement: review-streak, review-badge
+- Pattern analysis: finding-cluster, finding-hotspot
+- Compliance: review-audit-log
+- Experimentation: review-sandbox, review-ab-test
+- Onboarding: review-integration
+
 ## [3.67.0] — 2026-03-14
 
 ### Added
