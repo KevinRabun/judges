@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.69.0] — 2026-03-14
+
+### Added
+- Daily workflow: review-standup, review-changelog-gen
+- Fix tracking: finding-fix-rate, finding-recurrence
+- Progress: review-milestone, review-benchmark-self
+- Risk & reporting: review-risk-score, review-report-pdf
+
 ## [3.68.0] — 2026-03-14
 
 ### Added

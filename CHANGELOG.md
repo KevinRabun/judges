@@ -2,6 +2,14 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.69.0] — 2026-03-14
+
+### Added
+- Daily workflow: review-standup (daily standup-ready summaries), review-changelog-gen (auto-generate changelog from findings)
+- Fix tracking: finding-fix-rate (track resolution speed over time), finding-recurrence (detect findings that keep reappearing)
+- Progress: review-milestone (track and celebrate review milestones), review-benchmark-self (benchmark against your own history)
+- Risk & reporting: review-risk-score (weighted aggregate project risk), review-report-pdf (generate printable markdown review reports)
+
 ## [3.68.0] — 2026-03-14
 
 ### Added

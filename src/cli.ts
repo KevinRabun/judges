@@ -538,6 +538,14 @@ USAGE:
   judges finding-hotspot              Identify areas with most findings
   judges review-ab-test               A/B test review configurations
   judges review-integration           Verify CI/IDE/hook integrations
+  judges review-standup               Daily standup review summary
+  judges finding-fix-rate             Track finding resolution speed
+  judges review-milestone             Track and celebrate review milestones
+  judges review-risk-score            Calculate aggregate project risk
+  judges review-changelog-gen         Auto-generate changelog from findings
+  judges finding-recurrence           Track recurring findings
+  judges review-benchmark-self        Benchmark against your own history
+  judges review-report-pdf            Generate printable review reports
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2860,6 +2868,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-integration") {
     const { runReviewIntegration } = await import("./commands/review-integration.js");
     await runReviewIntegration(argv);
+    return;
+  }
+
+  // ─── Review Standup Command ──────────────────────────────────────
+  if (args.command === "review-standup") {
+    const { runReviewStandup } = await import("./commands/review-standup.js");
+    await runReviewStandup(argv);
+    return;
+  }
+
+  // ─── Finding Fix Rate Command ────────────────────────────────────
+  if (args.command === "finding-fix-rate") {
+    const { runFindingFixRate } = await import("./commands/finding-fix-rate.js");
+    await runFindingFixRate(argv);
+    return;
+  }
+
+  // ─── Review Milestone Command ────────────────────────────────────
+  if (args.command === "review-milestone") {
+    const { runReviewMilestone } = await import("./commands/review-milestone.js");
+    await runReviewMilestone(argv);
+    return;
+  }
+
+  // ─── Review Risk Score Command ───────────────────────────────────
+  if (args.command === "review-risk-score") {
+    const { runReviewRiskScore } = await import("./commands/review-risk-score.js");
+    await runReviewRiskScore(argv);
+    return;
+  }
+
+  // ─── Review Changelog Gen Command ────────────────────────────────
+  if (args.command === "review-changelog-gen") {
+    const { runReviewChangelogGen } = await import("./commands/review-changelog-gen.js");
+    await runReviewChangelogGen(argv);
+    return;
+  }
+
+  // ─── Finding Recurrence Command ──────────────────────────────────
+  if (args.command === "finding-recurrence") {
+    const { runFindingRecurrence } = await import("./commands/finding-recurrence.js");
+    await runFindingRecurrence(argv);
+    return;
+  }
+
+  // ─── Review Benchmark Self Command ───────────────────────────────
+  if (args.command === "review-benchmark-self") {
+    const { runReviewBenchmarkSelf } = await import("./commands/review-benchmark-self.js");
+    await runReviewBenchmarkSelf(argv);
+    return;
+  }
+
+  // ─── Review Report PDF Command ───────────────────────────────────
+  if (args.command === "review-report-pdf") {
+    const { runReviewReportPdf } = await import("./commands/review-report-pdf.js");
+    await runReviewReportPdf(argv);
     return;
   }
 
