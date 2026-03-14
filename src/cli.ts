@@ -466,6 +466,14 @@ USAGE:
   judges cross-file-consistency       Verify naming & pattern consistency across files
   judges api-misuse                   Detect incorrect API usage patterns
   judges review-focus                 Prioritize review attention by file risk
+  judges hallucination-detect         Find fabricated APIs and non-existent methods
+  judges context-blind                Flag AI reinventing existing project utilities
+  judges over-abstraction             Detect unnecessary abstractions from AI code
+  judges stale-pattern                Identify outdated idioms with modern alternatives
+  judges security-theater             Detect security code that provides no protection
+  judges review-digest                Generate concise role-appropriate review summaries
+  judges adoption-track               Measure team-level Judges adoption metrics
+  judges finding-budget               Manage finding volume to prevent alert fatigue
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2284,6 +2292,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-focus") {
     const { runReviewFocus } = await import("./commands/review-focus.js");
     runReviewFocus(argv);
+    return;
+  }
+
+  // ─── Hallucination Detect Command ────────────────────────────────
+  if (args.command === "hallucination-detect") {
+    const { runHallucinationDetect } = await import("./commands/hallucination-detect.js");
+    runHallucinationDetect(argv);
+    return;
+  }
+
+  // ─── Context Blind Command ───────────────────────────────────────
+  if (args.command === "context-blind") {
+    const { runContextBlind } = await import("./commands/context-blind.js");
+    runContextBlind(argv);
+    return;
+  }
+
+  // ─── Over Abstraction Command ────────────────────────────────────
+  if (args.command === "over-abstraction") {
+    const { runOverAbstraction } = await import("./commands/over-abstraction.js");
+    runOverAbstraction(argv);
+    return;
+  }
+
+  // ─── Stale Pattern Command ───────────────────────────────────────
+  if (args.command === "stale-pattern") {
+    const { runStalePattern } = await import("./commands/stale-pattern.js");
+    runStalePattern(argv);
+    return;
+  }
+
+  // ─── Security Theater Command ────────────────────────────────────
+  if (args.command === "security-theater") {
+    const { runSecurityTheater } = await import("./commands/security-theater.js");
+    runSecurityTheater(argv);
+    return;
+  }
+
+  // ─── Review Digest Command ───────────────────────────────────────
+  if (args.command === "review-digest") {
+    const { runReviewDigest } = await import("./commands/review-digest.js");
+    runReviewDigest(argv);
+    return;
+  }
+
+  // ─── Adoption Track Command ──────────────────────────────────────
+  if (args.command === "adoption-track") {
+    const { runAdoptionTrack } = await import("./commands/adoption-track.js");
+    runAdoptionTrack(argv);
+    return;
+  }
+
+  // ─── Finding Budget Command ──────────────────────────────────────
+  if (args.command === "finding-budget") {
+    const { runFindingBudget } = await import("./commands/finding-budget.js");
+    runFindingBudget(argv);
     return;
   }
 

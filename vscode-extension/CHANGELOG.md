@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.60.0] — 2026-03-14
+
+### Added
+- AI quality: hallucination-detect, context-blind, over-abstraction, stale-pattern
+- Security: security-theater
+- Developer experience: review-digest, adoption-track, finding-budget
+
 ## [3.59.0] — 2025-07-25
 
 ### Added

@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.60.0] — 2026-03-14
+
+### Added
+- **hallucination-detect** — Find fabricated API calls, non-existent methods, invented config options, and undeclared env vars
+- **context-blind** — Flag when AI reinvents utilities already present in the codebase (duplicate functions, redundant validators)
+- **over-abstraction** — Detect unnecessary abstractions: single-impl abstract classes, barely-used generics, delegation-only wrappers
+- **stale-pattern** — Identify outdated idioms when modern alternatives exist: callback→async, var→const, deprecated APIs, legacy React
+- **security-theater** — Detect security-looking code with no protection: weak hashing, unverified CSRF, wildcard CORS, hardcoded keys
+- **review-digest** — Generate concise role-appropriate review summaries with risk scores, hot files, and action items
+- **adoption-track** — Measure team-level Judges adoption metrics: config completeness, suppression rates, cold spots
+- **finding-budget** — Manage finding volume per PR to prevent alert fatigue with risk-based prioritization and graduated disclosure
+
 ## [3.59.0] — 2025-07-25
 
 ### Added
