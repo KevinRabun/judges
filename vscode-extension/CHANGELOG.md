@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.48.0] — 2026-03-12
+
+### Added
+- **Auto-fix** — Automated fix suggestions for 10 common vulnerability patterns
+- **Audit trail** — Chain-of-custody tracking for finding lifecycle events
+- **Pattern registry** — Team security pattern knowledge repository
+- **Security maturity** — Posture maturity assessment across 5 dimensions
+- **Perf hotspot** — Performance anti-pattern detection
+- **Doc gen** — Security documentation generation (policy, remediation, playbook)
+- **Dep correlate** — Dependency vulnerability correlation with upgrade recommendations
+- **Judge author** — Custom judge authoring toolkit
+
 ## [3.47.0] — 2026-03-12
 
 ### Added

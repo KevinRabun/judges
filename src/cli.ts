@@ -370,6 +370,14 @@ USAGE:
   judges pr-quality-gate              Automated PR pass/fail quality gate
   judges ai-prompt-audit              Scan for prompt injection risks
   judges adoption-report              Team adoption metrics dashboard
+  judges auto-fix                     Automated fix suggestions for findings
+  judges audit-trail                  Chain-of-custody tracking for findings
+  judges pattern-registry             Team security pattern knowledge repo
+  judges security-maturity            Security posture maturity assessment
+  judges perf-hotspot                 Performance anti-pattern detection
+  judges doc-gen                      Generate security documentation
+  judges dep-correlate                Dependency vulnerability correlation
+  judges judge-author                 Custom judge authoring toolkit
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1516,6 +1524,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "adoption-report") {
     const { runAdoptionReport } = await import("./commands/adoption-report.js");
     runAdoptionReport(argv);
+    return;
+  }
+
+  // ─── Auto-Fix Command ────────────────────────────────────────
+  if (args.command === "auto-fix") {
+    const { runAutoFix } = await import("./commands/auto-fix.js");
+    runAutoFix(argv);
+    return;
+  }
+
+  // ─── Audit Trail Command ─────────────────────────────────────
+  if (args.command === "audit-trail") {
+    const { runAuditTrail } = await import("./commands/audit-trail.js");
+    runAuditTrail(argv);
+    return;
+  }
+
+  // ─── Pattern Registry Command ────────────────────────────────
+  if (args.command === "pattern-registry") {
+    const { runPatternRegistry } = await import("./commands/pattern-registry.js");
+    runPatternRegistry(argv);
+    return;
+  }
+
+  // ─── Security Maturity Command ───────────────────────────────
+  if (args.command === "security-maturity") {
+    const { runSecurityMaturity } = await import("./commands/security-maturity.js");
+    runSecurityMaturity(argv);
+    return;
+  }
+
+  // ─── Perf Hotspot Command ────────────────────────────────────
+  if (args.command === "perf-hotspot") {
+    const { runPerfHotspot } = await import("./commands/perf-hotspot.js");
+    runPerfHotspot(argv);
+    return;
+  }
+
+  // ─── Doc Gen Command ─────────────────────────────────────────
+  if (args.command === "doc-gen") {
+    const { runDocGen } = await import("./commands/doc-gen.js");
+    runDocGen(argv);
+    return;
+  }
+
+  // ─── Dep Correlate Command ───────────────────────────────────
+  if (args.command === "dep-correlate") {
+    const { runDepCorrelate } = await import("./commands/dep-correlate.js");
+    runDepCorrelate(argv);
+    return;
+  }
+
+  // ─── Judge Author Command ────────────────────────────────────
+  if (args.command === "judge-author") {
+    const { runJudgeAuthor } = await import("./commands/judge-author.js");
+    runJudgeAuthor(argv);
     return;
   }
 

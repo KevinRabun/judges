@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.48.0] — 2026-03-12
+
+### Added
+- `judges auto-fix` — Automated fix suggestions with 10 fix templates for common vulnerability patterns
+- `judges audit-trail` — Chain-of-custody tracking for findings (created, reviewed, suppressed, resolved, reopened, escalated, voted)
+- `judges pattern-registry` — Team security pattern knowledge repository with built-in and custom patterns
+- `judges security-maturity` — Security posture maturity assessment across 5 dimensions (scanning, finding mgmt, compliance, collaboration, AI readiness)
+- `judges perf-hotspot` — Performance anti-pattern detection (N+1 queries, unbounded collections, sync I/O, string concat loops)
+- `judges doc-gen` — Generate security documentation (policy, remediation guide, team playbook)
+- `judges dep-correlate` — Dependency vulnerability correlation and upgrade priority recommendations
+- `judges judge-author` — Custom judge authoring toolkit (scaffold, validate, test)
+
 ## [3.47.0] — 2026-03-12
 
 ### Added
