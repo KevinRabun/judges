@@ -570,6 +570,14 @@ USAGE:
   judges finding-deduplicate          Detect and deduplicate similar findings
   judges review-score-history         Track review scores over time
   judges review-feedback              Collect user feedback on review quality
+  judges finding-false-positive       Track and manage false positive findings
+  judges review-session               Group reviews into named sessions
+  judges review-bulk-action           Apply bulk actions across findings
+  judges review-retry                 Retry failed or incomplete reviews
+  judges review-depth                 Control review depth (shallow/normal/deep)
+  judges finding-link                 Link related findings across files
+  judges review-compare-version       Compare review results between versions
+  judges review-summary-email         Generate email-ready review summaries
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3116,6 +3124,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-feedback") {
     const { runReviewFeedback } = await import("./commands/review-feedback.js");
     runReviewFeedback(argv);
+    return;
+  }
+
+  // ─── Finding False Positive Command ───────────────────────────────
+  if (args.command === "finding-false-positive") {
+    const { runFindingFalsePositive } = await import("./commands/finding-false-positive.js");
+    runFindingFalsePositive(argv);
+    return;
+  }
+
+  // ─── Review Session Command ───────────────────────────────────────
+  if (args.command === "review-session") {
+    const { runReviewSession } = await import("./commands/review-session.js");
+    runReviewSession(argv);
+    return;
+  }
+
+  // ─── Review Bulk Action Command ───────────────────────────────────
+  if (args.command === "review-bulk-action") {
+    const { runReviewBulkAction } = await import("./commands/review-bulk-action.js");
+    runReviewBulkAction(argv);
+    return;
+  }
+
+  // ─── Review Retry Command ─────────────────────────────────────────
+  if (args.command === "review-retry") {
+    const { runReviewRetry } = await import("./commands/review-retry.js");
+    runReviewRetry(argv);
+    return;
+  }
+
+  // ─── Review Depth Command ─────────────────────────────────────────
+  if (args.command === "review-depth") {
+    const { runReviewDepth } = await import("./commands/review-depth.js");
+    runReviewDepth(argv);
+    return;
+  }
+
+  // ─── Finding Link Command ─────────────────────────────────────────
+  if (args.command === "finding-link") {
+    const { runFindingLink } = await import("./commands/finding-link.js");
+    runFindingLink(argv);
+    return;
+  }
+
+  // ─── Review Compare Version Command ───────────────────────────────
+  if (args.command === "review-compare-version") {
+    const { runReviewCompareVersion } = await import("./commands/review-compare-version.js");
+    runReviewCompareVersion(argv);
+    return;
+  }
+
+  // ─── Review Summary Email Command ─────────────────────────────────
+  if (args.command === "review-summary-email") {
+    const { runReviewSummaryEmail } = await import("./commands/review-summary-email.js");
+    runReviewSummaryEmail(argv);
     return;
   }
 

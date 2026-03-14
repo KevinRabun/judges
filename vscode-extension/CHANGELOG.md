@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.73.0] — 2026-03-14
+
+### Added
+- False positive tracking: finding-false-positive
+- Review sessions: review-session
+- Bulk actions: review-bulk-action
+- Retry & depth control: review-retry, review-depth
+- Finding links: finding-link
+- Version comparison: review-compare-version
+- Email summaries: review-summary-email
+
 ## [3.72.0] — 2026-03-14
 
 ### Added

@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.73.0] — 2026-03-14
+
+### Added
+- False positive management: finding-false-positive (track and manage false positive findings)
+- Review sessions: review-session (group reviews into named sessions)
+- Bulk actions: review-bulk-action (dismiss, suppress, approve findings in bulk)
+- Review retry: review-retry (retry failed or incomplete reviews)
+- Review depth: review-depth (control review depth — shallow, normal, deep)
+- Finding links: finding-link (link related findings across files)
+- Version comparison: review-compare-version (compare results between code versions)
+- Email summaries: review-summary-email (generate email-ready review summaries)
+
 ## [3.72.0] — 2026-03-14
 
 ### Added
