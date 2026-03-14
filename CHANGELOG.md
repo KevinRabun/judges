@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.56.0] — 2025-07-25
+
+### Added
+- **api-versioning-audit** — Detect breaking changes and versioning policy violations across API surfaces
+- **ownership-map** — Generate and validate CODEOWNERS coverage, stale owners, and orphaned paths
+- **retry-pattern-audit** — Audit retry, backoff, and circuit-breaker patterns for correctness
+- **error-taxonomy** — Classify and standardize error codes, messages, and hierarchies
+- **boundary-enforce** — Validate architectural module boundaries and import rules
+- **log-quality** — Assess logging hygiene: structured format consistency, PII leaks, level correctness
+- **null-safety-audit** — Identify null/undefined dereference risks, missing guards, and inconsistent nullability
+- **test-isolation** — Detect shared mutable state, ordering dependencies, and resource leaks between tests
+
 ## [3.55.0] — 2025-07-25
 
 ### Added

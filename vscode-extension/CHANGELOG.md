@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.56.0] — 2025-07-25
+
+### Added
+- API governance: api-versioning-audit (breaking change detection), ownership-map (CODEOWNERS validation)
+- Resilience: retry-pattern-audit (backoff/circuit-breaker correctness), error-taxonomy (error standardization)
+- Architecture: boundary-enforce (module boundary validation), log-quality (logging hygiene)
+- Safety: null-safety-audit (null dereference risks), test-isolation (test coupling detection)
+
 ## [3.55.0] — 2025-07-25
 
 ### Added

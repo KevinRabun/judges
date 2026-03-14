@@ -434,6 +434,14 @@ USAGE:
   judges secret-age                   Credential lifecycle & rotation analysis
   judges observability-gap            Detect missing instrumentation
   judges migration-safety             Validate migration PRs for risks
+  judges api-versioning-audit         Detect API breaking changes & versioning gaps
+  judges ownership-map                Validate CODEOWNERS coverage & staleness
+  judges retry-pattern-audit          Audit retry, backoff & circuit-breaker patterns
+  judges error-taxonomy               Classify & standardize error codes/messages
+  judges boundary-enforce             Validate architectural module boundaries
+  judges log-quality                  Assess logging hygiene & PII leak risks
+  judges null-safety-audit            Identify null/undefined dereference risks
+  judges test-isolation               Detect test isolation violations & leaks
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2028,6 +2036,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "migration-safety") {
     const { runMigrationSafety } = await import("./commands/migration-safety.js");
     runMigrationSafety(argv);
+    return;
+  }
+
+  // ─── API Versioning Audit Command ────────────────────────────────
+  if (args.command === "api-versioning-audit") {
+    const { runApiVersioningAudit } = await import("./commands/api-versioning-audit.js");
+    runApiVersioningAudit(argv);
+    return;
+  }
+
+  // ─── Ownership Map Command ───────────────────────────────────────
+  if (args.command === "ownership-map") {
+    const { runOwnershipMap } = await import("./commands/ownership-map.js");
+    runOwnershipMap(argv);
+    return;
+  }
+
+  // ─── Retry Pattern Audit Command ─────────────────────────────────
+  if (args.command === "retry-pattern-audit") {
+    const { runRetryPatternAudit } = await import("./commands/retry-pattern-audit.js");
+    runRetryPatternAudit(argv);
+    return;
+  }
+
+  // ─── Error Taxonomy Command ──────────────────────────────────────
+  if (args.command === "error-taxonomy") {
+    const { runErrorTaxonomy } = await import("./commands/error-taxonomy.js");
+    runErrorTaxonomy(argv);
+    return;
+  }
+
+  // ─── Boundary Enforce Command ────────────────────────────────────
+  if (args.command === "boundary-enforce") {
+    const { runBoundaryEnforce } = await import("./commands/boundary-enforce.js");
+    runBoundaryEnforce(argv);
+    return;
+  }
+
+  // ─── Log Quality Command ─────────────────────────────────────────
+  if (args.command === "log-quality") {
+    const { runLogQuality } = await import("./commands/log-quality.js");
+    runLogQuality(argv);
+    return;
+  }
+
+  // ─── Null Safety Audit Command ───────────────────────────────────
+  if (args.command === "null-safety-audit") {
+    const { runNullSafetyAudit } = await import("./commands/null-safety-audit.js");
+    runNullSafetyAudit(argv);
+    return;
+  }
+
+  // ─── Test Isolation Command ──────────────────────────────────────
+  if (args.command === "test-isolation") {
+    const { runTestIsolation } = await import("./commands/test-isolation.js");
+    runTestIsolation(argv);
     return;
   }
 
