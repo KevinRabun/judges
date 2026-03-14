@@ -586,6 +586,14 @@ USAGE:
   judges review-snapshot-diff         Diff between review snapshots
   judges finding-resolution           Track finding resolution status
   judges review-owner                 Assign review ownership to team members
+  judges review-checklist             Manage pre/post-review checklists
+  judges finding-category             Categorize findings into custom groups
+  judges review-lock                  Lock reviews to prevent re-runs
+  judges finding-priority-queue       Queue findings by priority for triage
+  judges review-diff-annotate         Annotate diff hunks with findings
+  judges finding-remediation-plan     Generate remediation plans from findings
+  judges review-config-validate       Validate review configuration files
+  judges review-rate-limit            Control review execution frequency
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3244,6 +3252,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-owner") {
     const { runReviewOwner } = await import("./commands/review-owner.js");
     runReviewOwner(argv);
+    return;
+  }
+
+  // ─── Review Checklist Command ─────────────────────────────────────
+  if (args.command === "review-checklist") {
+    const { runReviewChecklist } = await import("./commands/review-checklist.js");
+    runReviewChecklist(argv);
+    return;
+  }
+
+  // ─── Finding Category Command ─────────────────────────────────────
+  if (args.command === "finding-category") {
+    const { runFindingCategory } = await import("./commands/finding-category.js");
+    runFindingCategory(argv);
+    return;
+  }
+
+  // ─── Review Lock Command ────────────────────────────────────────
+  if (args.command === "review-lock") {
+    const { runReviewLock } = await import("./commands/review-lock.js");
+    runReviewLock(argv);
+    return;
+  }
+
+  // ─── Finding Priority Queue Command ─────────────────────────────
+  if (args.command === "finding-priority-queue") {
+    const { runFindingPriorityQueue } = await import("./commands/finding-priority-queue.js");
+    runFindingPriorityQueue(argv);
+    return;
+  }
+
+  // ─── Review Diff Annotate Command ───────────────────────────────
+  if (args.command === "review-diff-annotate") {
+    const { runReviewDiffAnnotate } = await import("./commands/review-diff-annotate.js");
+    runReviewDiffAnnotate(argv);
+    return;
+  }
+
+  // ─── Finding Remediation Plan Command ───────────────────────────
+  if (args.command === "finding-remediation-plan") {
+    const { runFindingRemediationPlan } = await import("./commands/finding-remediation-plan.js");
+    runFindingRemediationPlan(argv);
+    return;
+  }
+
+  // ─── Review Config Validate Command ─────────────────────────────
+  if (args.command === "review-config-validate") {
+    const { runReviewConfigValidate } = await import("./commands/review-config-validate.js");
+    runReviewConfigValidate(argv);
+    return;
+  }
+
+  // ─── Review Rate Limit Command ──────────────────────────────────
+  if (args.command === "review-rate-limit") {
+    const { runReviewRateLimit } = await import("./commands/review-rate-limit.js");
+    runReviewRateLimit(argv);
     return;
   }
 

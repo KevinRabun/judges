@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.75.0] — 2026-03-14
+
+### Added
+- Checklists: review-checklist (pre/post-review checklists)
+- Categories: finding-category (custom finding groups)
+- Locking: review-lock (prevent review re-runs)
+- Priority queue: finding-priority-queue (prioritized triage)
+- Diff annotation: review-diff-annotate (annotate diffs with findings)
+- Remediation: finding-remediation-plan (generate remediation plans)
+- Config validation: review-config-validate (validate config files)
+- Rate limiting: review-rate-limit (control review frequency)
+
 ## [3.74.0] — 2026-03-14
 
 ### Added

@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.75.0] — 2026-03-14
+
+### Added
+- Review checklists: review-checklist (manage pre/post-review checklists)
+- Finding categories: finding-category (categorize findings into custom groups)
+- Review locking: review-lock (lock reviews to prevent re-runs)
+- Priority queue: finding-priority-queue (queue findings by priority for triage)
+- Diff annotation: review-diff-annotate (annotate diff hunks with findings)
+- Remediation plans: finding-remediation-plan (generate remediation plans from findings)
+- Config validation: review-config-validate (validate review configuration files)
+- Rate limiting: review-rate-limit (control review execution frequency)
+
 ## [3.74.0] — 2026-03-14
 
 ### Added
