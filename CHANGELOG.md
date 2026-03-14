@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.58.0] — 2025-07-25
+
+### Added
+- **dead-code-detect** — Find unreachable code, unused exports, orphaned functions, and dead branches via cross-file analysis
+- **async-safety** — Detect async anti-patterns: fire-and-forget promises, .then() without .catch(), await in loops, async in timers
+- **input-guard** — Verify input validation on route handlers, SQL/command injection, file upload limits, ReDoS, open redirects
+- **clone-detect** — Find duplicated code blocks and functions using normalized comparison across files
+- **contract-verify** — Check API spec vs implementation alignment: unimplemented routes, undocumented statuses, mixed versions
+- **encoding-safety** — Detect encoding/serialization hazards: eval(), unsafe deserialization, innerHTML, RegExp injection
+- **assertion-density** — Audit defensive checks: missing preconditions, division without zero-check, switch without default, unchecked Map.get
+- **state-integrity** — Validate state machine correctness: incomplete enum handling, impossible boolean combos, missing error states
+
 ## [3.57.0] — 2025-07-25
 
 ### Added

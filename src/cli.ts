@@ -450,6 +450,14 @@ USAGE:
   judges event-leak                   Detect orphaned listeners & subscriptions
   judges privilege-path               Model authorization escalation paths
   judges error-ux                     Audit user-facing error quality & safety
+  judges dead-code-detect             Find unreachable code & unused exports
+  judges async-safety                 Detect async anti-patterns & fire-and-forget
+  judges input-guard                  Verify input validation on all boundaries
+  judges clone-detect                 Find duplicated code blocks & functions
+  judges contract-verify              Check API spec vs implementation alignment
+  judges encoding-safety              Detect encoding/serialization hazards
+  judges assertion-density            Audit defensive checks & preconditions
+  judges state-integrity              Validate state machines & flag impossible states
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2156,6 +2164,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "error-ux") {
     const { runErrorUx } = await import("./commands/error-ux.js");
     runErrorUx(argv);
+    return;
+  }
+
+  // ─── Dead Code Detect Command ─────────────────────────────────────
+  if (args.command === "dead-code-detect") {
+    const { runDeadCodeDetect } = await import("./commands/dead-code-detect.js");
+    runDeadCodeDetect(argv);
+    return;
+  }
+
+  // ─── Async Safety Command ────────────────────────────────────────
+  if (args.command === "async-safety") {
+    const { runAsyncSafety } = await import("./commands/async-safety.js");
+    runAsyncSafety(argv);
+    return;
+  }
+
+  // ─── Input Guard Command ─────────────────────────────────────────
+  if (args.command === "input-guard") {
+    const { runInputGuard } = await import("./commands/input-guard.js");
+    runInputGuard(argv);
+    return;
+  }
+
+  // ─── Clone Detect Command ────────────────────────────────────────
+  if (args.command === "clone-detect") {
+    const { runCloneDetect } = await import("./commands/clone-detect.js");
+    runCloneDetect(argv);
+    return;
+  }
+
+  // ─── Contract Verify Command ─────────────────────────────────────
+  if (args.command === "contract-verify") {
+    const { runContractVerify } = await import("./commands/contract-verify.js");
+    runContractVerify(argv);
+    return;
+  }
+
+  // ─── Encoding Safety Command ─────────────────────────────────────
+  if (args.command === "encoding-safety") {
+    const { runEncodingSafety } = await import("./commands/encoding-safety.js");
+    runEncodingSafety(argv);
+    return;
+  }
+
+  // ─── Assertion Density Command ────────────────────────────────────
+  if (args.command === "assertion-density") {
+    const { runAssertionDensity } = await import("./commands/assertion-density.js");
+    runAssertionDensity(argv);
+    return;
+  }
+
+  // ─── State Integrity Command ──────────────────────────────────────
+  if (args.command === "state-integrity") {
+    const { runStateIntegrity } = await import("./commands/state-integrity.js");
+    runStateIntegrity(argv);
     return;
   }
 

@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.58.0] — 2025-07-25
+
+### Added
+- AI code correctness: dead-code-detect, async-safety, input-guard, clone-detect
+- Contract & encoding: contract-verify, encoding-safety
+- Runtime safety: assertion-density, state-integrity
+
 ## [3.57.0] — 2025-07-25
 
 ### Added
