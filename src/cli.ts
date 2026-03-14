@@ -330,6 +330,14 @@ USAGE:
   judges validate-config              Validate .judgesrc configuration
   judges coverage-map                 Show which rules apply to which languages
   judges warm-cache                   Pre-populate eval cache for faster CI
+  judges policy-audit                 Compliance audit trail with policy snapshots
+  judges remediation <rule-id>        Step-by-step fix guide for a finding
+  judges hook-install                 Install git pre-commit/pre-push hooks
+  judges false-negatives              Track and report false-negative feedback
+  judges assign                       Assign findings to team members
+  judges ticket-sync                  Create tickets from findings (Jira/Linear/GitHub)
+  judges sla-track                    SLA tracking and violation detection
+  judges regression-alert             Detect quality regressions between scans
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1196,6 +1204,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "warm-cache") {
     const { runWarmCache } = await import("./commands/warm-cache.js");
     await runWarmCache(argv);
+    return;
+  }
+
+  // ─── Policy Audit Command ──────────────────────────────────────────
+  if (args.command === "policy-audit") {
+    const { runPolicyAudit } = await import("./commands/policy-audit.js");
+    await runPolicyAudit(argv);
+    return;
+  }
+
+  // ─── Remediation Command ───────────────────────────────────────────
+  if (args.command === "remediation") {
+    const { runRemediationGuide } = await import("./commands/remediation.js");
+    runRemediationGuide(argv);
+    return;
+  }
+
+  // ─── Hook Install Command ─────────────────────────────────────────
+  if (args.command === "hook-install") {
+    const { runHookInstall } = await import("./commands/hook-install.js");
+    await runHookInstall(argv);
+    return;
+  }
+
+  // ─── False Negatives Command ──────────────────────────────────────
+  if (args.command === "false-negatives") {
+    const { runFalseNegativeReport } = await import("./commands/false-negatives.js");
+    await runFalseNegativeReport(argv);
+    return;
+  }
+
+  // ─── Assign Findings Command ──────────────────────────────────────
+  if (args.command === "assign") {
+    const { runAssignFindings } = await import("./commands/assign-findings.js");
+    await runAssignFindings(argv);
+    return;
+  }
+
+  // ─── Ticket Sync Command ─────────────────────────────────────────
+  if (args.command === "ticket-sync") {
+    const { runTicketSync } = await import("./commands/ticket-sync.js");
+    await runTicketSync(argv);
+    return;
+  }
+
+  // ─── SLA Track Command ───────────────────────────────────────────
+  if (args.command === "sla-track") {
+    const { runSlaTrack } = await import("./commands/sla-track.js");
+    await runSlaTrack(argv);
+    return;
+  }
+
+  // ─── Regression Alert Command ─────────────────────────────────────
+  if (args.command === "regression-alert") {
+    const { runRegressionAlert } = await import("./commands/regression-alert.js");
+    await runRegressionAlert(argv);
     return;
   }
 

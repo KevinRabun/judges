@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.43.0] — 2026-03-12
+
+### Added — Workflow Integration & Compliance (9 features)
+- **CI template generator** (`judges ci-template`) — Generate CI pipeline templates for GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket Pipelines, and CircleCI; auto-detect platform from repo structure; `--write` to create file directly
+- **Policy audit trail** (`judges policy-audit`) — SOC2/ISO27001 compliance audit trail with SHA-256 policy snapshots; records enabled/disabled judges, rules, overrides, and git commit; `--diff` compares policy changes; `--export` for external systems
+- **Remediation guides** (`judges remediation`) — 10 step-by-step fix guides for common finding categories (SQL injection, XSS, command injection, auth, crypto, SSRF, performance, error handling, concurrency, IaC); before/after code examples; OWASP/CWE references
+- **Git hook installation** (`judges hook-install`) — Install pre-commit/pre-push hooks with direct `.git/hooks` or Husky support; `JUDGES_SKIP_HOOK` env var to bypass; timeout protection; `--uninstall` support
+- **False-negative tracking** (`judges false-negatives`) — Local feedback database for tracking missed findings; `--add` with file/line/category/severity/description; `--resolve`; stats by category, severity, and language
+- **Finding assignment** (`judges assign`) — Assign findings to team members with local database; severity filtering; `--resolve` workflow; `--stats` for workload analysis
+- **Ticket sync** (`judges ticket-sync`) — Create tickets from findings in Jira, Linear, or GitHub Issues; severity filtering; `--dry-run` preview; supports `JUDGES_TICKET_TOKEN` env var
+- **SLA tracking** (`judges sla-track`) — Define response-time SLAs per severity and track violations; `--check` for violation detection; `--set-policy` to customize thresholds; local `.judges-sla.json` storage
+- **Regression alerting** (`judges regression-alert`) — Baseline snapshot comparison to detect quality regressions; `--save` to capture baseline; `--check` to compare; `--fail-on-regression` for CI gating; severity and rule-level delta reporting
+
 ## [3.42.0] — 2026-03-12
 
 ### Added — CI Integration & Review UX (10 features)

@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.43.0] — 2026-03-12
+
+### Added
+- **CI template generator** — Generate CI pipeline configs for 5 platforms with auto-detect
+- **Policy audit trail** — SOC2/ISO27001 compliance snapshots with SHA-256 hashing
+- **Remediation guides** — 10 step-by-step fix guides with OWASP/CWE references
+- **Git hook installation** — Install pre-commit/pre-push hooks (direct or Husky)
+- **False-negative tracking** — Local feedback database for missed findings
+- **Finding assignment** — Assign findings to team members with resolution workflow
+- **Ticket sync** — Create Jira/Linear/GitHub Issues from findings
+- **SLA tracking** — Response-time SLAs with violation detection
+- **Regression alerting** — Baseline comparison for quality regression detection
+
 ## [3.42.0] — 2026-03-12
 
 ### Added
