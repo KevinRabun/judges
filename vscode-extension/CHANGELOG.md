@@ -4,6 +4,20 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.42.0] — 2026-03-12
+
+### Added
+- **SARIF upload to GitHub Code Scanning** — Direct `judges upload` command for CI integration
+- **Smart judge selection** — Auto-select relevant judges per file language and content
+- **PR summary comment** — Post verdict summary as PR comment, updates in-place
+- **Performance profiling** — Track per-judge evaluation time with `judges profile`
+- **Finding grouping** — Group findings by category, severity, file, rule, or judge
+- **Diff-only evaluation** — Filter findings to only changed lines in PRs
+- **Confidence auto-triage** — Auto-suppress low-confidence findings
+- **Config validation** — Validate `.judgesrc` with typo suggestions
+- **Rule coverage map** — Visual matrix of rules × languages
+- **Eval cache warming** — Pre-populate cache for faster CI runs
+
 ## [3.41.0] — 2026-03-12
 
 ### Added

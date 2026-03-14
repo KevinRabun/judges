@@ -2,6 +2,23 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.42.0] — 2026-03-12
+
+### Added — CI Integration & Review UX (10 features)
+- **SARIF upload to GitHub Code Scanning** (`judges upload`) — Upload SARIF results directly to GitHub's Code Scanning API; auto-detects git ref, SHA, and repo; supports `GITHUB_TOKEN` env var; gzip+base64 encoding
+- **Smart judge selection** (`judges smart-select`) — Auto-select relevant judges based on file language and content signals; reduces noise by skipping irrelevant judges (e.g., IaC judge on `.tsx` files); exports `getRelevantJudges()` for programmatic use
+- **PR summary comment** (`judges pr-summary`) — Post a top-level PR comment with verdict, score, per-judge breakdown, and top findings; updates in-place on subsequent runs via comment marker; supports `--sarif` and `--json` input
+- **Performance profiling** (`judges profile`) — Track evaluation time per judge with `JUDGES_PROFILE=1`; view timing reports with slow-judge warnings; bar chart visualization in terminal
+- **Finding grouping** (`judges group`) — Group findings by category, severity, file, rule, or judge for digest-style review; automatic category classification from rule ID prefixes
+- **Diff-only evaluation** (`judges diff-only`) — Filter findings to only changed lines in a PR; parses unified diff output; supports `--base <ref>` and `--diff-file`; dramatically reduces CI review noise
+- **Confidence auto-triage** (`judges auto-triage`) — Auto-suppress findings below configurable confidence threshold; per-severity threshold overrides; always-keep and always-suppress rule lists; audit trail preserved
+- **Config validation** (`judges validate-config`) — Validate `.judgesrc` against known fields with Levenshtein-based typo suggestions; checks severity, format, concurrency, quality gate, and notification config; `--strict` mode
+- **Rule coverage map** (`judges coverage-map`) — Visual matrix of which rules apply to which languages; stats by language and judge; `--languages` filter; coverage gap identification
+- **Eval cache warming** (`judges warm-cache`) — Pre-populate disk cache with file hashes for faster CI runs; supports `--max`, `--root`, `--extensions`; skips already-warm files
+
+### Tests
+- 2,267 tests passing (1,082 main + 1,185 additional suites), 0 failures
+
 ## [3.41.0] — 2026-03-12
 
 ### Added — Adoption Gap Closure (12 features)

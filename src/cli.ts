@@ -320,6 +320,16 @@ USAGE:
   judges config-migrate               Migrate .judgesrc to current schema
   judges deprecated                   List deprecated rules with migration guidance
   judges dedup-report                 Cross-run finding deduplication report
+  judges upload                       Upload SARIF results to GitHub Code Scanning
+  judges smart-select                 Show which judges are relevant for a file
+  judges pr-summary                   Post a PR summary comment with verdict
+  judges profile                      Performance profiling for judge evaluations
+  judges group                        Group findings by category, severity, or file
+  judges diff-only                    Evaluate only changed lines in a PR diff
+  judges auto-triage                  Auto-suppress low-confidence findings
+  judges validate-config              Validate .judgesrc configuration
+  judges coverage-map                 Show which rules apply to which languages
+  judges warm-cache                   Pre-populate eval cache for faster CI
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1116,6 +1126,76 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "dedup-report") {
     const { runDedupReport } = await import("./commands/dedup-report.js");
     runDedupReport(argv);
+    return;
+  }
+
+  // ─── Upload Command ───────────────────────────────────────────────
+  if (args.command === "upload") {
+    const { runUpload } = await import("./commands/upload.js");
+    await runUpload(argv);
+    return;
+  }
+
+  // ─── Smart Select Command ─────────────────────────────────────────
+  if (args.command === "smart-select") {
+    const { runSmartSelect } = await import("./commands/smart-select.js");
+    runSmartSelect(argv);
+    return;
+  }
+
+  // ─── PR Summary Command ──────────────────────────────────────────
+  if (args.command === "pr-summary") {
+    const { runPrSummary } = await import("./commands/pr-summary.js");
+    await runPrSummary(argv);
+    return;
+  }
+
+  // ─── Profile Command ─────────────────────────────────────────────
+  if (args.command === "profile") {
+    const { runProfile } = await import("./commands/profile.js");
+    runProfile(argv);
+    return;
+  }
+
+  // ─── Group Findings Command ───────────────────────────────────────
+  if (args.command === "group") {
+    const { runGroupFindings } = await import("./commands/group-findings.js");
+    runGroupFindings(argv);
+    return;
+  }
+
+  // ─── Diff-Only Command ───────────────────────────────────────────
+  if (args.command === "diff-only") {
+    const { runDiffOnly } = await import("./commands/diff-only.js");
+    await runDiffOnly(argv);
+    return;
+  }
+
+  // ─── Auto-Triage Command ─────────────────────────────────────────
+  if (args.command === "auto-triage") {
+    const { runAutoTriage } = await import("./commands/auto-triage.js");
+    runAutoTriage(argv);
+    return;
+  }
+
+  // ─── Validate Config Command ─────────────────────────────────────
+  if (args.command === "validate-config") {
+    const { runValidateConfig } = await import("./commands/validate-config.js");
+    runValidateConfig(argv);
+    return;
+  }
+
+  // ─── Coverage Map Command ────────────────────────────────────────
+  if (args.command === "coverage-map") {
+    const { runCoverageMap } = await import("./commands/coverage-map.js");
+    runCoverageMap(argv);
+    return;
+  }
+
+  // ─── Warm Cache Command ──────────────────────────────────────────
+  if (args.command === "warm-cache") {
+    const { runWarmCache } = await import("./commands/warm-cache.js");
+    await runWarmCache(argv);
     return;
   }
 
