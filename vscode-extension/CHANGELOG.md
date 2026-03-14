@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.53.0] — 2025-07-25
+
+### Added
+- Code quality analysis: doc-drift, exception-consistency, resource-cleanup, refactor-safety, code-similarity
+- Enterprise compliance: compliance-weight (PCI-DSS, HIPAA, GDPR, SOC2, ISO27001), team-trust profiles
+- Pattern detection: cross-pr-regression tracking across PRs
+
 ## [3.52.0] — 2025-07-25
 
 ### Added

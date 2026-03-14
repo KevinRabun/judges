@@ -410,6 +410,14 @@ USAGE:
   judges chat-notify                  Publish findings to chat platforms
   judges design-audit                 Detect code breaking project conventions
   judges remediation-lib              Proven fix templates for common findings
+  judges doc-drift                    Detect documentation-to-code drift
+  judges cross-pr-regression          Track flagged pattern recurrence across PRs
+  judges code-similarity              Compare code across files for duplication
+  judges team-trust                   Team-wide trust profile aggregation
+  judges exception-consistency        Detect inconsistent exception handling
+  judges resource-cleanup             Validate resource cleanup patterns
+  judges refactor-safety              Analyze refactoring safety
+  judges compliance-weight            Re-weight findings by compliance framework
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1836,6 +1844,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "remediation-lib") {
     const { runRemediationLib } = await import("./commands/remediation-lib.js");
     runRemediationLib(argv);
+    return;
+  }
+
+  // ─── Doc Drift Command ───────────────────────────────────────
+  if (args.command === "doc-drift") {
+    const { runDocDrift } = await import("./commands/doc-drift.js");
+    runDocDrift(argv);
+    return;
+  }
+
+  // ─── Cross-PR Regression Command ─────────────────────────────
+  if (args.command === "cross-pr-regression") {
+    const { runCrossPrRegression } = await import("./commands/cross-pr-regression.js");
+    runCrossPrRegression(argv);
+    return;
+  }
+
+  // ─── Code Similarity Command ─────────────────────────────────
+  if (args.command === "code-similarity") {
+    const { runCodeSimilarity } = await import("./commands/code-similarity.js");
+    runCodeSimilarity(argv);
+    return;
+  }
+
+  // ─── Team Trust Command ──────────────────────────────────────
+  if (args.command === "team-trust") {
+    const { runTeamTrust } = await import("./commands/team-trust.js");
+    runTeamTrust(argv);
+    return;
+  }
+
+  // ─── Exception Consistency Command ───────────────────────────
+  if (args.command === "exception-consistency") {
+    const { runExceptionConsistency } = await import("./commands/exception-consistency.js");
+    runExceptionConsistency(argv);
+    return;
+  }
+
+  // ─── Resource Cleanup Command ────────────────────────────────
+  if (args.command === "resource-cleanup") {
+    const { runResourceCleanup } = await import("./commands/resource-cleanup.js");
+    runResourceCleanup(argv);
+    return;
+  }
+
+  // ─── Refactor Safety Command ─────────────────────────────────
+  if (args.command === "refactor-safety") {
+    const { runRefactorSafety } = await import("./commands/refactor-safety.js");
+    runRefactorSafety(argv);
+    return;
+  }
+
+  // ─── Compliance Weight Command ───────────────────────────────
+  if (args.command === "compliance-weight") {
+    const { runComplianceWeight } = await import("./commands/compliance-weight.js");
+    runComplianceWeight(argv);
     return;
   }
 

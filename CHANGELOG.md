@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.53.0] — 2025-07-25
+
+### Added
+- **doc-drift** — Detect documentation-to-code drift (@param mismatches, stale @returns, dead doc blocks)
+- **cross-pr-regression** — Track flagged pattern recurrence across PRs (SQL injection, eval, innerHTML, etc.)
+- **code-similarity** — Compare code across files for duplication using line-level and N-gram structural similarity
+- **team-trust** — Aggregate team-wide false-positive/true-positive feedback to build collective trust profiles
+- **exception-consistency** — Detect inconsistent exception handling (empty catch, throw string, mixed strategies)
+- **resource-cleanup** — Validate resource cleanup patterns (file handles, DB connections, timers, streams)
+- **refactor-safety** — Analyze refactoring safety (orphaned imports, deprecated-still-used, dead files)
+- **compliance-weight** — Re-weight finding severity by active compliance frameworks (PCI-DSS, HIPAA, GDPR, SOC2, ISO27001)
+
 ## [3.52.0] — 2025-07-25
 
 ### Added
