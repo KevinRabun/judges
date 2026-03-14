@@ -4,6 +4,12 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.51.0] — 2025-07-25
+
+### Added
+- AI output comparison, hallucination scoring, AI pre-merge gating, AI pattern trend tracking
+- Test scenario suggestions, vendor lock-in detection, code clarity scoring, architecture auditing
+
 ## [3.50.0] — 2025-07-25
 
 ### Added

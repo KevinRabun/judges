@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.51.0] — 2025-07-25
+
+### Added
+- **`judges ai-output-compare`** — Compare outputs from multiple AI models (divergence detection across complexity, patterns, structure, dependencies; structural similarity score 0-100)
+- **`judges hallucination-score`** — Hallucination risk score (0-100) with 10 weighted signal detectors: suspicious imports, generic naming, TODOs, dead code, tautologies, copy-paste artifacts, magic numbers, empty catch, commented code, empty functions
+- **`judges ai-gate`** — Pre-commit/pre-PR guard blocking AI-generated code below confidence threshold (8 AI detection signals; --block flag for CI exit code 1; report generation to `.judges-ai-gate/`)
+- **`judges ai-pattern-trend`** — Track AI-generated code pattern evolution over time (snapshot capture to `.judges-ai-trend/history.json`; trend arrows for metric changes across snapshots)
+- **`judges test-suggest`** — Test scenario suggestions for AI-generated code (function extraction; 10 suggestion categories: null input, empty input, error path, async error, boundary, type coercion, regex edge case, file IO, state mutation, return consistency)
+- **`judges vendor-lock-detect`** — Vendor-specific API/SDK detection (AWS, Azure, GCP, Vercel, Cloudflare, Firebase, Stripe, Twilio, Docker, MongoDB, PostgreSQL; portability scoring 0-100)
+- **`judges clarity-score`** — Code readability and self-documentation score (naming quality, comment coverage, function length, line length, nesting depth, magic values, style consistency; A-F grading)
+- **`judges arch-audit`** — Architecture quality audit (coupling, separation of concerns, dependency injection, testability, single responsibility, scalability patterns; A-F grading with issue severity)
+
 ## [3.50.0] — 2025-07-25
 
 ### Added

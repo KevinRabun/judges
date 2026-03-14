@@ -394,6 +394,14 @@ USAGE:
   judges perf-compare                 Before/after performance comparison
   judges guided-tour                  Interactive onboarding tutorials
   judges exec-report                  Executive security dashboard
+  judges ai-output-compare            Compare outputs from multiple AI models
+  judges hallucination-score          Hallucination risk score for AI code
+  judges ai-gate                      Pre-merge gate for AI-generated code
+  judges ai-pattern-trend             Track AI code pattern evolution over time
+  judges test-suggest                 Test scenario suggestions for AI code
+  judges vendor-lock-detect           Detect vendor-specific API lock-in
+  judges clarity-score                Code readability and self-documentation score
+  judges arch-audit                   Architecture quality audit
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1708,6 +1716,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "exec-report") {
     const { runExecReport } = await import("./commands/exec-report.js");
     runExecReport(argv);
+    return;
+  }
+
+  // ─── AI Output Compare Command ───────────────────────────────
+  if (args.command === "ai-output-compare") {
+    const { runAiOutputCompare } = await import("./commands/ai-output-compare.js");
+    runAiOutputCompare(argv);
+    return;
+  }
+
+  // ─── Hallucination Score Command ─────────────────────────────
+  if (args.command === "hallucination-score") {
+    const { runHallucinationScore } = await import("./commands/hallucination-score.js");
+    runHallucinationScore(argv);
+    return;
+  }
+
+  // ─── AI Gate Command ─────────────────────────────────────────
+  if (args.command === "ai-gate") {
+    const { runAiGate } = await import("./commands/ai-gate.js");
+    runAiGate(argv);
+    return;
+  }
+
+  // ─── AI Pattern Trend Command ────────────────────────────────
+  if (args.command === "ai-pattern-trend") {
+    const { runAiPatternTrend } = await import("./commands/ai-pattern-trend.js");
+    runAiPatternTrend(argv);
+    return;
+  }
+
+  // ─── Test Suggest Command ────────────────────────────────────
+  if (args.command === "test-suggest") {
+    const { runTestSuggest } = await import("./commands/test-suggest.js");
+    runTestSuggest(argv);
+    return;
+  }
+
+  // ─── Vendor Lock Detect Command ──────────────────────────────
+  if (args.command === "vendor-lock-detect") {
+    const { runVendorLockDetect } = await import("./commands/vendor-lock-detect.js");
+    runVendorLockDetect(argv);
+    return;
+  }
+
+  // ─── Clarity Score Command ───────────────────────────────────
+  if (args.command === "clarity-score") {
+    const { runClarityScore } = await import("./commands/clarity-score.js");
+    runClarityScore(argv);
+    return;
+  }
+
+  // ─── Arch Audit Command ──────────────────────────────────────
+  if (args.command === "arch-audit") {
+    const { runArchAudit } = await import("./commands/arch-audit.js");
+    runArchAudit(argv);
     return;
   }
 
