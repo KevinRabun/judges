@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.76.0] — 2026-03-14
+
+### Added
+- Finding trends: finding-trend (show finding trends over time)
+- Code snippets: finding-snippet (extract code snippets from findings with context)
+- Environment check: review-env-check (verify review environment prerequisites)
+- Batch resolve: finding-batch-resolve (resolve multiple findings in bulk)
+- CI/CD integration test: review-integration-test (validate CI/CD integration)
+- Health check: review-health-check (diagnose review system health)
+- Age report: finding-age-report (report on finding ages and staleness)
+- Rule stats: review-rule-stats (per-rule statistics across reviews)
+- Parallel diff: review-parallel-diff (review multiple diff hunks)
+
 ## [3.75.0] — 2026-03-14
 
 ### Added

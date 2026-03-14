@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.76.0] — 2026-03-14
+
+### Added
+- Trends: finding-trend (track finding trends)
+- Snippets: finding-snippet (extract code snippets from findings)
+- Env check: review-env-check (verify prerequisites)
+- Batch resolve: finding-batch-resolve (bulk finding resolution)
+- Integration test: review-integration-test (CI/CD validation)
+- Health check: review-health-check (system diagnostics)
+- Age report: finding-age-report (finding staleness tracking)
+- Rule stats: review-rule-stats (per-rule statistics)
+- Parallel diff: review-parallel-diff (multi-hunk review)
+
 ## [3.75.0] — 2026-03-14
 
 ### Added

@@ -594,6 +594,15 @@ USAGE:
   judges finding-remediation-plan     Generate remediation plans from findings
   judges review-config-validate       Validate review configuration files
   judges review-rate-limit            Control review execution frequency
+  judges finding-trend                Show finding trends over time
+  judges finding-snippet              Extract code snippets from findings
+  judges review-env-check             Verify review environment prerequisites
+  judges finding-batch-resolve        Resolve multiple findings in bulk
+  judges review-integration-test      Validate CI/CD integration
+  judges review-health-check          Diagnose review system health
+  judges finding-age-report           Report on finding ages and staleness
+  judges review-rule-stats            Per-rule statistics across reviews
+  judges review-parallel-diff         Review multiple diff hunks
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3308,6 +3317,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-rate-limit") {
     const { runReviewRateLimit } = await import("./commands/review-rate-limit.js");
     runReviewRateLimit(argv);
+    return;
+  }
+
+  // ─── Finding Trend Command ────────────────────────────────────────
+  if (args.command === "finding-trend") {
+    const { runFindingTrend } = await import("./commands/finding-trend.js");
+    runFindingTrend(argv);
+    return;
+  }
+
+  // ─── Finding Snippet Command ──────────────────────────────────────
+  if (args.command === "finding-snippet") {
+    const { runFindingSnippet } = await import("./commands/finding-snippet.js");
+    runFindingSnippet(argv);
+    return;
+  }
+
+  // ─── Review Env Check Command ─────────────────────────────────────
+  if (args.command === "review-env-check") {
+    const { runReviewEnvCheck } = await import("./commands/review-env-check.js");
+    runReviewEnvCheck(argv);
+    return;
+  }
+
+  // ─── Finding Batch Resolve Command ────────────────────────────────
+  if (args.command === "finding-batch-resolve") {
+    const { runFindingBatchResolve } = await import("./commands/finding-batch-resolve.js");
+    runFindingBatchResolve(argv);
+    return;
+  }
+
+  // ─── Review Integration Test Command ──────────────────────────────
+  if (args.command === "review-integration-test") {
+    const { runReviewIntegrationTest } = await import("./commands/review-integration-test.js");
+    runReviewIntegrationTest(argv);
+    return;
+  }
+
+  // ─── Review Health Check Command ──────────────────────────────────
+  if (args.command === "review-health-check") {
+    const { runReviewHealthCheck } = await import("./commands/review-health-check.js");
+    runReviewHealthCheck(argv);
+    return;
+  }
+
+  // ─── Finding Age Report Command ───────────────────────────────────
+  if (args.command === "finding-age-report") {
+    const { runFindingAgeReport } = await import("./commands/finding-age-report.js");
+    runFindingAgeReport(argv);
+    return;
+  }
+
+  // ─── Review Rule Stats Command ────────────────────────────────────
+  if (args.command === "review-rule-stats") {
+    const { runReviewRuleStats } = await import("./commands/review-rule-stats.js");
+    runReviewRuleStats(argv);
+    return;
+  }
+
+  // ─── Review Parallel Diff Command ─────────────────────────────────
+  if (args.command === "review-parallel-diff") {
+    const { runReviewParallelDiff } = await import("./commands/review-parallel-diff.js");
+    runReviewParallelDiff(argv);
     return;
   }
 
