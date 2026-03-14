@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.79.0] — 2026-03-14
+
+### Added
+- Group by: finding-group-by (category/severity/file grouping)
+- Diff highlight: finding-diff-highlight (inline diff annotation)
+- Fix verify: finding-fix-verify (fix validation)
+- Custom judges: review-custom-judge (user-defined judge management)
+- Prioritize: finding-prioritize (business impact prioritization)
+- Annotations: review-annotation (result annotations)
+- Multi-repo: review-multi-repo (cross-repository review)
+- Finding trace: finding-trace (origin commit tracing)
+- Preset save: review-preset-save (preset configuration management)
+
 ## [3.78.0] — 2026-03-14
 
 ### Added

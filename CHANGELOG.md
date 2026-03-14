@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.79.0] — 2026-03-14
+
+### Added
+- Group by: finding-group-by (group findings by category/severity/file)
+- Diff highlight: finding-diff-highlight (highlight diff regions related to findings)
+- Fix verify: finding-fix-verify (verify fixes resolve findings)
+- Custom judges: review-custom-judge (register and manage custom judges)
+- Prioritize: finding-prioritize (prioritize findings by business impact)
+- Annotations: review-annotation (add annotations to review results)
+- Multi-repo: review-multi-repo (review across multiple repositories)
+- Finding trace: finding-trace (trace findings to origin commits)
+- Preset save: review-preset-save (save and load review preset configurations)
+
 ## [3.78.0] — 2026-03-14
 
 ### Added

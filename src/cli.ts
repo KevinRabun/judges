@@ -619,6 +619,15 @@ USAGE:
   judges finding-dedup-cross-file     Deduplicate findings across result files
   judges review-progress-bar          Track and display review progress
   judges finding-auto-label           Auto-label findings based on content
+  judges finding-group-by             Group findings by category/severity/file
+  judges finding-diff-highlight       Highlight diff regions related to findings
+  judges finding-fix-verify           Verify fixes resolve findings
+  judges review-custom-judge          Register and manage custom judges
+  judges finding-prioritize           Prioritize findings by business impact
+  judges review-annotation            Add annotations to review results
+  judges review-multi-repo            Review across multiple repositories
+  judges finding-trace                Trace findings to origin commits
+  judges review-preset-save           Save and load review preset configurations
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3508,6 +3517,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-auto-label") {
     const { runFindingAutoLabel } = await import("./commands/finding-auto-label.js");
     runFindingAutoLabel(argv);
+    return;
+  }
+
+  // ─── Finding Group By Command ────────────────────────────────────
+  if (args.command === "finding-group-by") {
+    const { runFindingGroupBy } = await import("./commands/finding-group-by.js");
+    runFindingGroupBy(argv);
+    return;
+  }
+
+  // ─── Finding Diff Highlight Command ──────────────────────────────
+  if (args.command === "finding-diff-highlight") {
+    const { runFindingDiffHighlight } = await import("./commands/finding-diff-highlight.js");
+    runFindingDiffHighlight(argv);
+    return;
+  }
+
+  // ─── Finding Fix Verify Command ──────────────────────────────────
+  if (args.command === "finding-fix-verify") {
+    const { runFindingFixVerify } = await import("./commands/finding-fix-verify.js");
+    runFindingFixVerify(argv);
+    return;
+  }
+
+  // ─── Review Custom Judge Command ─────────────────────────────────
+  if (args.command === "review-custom-judge") {
+    const { runReviewCustomJudge } = await import("./commands/review-custom-judge.js");
+    runReviewCustomJudge(argv);
+    return;
+  }
+
+  // ─── Finding Prioritize Command ──────────────────────────────────
+  if (args.command === "finding-prioritize") {
+    const { runFindingPrioritize } = await import("./commands/finding-prioritize.js");
+    runFindingPrioritize(argv);
+    return;
+  }
+
+  // ─── Review Annotation Command ───────────────────────────────────
+  if (args.command === "review-annotation") {
+    const { runReviewAnnotation } = await import("./commands/review-annotation.js");
+    runReviewAnnotation(argv);
+    return;
+  }
+
+  // ─── Review Multi Repo Command ───────────────────────────────────
+  if (args.command === "review-multi-repo") {
+    const { runReviewMultiRepo } = await import("./commands/review-multi-repo.js");
+    runReviewMultiRepo(argv);
+    return;
+  }
+
+  // ─── Finding Trace Command ───────────────────────────────────────
+  if (args.command === "finding-trace") {
+    const { runFindingTrace } = await import("./commands/finding-trace.js");
+    runFindingTrace(argv);
+    return;
+  }
+
+  // ─── Review Preset Save Command ──────────────────────────────────
+  if (args.command === "review-preset-save") {
+    const { runReviewPresetSave } = await import("./commands/review-preset-save.js");
+    runReviewPresetSave(argv);
     return;
   }
 
