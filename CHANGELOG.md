@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.78.0] — 2026-03-14
+
+### Added
+- File filtering: review-file-filter (filter files for review inclusion/exclusion)
+- Dependency check: finding-dependency-check (check dependency-related findings)
+- Incremental review: review-incremental (review only changed files since last review)
+- Severity histogram: finding-severity-histogram (visualize severity distribution)
+- Plugin management: review-plugin-manage (manage review plugins and extensions)
+- Cross-file dedup: finding-dedup-cross-file (deduplicate findings across result files)
+- Progress tracking: review-progress-bar (track and display review progress)
+- Auto-labeling: finding-auto-label (auto-label findings based on content analysis)
+
 ## [3.77.0] — 2026-03-14
 
 ### Added

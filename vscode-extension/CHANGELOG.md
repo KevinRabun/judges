@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.78.0] — 2026-03-14
+
+### Added
+- File filter: review-file-filter (include/exclude file filtering)
+- Dependency check: finding-dependency-check (dependency vulnerability analysis)
+- Incremental: review-incremental (review changed files only)
+- Severity histogram: finding-severity-histogram (severity visualization)
+- Plugin manage: review-plugin-manage (plugin lifecycle management)
+- Cross-file dedup: finding-dedup-cross-file (multi-file deduplication)
+- Progress bar: review-progress-bar (progress tracking indicators)
+- Auto-label: finding-auto-label (content-based labeling)
+
 ## [3.77.0] — 2026-03-14
 
 ### Added

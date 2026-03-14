@@ -611,6 +611,14 @@ USAGE:
   judges finding-impact-score         Score findings by estimated impact
   judges review-compliance-check      Check findings against compliance frameworks
   judges finding-root-cause           Identify root causes of recurring findings
+  judges review-file-filter           Filter files for review inclusion/exclusion
+  judges finding-dependency-check     Check dependency-related findings
+  judges review-incremental           Review only changed files since last review
+  judges finding-severity-histogram   Visualize severity distribution histogram
+  judges review-plugin-manage         Manage review plugins and extensions
+  judges finding-dedup-cross-file     Deduplicate findings across result files
+  judges review-progress-bar          Track and display review progress
+  judges finding-auto-label           Auto-label findings based on content
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3444,6 +3452,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-root-cause") {
     const { runFindingRootCause } = await import("./commands/finding-root-cause.js");
     runFindingRootCause(argv);
+    return;
+  }
+
+  // ─── Review File Filter Command ──────────────────────────────────
+  if (args.command === "review-file-filter") {
+    const { runReviewFileFilter } = await import("./commands/review-file-filter.js");
+    runReviewFileFilter(argv);
+    return;
+  }
+
+  // ─── Finding Dependency Check Command ────────────────────────────
+  if (args.command === "finding-dependency-check") {
+    const { runFindingDependencyCheck } = await import("./commands/finding-dependency-check.js");
+    runFindingDependencyCheck(argv);
+    return;
+  }
+
+  // ─── Review Incremental Command ──────────────────────────────────
+  if (args.command === "review-incremental") {
+    const { runReviewIncremental } = await import("./commands/review-incremental.js");
+    runReviewIncremental(argv);
+    return;
+  }
+
+  // ─── Finding Severity Histogram Command ──────────────────────────
+  if (args.command === "finding-severity-histogram") {
+    const { runFindingSeverityHistogram } = await import("./commands/finding-severity-histogram.js");
+    runFindingSeverityHistogram(argv);
+    return;
+  }
+
+  // ─── Review Plugin Manage Command ────────────────────────────────
+  if (args.command === "review-plugin-manage") {
+    const { runReviewPluginManage } = await import("./commands/review-plugin-manage.js");
+    runReviewPluginManage(argv);
+    return;
+  }
+
+  // ─── Finding Dedup Cross File Command ────────────────────────────
+  if (args.command === "finding-dedup-cross-file") {
+    const { runFindingDedupCrossFile } = await import("./commands/finding-dedup-cross-file.js");
+    runFindingDedupCrossFile(argv);
+    return;
+  }
+
+  // ─── Review Progress Bar Command ─────────────────────────────────
+  if (args.command === "review-progress-bar") {
+    const { runReviewProgressBar } = await import("./commands/review-progress-bar.js");
+    runReviewProgressBar(argv);
+    return;
+  }
+
+  // ─── Finding Auto Label Command ──────────────────────────────────
+  if (args.command === "finding-auto-label") {
+    const { runFindingAutoLabel } = await import("./commands/finding-auto-label.js");
+    runFindingAutoLabel(argv);
     return;
   }
 
