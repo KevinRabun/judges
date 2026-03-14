@@ -578,6 +578,14 @@ USAGE:
   judges finding-link                 Link related findings across files
   judges review-compare-version       Compare review results between versions
   judges review-summary-email         Generate email-ready review summaries
+  judges finding-confidence-filter    Filter findings by confidence level
+  judges review-skip-rule             Quick skip/disable specific rules
+  judges review-note                  Attach notes to reviews
+  judges finding-export-csv           Export findings as CSV
+  judges review-timeline              Show review activity timeline
+  judges review-snapshot-diff         Diff between review snapshots
+  judges finding-resolution           Track finding resolution status
+  judges review-owner                 Assign review ownership to team members
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3180,6 +3188,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-summary-email") {
     const { runReviewSummaryEmail } = await import("./commands/review-summary-email.js");
     runReviewSummaryEmail(argv);
+    return;
+  }
+
+  // ─── Finding Confidence Filter Command ────────────────────────────
+  if (args.command === "finding-confidence-filter") {
+    const { runFindingConfidenceFilter } = await import("./commands/finding-confidence-filter.js");
+    runFindingConfidenceFilter(argv);
+    return;
+  }
+
+  // ─── Review Skip Rule Command ─────────────────────────────────────
+  if (args.command === "review-skip-rule") {
+    const { runReviewSkipRule } = await import("./commands/review-skip-rule.js");
+    runReviewSkipRule(argv);
+    return;
+  }
+
+  // ─── Review Note Command ──────────────────────────────────────────
+  if (args.command === "review-note") {
+    const { runReviewNote } = await import("./commands/review-note.js");
+    runReviewNote(argv);
+    return;
+  }
+
+  // ─── Finding Export CSV Command ───────────────────────────────────
+  if (args.command === "finding-export-csv") {
+    const { runFindingExportCsv } = await import("./commands/finding-export-csv.js");
+    runFindingExportCsv(argv);
+    return;
+  }
+
+  // ─── Review Timeline Command ──────────────────────────────────────
+  if (args.command === "review-timeline") {
+    const { runReviewTimeline } = await import("./commands/review-timeline.js");
+    runReviewTimeline(argv);
+    return;
+  }
+
+  // ─── Review Snapshot Diff Command ─────────────────────────────────
+  if (args.command === "review-snapshot-diff") {
+    const { runReviewSnapshotDiff } = await import("./commands/review-snapshot-diff.js");
+    runReviewSnapshotDiff(argv);
+    return;
+  }
+
+  // ─── Finding Resolution Command ───────────────────────────────────
+  if (args.command === "finding-resolution") {
+    const { runFindingResolution } = await import("./commands/finding-resolution.js");
+    runFindingResolution(argv);
+    return;
+  }
+
+  // ─── Review Owner Command ─────────────────────────────────────────
+  if (args.command === "review-owner") {
+    const { runReviewOwner } = await import("./commands/review-owner.js");
+    runReviewOwner(argv);
     return;
   }
 

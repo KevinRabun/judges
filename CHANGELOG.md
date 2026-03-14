@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.74.0] — 2026-03-14
+
+### Added
+- Confidence filtering: finding-confidence-filter (filter findings by confidence level)
+- Rule skipping: review-skip-rule (quick skip/disable specific rules)
+- Review notes: review-note (attach notes to reviews)
+- CSV export: finding-export-csv (export findings as CSV)
+- Timeline: review-timeline (show review activity timeline)
+- Snapshot diff: review-snapshot-diff (diff between review snapshots)
+- Resolution tracking: finding-resolution (track finding resolution status)
+- Review ownership: review-owner (assign review ownership to team members)
+
 ## [3.73.0] — 2026-03-14
 
 ### Added

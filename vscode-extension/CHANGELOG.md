@@ -4,6 +4,16 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.74.0] — 2026-03-14
+
+### Added
+- Confidence filtering: finding-confidence-filter
+- Rule management: review-skip-rule
+- Review notes: review-note
+- CSV export: finding-export-csv
+- Timeline & diff: review-timeline, review-snapshot-diff
+- Resolution & ownership: finding-resolution, review-owner
+
 ## [3.73.0] — 2026-03-14
 
 ### Added
