@@ -4,6 +4,18 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.44.0] — 2026-03-12
+
+### Added
+- **Batch FP suppression** — Suppress findings by glob, rule prefix, or severity with audit trail
+- **Rule ownership** — Map rules to team owners with expertise levels
+- **Noise advisor** — Analyze rule FP rates and recommend tuning actions
+- **Human review queue** — Route low-confidence findings to experts
+- **Report templates** — 6 predefined templates for different audiences
+- **Finding burndown** — Track resolution progress with visual chart and ETA
+- **Team knowledge base** — Store team decisions and exceptions for rules
+- **Judge recommendations** — Analyze project stack and recommend judges
+
 ## [3.43.0] — 2026-03-12
 
 ### Added

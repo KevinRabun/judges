@@ -338,6 +338,14 @@ USAGE:
   judges ticket-sync                  Create tickets from findings (Jira/Linear/GitHub)
   judges sla-track                    SLA tracking and violation detection
   judges regression-alert             Detect quality regressions between scans
+  judges suppress                     Batch false-positive suppression
+  judges rule-owner                   Map rules to team owners
+  judges noise-advisor                Analyze rule performance and recommend tuning
+  judges review-queue                 Human review queue for low-confidence findings
+  judges report-template              Generate reports from templates
+  judges burndown                     Track finding resolution progress
+  judges kb                           Team knowledge base for rule decisions
+  judges recommend                    Analyze project and recommend judges
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -1260,6 +1268,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "regression-alert") {
     const { runRegressionAlert } = await import("./commands/regression-alert.js");
     await runRegressionAlert(argv);
+    return;
+  }
+
+  // ─── Suppress Command ────────────────────────────────────────────
+  if (args.command === "suppress") {
+    const { runSuppress } = await import("./commands/suppress.js");
+    runSuppress(argv);
+    return;
+  }
+
+  // ─── Rule Owner Command ──────────────────────────────────────────
+  if (args.command === "rule-owner") {
+    const { runRuleOwner } = await import("./commands/rule-owner.js");
+    runRuleOwner(argv);
+    return;
+  }
+
+  // ─── Noise Advisor Command ───────────────────────────────────────
+  if (args.command === "noise-advisor") {
+    const { runNoiseAdvisor } = await import("./commands/noise-advisor.js");
+    runNoiseAdvisor(argv);
+    return;
+  }
+
+  // ─── Review Queue Command ────────────────────────────────────────
+  if (args.command === "review-queue") {
+    const { runReviewQueue } = await import("./commands/review-queue.js");
+    await runReviewQueue(argv);
+    return;
+  }
+
+  // ─── Report Template Command ─────────────────────────────────────
+  if (args.command === "report-template") {
+    const { runReportTemplate } = await import("./commands/report-template.js");
+    runReportTemplate(argv);
+    return;
+  }
+
+  // ─── Burndown Command ────────────────────────────────────────────
+  if (args.command === "burndown") {
+    const { runBurndown } = await import("./commands/burndown.js");
+    await runBurndown(argv);
+    return;
+  }
+
+  // ─── Knowledge Base Command ──────────────────────────────────────
+  if (args.command === "kb") {
+    const { runKnowledgeBase } = await import("./commands/kb.js");
+    runKnowledgeBase(argv);
+    return;
+  }
+
+  // ─── Recommend Command ───────────────────────────────────────────
+  if (args.command === "recommend") {
+    const { runRecommend } = await import("./commands/recommend.js");
+    runRecommend(argv);
     return;
   }
 

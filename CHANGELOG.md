@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.44.0] — 2026-03-12
+
+### Added — Trust, Noise Reduction & Team Adoption (8 features)
+- **Batch FP suppression** (`judges suppress`) — Suppress findings by file glob, rule prefix, severity, or exact rule IDs with full audit trail; supports auto-expiry; `--list` and `--stats`
+- **Rule ownership** (`judges rule-owner`) — Map rules/categories to team owners with contact info and expertise levels; `--find` resolves ownership for any rule ID via prefix matching
+- **Noise advisor** (`judges noise-advisor`) — Analyze rule FP rates by cross-referencing suppressions, false-negative feedback, and confidence scores; recommends disable/raise-threshold/lower-severity actions
+- **Human review queue** (`judges review-queue`) — Surface low-confidence findings needing human judgment; route to experts via rule-owner integration; record verdicts (approve/dismiss/escalate)
+- **Report templates** (`judges report-template`) — 6 predefined templates (exec-summary, dev-detail, compliance, pr-review, trend, onboarding) targeting different audiences; `--output` to write files
+- **Finding burndown** (`judges burndown`) — Track resolution progress over time with visual chart; `--set-target` and `--trajectory` for ETA analysis; local `.judges-burndown.json` storage
+- **Team knowledge base** (`judges kb`) — Store team decisions about rules (not-applicable, accepted-risk, deferred, exception, custom-guidance); searchable with expiry; approved-by audit trail
+- **Judge recommendations** (`judges recommend`) — Analyze project stack (16 framework detectors) and recommend relevant judges; shows coverage estimates and reasons
+
 ## [3.43.0] — 2026-03-12
 
 ### Added — Workflow Integration & Compliance (9 features)
