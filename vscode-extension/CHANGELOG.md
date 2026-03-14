@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.57.0] — 2025-07-25
+
+### Added
+- Code quality: comment-drift (stale comment detection), type-boundary (serialization safety), error-ux (user-facing error quality)
+- Resilience: timeout-audit (timeout propagation), cache-audit (cache invalidation), idempotency-audit (retry safety)
+- Security: privilege-path (authorization flow analysis), event-leak (orphaned listener detection)
+
 ## [3.56.0] — 2025-07-25
 
 ### Added

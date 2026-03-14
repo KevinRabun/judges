@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.57.0] — 2025-07-25
+
+### Added
+- **comment-drift** — Detect stale, misleading, or contradictory inline comments (TODO without tickets, renamed variable refs, commented-out code, tautological comments, outdated @param names)
+- **timeout-audit** — Trace timeout and deadline propagation gaps (missing HTTP timeouts, hardcoded values, DB queries, Promise.all guards, downstream > upstream mismatches)
+- **cache-audit** — Audit cache invalidation correctness, TTL consistency, and stampede risk (missing TTL, unbounded caches, write-through gaps, suspicious TTL values)
+- **idempotency-audit** — Verify retried/webhook operations are safely idempotent (INSERT without conflict handling, counter mutation in retries, notification dedup, payment keys)
+- **type-boundary** — Check type safety at serialization boundaries (JSON.parse without validation, unchecked `as` casts, ts-ignore at boundaries, `any` at API boundaries)
+- **event-leak** — Detect orphaned event listeners, unsubscribed observables, dangling async handles (addEventListener without cleanup, setInterval without clear, useEffect leaks)
+- **privilege-path** — Model authorization flows to find privilege-escalation paths (routes without auth, IDOR patterns, JWT decode without verify, CORS misconfig)
+- **error-ux** — Audit user-facing error messages for actionability and safety (generic messages, stack trace leaks, internal path exposure, missing remediation hints)
+
 ## [3.56.0] — 2025-07-25
 
 ### Added

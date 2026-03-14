@@ -442,6 +442,14 @@ USAGE:
   judges log-quality                  Assess logging hygiene & PII leak risks
   judges null-safety-audit            Identify null/undefined dereference risks
   judges test-isolation               Detect test isolation violations & leaks
+  judges comment-drift                Detect stale/misleading inline comments
+  judges timeout-audit                Trace timeout propagation gaps
+  judges cache-audit                  Audit cache invalidation & stampede risk
+  judges idempotency-audit            Verify retry/webhook idempotency safety
+  judges type-boundary                Check type safety at serialization bounds
+  judges event-leak                   Detect orphaned listeners & subscriptions
+  judges privilege-path               Model authorization escalation paths
+  judges error-ux                     Audit user-facing error quality & safety
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2092,6 +2100,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "test-isolation") {
     const { runTestIsolation } = await import("./commands/test-isolation.js");
     runTestIsolation(argv);
+    return;
+  }
+
+  // ─── Comment Drift Command ───────────────────────────────────────
+  if (args.command === "comment-drift") {
+    const { runCommentDrift } = await import("./commands/comment-drift.js");
+    runCommentDrift(argv);
+    return;
+  }
+
+  // ─── Timeout Audit Command ──────────────────────────────────────
+  if (args.command === "timeout-audit") {
+    const { runTimeoutAudit } = await import("./commands/timeout-audit.js");
+    runTimeoutAudit(argv);
+    return;
+  }
+
+  // ─── Cache Audit Command ────────────────────────────────────────
+  if (args.command === "cache-audit") {
+    const { runCacheAudit } = await import("./commands/cache-audit.js");
+    runCacheAudit(argv);
+    return;
+  }
+
+  // ─── Idempotency Audit Command ──────────────────────────────────
+  if (args.command === "idempotency-audit") {
+    const { runIdempotencyAudit } = await import("./commands/idempotency-audit.js");
+    runIdempotencyAudit(argv);
+    return;
+  }
+
+  // ─── Type Boundary Command ──────────────────────────────────────
+  if (args.command === "type-boundary") {
+    const { runTypeBoundary } = await import("./commands/type-boundary.js");
+    runTypeBoundary(argv);
+    return;
+  }
+
+  // ─── Event Leak Command ─────────────────────────────────────────
+  if (args.command === "event-leak") {
+    const { runEventLeak } = await import("./commands/event-leak.js");
+    runEventLeak(argv);
+    return;
+  }
+
+  // ─── Privilege Path Command ─────────────────────────────────────
+  if (args.command === "privilege-path") {
+    const { runPrivilegePath } = await import("./commands/privilege-path.js");
+    runPrivilegePath(argv);
+    return;
+  }
+
+  // ─── Error UX Command ───────────────────────────────────────────
+  if (args.command === "error-ux") {
+    const { runErrorUx } = await import("./commands/error-ux.js");
+    runErrorUx(argv);
     return;
   }
 
