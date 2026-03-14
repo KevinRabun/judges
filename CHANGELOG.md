@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.83.0] — 2026-03-14
+
+### Added
+- Finding link: review-finding-link (link related findings together)
+- Team assign: review-team-assign (assign findings to team members)
+- Compare runs: finding-compare-runs (compare findings across runs)
+- Skip list: review-skip-list (manage review skip list)
+- Hotfix suggest: finding-hotfix-suggest (suggest quick hotfixes)
+- Approval gate: review-approval-gate (configurable quality gates)
+- Changelog entry: review-changelog-entry (generate changelog from findings)
+- Branch compare: review-branch-compare (compare reviews between branches)
+- Category stats: finding-category-stats (category statistics)
+
 ## [3.82.0] — 2026-03-14
 
 ### Added

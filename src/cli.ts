@@ -654,6 +654,15 @@ USAGE:
   judges review-parallel-files        Batch files for parallel review
   judges finding-summary-digest       Generate concise finding digests
   judges review-code-owner            Map findings to CODEOWNERS entries
+  judges review-finding-link          Link related findings together
+  judges review-team-assign           Assign findings to team members
+  judges finding-compare-runs         Compare findings across review runs
+  judges review-skip-list             Manage skip list for reviews
+  judges finding-hotfix-suggest       Suggest quick hotfixes for findings
+  judges review-approval-gate         Configurable review approval gates
+  judges review-changelog-entry       Generate changelog from findings
+  judges review-branch-compare        Compare reviews between branches
+  judges finding-category-stats       Finding category statistics
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -3788,6 +3797,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-code-owner") {
     const { runReviewCodeOwner } = await import("./commands/review-code-owner.js");
     runReviewCodeOwner(argv);
+    return;
+  }
+
+  // ─── Review Finding Link Command ────────────────────────────────
+  if (args.command === "review-finding-link") {
+    const { runReviewFindingLink } = await import("./commands/review-finding-link.js");
+    runReviewFindingLink(argv);
+    return;
+  }
+
+  // ─── Review Team Assign Command ─────────────────────────────────
+  if (args.command === "review-team-assign") {
+    const { runReviewTeamAssign } = await import("./commands/review-team-assign.js");
+    runReviewTeamAssign(argv);
+    return;
+  }
+
+  // ─── Finding Compare Runs Command ───────────────────────────────
+  if (args.command === "finding-compare-runs") {
+    const { runFindingCompareRuns } = await import("./commands/finding-compare-runs.js");
+    runFindingCompareRuns(argv);
+    return;
+  }
+
+  // ─── Review Skip List Command ───────────────────────────────────
+  if (args.command === "review-skip-list") {
+    const { runReviewSkipList } = await import("./commands/review-skip-list.js");
+    runReviewSkipList(argv);
+    return;
+  }
+
+  // ─── Finding Hotfix Suggest Command ─────────────────────────────
+  if (args.command === "finding-hotfix-suggest") {
+    const { runFindingHotfixSuggest } = await import("./commands/finding-hotfix-suggest.js");
+    runFindingHotfixSuggest(argv);
+    return;
+  }
+
+  // ─── Review Approval Gate Command ───────────────────────────────
+  if (args.command === "review-approval-gate") {
+    const { runReviewApprovalGate } = await import("./commands/review-approval-gate.js");
+    runReviewApprovalGate(argv);
+    return;
+  }
+
+  // ─── Review Changelog Entry Command ─────────────────────────────
+  if (args.command === "review-changelog-entry") {
+    const { runReviewChangelogEntry } = await import("./commands/review-changelog-entry.js");
+    runReviewChangelogEntry(argv);
+    return;
+  }
+
+  // ─── Review Branch Compare Command ──────────────────────────────
+  if (args.command === "review-branch-compare") {
+    const { runReviewBranchCompare } = await import("./commands/review-branch-compare.js");
+    runReviewBranchCompare(argv);
+    return;
+  }
+
+  // ─── Finding Category Stats Command ─────────────────────────────
+  if (args.command === "finding-category-stats") {
+    const { runFindingCategoryStats } = await import("./commands/finding-category-stats.js");
+    runFindingCategoryStats(argv);
     return;
   }
 

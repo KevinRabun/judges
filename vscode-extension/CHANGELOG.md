@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.83.0] — 2026-03-14
+
+### Added
+- Finding link: review-finding-link (related finding linking)
+- Team assign: review-team-assign (team assignment)
+- Compare runs: finding-compare-runs (run comparison)
+- Skip list: review-skip-list (skip list management)
+- Hotfix suggest: finding-hotfix-suggest (hotfix suggestions)
+- Approval gate: review-approval-gate (quality gates)
+- Changelog entry: review-changelog-entry (changelog generation)
+- Branch compare: review-branch-compare (branch comparison)
+- Category stats: finding-category-stats (category statistics)
+
 ## [3.82.0] — 2026-03-14
 
 ### Added
