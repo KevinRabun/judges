@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.71.0] — 2026-03-14
+
+### Added
+- Auto-fix: finding-auto-fix, finding-context
+- History & coverage: review-history-search, review-coverage-map
+- Language insights: review-language-stats
+- Config & onboarding: review-rollback, review-onboard
+- Batch review: review-parallel
+
 ## [3.70.0] — 2026-03-14
 
 ### Added

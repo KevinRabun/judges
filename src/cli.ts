@@ -554,6 +554,14 @@ USAGE:
   judges review-diff-context          Show diff hunks with surrounding context
   judges review-ci-status             Check CI pipeline review status
   judges review-team-summary          Aggregate team review metrics
+  judges finding-auto-fix             Auto-generate fix suggestions
+  judges review-history-search        Search past review history
+  judges review-language-stats        Language-specific review statistics
+  judges review-coverage-map          Map which files have been reviewed
+  judges review-rollback              Roll back review config to a previous state
+  judges review-onboard               Guided onboarding for new team members
+  judges review-parallel              Batch review multiple files
+  judges finding-context              Enrich findings with surrounding code context
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2988,6 +2996,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-team-summary") {
     const { runReviewTeamSummary } = await import("./commands/review-team-summary.js");
     runReviewTeamSummary(argv);
+    return;
+  }
+
+  // ─── Finding Auto Fix Command ─────────────────────────────────────
+  if (args.command === "finding-auto-fix") {
+    const { runFindingAutoFix } = await import("./commands/finding-auto-fix.js");
+    runFindingAutoFix(argv);
+    return;
+  }
+
+  // ─── Review History Search Command ────────────────────────────────
+  if (args.command === "review-history-search") {
+    const { runReviewHistorySearch } = await import("./commands/review-history-search.js");
+    runReviewHistorySearch(argv);
+    return;
+  }
+
+  // ─── Review Language Stats Command ────────────────────────────────
+  if (args.command === "review-language-stats") {
+    const { runReviewLanguageStats } = await import("./commands/review-language-stats.js");
+    runReviewLanguageStats(argv);
+    return;
+  }
+
+  // ─── Review Coverage Map Command ──────────────────────────────────
+  if (args.command === "review-coverage-map") {
+    const { runReviewCoverageMap } = await import("./commands/review-coverage-map.js");
+    runReviewCoverageMap(argv);
+    return;
+  }
+
+  // ─── Review Rollback Command ──────────────────────────────────────
+  if (args.command === "review-rollback") {
+    const { runReviewRollback } = await import("./commands/review-rollback.js");
+    runReviewRollback(argv);
+    return;
+  }
+
+  // ─── Review Onboard Command ───────────────────────────────────────
+  if (args.command === "review-onboard") {
+    const { runReviewOnboard } = await import("./commands/review-onboard.js");
+    runReviewOnboard(argv);
+    return;
+  }
+
+  // ─── Review Parallel Command ──────────────────────────────────────
+  if (args.command === "review-parallel") {
+    const { runReviewParallel } = await import("./commands/review-parallel.js");
+    runReviewParallel(argv);
+    return;
+  }
+
+  // ─── Finding Context Command ──────────────────────────────────────
+  if (args.command === "finding-context") {
+    const { runFindingContext } = await import("./commands/finding-context.js");
+    runFindingContext(argv);
     return;
   }
 

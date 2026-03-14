@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.71.0] — 2026-03-14
+
+### Added
+- Auto-fix: finding-auto-fix (auto-generate fix suggestions for common patterns)
+- History: review-history-search (search through past review history)
+- Language insights: review-language-stats (language-specific statistics)
+- Coverage: review-coverage-map (map which files have been reviewed)
+- Config management: review-rollback (roll back review config to a previous state)
+- Onboarding: review-onboard (guided onboarding for new team members)
+- Batch review: review-parallel (discover and queue multiple files for review)
+- Context enrichment: finding-context (enrich findings with surrounding code)
+
 ## [3.70.0] — 2026-03-14
 
 ### Added
