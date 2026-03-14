@@ -482,6 +482,14 @@ USAGE:
   judges review-receipt               Cryptographically signed review attestation
   judges review-contract              Define and verify what Judges reviews
   judges blame-review                 Git-blame integrated finding attribution
+  judges review-gate                  CI/CD quality gate with configurable thresholds
+  judges diff-review                  Review only changed lines in a diff
+  judges batch-review                 Parallel review of multiple files
+  judges custom-rule                  Load and run user-defined custom rules
+  judges review-compare               Compare two review runs for improvement
+  judges severity-tune                Auto-calibrate severity levels for your project
+  judges review-explain               Plain-language finding explanations
+  judges focus-area                   Identify high-risk areas needing review
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2412,6 +2420,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "blame-review") {
     const { runBlameReview } = await import("./commands/blame-review.js");
     runBlameReview(argv);
+    return;
+  }
+
+  // ─── Review Gate Command ─────────────────────────────────────────
+  if (args.command === "review-gate") {
+    const { runReviewGate } = await import("./commands/review-gate.js");
+    runReviewGate(argv);
+    return;
+  }
+
+  // ─── Diff Review Command ─────────────────────────────────────────
+  if (args.command === "diff-review") {
+    const { runDiffReview } = await import("./commands/diff-review.js");
+    runDiffReview(argv);
+    return;
+  }
+
+  // ─── Batch Review Command ───────────────────────────────────────
+  if (args.command === "batch-review") {
+    const { runBatchReview } = await import("./commands/batch-review.js");
+    runBatchReview(argv);
+    return;
+  }
+
+  // ─── Custom Rule Command ────────────────────────────────────────
+  if (args.command === "custom-rule") {
+    const { runCustomRule } = await import("./commands/custom-rule.js");
+    runCustomRule(argv);
+    return;
+  }
+
+  // ─── Review Compare Command ─────────────────────────────────────
+  if (args.command === "review-compare") {
+    const { runReviewCompare } = await import("./commands/review-compare.js");
+    runReviewCompare(argv);
+    return;
+  }
+
+  // ─── Severity Tune Command ──────────────────────────────────────
+  if (args.command === "severity-tune") {
+    const { runSeverityTune } = await import("./commands/severity-tune.js");
+    runSeverityTune(argv);
+    return;
+  }
+
+  // ─── Review Explain Command ─────────────────────────────────────
+  if (args.command === "review-explain") {
+    const { runReviewExplain } = await import("./commands/review-explain.js");
+    runReviewExplain(argv);
+    return;
+  }
+
+  // ─── Focus Area Command ─────────────────────────────────────────
+  if (args.command === "focus-area") {
+    const { runFocusArea } = await import("./commands/focus-area.js");
+    runFocusArea(argv);
     return;
   }
 

@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.62.0] — 2026-03-14
+
+### Added
+- CI/CD: review-gate, diff-review, batch-review
+- Customization: custom-rule, severity-tune
+- Insights: review-compare, review-explain, focus-area
+
 ## [3.61.0] — 2026-03-14
 
 ### Added

@@ -2,6 +2,13 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.62.0] — 2026-03-14
+
+### Added
+- CI/CD integration: review-gate (quality gate with thresholds), diff-review (review only changed lines), batch-review (parallel multi-file review)
+- Customization: custom-rule (user-defined rules), severity-tune (auto-calibrate severity levels)
+- Insights: review-compare (compare review runs), review-explain (plain-language explanations), focus-area (risk-based file prioritization)
+
 ## [3.61.0] — 2026-03-14
 
 ### Added
