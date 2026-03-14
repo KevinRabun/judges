@@ -2,6 +2,13 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.63.0] — 2026-03-14
+
+### Added
+- Workflow efficiency: review-cache (cache results for unchanged files), ignore-list (configurable file/rule ignore patterns), incremental-review (only review changed files since last run)
+- Team governance: team-config (shared team-level configuration), review-log (structured audit log of review actions)
+- Developer productivity: finding-group (group related findings into clusters), review-summary (PR-ready summary with metrics), rule-test (test custom rules against sample code)
+
 ## [3.62.0] — 2026-03-14
 
 ### Added

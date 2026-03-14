@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.63.0] — 2026-03-14
+
+### Added
+- Workflow: review-cache, ignore-list, incremental-review
+- Governance: team-config, review-log
+- Productivity: finding-group, review-summary, rule-test
+
 ## [3.62.0] — 2026-03-14
 
 ### Added

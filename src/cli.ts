@@ -490,6 +490,14 @@ USAGE:
   judges severity-tune                Auto-calibrate severity levels for your project
   judges review-explain               Plain-language finding explanations
   judges focus-area                   Identify high-risk areas needing review
+  judges review-cache                 Cache review results for unchanged files
+  judges ignore-list                  Manage file/rule ignore patterns
+  judges review-log                   Structured audit log of review actions
+  judges team-config                  Team-level shared configuration management
+  judges finding-group                Group related findings into clusters
+  judges review-summary               Generate PR-ready review summary
+  judges rule-test                    Test custom rules against sample code
+  judges incremental-review           Review only changed files since last run
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2476,6 +2484,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "focus-area") {
     const { runFocusArea } = await import("./commands/focus-area.js");
     runFocusArea(argv);
+    return;
+  }
+
+  // ─── Review Cache Command ──────────────────────────────────────
+  if (args.command === "review-cache") {
+    const { runReviewCache } = await import("./commands/review-cache.js");
+    runReviewCache(argv);
+    return;
+  }
+
+  // ─── Ignore List Command ──────────────────────────────────────
+  if (args.command === "ignore-list") {
+    const { runIgnoreList } = await import("./commands/ignore-list.js");
+    runIgnoreList(argv);
+    return;
+  }
+
+  // ─── Review Log Command ───────────────────────────────────────
+  if (args.command === "review-log") {
+    const { runReviewLog } = await import("./commands/review-log.js");
+    runReviewLog(argv);
+    return;
+  }
+
+  // ─── Team Config Command ──────────────────────────────────────
+  if (args.command === "team-config") {
+    const { runTeamConfig } = await import("./commands/team-config.js");
+    runTeamConfig(argv);
+    return;
+  }
+
+  // ─── Finding Group Command ────────────────────────────────────
+  if (args.command === "finding-group") {
+    const { runFindingGroup } = await import("./commands/finding-group.js");
+    runFindingGroup(argv);
+    return;
+  }
+
+  // ─── Review Summary Command ───────────────────────────────────
+  if (args.command === "review-summary") {
+    const { runReviewSummary } = await import("./commands/review-summary.js");
+    runReviewSummary(argv);
+    return;
+  }
+
+  // ─── Rule Test Command ────────────────────────────────────────
+  if (args.command === "rule-test") {
+    const { runRuleTest } = await import("./commands/rule-test.js");
+    runRuleTest(argv);
+    return;
+  }
+
+  // ─── Incremental Review Command ───────────────────────────────
+  if (args.command === "incremental-review") {
+    const { runIncrementalReview } = await import("./commands/incremental-review.js");
+    runIncrementalReview(argv);
     return;
   }
 
