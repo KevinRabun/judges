@@ -2,6 +2,13 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.65.0] — 2026-03-14
+
+### Added
+- Integrations: review-webhook (webhook notifications for CI/CD), review-annotate (GitHub-compatible PR annotations), review-merge (merge multiple review results)
+- Governance: finding-suppress (suppress findings with expiration), judge-config (per-judge sensitivity overrides), review-checkpoint (save/restore review state)
+- Analysis: review-filter (advanced multi-criteria finding filter), code-health (overall codebase health score with letter grades)
+
 ## [3.64.0] — 2026-03-14
 
 ### Added

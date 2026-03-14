@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.65.0] — 2026-03-14
+
+### Added
+- Integrations: review-webhook, review-annotate, review-merge
+- Governance: finding-suppress, judge-config, review-checkpoint
+- Analysis: review-filter, code-health
+
 ## [3.64.0] — 2026-03-14
 
 ### Added

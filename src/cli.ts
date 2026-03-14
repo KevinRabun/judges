@@ -506,6 +506,14 @@ USAGE:
   judges fix-suggest                  Generate concrete fix suggestions
   judges review-priority              Smart finding prioritization
   judges multi-lang-review            Cross-language consistency checking
+  judges review-webhook               Configure webhook notifications for reviews
+  judges finding-suppress             Suppress specific findings
+  judges review-annotate              Generate GitHub-compatible PR annotations
+  judges judge-config                 Per-judge sensitivity configuration
+  judges review-checkpoint            Save and restore review state checkpoints
+  judges review-merge                 Merge multiple review results
+  judges review-filter                Advanced multi-criteria finding filter
+  judges code-health                  Overall codebase health score
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -2604,6 +2612,62 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "multi-lang-review") {
     const { runMultiLangReview } = await import("./commands/multi-lang-review.js");
     runMultiLangReview(argv);
+    return;
+  }
+
+  // ─── Review Webhook Command ───────────────────────────────────
+  if (args.command === "review-webhook") {
+    const { runReviewWebhook } = await import("./commands/review-webhook.js");
+    runReviewWebhook(argv);
+    return;
+  }
+
+  // ─── Finding Suppress Command ─────────────────────────────────
+  if (args.command === "finding-suppress") {
+    const { runFindingSuppress } = await import("./commands/finding-suppress.js");
+    runFindingSuppress(argv);
+    return;
+  }
+
+  // ─── Review Annotate Command ──────────────────────────────────
+  if (args.command === "review-annotate") {
+    const { runReviewAnnotate } = await import("./commands/review-annotate.js");
+    runReviewAnnotate(argv);
+    return;
+  }
+
+  // ─── Judge Config Command ─────────────────────────────────────
+  if (args.command === "judge-config") {
+    const { runJudgeConfig } = await import("./commands/judge-config.js");
+    runJudgeConfig(argv);
+    return;
+  }
+
+  // ─── Review Checkpoint Command ────────────────────────────────
+  if (args.command === "review-checkpoint") {
+    const { runReviewCheckpoint } = await import("./commands/review-checkpoint.js");
+    runReviewCheckpoint(argv);
+    return;
+  }
+
+  // ─── Review Merge Command ─────────────────────────────────────
+  if (args.command === "review-merge") {
+    const { runReviewMerge } = await import("./commands/review-merge.js");
+    runReviewMerge(argv);
+    return;
+  }
+
+  // ─── Review Filter Command ────────────────────────────────────
+  if (args.command === "review-filter") {
+    const { runReviewFilter } = await import("./commands/review-filter.js");
+    runReviewFilter(argv);
+    return;
+  }
+
+  // ─── Code Health Command ──────────────────────────────────────
+  if (args.command === "code-health") {
+    const { runCodeHealth } = await import("./commands/code-health.js");
+    runCodeHealth(argv);
     return;
   }
 
