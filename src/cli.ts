@@ -843,6 +843,15 @@ USAGE:
   judges finding-dedup-smart          Smart finding dedup
   judges finding-annotation-export    Export annotations
   judges review-ci-insight            CI pipeline insights
+  judges review-template-suggest      Suggest review templates
+  judges finding-hotspot-detect       Detect code hotspots
+  judges review-code-health-score     Code health score
+  judges review-velocity-track        Track review velocity
+  judges finding-cross-file-link      Cross-file finding links
+  judges review-pr-size-check         PR size analysis
+  judges review-focus-area            Identify focus areas
+  judges review-team-analytics        Team review analytics
+  judges finding-similar-match        Find similar findings
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5300,6 +5309,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-ci-insight") {
     const { runReviewCiInsight } = await import("./commands/review-ci-insight.js");
     runReviewCiInsight(argv);
+    return;
+  }
+
+  // ─── Review Template Suggest Command ──────────────────────────────
+  if (args.command === "review-template-suggest") {
+    const { runReviewTemplateSuggest } = await import("./commands/review-template-suggest.js");
+    runReviewTemplateSuggest(argv);
+    return;
+  }
+
+  // ─── Finding Hotspot Detect Command ───────────────────────────────
+  if (args.command === "finding-hotspot-detect") {
+    const { runFindingHotspotDetect } = await import("./commands/finding-hotspot-detect.js");
+    runFindingHotspotDetect(argv);
+    return;
+  }
+
+  // ─── Review Code Health Score Command ─────────────────────────────
+  if (args.command === "review-code-health-score") {
+    const { runReviewCodeHealthScore } = await import("./commands/review-code-health-score.js");
+    runReviewCodeHealthScore(argv);
+    return;
+  }
+
+  // ─── Review Velocity Track Command ────────────────────────────────
+  if (args.command === "review-velocity-track") {
+    const { runReviewVelocityTrack } = await import("./commands/review-velocity-track.js");
+    runReviewVelocityTrack(argv);
+    return;
+  }
+
+  // ─── Finding Cross File Link Command ───────────────────────────────
+  if (args.command === "finding-cross-file-link") {
+    const { runFindingCrossFileLink } = await import("./commands/finding-cross-file-link.js");
+    runFindingCrossFileLink(argv);
+    return;
+  }
+
+  // ─── Review PR Size Check Command ─────────────────────────────────
+  if (args.command === "review-pr-size-check") {
+    const { runReviewPrSizeCheck } = await import("./commands/review-pr-size-check.js");
+    runReviewPrSizeCheck(argv);
+    return;
+  }
+
+  // ─── Review Focus Area Command ────────────────────────────────────
+  if (args.command === "review-focus-area") {
+    const { runReviewFocusArea } = await import("./commands/review-focus-area.js");
+    runReviewFocusArea(argv);
+    return;
+  }
+
+  // ─── Review Team Analytics Command ────────────────────────────────
+  if (args.command === "review-team-analytics") {
+    const { runReviewTeamAnalytics } = await import("./commands/review-team-analytics.js");
+    runReviewTeamAnalytics(argv);
+    return;
+  }
+
+  // ─── Finding Similar Match Command ─────────────────────────────────
+  if (args.command === "finding-similar-match") {
+    const { runFindingSimilarMatch } = await import("./commands/finding-similar-match.js");
+    runFindingSimilarMatch(argv);
     return;
   }
 

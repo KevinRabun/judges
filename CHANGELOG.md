@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.104.0] — 2026-03-14
+
+### Added
+- Review template suggestions: review-template-suggest
+- Code hotspot detection: finding-hotspot-detect
+- Code health scoring: review-code-health-score
+- Review velocity tracking: review-velocity-track
+- Cross-file finding links: finding-cross-file-link
+- PR size analysis: review-pr-size-check
+- Review focus areas: review-focus-area
+- Team review analytics: review-team-analytics
+- Similar finding matching: finding-similar-match
+
 ## [3.103.0] — 2026-03-14
 
 ### Added
