@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.92.0] — 2026-03-14
+
+### Added
+- Auto-group findings: finding-auto-group
+- Suppression list management: finding-suppression-list
+- Plugin status display: review-plugin-status
+- Cross-reference findings: finding-cross-ref
+- CI gate integration: review-ci-gate
+- Team review statistics: review-team-stats
+- Pattern detection: finding-pattern-detect
+- Coverage gap analysis: review-coverage-gap
+- Feedback loop tracking: review-feedback-loop
+
 ## [3.91.0] — 2026-03-14
 
 ### Added

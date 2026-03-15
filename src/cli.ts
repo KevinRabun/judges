@@ -735,6 +735,15 @@ USAGE:
   judges review-onboard-wizard        Onboarding wizard for new users
   judges review-cache-warm            Pre-warm review cache
   judges finding-metadata-enrich      Enrich findings with metadata
+  judges finding-auto-group           Auto-group findings into categories
+  judges finding-suppression-list     Manage finding suppressions
+  judges review-plugin-status         Show plugin loading status
+  judges finding-cross-ref            Cross-reference findings across reviews
+  judges review-ci-gate               CI gate integration checks
+  judges review-team-stats            Team review statistics
+  judges finding-pattern-detect       Detect recurring finding patterns
+  judges review-coverage-gap          Identify review coverage gaps
+  judges review-feedback-loop         Track review feedback over time
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4436,6 +4445,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-metadata-enrich") {
     const { runFindingMetadataEnrich } = await import("./commands/finding-metadata-enrich.js");
     runFindingMetadataEnrich(argv);
+    return;
+  }
+
+  // ─── Finding Auto Group Command ──────────────────────────────────
+  if (args.command === "finding-auto-group") {
+    const { runFindingAutoGroup } = await import("./commands/finding-auto-group.js");
+    runFindingAutoGroup(argv);
+    return;
+  }
+
+  // ─── Finding Suppression List Command ─────────────────────────────
+  if (args.command === "finding-suppression-list") {
+    const { runFindingSuppressionList } = await import("./commands/finding-suppression-list.js");
+    runFindingSuppressionList(argv);
+    return;
+  }
+
+  // ─── Review Plugin Status Command ─────────────────────────────────
+  if (args.command === "review-plugin-status") {
+    const { runReviewPluginStatus } = await import("./commands/review-plugin-status.js");
+    runReviewPluginStatus(argv);
+    return;
+  }
+
+  // ─── Finding Cross Ref Command ────────────────────────────────────
+  if (args.command === "finding-cross-ref") {
+    const { runFindingCrossRef } = await import("./commands/finding-cross-ref.js");
+    runFindingCrossRef(argv);
+    return;
+  }
+
+  // ─── Review CI Gate Command ───────────────────────────────────────
+  if (args.command === "review-ci-gate") {
+    const { runReviewCiGate } = await import("./commands/review-ci-gate.js");
+    runReviewCiGate(argv);
+    return;
+  }
+
+  // ─── Review Team Stats Command ────────────────────────────────────
+  if (args.command === "review-team-stats") {
+    const { runReviewTeamStats } = await import("./commands/review-team-stats.js");
+    runReviewTeamStats(argv);
+    return;
+  }
+
+  // ─── Finding Pattern Detect Command ───────────────────────────────
+  if (args.command === "finding-pattern-detect") {
+    const { runFindingPatternDetect } = await import("./commands/finding-pattern-detect.js");
+    runFindingPatternDetect(argv);
+    return;
+  }
+
+  // ─── Review Coverage Gap Command ──────────────────────────────────
+  if (args.command === "review-coverage-gap") {
+    const { runReviewCoverageGap } = await import("./commands/review-coverage-gap.js");
+    runReviewCoverageGap(argv);
+    return;
+  }
+
+  // ─── Review Feedback Loop Command ─────────────────────────────────
+  if (args.command === "review-feedback-loop") {
+    const { runReviewFeedbackLoop } = await import("./commands/review-feedback-loop.js");
+    runReviewFeedbackLoop(argv);
     return;
   }
 

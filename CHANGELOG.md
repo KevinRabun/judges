@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.92.0] — 2026-03-14
+
+### Added
+- Auto-group findings into logical categories by content analysis: finding-auto-group
+- Manage finding suppression lists with expiry support: finding-suppression-list
+- Show plugin loading status and domain filtering: review-plugin-status
+- Cross-reference findings across multiple review files: finding-cross-ref
+- CI gate integration with configurable pass/fail policies: review-ci-gate
+- Team review statistics with aggregated metrics: review-team-stats
+- Detect recurring finding patterns and co-occurrences: finding-pattern-detect
+- Identify review coverage gaps and missing judges: review-coverage-gap
+- Track review feedback loop with trend analysis: review-feedback-loop
+
 ## [3.91.0] — 2026-03-14
 
 ### Added
