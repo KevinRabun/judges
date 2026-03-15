@@ -771,6 +771,15 @@ USAGE:
   judges finding-correlation-map     Map finding correlations
   judges review-template-library     Reusable review templates
   judges review-notification-config  Configure notification preferences
+  judges review-bulk-apply            Apply fixes in bulk
+  judges finding-severity-heatmap     Severity distribution heatmap
+  judges review-config-migrate        Migrate configs between versions
+  judges review-history-compare       Compare review history
+  judges review-team-dashboard        Team review dashboard
+  judges finding-confidence-calibrate Calibrate confidence thresholds
+  judges review-output-transform      Transform output formats
+  judges review-adoption-metrics      Track adoption metrics
+  judges review-workspace-init        Initialize workspace for Judges
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4724,6 +4733,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-notification-config") {
     const { runReviewNotificationConfig } = await import("./commands/review-notification-config.js");
     runReviewNotificationConfig(argv);
+    return;
+  }
+
+  // ─── Review Bulk Apply Command ────────────────────────────────────
+  if (args.command === "review-bulk-apply") {
+    const { runReviewBulkApply } = await import("./commands/review-bulk-apply.js");
+    runReviewBulkApply(argv);
+    return;
+  }
+
+  // ─── Finding Severity Heatmap Command ─────────────────────────────
+  if (args.command === "finding-severity-heatmap") {
+    const { runFindingSeverityHeatmap } = await import("./commands/finding-severity-heatmap.js");
+    runFindingSeverityHeatmap(argv);
+    return;
+  }
+
+  // ─── Review Config Migrate Command ────────────────────────────────
+  if (args.command === "review-config-migrate") {
+    const { runReviewConfigMigrate } = await import("./commands/review-config-migrate.js");
+    runReviewConfigMigrate(argv);
+    return;
+  }
+
+  // ─── Review History Compare Command ───────────────────────────────
+  if (args.command === "review-history-compare") {
+    const { runReviewHistoryCompare } = await import("./commands/review-history-compare.js");
+    runReviewHistoryCompare(argv);
+    return;
+  }
+
+  // ─── Review Team Dashboard Command ────────────────────────────────
+  if (args.command === "review-team-dashboard") {
+    const { runReviewTeamDashboard } = await import("./commands/review-team-dashboard.js");
+    runReviewTeamDashboard(argv);
+    return;
+  }
+
+  // ─── Finding Confidence Calibrate Command ─────────────────────────
+  if (args.command === "finding-confidence-calibrate") {
+    const { runFindingConfidenceCalibrate } = await import("./commands/finding-confidence-calibrate.js");
+    runFindingConfidenceCalibrate(argv);
+    return;
+  }
+
+  // ─── Review Output Transform Command ──────────────────────────────
+  if (args.command === "review-output-transform") {
+    const { runReviewOutputTransform } = await import("./commands/review-output-transform.js");
+    runReviewOutputTransform(argv);
+    return;
+  }
+
+  // ─── Review Adoption Metrics Command ──────────────────────────────
+  if (args.command === "review-adoption-metrics") {
+    const { runReviewAdoptionMetrics } = await import("./commands/review-adoption-metrics.js");
+    runReviewAdoptionMetrics(argv);
+    return;
+  }
+
+  // ─── Review Workspace Init Command ────────────────────────────────
+  if (args.command === "review-workspace-init") {
+    const { runReviewWorkspaceInit } = await import("./commands/review-workspace-init.js");
+    runReviewWorkspaceInit(argv);
     return;
   }
 

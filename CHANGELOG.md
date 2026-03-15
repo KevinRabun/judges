@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.96.0] — 2026-03-14
+
+### Added
+- Apply suggested fixes in bulk across findings: review-bulk-apply
+- Severity distribution heatmap visualization: finding-severity-heatmap
+- Migrate configs between Judges versions: review-config-migrate
+- Compare review history across time periods: review-history-compare
+- Team-level review dashboard with aggregates: review-team-dashboard
+- Calibrate confidence thresholds from feedback: finding-confidence-calibrate
+- Transform review output between formats: review-output-transform
+- Track Judges adoption metrics over time: review-adoption-metrics
+- Initialize workspace with Judges config files: review-workspace-init
+
 ## [3.95.0] — 2026-03-14
 
 ### Added

@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.96.0] — 2026-03-14
+
+### Added
+- Bulk fix application: review-bulk-apply
+- Severity heatmap: finding-severity-heatmap
+- Config migration: review-config-migrate
+- Review history comparison: review-history-compare
+- Team dashboard: review-team-dashboard
+- Confidence calibration: finding-confidence-calibrate
+- Output format transform: review-output-transform
+- Adoption metrics tracking: review-adoption-metrics
+- Workspace initialization: review-workspace-init
+
 ## [3.95.0] — 2026-03-14
 
 ### Added
