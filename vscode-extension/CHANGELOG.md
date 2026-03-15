@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.108.0] — 2026-03-14
+
+### Added
+- Action item generation: review-action-item-gen
+- Policy enforcement: review-policy-enforce
+- Time-to-fix estimates: finding-time-to-fix
+- Sprint planning: review-sprint-plan
+- Finding ancestry tracing: finding-ancestry-trace
+- Escalation paths: review-escalation-path
+- Remediation cost estimates: finding-remediation-cost
+- Review digest generation: review-digest-gen
+- Recurrence checking: finding-recurrence-check
+
 ## [3.107.0] — 2026-03-14
 
 ### Added

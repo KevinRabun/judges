@@ -879,6 +879,15 @@ USAGE:
   judges review-pr-label-suggest     PR label suggestions
   judges finding-confidence-boost    Confidence boost analysis
   judges review-review-cadence       Review cadence analysis
+  judges review-action-item-gen      Generate action items
+  judges review-policy-enforce       Policy enforcement
+  judges finding-time-to-fix         Time-to-fix estimates
+  judges review-sprint-plan          Sprint planning
+  judges finding-ancestry-trace      Finding ancestry trace
+  judges review-escalation-path      Escalation paths
+  judges finding-remediation-cost    Remediation cost estimate
+  judges review-digest-gen           Review digest
+  judges finding-recurrence-check    Recurrence check
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5588,6 +5597,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-review-cadence") {
     const { runReviewReviewCadence } = await import("./commands/review-review-cadence.js");
     runReviewReviewCadence(argv);
+    return;
+  }
+
+  // ─── Review Action Item Gen Command ──────────────────────────────
+  if (args.command === "review-action-item-gen") {
+    const { runReviewActionItemGen } = await import("./commands/review-action-item-gen.js");
+    runReviewActionItemGen(argv);
+    return;
+  }
+
+  // ─── Review Policy Enforce Command ───────────────────────────────
+  if (args.command === "review-policy-enforce") {
+    const { runReviewPolicyEnforce } = await import("./commands/review-policy-enforce.js");
+    runReviewPolicyEnforce(argv);
+    return;
+  }
+
+  // ─── Finding Time-to-Fix Command ─────────────────────────────────
+  if (args.command === "finding-time-to-fix") {
+    const { runFindingTimeToFix } = await import("./commands/finding-time-to-fix.js");
+    runFindingTimeToFix(argv);
+    return;
+  }
+
+  // ─── Review Sprint Plan Command ──────────────────────────────────
+  if (args.command === "review-sprint-plan") {
+    const { runReviewSprintPlan } = await import("./commands/review-sprint-plan.js");
+    runReviewSprintPlan(argv);
+    return;
+  }
+
+  // ─── Finding Ancestry Trace Command ──────────────────────────────
+  if (args.command === "finding-ancestry-trace") {
+    const { runFindingAncestryTrace } = await import("./commands/finding-ancestry-trace.js");
+    runFindingAncestryTrace(argv);
+    return;
+  }
+
+  // ─── Review Escalation Path Command ──────────────────────────────
+  if (args.command === "review-escalation-path") {
+    const { runReviewEscalationPath } = await import("./commands/review-escalation-path.js");
+    runReviewEscalationPath(argv);
+    return;
+  }
+
+  // ─── Finding Remediation Cost Command ────────────────────────────
+  if (args.command === "finding-remediation-cost") {
+    const { runFindingRemediationCost } = await import("./commands/finding-remediation-cost.js");
+    runFindingRemediationCost(argv);
+    return;
+  }
+
+  // ─── Review Digest Gen Command ───────────────────────────────────
+  if (args.command === "review-digest-gen") {
+    const { runReviewDigestGen } = await import("./commands/review-digest-gen.js");
+    runReviewDigestGen(argv);
+    return;
+  }
+
+  // ─── Finding Recurrence Check Command ────────────────────────────
+  if (args.command === "finding-recurrence-check") {
+    const { runFindingRecurrenceCheck } = await import("./commands/finding-recurrence-check.js");
+    runFindingRecurrenceCheck(argv);
     return;
   }
 
