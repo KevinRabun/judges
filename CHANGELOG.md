@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.103.0] — 2026-03-14
+
+### Added
+- Confidence explainability: review-confidence-explain
+- Cross-branch finding merge: finding-merge-strategy
+- Review scope suggestions: review-scope-suggest
+- AI feedback loop: review-ai-feedback-loop
+- Finding trend alerts: finding-trend-alert
+- Workload balancing: review-workload-balance
+- Smart deduplication: finding-dedup-smart
+- Annotation export: finding-annotation-export
+- CI pipeline insights: review-ci-insight
+
 ## [3.102.0] — 2026-03-14
 
 ### Added

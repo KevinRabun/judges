@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.103.0] — 2026-03-14
+
+### Added
+- Confidence explainability: review-confidence-explain
+- Cross-branch finding merge: finding-merge-strategy
+- Review scope suggestions: review-scope-suggest
+- AI feedback loop: review-ai-feedback-loop
+- Finding trend alerts: finding-trend-alert
+- Workload balancing: review-workload-balance
+- Smart deduplication: finding-dedup-smart
+- Annotation export: finding-annotation-export
+- CI pipeline insights: review-ci-insight
+
 ## [3.102.0] — 2026-03-14
 
 ### Added

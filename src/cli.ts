@@ -834,6 +834,15 @@ USAGE:
   judges review-archive-search        Search archived reviews
   judges review-incident-link         Link findings to incidents
   judges finding-search-index         Build/search findings index
+  judges review-confidence-explain    Explain confidence levels
+  judges finding-merge-strategy       Merge findings across branches
+  judges review-scope-suggest         Suggest review scope
+  judges review-ai-feedback-loop      AI feedback capture
+  judges finding-trend-alert          Alert on finding trends
+  judges review-workload-balance      Balance reviewer workload
+  judges finding-dedup-smart          Smart finding dedup
+  judges finding-annotation-export    Export annotations
+  judges review-ci-insight            CI pipeline insights
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5228,6 +5237,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-search-index") {
     const { runFindingSearchIndex } = await import("./commands/finding-search-index.js");
     runFindingSearchIndex(argv);
+    return;
+  }
+
+  // ─── Review Confidence Explain Command ────────────────────────────
+  if (args.command === "review-confidence-explain") {
+    const { runReviewConfidenceExplain } = await import("./commands/review-confidence-explain.js");
+    runReviewConfidenceExplain(argv);
+    return;
+  }
+
+  // ─── Finding Merge Strategy Command ───────────────────────────────
+  if (args.command === "finding-merge-strategy") {
+    const { runFindingMergeStrategy } = await import("./commands/finding-merge-strategy.js");
+    runFindingMergeStrategy(argv);
+    return;
+  }
+
+  // ─── Review Scope Suggest Command ─────────────────────────────────
+  if (args.command === "review-scope-suggest") {
+    const { runReviewScopeSuggest } = await import("./commands/review-scope-suggest.js");
+    runReviewScopeSuggest(argv);
+    return;
+  }
+
+  // ─── Review AI Feedback Loop Command ──────────────────────────────
+  if (args.command === "review-ai-feedback-loop") {
+    const { runReviewAiFeedbackLoop } = await import("./commands/review-ai-feedback-loop.js");
+    runReviewAiFeedbackLoop(argv);
+    return;
+  }
+
+  // ─── Finding Trend Alert Command ──────────────────────────────────
+  if (args.command === "finding-trend-alert") {
+    const { runFindingTrendAlert } = await import("./commands/finding-trend-alert.js");
+    runFindingTrendAlert(argv);
+    return;
+  }
+
+  // ─── Review Workload Balance Command ──────────────────────────────
+  if (args.command === "review-workload-balance") {
+    const { runReviewWorkloadBalance } = await import("./commands/review-workload-balance.js");
+    runReviewWorkloadBalance(argv);
+    return;
+  }
+
+  // ─── Finding Dedup Smart Command ──────────────────────────────────
+  if (args.command === "finding-dedup-smart") {
+    const { runFindingDedupSmart } = await import("./commands/finding-dedup-smart.js");
+    runFindingDedupSmart(argv);
+    return;
+  }
+
+  // ─── Finding Annotation Export Command ────────────────────────────
+  if (args.command === "finding-annotation-export") {
+    const { runFindingAnnotationExport } = await import("./commands/finding-annotation-export.js");
+    runFindingAnnotationExport(argv);
+    return;
+  }
+
+  // ─── Review CI Insight Command ────────────────────────────────────
+  if (args.command === "review-ci-insight") {
+    const { runReviewCiInsight } = await import("./commands/review-ci-insight.js");
+    runReviewCiInsight(argv);
     return;
   }
 
