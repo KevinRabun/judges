@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.107.0] — 2026-03-14
+
+### Added
+- Auto-fix suggestions: finding-auto-fix-suggest
+- Scope-based finding filter: finding-scope-filter
+- Finding noise reduction: finding-noise-reduce
+- Release gate evaluation: review-release-gate
+- Code ownership mapping: review-code-ownership
+- Batch triage: finding-batch-triage
+- PR label suggestions: review-pr-label-suggest
+- Confidence boost analysis: finding-confidence-boost
+- Review cadence analysis: review-review-cadence
+
 ## [3.106.0] — 2026-03-14
 
 ### Added

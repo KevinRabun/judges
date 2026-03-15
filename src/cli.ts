@@ -870,6 +870,15 @@ USAGE:
   judges review-knowledge-capture    Capture lessons learned
   judges review-onboarding-check     Onboarding checklist
   judges finding-regression-detect   Detect regressions
+  judges finding-auto-fix-suggest    Auto-fix suggestions
+  judges finding-scope-filter        Scope-based filtering
+  judges finding-noise-reduce        Reduce finding noise
+  judges review-release-gate         Release gate checks
+  judges review-code-ownership       Code ownership mapping
+  judges finding-batch-triage        Batch triage findings
+  judges review-pr-label-suggest     PR label suggestions
+  judges finding-confidence-boost    Confidence boost analysis
+  judges review-review-cadence       Review cadence analysis
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5516,6 +5525,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-regression-detect") {
     const { runFindingRegressionDetect } = await import("./commands/finding-regression-detect.js");
     runFindingRegressionDetect(argv);
+    return;
+  }
+
+  // ─── Finding Auto-Fix Suggest Command ─────────────────────────────
+  if (args.command === "finding-auto-fix-suggest") {
+    const { runFindingAutoFixSuggest } = await import("./commands/finding-auto-fix-suggest.js");
+    runFindingAutoFixSuggest(argv);
+    return;
+  }
+
+  // ─── Finding Scope Filter Command ────────────────────────────────
+  if (args.command === "finding-scope-filter") {
+    const { runFindingScopeFilter } = await import("./commands/finding-scope-filter.js");
+    runFindingScopeFilter(argv);
+    return;
+  }
+
+  // ─── Finding Noise Reduce Command ────────────────────────────────
+  if (args.command === "finding-noise-reduce") {
+    const { runFindingNoiseReduce } = await import("./commands/finding-noise-reduce.js");
+    runFindingNoiseReduce(argv);
+    return;
+  }
+
+  // ─── Review Release Gate Command ─────────────────────────────────
+  if (args.command === "review-release-gate") {
+    const { runReviewReleaseGate } = await import("./commands/review-release-gate.js");
+    runReviewReleaseGate(argv);
+    return;
+  }
+
+  // ─── Review Code Ownership Command ───────────────────────────────
+  if (args.command === "review-code-ownership") {
+    const { runReviewCodeOwnership } = await import("./commands/review-code-ownership.js");
+    runReviewCodeOwnership(argv);
+    return;
+  }
+
+  // ─── Finding Batch Triage Command ────────────────────────────────
+  if (args.command === "finding-batch-triage") {
+    const { runFindingBatchTriage } = await import("./commands/finding-batch-triage.js");
+    runFindingBatchTriage(argv);
+    return;
+  }
+
+  // ─── Review PR Label Suggest Command ─────────────────────────────
+  if (args.command === "review-pr-label-suggest") {
+    const { runReviewPrLabelSuggest } = await import("./commands/review-pr-label-suggest.js");
+    runReviewPrLabelSuggest(argv);
+    return;
+  }
+
+  // ─── Finding Confidence Boost Command ─────────────────────────────
+  if (args.command === "finding-confidence-boost") {
+    const { runFindingConfidenceBoost } = await import("./commands/finding-confidence-boost.js");
+    runFindingConfidenceBoost(argv);
+    return;
+  }
+
+  // ─── Review Review Cadence Command ───────────────────────────────
+  if (args.command === "review-review-cadence") {
+    const { runReviewReviewCadence } = await import("./commands/review-review-cadence.js");
+    runReviewReviewCadence(argv);
     return;
   }
 
