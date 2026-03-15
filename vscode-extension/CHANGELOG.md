@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.91.0] — 2026-03-14
+
+### Added
+- Merge review configurations: review-merge-config
+- Finding hotspot map: finding-hotspot-map
+- Parallel run summary: review-parallel-run
+- Annotation export: review-annotation-export
+- Blast radius estimation: finding-blast-radius
+- Quality score computation: review-quality-score
+- Onboarding wizard: review-onboard-wizard
+- Cache warm: review-cache-warm
+- Metadata enrichment: finding-metadata-enrich
+
 ## [3.90.0] — 2026-03-14
 
 ### Added

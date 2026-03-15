@@ -726,6 +726,15 @@ USAGE:
   judges finding-resolution-tracker   Track finding resolutions
   judges review-threshold-tune        Tune review thresholds
   judges finding-cluster-group        Group findings into clusters
+  judges review-merge-config          Merge multiple configuration files
+  judges finding-hotspot-map          Map finding hotspots in code
+  judges review-parallel-run          Summarize parallel review runs
+  judges review-annotation-export     Export findings as code annotations
+  judges finding-blast-radius         Estimate finding blast radius
+  judges review-quality-score         Compute multi-dimension quality score
+  judges review-onboard-wizard        Onboarding wizard for new users
+  judges review-cache-warm            Pre-warm review cache
+  judges finding-metadata-enrich      Enrich findings with metadata
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4364,6 +4373,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-cluster-group") {
     const { runFindingClusterGroup } = await import("./commands/finding-cluster-group.js");
     runFindingClusterGroup(argv);
+    return;
+  }
+
+  // ─── Review Merge Config Command ──────────────────────────────────
+  if (args.command === "review-merge-config") {
+    const { runReviewMergeConfig } = await import("./commands/review-merge-config.js");
+    runReviewMergeConfig(argv);
+    return;
+  }
+
+  // ─── Finding Hotspot Map Command ──────────────────────────────────
+  if (args.command === "finding-hotspot-map") {
+    const { runFindingHotspotMap } = await import("./commands/finding-hotspot-map.js");
+    runFindingHotspotMap(argv);
+    return;
+  }
+
+  // ─── Review Parallel Run Command ──────────────────────────────────
+  if (args.command === "review-parallel-run") {
+    const { runReviewParallelRun } = await import("./commands/review-parallel-run.js");
+    runReviewParallelRun(argv);
+    return;
+  }
+
+  // ─── Review Annotation Export Command ─────────────────────────────
+  if (args.command === "review-annotation-export") {
+    const { runReviewAnnotationExport } = await import("./commands/review-annotation-export.js");
+    runReviewAnnotationExport(argv);
+    return;
+  }
+
+  // ─── Finding Blast Radius Command ─────────────────────────────────
+  if (args.command === "finding-blast-radius") {
+    const { runFindingBlastRadius } = await import("./commands/finding-blast-radius.js");
+    runFindingBlastRadius(argv);
+    return;
+  }
+
+  // ─── Review Quality Score Command ─────────────────────────────────
+  if (args.command === "review-quality-score") {
+    const { runReviewQualityScore } = await import("./commands/review-quality-score.js");
+    runReviewQualityScore(argv);
+    return;
+  }
+
+  // ─── Review Onboard Wizard Command ────────────────────────────────
+  if (args.command === "review-onboard-wizard") {
+    const { runReviewOnboardWizard } = await import("./commands/review-onboard-wizard.js");
+    runReviewOnboardWizard(argv);
+    return;
+  }
+
+  // ─── Review Cache Warm Command ────────────────────────────────────
+  if (args.command === "review-cache-warm") {
+    const { runReviewCacheWarm } = await import("./commands/review-cache-warm.js");
+    runReviewCacheWarm(argv);
+    return;
+  }
+
+  // ─── Finding Metadata Enrich Command ──────────────────────────────
+  if (args.command === "finding-metadata-enrich") {
+    const { runFindingMetadataEnrich } = await import("./commands/finding-metadata-enrich.js");
+    runFindingMetadataEnrich(argv);
     return;
   }
 

@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.91.0] — 2026-03-14
+
+### Added
+- Merge multiple configuration files with conflict detection: review-merge-config
+- Map finding hotspots by line range buckets: finding-hotspot-map
+- Summarize parallel review runs with consensus analysis: review-parallel-run
+- Export findings as GitHub Actions, inline, or JSON annotations: review-annotation-export
+- Estimate finding blast radius with risk scoring: finding-blast-radius
+- Compute multi-dimension quality score with grading: review-quality-score
+- Onboarding wizard with focus-based judge suggestions: review-onboard-wizard
+- Pre-warm review cache for faster subsequent runs: review-cache-warm
+- Enrich findings with judge and domain metadata: finding-metadata-enrich
+
 ## [3.90.0] — 2026-03-14
 
 ### Added
