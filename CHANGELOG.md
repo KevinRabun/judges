@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.105.0] — 2026-03-14
+
+### Added
+- Risk matrix view: review-risk-matrix
+- Approval criteria checks: review-approval-criteria
+- Finding context summaries: finding-context-summary
+- Changelog impact assessment: review-changelog-impact
+- Commit quality scoring: review-commit-quality
+- Auto-categorize findings: finding-auto-categorize
+- Stale finding cleanup: review-stale-finding-clean
+- Impact radius analysis: finding-impact-radius
+- Reviewer matching: review-reviewer-match
+
 ## [3.104.0] — 2026-03-14
 
 ### Added

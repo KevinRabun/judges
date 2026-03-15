@@ -852,6 +852,15 @@ USAGE:
   judges review-focus-area            Identify focus areas
   judges review-team-analytics        Team review analytics
   judges finding-similar-match        Find similar findings
+  judges review-risk-matrix           Risk matrix view
+  judges review-approval-criteria    Check approval criteria
+  judges finding-context-summary     Context summaries
+  judges review-changelog-impact     Changelog impact
+  judges review-commit-quality       Commit quality score
+  judges finding-auto-categorize     Auto-categorize findings
+  judges review-stale-finding-clean  Clean stale findings
+  judges finding-impact-radius       Impact radius analysis
+  judges review-reviewer-match       Match reviewers
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5372,6 +5381,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-similar-match") {
     const { runFindingSimilarMatch } = await import("./commands/finding-similar-match.js");
     runFindingSimilarMatch(argv);
+    return;
+  }
+
+  // ─── Review Risk Matrix Command ───────────────────────────────────
+  if (args.command === "review-risk-matrix") {
+    const { runReviewRiskMatrix } = await import("./commands/review-risk-matrix.js");
+    runReviewRiskMatrix(argv);
+    return;
+  }
+
+  // ─── Review Approval Criteria Command ─────────────────────────────
+  if (args.command === "review-approval-criteria") {
+    const { runReviewApprovalCriteria } = await import("./commands/review-approval-criteria.js");
+    runReviewApprovalCriteria(argv);
+    return;
+  }
+
+  // ─── Finding Context Summary Command ──────────────────────────────
+  if (args.command === "finding-context-summary") {
+    const { runFindingContextSummary } = await import("./commands/finding-context-summary.js");
+    runFindingContextSummary(argv);
+    return;
+  }
+
+  // ─── Review Changelog Impact Command ──────────────────────────────
+  if (args.command === "review-changelog-impact") {
+    const { runReviewChangelogImpact } = await import("./commands/review-changelog-impact.js");
+    runReviewChangelogImpact(argv);
+    return;
+  }
+
+  // ─── Review Commit Quality Command ────────────────────────────────
+  if (args.command === "review-commit-quality") {
+    const { runReviewCommitQuality } = await import("./commands/review-commit-quality.js");
+    runReviewCommitQuality(argv);
+    return;
+  }
+
+  // ─── Finding Auto-Categorize Command ──────────────────────────────
+  if (args.command === "finding-auto-categorize") {
+    const { runFindingAutoCategorize } = await import("./commands/finding-auto-categorize.js");
+    runFindingAutoCategorize(argv);
+    return;
+  }
+
+  // ─── Review Stale Finding Clean Command ───────────────────────────
+  if (args.command === "review-stale-finding-clean") {
+    const { runReviewStaleFindingClean } = await import("./commands/review-stale-finding-clean.js");
+    runReviewStaleFindingClean(argv);
+    return;
+  }
+
+  // ─── Finding Impact Radius Command ────────────────────────────────
+  if (args.command === "finding-impact-radius") {
+    const { runFindingImpactRadius } = await import("./commands/finding-impact-radius.js");
+    runFindingImpactRadius(argv);
+    return;
+  }
+
+  // ─── Review Reviewer Match Command ────────────────────────────────
+  if (args.command === "review-reviewer-match") {
+    const { runReviewReviewerMatch } = await import("./commands/review-reviewer-match.js");
+    runReviewReviewerMatch(argv);
     return;
   }
 
