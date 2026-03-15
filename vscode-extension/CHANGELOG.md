@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.99.0] — 2026-03-14
+
+### Added
+- Auto-suppress findings: finding-auto-suppress
+- Review comments generation: review-review-comments
+- Permission model management: review-permission-model
+- Repository onboarding: review-repo-onboard
+- Finding dismissal workflows: finding-dismiss-workflow
+- Data retention configuration: review-data-retention
+- Reachability analysis for findings: finding-reachability-check
+- Audit data export: review-audit-export
+- Pipeline status monitoring: review-pipeline-status
+
 ## [3.98.0] — 2026-03-14
 
 ### Added

@@ -798,6 +798,15 @@ USAGE:
   judges finding-priority-matrix      Urgency x impact priority matrix
   judges review-sla-config            Configure SLA targets
   judges review-report-archive        Archive review reports
+  judges finding-auto-suppress        Auto-suppress findings
+  judges review-review-comments       Generate review comments
+  judges review-permission-model      Role-based permissions
+  judges review-repo-onboard          Onboard repository
+  judges finding-dismiss-workflow     Manage finding dismissals
+  judges review-data-retention        Configure data retention
+  judges finding-reachability-check   Check finding reachability
+  judges review-audit-export          Export audit data
+  judges review-pipeline-status       Monitor pipeline status
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4940,6 +4949,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-report-archive") {
     const { runReviewReportArchive } = await import("./commands/review-report-archive.js");
     runReviewReportArchive(argv);
+    return;
+  }
+
+  // ─── Finding Auto Suppress Command ─────────────────────────────────
+  if (args.command === "finding-auto-suppress") {
+    const { runFindingAutoSuppress } = await import("./commands/finding-auto-suppress.js");
+    runFindingAutoSuppress(argv);
+    return;
+  }
+
+  // ─── Review Review Comments Command ─────────────────────────────────
+  if (args.command === "review-review-comments") {
+    const { runReviewReviewComments } = await import("./commands/review-review-comments.js");
+    runReviewReviewComments(argv);
+    return;
+  }
+
+  // ─── Review Permission Model Command ─────────────────────────────────
+  if (args.command === "review-permission-model") {
+    const { runReviewPermissionModel } = await import("./commands/review-permission-model.js");
+    runReviewPermissionModel(argv);
+    return;
+  }
+
+  // ─── Review Repo Onboard Command ─────────────────────────────────
+  if (args.command === "review-repo-onboard") {
+    const { runReviewRepoOnboard } = await import("./commands/review-repo-onboard.js");
+    runReviewRepoOnboard(argv);
+    return;
+  }
+
+  // ─── Finding Dismiss Workflow Command ─────────────────────────────────
+  if (args.command === "finding-dismiss-workflow") {
+    const { runFindingDismissWorkflow } = await import("./commands/finding-dismiss-workflow.js");
+    runFindingDismissWorkflow(argv);
+    return;
+  }
+
+  // ─── Review Data Retention Command ─────────────────────────────────
+  if (args.command === "review-data-retention") {
+    const { runReviewDataRetention } = await import("./commands/review-data-retention.js");
+    runReviewDataRetention(argv);
+    return;
+  }
+
+  // ─── Finding Reachability Check Command ─────────────────────────────────
+  if (args.command === "finding-reachability-check") {
+    const { runFindingReachabilityCheck } = await import("./commands/finding-reachability-check.js");
+    runFindingReachabilityCheck(argv);
+    return;
+  }
+
+  // ─── Review Audit Export Command ─────────────────────────────────
+  if (args.command === "review-audit-export") {
+    const { runReviewAuditExport } = await import("./commands/review-audit-export.js");
+    runReviewAuditExport(argv);
+    return;
+  }
+
+  // ─── Review Pipeline Status Command ─────────────────────────────────
+  if (args.command === "review-pipeline-status") {
+    const { runReviewPipelineStatus } = await import("./commands/review-pipeline-status.js");
+    runReviewPipelineStatus(argv);
     return;
   }
 

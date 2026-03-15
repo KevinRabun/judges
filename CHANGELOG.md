@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.99.0] — 2026-03-14
+
+### Added
+- Auto-suppress findings matching criteria: finding-auto-suppress
+- Generate structured review comments from findings: review-review-comments
+- Role-based permission management for review workflows: review-permission-model
+- Onboard a repository to Judges with config and baseline: review-repo-onboard
+- Manage finding dismissals with reasons and audit trail: finding-dismiss-workflow
+- Configure local data retention policies and cleanup: review-data-retention
+- Check if findings reference reachable code paths: finding-reachability-check
+- Export audit data in JSON/CSV for compliance: review-audit-export
+- Monitor review pipeline and integration status: review-pipeline-status
+
 ## [3.98.0] — 2026-03-14
 
 ### Added
