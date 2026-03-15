@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.89.0] — 2026-03-14
+
+### Added
+- Review scope limiter to filter findings by prefix or severity: review-scope-limit
+- Finding regression check comparing current vs baseline verdicts: finding-regression-check
+- Finding fix validation to verify patches and estimate effort: finding-fix-validation
+- Dashboard data generator from verdict reports: review-dashboard-data
+- Finding category mapping with keyword-based classification: finding-category-map
+- Deduplicated findings report with occurrence counts: finding-dedup-report
+- Review performance profiler with judge and source metrics: review-perf-profile
+- False positive tracking log with add/remove/check actions: finding-false-positive-log
+- Review guardrails for enforcing quality gates (no-critical, min-score, max-findings): review-guardrail
+
 ## [3.88.0] — 2026-03-14
 
 ### Added

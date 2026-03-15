@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.89.0] — 2026-03-14
+
+### Added
+- Review scope limiter: review-scope-limit
+- Finding regression check: finding-regression-check
+- Finding fix validation: finding-fix-validation
+- Dashboard data generator: review-dashboard-data
+- Finding category mapping: finding-category-map
+- Deduplicated findings report: finding-dedup-report
+- Review performance profiler: review-perf-profile
+- False positive tracking log: finding-false-positive-log
+- Review guardrails enforcement: review-guardrail
+
 ## [3.88.0] — 2026-03-14
 
 ### Added

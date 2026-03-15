@@ -708,6 +708,15 @@ USAGE:
   judges finding-age-analysis         Analyze finding age over time
   judges review-template-export       Export review templates
   judges finding-correlation          Find correlations between findings
+  judges review-scope-limit           Limit review scope to specific criteria
+  judges finding-regression-check     Check for regressions vs baseline
+  judges finding-fix-validation       Validate finding fixes
+  judges review-dashboard-data        Generate dashboard-ready data
+  judges finding-category-map         Map findings to categories
+  judges finding-dedup-report         Deduplicated findings report
+  judges review-perf-profile          Profile review performance
+  judges finding-false-positive-log   Track false positive findings
+  judges review-guardrail             Define and enforce review guardrails
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4220,6 +4229,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-correlation") {
     const { runFindingCorrelation } = await import("./commands/finding-correlation.js");
     runFindingCorrelation(argv);
+    return;
+  }
+
+  // ─── Review Scope Limit Command ───────────────────────────────────
+  if (args.command === "review-scope-limit") {
+    const { runReviewScopeLimit } = await import("./commands/review-scope-limit.js");
+    runReviewScopeLimit(argv);
+    return;
+  }
+
+  // ─── Finding Regression Check Command ─────────────────────────────
+  if (args.command === "finding-regression-check") {
+    const { runFindingRegressionCheck } = await import("./commands/finding-regression-check.js");
+    runFindingRegressionCheck(argv);
+    return;
+  }
+
+  // ─── Finding Fix Validation Command ───────────────────────────────
+  if (args.command === "finding-fix-validation") {
+    const { runFindingFixValidation } = await import("./commands/finding-fix-validation.js");
+    runFindingFixValidation(argv);
+    return;
+  }
+
+  // ─── Review Dashboard Data Command ────────────────────────────────
+  if (args.command === "review-dashboard-data") {
+    const { runReviewDashboardData } = await import("./commands/review-dashboard-data.js");
+    runReviewDashboardData(argv);
+    return;
+  }
+
+  // ─── Finding Category Map Command ────────────────────────────────
+  if (args.command === "finding-category-map") {
+    const { runFindingCategoryMap } = await import("./commands/finding-category-map.js");
+    runFindingCategoryMap(argv);
+    return;
+  }
+
+  // ─── Finding Dedup Report Command ─────────────────────────────────
+  if (args.command === "finding-dedup-report") {
+    const { runFindingDedupReport } = await import("./commands/finding-dedup-report.js");
+    runFindingDedupReport(argv);
+    return;
+  }
+
+  // ─── Review Perf Profile Command ──────────────────────────────────
+  if (args.command === "review-perf-profile") {
+    const { runReviewPerfProfile } = await import("./commands/review-perf-profile.js");
+    runReviewPerfProfile(argv);
+    return;
+  }
+
+  // ─── Finding False Positive Log Command ───────────────────────────
+  if (args.command === "finding-false-positive-log") {
+    const { runFindingFalsePositiveLog } = await import("./commands/finding-false-positive-log.js");
+    runFindingFalsePositiveLog(argv);
+    return;
+  }
+
+  // ─── Review Guardrail Command ─────────────────────────────────────
+  if (args.command === "review-guardrail") {
+    const { runReviewGuardrail } = await import("./commands/review-guardrail.js");
+    runReviewGuardrail(argv);
     return;
   }
 
