@@ -816,6 +816,15 @@ USAGE:
   judges review-multi-repo-sync       Multi-repo config sync
   judges review-session-replay        Replay past sessions
   judges finding-context-enrich       Enrich finding context
+  judges review-custom-judge-config   Custom judge settings
+  judges review-branch-policy         Branch review policies
+  judges finding-recurrence-detect    Detect recurring findings
+  judges review-integration-health    Check integration health
+  judges review-metric-export         Export review metrics
+  judges finding-ownership-assign     Assign finding ownership
+  judges review-notification-digest   Notification digests
+  judges review-access-log            View access logs
+  judges review-tag-manager           Manage review tags
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5084,6 +5093,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-context-enrich") {
     const { runFindingContextEnrich } = await import("./commands/finding-context-enrich.js");
     runFindingContextEnrich(argv);
+    return;
+  }
+
+  // ─── Review Custom Judge Config Command ─────────────────────────────
+  if (args.command === "review-custom-judge-config") {
+    const { runReviewCustomJudgeConfig } = await import("./commands/review-custom-judge-config.js");
+    runReviewCustomJudgeConfig(argv);
+    return;
+  }
+
+  // ─── Review Branch Policy Command ───────────────────────────────────
+  if (args.command === "review-branch-policy") {
+    const { runReviewBranchPolicy } = await import("./commands/review-branch-policy.js");
+    runReviewBranchPolicy(argv);
+    return;
+  }
+
+  // ─── Finding Recurrence Detect Command ──────────────────────────────
+  if (args.command === "finding-recurrence-detect") {
+    const { runFindingRecurrenceDetect } = await import("./commands/finding-recurrence-detect.js");
+    runFindingRecurrenceDetect(argv);
+    return;
+  }
+
+  // ─── Review Integration Health Command ──────────────────────────────
+  if (args.command === "review-integration-health") {
+    const { runReviewIntegrationHealth } = await import("./commands/review-integration-health.js");
+    runReviewIntegrationHealth(argv);
+    return;
+  }
+
+  // ─── Review Metric Export Command ───────────────────────────────────
+  if (args.command === "review-metric-export") {
+    const { runReviewMetricExport } = await import("./commands/review-metric-export.js");
+    runReviewMetricExport(argv);
+    return;
+  }
+
+  // ─── Finding Ownership Assign Command ───────────────────────────────
+  if (args.command === "finding-ownership-assign") {
+    const { runFindingOwnershipAssign } = await import("./commands/finding-ownership-assign.js");
+    runFindingOwnershipAssign(argv);
+    return;
+  }
+
+  // ─── Review Notification Digest Command ─────────────────────────────
+  if (args.command === "review-notification-digest") {
+    const { runReviewNotificationDigest } = await import("./commands/review-notification-digest.js");
+    runReviewNotificationDigest(argv);
+    return;
+  }
+
+  // ─── Review Access Log Command ─────────────────────────────────────
+  if (args.command === "review-access-log") {
+    const { runReviewAccessLog } = await import("./commands/review-access-log.js");
+    runReviewAccessLog(argv);
+    return;
+  }
+
+  // ─── Review Tag Manager Command ────────────────────────────────────
+  if (args.command === "review-tag-manager") {
+    const { runReviewTagManager } = await import("./commands/review-tag-manager.js");
+    runReviewTagManager(argv);
     return;
   }
 

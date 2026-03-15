@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.101.0] — 2026-03-14
+
+### Added
+- Custom judge configuration: review-custom-judge-config
+- Branch review policies: review-branch-policy
+- Recurrence detection: finding-recurrence-detect
+- Integration health checks: review-integration-health
+- Metric export: review-metric-export
+- Finding ownership assignment: finding-ownership-assign
+- Notification digests: review-notification-digest
+- Access log viewer: review-access-log
+- Tag management: review-tag-manager
+
 ## [3.100.0] — 2026-03-14
 
 ### Added

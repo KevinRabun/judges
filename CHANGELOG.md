@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.101.0] — 2026-03-14
+
+### Added
+- Configure custom judge settings per project: review-custom-judge-config
+- Manage branch-level review policies: review-branch-policy
+- Detect recurring findings across review runs: finding-recurrence-detect
+- Check health of Judges integrations: review-integration-health
+- Export review metrics for external dashboards: review-metric-export
+- Assign ownership of findings to team members: finding-ownership-assign
+- Generate notification digests for review activity: review-notification-digest
+- View and manage review access logs: review-access-log
+- Manage tags for reviews and findings: review-tag-manager
+
 ## [3.100.0] — 2026-03-14
 
 ### Added
