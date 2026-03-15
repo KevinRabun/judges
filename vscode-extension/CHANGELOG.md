@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.95.0] — 2026-03-14
+
+### Added
+- Review summary dashboard: review-summary-dashboard
+- MR/PR comment formatting: review-merge-request
+- Group findings by file: finding-groupby-file
+- Cross-review deduplication: finding-dedup-cross
+- Review scope selection: review-scope-select
+- API-compatible export: review-api-export
+- Finding correlation mapping: finding-correlation-map
+- Review template library: review-template-library
+- Notification configuration: review-notification-config
+
 ## [3.94.0] — 2026-03-14
 
 ### Added

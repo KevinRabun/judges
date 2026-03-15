@@ -762,6 +762,15 @@ USAGE:
   judges finding-code-context         Show code context for findings
   judges finding-resolution-track     Track finding resolution status
   judges review-onboard-checklist     Team onboarding checklist
+  judges review-summary-dashboard    Aggregate review dashboard
+  judges review-merge-request        Format findings for MR/PR comments
+  judges finding-groupby-file        Group findings by source file
+  judges finding-dedup-cross         Deduplicate findings across reviews
+  judges review-scope-select         Select review scope by path
+  judges review-api-export           Export review data in API format
+  judges finding-correlation-map     Map finding correlations
+  judges review-template-library     Reusable review templates
+  judges review-notification-config  Configure notification preferences
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4652,6 +4661,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-onboard-checklist") {
     const { runReviewOnboardChecklist } = await import("./commands/review-onboard-checklist.js");
     runReviewOnboardChecklist(argv);
+    return;
+  }
+
+  // ─── Review Summary Dashboard Command ─────────────────────────────
+  if (args.command === "review-summary-dashboard") {
+    const { runReviewSummaryDashboard } = await import("./commands/review-summary-dashboard.js");
+    runReviewSummaryDashboard(argv);
+    return;
+  }
+
+  // ─── Review Merge Request Command ─────────────────────────────────
+  if (args.command === "review-merge-request") {
+    const { runReviewMergeRequest } = await import("./commands/review-merge-request.js");
+    runReviewMergeRequest(argv);
+    return;
+  }
+
+  // ─── Finding Groupby File Command ─────────────────────────────────
+  if (args.command === "finding-groupby-file") {
+    const { runFindingGroupbyFile } = await import("./commands/finding-groupby-file.js");
+    runFindingGroupbyFile(argv);
+    return;
+  }
+
+  // ─── Finding Dedup Cross Command ──────────────────────────────────
+  if (args.command === "finding-dedup-cross") {
+    const { runFindingDedupCross } = await import("./commands/finding-dedup-cross.js");
+    runFindingDedupCross(argv);
+    return;
+  }
+
+  // ─── Review Scope Select Command ──────────────────────────────────
+  if (args.command === "review-scope-select") {
+    const { runReviewScopeSelect } = await import("./commands/review-scope-select.js");
+    runReviewScopeSelect(argv);
+    return;
+  }
+
+  // ─── Review API Export Command ────────────────────────────────────
+  if (args.command === "review-api-export") {
+    const { runReviewApiExport } = await import("./commands/review-api-export.js");
+    runReviewApiExport(argv);
+    return;
+  }
+
+  // ─── Finding Correlation Map Command ──────────────────────────────
+  if (args.command === "finding-correlation-map") {
+    const { runFindingCorrelationMap } = await import("./commands/finding-correlation-map.js");
+    runFindingCorrelationMap(argv);
+    return;
+  }
+
+  // ─── Review Template Library Command ──────────────────────────────
+  if (args.command === "review-template-library") {
+    const { runReviewTemplateLibrary } = await import("./commands/review-template-library.js");
+    runReviewTemplateLibrary(argv);
+    return;
+  }
+
+  // ─── Review Notification Config Command ───────────────────────────
+  if (args.command === "review-notification-config") {
+    const { runReviewNotificationConfig } = await import("./commands/review-notification-config.js");
+    runReviewNotificationConfig(argv);
     return;
   }
 

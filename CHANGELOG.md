@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.95.0] — 2026-03-14
+
+### Added
+- Aggregate review dashboard with key metrics: review-summary-dashboard
+- Format findings for merge/pull request comments: review-merge-request
+- Group findings by source file path: finding-groupby-file
+- Deduplicate findings across multiple review files: finding-dedup-cross
+- Select review scope by path patterns and extensions: review-scope-select
+- Export review data in API-compatible JSON format: review-api-export
+- Map correlations between related findings: finding-correlation-map
+- Library of reusable review templates: review-template-library
+- Configure notification preferences for review results: review-notification-config
+
 ## [3.94.0] — 2026-03-14
 
 ### Added
