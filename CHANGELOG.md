@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.110.0] — 2026-03-14
+
+### Added
+- **finding-risk-label** — Label findings with risk categories (exploitable, data-loss, compliance, etc.)
+- **review-feedback-summary** — Summarize reviewer feedback trends from review history
+- **finding-fix-chain** — Chain related fixes together for batch remediation
+- **review-config-health** — Assess configuration health and suggest improvements
+- **finding-owner-notify** — Generate ownership-based notification lists for findings
+- **review-progress-report** — Generate progress reports from review history
+- **finding-patch-chain** — Link and order patches for safe sequential application
+- **review-engagement-score** — Score team engagement with code reviews
+- **finding-effort-rank** — Rank findings by estimated fix effort
+
 ## [3.109.0] — 2026-03-14
 
 ### Added

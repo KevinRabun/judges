@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.110.0] — 2026-03-14
+
+### Added
+- Risk labeling: finding-risk-label
+- Feedback summary: review-feedback-summary
+- Fix chaining: finding-fix-chain
+- Config health: review-config-health
+- Owner notifications: finding-owner-notify
+- Progress reports: review-progress-report
+- Patch chaining: finding-patch-chain
+- Engagement scoring: review-engagement-score
+- Effort ranking: finding-effort-rank
+
 ## [3.109.0] — 2026-03-14
 
 ### Added

@@ -897,6 +897,15 @@ USAGE:
   judges finding-dedup-merge         Dedup merge across runs
   judges review-team-rotation        Team rotation
   judges review-goal-track           Goal tracking
+  judges finding-risk-label          Risk labeling
+  judges review-feedback-summary     Feedback summary
+  judges finding-fix-chain           Fix chaining
+  judges review-config-health        Config health check
+  judges finding-owner-notify        Owner notifications
+  judges review-progress-report      Progress report
+  judges finding-patch-chain         Patch chaining
+  judges review-engagement-score     Engagement score
+  judges finding-effort-rank         Effort ranking
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5732,6 +5741,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-goal-track") {
     const { runReviewGoalTrack } = await import("./commands/review-goal-track.js");
     runReviewGoalTrack(argv);
+    return;
+  }
+
+  // ─── Finding Risk Label Command ──────────────────────────────────
+  if (args.command === "finding-risk-label") {
+    const { runFindingRiskLabel } = await import("./commands/finding-risk-label.js");
+    runFindingRiskLabel(argv);
+    return;
+  }
+
+  // ─── Review Feedback Summary Command ─────────────────────────────
+  if (args.command === "review-feedback-summary") {
+    const { runReviewFeedbackSummary } = await import("./commands/review-feedback-summary.js");
+    runReviewFeedbackSummary(argv);
+    return;
+  }
+
+  // ─── Finding Fix Chain Command ───────────────────────────────────
+  if (args.command === "finding-fix-chain") {
+    const { runFindingFixChain } = await import("./commands/finding-fix-chain.js");
+    runFindingFixChain(argv);
+    return;
+  }
+
+  // ─── Review Config Health Command ────────────────────────────────
+  if (args.command === "review-config-health") {
+    const { runReviewConfigHealth } = await import("./commands/review-config-health.js");
+    runReviewConfigHealth(argv);
+    return;
+  }
+
+  // ─── Finding Owner Notify Command ────────────────────────────────
+  if (args.command === "finding-owner-notify") {
+    const { runFindingOwnerNotify } = await import("./commands/finding-owner-notify.js");
+    runFindingOwnerNotify(argv);
+    return;
+  }
+
+  // ─── Review Progress Report Command ──────────────────────────────
+  if (args.command === "review-progress-report") {
+    const { runReviewProgressReport } = await import("./commands/review-progress-report.js");
+    runReviewProgressReport(argv);
+    return;
+  }
+
+  // ─── Finding Patch Chain Command ─────────────────────────────────
+  if (args.command === "finding-patch-chain") {
+    const { runFindingPatchChain } = await import("./commands/finding-patch-chain.js");
+    runFindingPatchChain(argv);
+    return;
+  }
+
+  // ─── Review Engagement Score Command ─────────────────────────────
+  if (args.command === "review-engagement-score") {
+    const { runReviewEngagementScore } = await import("./commands/review-engagement-score.js");
+    runReviewEngagementScore(argv);
+    return;
+  }
+
+  // ─── Finding Effort Rank Command ─────────────────────────────────
+  if (args.command === "finding-effort-rank") {
+    const { runFindingEffortRank } = await import("./commands/finding-effort-rank.js");
+    runFindingEffortRank(argv);
     return;
   }
 
