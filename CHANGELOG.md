@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.102.0] — 2026-03-14
+
+### Added
+- Quality trend tracking: review-quality-trend
+- Batch finding suppression: finding-batch-suppress
+- Severity drift detection: finding-severity-drift
+- PR comment generation: review-pr-comment-gen
+- Finding dependency linking: finding-dependency-link
+- Reviewer role assignment: review-role-assignment
+- Archived review search: review-archive-search
+- Incident linking: review-incident-link
+- Finding search index: finding-search-index
+
 ## [3.101.0] — 2026-03-14
 
 ### Added

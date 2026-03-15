@@ -825,6 +825,15 @@ USAGE:
   judges review-notification-digest   Notification digests
   judges review-access-log            View access logs
   judges review-tag-manager           Manage review tags
+  judges review-quality-trend         Track quality trends
+  judges finding-batch-suppress       Batch suppress findings
+  judges finding-severity-drift       Detect severity changes
+  judges review-pr-comment-gen        Generate PR comments
+  judges finding-dependency-link      Link findings to deps
+  judges review-role-assignment       Manage reviewer roles
+  judges review-archive-search        Search archived reviews
+  judges review-incident-link         Link findings to incidents
+  judges finding-search-index         Build/search findings index
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5156,6 +5165,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-tag-manager") {
     const { runReviewTagManager } = await import("./commands/review-tag-manager.js");
     runReviewTagManager(argv);
+    return;
+  }
+
+  // ─── Review Quality Trend Command ───────────────────────────────────
+  if (args.command === "review-quality-trend") {
+    const { runReviewQualityTrend } = await import("./commands/review-quality-trend.js");
+    runReviewQualityTrend(argv);
+    return;
+  }
+
+  // ─── Finding Batch Suppress Command ─────────────────────────────────
+  if (args.command === "finding-batch-suppress") {
+    const { runFindingBatchSuppress } = await import("./commands/finding-batch-suppress.js");
+    runFindingBatchSuppress(argv);
+    return;
+  }
+
+  // ─── Finding Severity Drift Command ─────────────────────────────────
+  if (args.command === "finding-severity-drift") {
+    const { runFindingSeverityDrift } = await import("./commands/finding-severity-drift.js");
+    runFindingSeverityDrift(argv);
+    return;
+  }
+
+  // ─── Review PR Comment Gen Command ──────────────────────────────────
+  if (args.command === "review-pr-comment-gen") {
+    const { runReviewPrCommentGen } = await import("./commands/review-pr-comment-gen.js");
+    runReviewPrCommentGen(argv);
+    return;
+  }
+
+  // ─── Finding Dependency Link Command ────────────────────────────────
+  if (args.command === "finding-dependency-link") {
+    const { runFindingDependencyLink } = await import("./commands/finding-dependency-link.js");
+    runFindingDependencyLink(argv);
+    return;
+  }
+
+  // ─── Review Role Assignment Command ─────────────────────────────────
+  if (args.command === "review-role-assignment") {
+    const { runReviewRoleAssignment } = await import("./commands/review-role-assignment.js");
+    runReviewRoleAssignment(argv);
+    return;
+  }
+
+  // ─── Review Archive Search Command ──────────────────────────────────
+  if (args.command === "review-archive-search") {
+    const { runReviewArchiveSearch } = await import("./commands/review-archive-search.js");
+    runReviewArchiveSearch(argv);
+    return;
+  }
+
+  // ─── Review Incident Link Command ───────────────────────────────────
+  if (args.command === "review-incident-link") {
+    const { runReviewIncidentLink } = await import("./commands/review-incident-link.js");
+    runReviewIncidentLink(argv);
+    return;
+  }
+
+  // ─── Finding Search Index Command ───────────────────────────────────
+  if (args.command === "finding-search-index") {
+    const { runFindingSearchIndex } = await import("./commands/finding-search-index.js");
+    runFindingSearchIndex(argv);
     return;
   }
 
