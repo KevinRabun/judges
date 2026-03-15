@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.112.0] — 2026-03-14
+
+### Added
+- **finding-scope-impact** — Analyse finding scope impact across domains (isolated, moderate, widespread, systemic)
+- **review-health-trend** — Track review health over time with composite scoring and trend detection
+- **finding-fix-estimate** — Estimate fix effort for each finding with time-boxed labels
+- **review-readiness-check** — Assess codebase readiness for review with prerequisite checklist
+- **finding-noise-score** — Score finding noise levels to identify low-signal findings
+- **review-workflow-suggest** — Suggest optimal review workflows based on project characteristics
+- **finding-top-offender** — Identify the most frequently triggered rules
+- **review-team-skill-map** — Build team skill map from review history with expertise levels
+- **finding-repeat-detect** — Detect findings that repeat across multiple reviews
+
 ## [3.111.0] — 2026-03-14
 
 ### Added

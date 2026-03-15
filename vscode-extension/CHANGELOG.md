@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.112.0] — 2026-03-14
+
+### Added
+- Scope impact: finding-scope-impact
+- Health trend: review-health-trend
+- Fix estimates: finding-fix-estimate
+- Readiness check: review-readiness-check
+- Noise scoring: finding-noise-score
+- Workflow suggestions: review-workflow-suggest
+- Top offenders: finding-top-offender
+- Team skill map: review-team-skill-map
+- Repeat detection: finding-repeat-detect
+
 ## [3.111.0] — 2026-03-14
 
 ### Added

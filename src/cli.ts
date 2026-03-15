@@ -915,6 +915,15 @@ USAGE:
   judges finding-dependency-impact   Dependency impact
   judges review-mentor-suggest       Mentor suggestions
   judges finding-cluster-summary     Cluster summary
+  judges finding-scope-impact        Scope impact
+  judges review-health-trend         Health trend
+  judges finding-fix-estimate        Fix estimates
+  judges review-readiness-check      Readiness check
+  judges finding-noise-score         Noise scoring
+  judges review-workflow-suggest     Workflow suggestions
+  judges finding-top-offender        Top offenders
+  judges review-team-skill-map       Team skill map
+  judges finding-repeat-detect       Repeat detection
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5876,6 +5885,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-cluster-summary") {
     const { runFindingClusterSummary } = await import("./commands/finding-cluster-summary.js");
     runFindingClusterSummary(argv);
+    return;
+  }
+
+  // ─── Finding Scope Impact Command ────────────────────────────────
+  if (args.command === "finding-scope-impact") {
+    const { runFindingScopeImpact } = await import("./commands/finding-scope-impact.js");
+    runFindingScopeImpact(argv);
+    return;
+  }
+
+  // ─── Review Health Trend Command ─────────────────────────────────
+  if (args.command === "review-health-trend") {
+    const { runReviewHealthTrend } = await import("./commands/review-health-trend.js");
+    runReviewHealthTrend(argv);
+    return;
+  }
+
+  // ─── Finding Fix Estimate Command ────────────────────────────────
+  if (args.command === "finding-fix-estimate") {
+    const { runFindingFixEstimate } = await import("./commands/finding-fix-estimate.js");
+    runFindingFixEstimate(argv);
+    return;
+  }
+
+  // ─── Review Readiness Check Command ──────────────────────────────
+  if (args.command === "review-readiness-check") {
+    const { runReviewReadinessCheck } = await import("./commands/review-readiness-check.js");
+    runReviewReadinessCheck(argv);
+    return;
+  }
+
+  // ─── Finding Noise Score Command ─────────────────────────────────
+  if (args.command === "finding-noise-score") {
+    const { runFindingNoiseScore } = await import("./commands/finding-noise-score.js");
+    runFindingNoiseScore(argv);
+    return;
+  }
+
+  // ─── Review Workflow Suggest Command ──────────────────────────────
+  if (args.command === "review-workflow-suggest") {
+    const { runReviewWorkflowSuggest } = await import("./commands/review-workflow-suggest.js");
+    runReviewWorkflowSuggest(argv);
+    return;
+  }
+
+  // ─── Finding Top Offender Command ────────────────────────────────
+  if (args.command === "finding-top-offender") {
+    const { runFindingTopOffender } = await import("./commands/finding-top-offender.js");
+    runFindingTopOffender(argv);
+    return;
+  }
+
+  // ─── Review Team Skill Map Command ───────────────────────────────
+  if (args.command === "review-team-skill-map") {
+    const { runReviewTeamSkillMap } = await import("./commands/review-team-skill-map.js");
+    runReviewTeamSkillMap(argv);
+    return;
+  }
+
+  // ─── Finding Repeat Detect Command ───────────────────────────────
+  if (args.command === "finding-repeat-detect") {
+    const { runFindingRepeatDetect } = await import("./commands/finding-repeat-detect.js");
+    runFindingRepeatDetect(argv);
     return;
   }
 
