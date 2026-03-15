@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.106.0] — 2026-03-14
+
+### Added
+- Quality gate evaluation: review-quality-gate
+- Reopened finding detection: finding-reopen-detect
+- Finding priority ranking: finding-priority-rank
+- Dependency risk review: review-dependency-review
+- Merge readiness assessment: review-merge-readiness
+- Security posture analysis: review-security-posture
+- Knowledge capture: review-knowledge-capture
+- Onboarding checklist: review-onboarding-check
+- Regression detection: finding-regression-detect
+
 ## [3.105.0] — 2026-03-14
 
 ### Added

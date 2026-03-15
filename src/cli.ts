@@ -861,6 +861,15 @@ USAGE:
   judges review-stale-finding-clean  Clean stale findings
   judges finding-impact-radius       Impact radius analysis
   judges review-reviewer-match       Match reviewers
+  judges review-quality-gate         Quality gate checks
+  judges finding-reopen-detect       Detect reopened findings
+  judges finding-priority-rank       Priority ranking
+  judges review-dependency-review    Dependency risk review
+  judges review-merge-readiness      Merge readiness check
+  judges review-security-posture     Security posture summary
+  judges review-knowledge-capture    Capture lessons learned
+  judges review-onboarding-check     Onboarding checklist
+  judges finding-regression-detect   Detect regressions
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5444,6 +5453,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-reviewer-match") {
     const { runReviewReviewerMatch } = await import("./commands/review-reviewer-match.js");
     runReviewReviewerMatch(argv);
+    return;
+  }
+
+  // ─── Review Quality Gate Command ──────────────────────────────────
+  if (args.command === "review-quality-gate") {
+    const { runReviewQualityGate } = await import("./commands/review-quality-gate.js");
+    runReviewQualityGate(argv);
+    return;
+  }
+
+  // ─── Finding Reopen Detect Command ────────────────────────────────
+  if (args.command === "finding-reopen-detect") {
+    const { runFindingReopenDetect } = await import("./commands/finding-reopen-detect.js");
+    runFindingReopenDetect(argv);
+    return;
+  }
+
+  // ─── Finding Priority Rank Command ────────────────────────────────
+  if (args.command === "finding-priority-rank") {
+    const { runFindingPriorityRank } = await import("./commands/finding-priority-rank.js");
+    runFindingPriorityRank(argv);
+    return;
+  }
+
+  // ─── Review Dependency Review Command ─────────────────────────────
+  if (args.command === "review-dependency-review") {
+    const { runReviewDependencyReview } = await import("./commands/review-dependency-review.js");
+    runReviewDependencyReview(argv);
+    return;
+  }
+
+  // ─── Review Merge Readiness Command ───────────────────────────────
+  if (args.command === "review-merge-readiness") {
+    const { runReviewMergeReadiness } = await import("./commands/review-merge-readiness.js");
+    runReviewMergeReadiness(argv);
+    return;
+  }
+
+  // ─── Review Security Posture Command ──────────────────────────────
+  if (args.command === "review-security-posture") {
+    const { runReviewSecurityPosture } = await import("./commands/review-security-posture.js");
+    runReviewSecurityPosture(argv);
+    return;
+  }
+
+  // ─── Review Knowledge Capture Command ─────────────────────────────
+  if (args.command === "review-knowledge-capture") {
+    const { runReviewKnowledgeCapture } = await import("./commands/review-knowledge-capture.js");
+    runReviewKnowledgeCapture(argv);
+    return;
+  }
+
+  // ─── Review Onboarding Check Command ──────────────────────────────
+  if (args.command === "review-onboarding-check") {
+    const { runReviewOnboardingCheck } = await import("./commands/review-onboarding-check.js");
+    runReviewOnboardingCheck(argv);
+    return;
+  }
+
+  // ─── Finding Regression Detect Command ────────────────────────────
+  if (args.command === "finding-regression-detect") {
+    const { runFindingRegressionDetect } = await import("./commands/finding-regression-detect.js");
+    runFindingRegressionDetect(argv);
     return;
   }
 
