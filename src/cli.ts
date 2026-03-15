@@ -906,6 +906,15 @@ USAGE:
   judges finding-patch-chain         Patch chaining
   judges review-engagement-score     Engagement score
   judges finding-effort-rank         Effort ranking
+  judges finding-resolution-workflow Resolution workflow
+  judges review-quality-baseline     Quality baseline
+  judges finding-context-link        Context linking
+  judges review-team-velocity        Team velocity
+  judges finding-auto-priority       Auto prioritisation
+  judges review-retrospective        Retrospective
+  judges finding-dependency-impact   Dependency impact
+  judges review-mentor-suggest       Mentor suggestions
+  judges finding-cluster-summary     Cluster summary
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5804,6 +5813,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-effort-rank") {
     const { runFindingEffortRank } = await import("./commands/finding-effort-rank.js");
     runFindingEffortRank(argv);
+    return;
+  }
+
+  // ─── Finding Resolution Workflow Command ─────────────────────────
+  if (args.command === "finding-resolution-workflow") {
+    const { runFindingResolutionWorkflow } = await import("./commands/finding-resolution-workflow.js");
+    runFindingResolutionWorkflow(argv);
+    return;
+  }
+
+  // ─── Review Quality Baseline Command ─────────────────────────────
+  if (args.command === "review-quality-baseline") {
+    const { runReviewQualityBaseline } = await import("./commands/review-quality-baseline.js");
+    runReviewQualityBaseline(argv);
+    return;
+  }
+
+  // ─── Finding Context Link Command ────────────────────────────────
+  if (args.command === "finding-context-link") {
+    const { runFindingContextLink } = await import("./commands/finding-context-link.js");
+    runFindingContextLink(argv);
+    return;
+  }
+
+  // ─── Review Team Velocity Command ────────────────────────────────
+  if (args.command === "review-team-velocity") {
+    const { runReviewTeamVelocity } = await import("./commands/review-team-velocity.js");
+    runReviewTeamVelocity(argv);
+    return;
+  }
+
+  // ─── Finding Auto Priority Command ───────────────────────────────
+  if (args.command === "finding-auto-priority") {
+    const { runFindingAutoPriority } = await import("./commands/finding-auto-priority.js");
+    runFindingAutoPriority(argv);
+    return;
+  }
+
+  // ─── Review Retrospective Command ────────────────────────────────
+  if (args.command === "review-retrospective") {
+    const { runReviewRetrospective } = await import("./commands/review-retrospective.js");
+    runReviewRetrospective(argv);
+    return;
+  }
+
+  // ─── Finding Dependency Impact Command ───────────────────────────
+  if (args.command === "finding-dependency-impact") {
+    const { runFindingDependencyImpact } = await import("./commands/finding-dependency-impact.js");
+    runFindingDependencyImpact(argv);
+    return;
+  }
+
+  // ─── Review Mentor Suggest Command ───────────────────────────────
+  if (args.command === "review-mentor-suggest") {
+    const { runReviewMentorSuggest } = await import("./commands/review-mentor-suggest.js");
+    runReviewMentorSuggest(argv);
+    return;
+  }
+
+  // ─── Finding Cluster Summary Command ─────────────────────────────
+  if (args.command === "finding-cluster-summary") {
+    const { runFindingClusterSummary } = await import("./commands/finding-cluster-summary.js");
+    runFindingClusterSummary(argv);
     return;
   }
 

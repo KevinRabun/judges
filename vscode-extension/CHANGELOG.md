@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.111.0] — 2026-03-14
+
+### Added
+- Resolution workflow: finding-resolution-workflow
+- Quality baseline: review-quality-baseline
+- Context linking: finding-context-link
+- Team velocity: review-team-velocity
+- Auto priority: finding-auto-priority
+- Retrospective: review-retrospective
+- Dependency impact: finding-dependency-impact
+- Mentor suggestions: review-mentor-suggest
+- Cluster summary: finding-cluster-summary
+
 ## [3.110.0] — 2026-03-14
 
 ### Added

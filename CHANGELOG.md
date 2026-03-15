@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.111.0] — 2026-03-14
+
+### Added
+- **finding-resolution-workflow** — Guide through severity-based resolution workflows with step checklists
+- **review-quality-baseline** — Compare current review quality against historical baseline
+- **finding-context-link** — Link findings to relevant documentation via keyword matching
+- **review-team-velocity** — Track team review velocity metrics with trend detection
+- **finding-auto-priority** — Auto-prioritise findings with multi-factor scoring (P0–P4)
+- **review-retrospective** — Generate review retrospective summaries (went well, needs improvement, action items)
+- **finding-dependency-impact** — Show impact of dependency-related findings and blast radius
+- **review-mentor-suggest** — Suggest mentor pairings based on expertise gaps in review history
+- **finding-cluster-summary** — Summarise finding clusters by domain with severity breakdown
+
 ## [3.110.0] — 2026-03-14
 
 ### Added
