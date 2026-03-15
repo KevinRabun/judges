@@ -4,6 +4,21 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.88.0] — 2026-03-14
+
+### Added
+- Finding dependency tree visualization: finding-dependency-tree
+- CI pipeline generation: review-ci-integration
+- Comparative review: review-comparative
+- Suppression audit: finding-suppression-audit
+- Custom rules management: review-custom-rule
+- Notification configuration: review-notification
+- Finding age analysis: finding-age-analysis
+- Template export: review-template-export
+- Finding correlation: finding-correlation
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.87.0] — 2026-03-14
 
 ### Added

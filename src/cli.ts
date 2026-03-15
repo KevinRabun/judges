@@ -699,6 +699,15 @@ USAGE:
   judges finding-pattern-library      Manage finding pattern library
   judges review-status-badge          Generate status badges
   judges finding-rule-explain         Explain rules in detail
+  judges finding-dependency-tree      Visualize finding dependencies
+  judges review-ci-integration        Generate CI pipeline configuration
+  judges review-comparative           Compare two verdict reports
+  judges finding-suppression-audit    Audit suppressed findings
+  judges review-custom-rule           Manage custom review rules
+  judges review-notification          Manage review notifications
+  judges finding-age-analysis         Analyze finding age over time
+  judges review-template-export       Export review templates
+  judges finding-correlation          Find correlations between findings
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4148,6 +4157,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-rule-explain") {
     const { runFindingRuleExplain } = await import("./commands/finding-rule-explain.js");
     runFindingRuleExplain(argv);
+    return;
+  }
+
+  // ─── Finding Dependency Tree Command ──────────────────────────────
+  if (args.command === "finding-dependency-tree") {
+    const { runFindingDependencyTree } = await import("./commands/finding-dependency-tree.js");
+    runFindingDependencyTree(argv);
+    return;
+  }
+
+  // ─── Review CI Integration Command ────────────────────────────────
+  if (args.command === "review-ci-integration") {
+    const { runReviewCiIntegration } = await import("./commands/review-ci-integration.js");
+    runReviewCiIntegration(argv);
+    return;
+  }
+
+  // ─── Review Comparative Command ───────────────────────────────────
+  if (args.command === "review-comparative") {
+    const { runReviewComparative } = await import("./commands/review-comparative.js");
+    runReviewComparative(argv);
+    return;
+  }
+
+  // ─── Finding Suppression Audit Command ────────────────────────────
+  if (args.command === "finding-suppression-audit") {
+    const { runFindingSuppressionAudit } = await import("./commands/finding-suppression-audit.js");
+    runFindingSuppressionAudit(argv);
+    return;
+  }
+
+  // ─── Review Custom Rule Command ───────────────────────────────────
+  if (args.command === "review-custom-rule") {
+    const { runReviewCustomRule } = await import("./commands/review-custom-rule.js");
+    runReviewCustomRule(argv);
+    return;
+  }
+
+  // ─── Review Notification Command ──────────────────────────────────
+  if (args.command === "review-notification") {
+    const { runReviewNotification } = await import("./commands/review-notification.js");
+    runReviewNotification(argv);
+    return;
+  }
+
+  // ─── Finding Age Analysis Command ─────────────────────────────────
+  if (args.command === "finding-age-analysis") {
+    const { runFindingAgeAnalysis } = await import("./commands/finding-age-analysis.js");
+    runFindingAgeAnalysis(argv);
+    return;
+  }
+
+  // ─── Review Template Export Command ───────────────────────────────
+  if (args.command === "review-template-export") {
+    const { runReviewTemplateExport } = await import("./commands/review-template-export.js");
+    runReviewTemplateExport(argv);
+    return;
+  }
+
+  // ─── Finding Correlation Command ──────────────────────────────────
+  if (args.command === "finding-correlation") {
+    const { runFindingCorrelation } = await import("./commands/finding-correlation.js");
+    runFindingCorrelation(argv);
     return;
   }
 

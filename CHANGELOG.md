@@ -2,6 +2,22 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.88.0] — 2026-03-14
+
+### Added
+- Dependency tree: finding-dependency-tree (visualize finding dependency relationships)
+- CI integration: review-ci-integration (generate CI pipeline configuration)
+- Comparative review: review-comparative (compare two verdict reports side by side)
+- Suppression audit: finding-suppression-audit (audit suppressed/ignored findings)
+- Custom rules: review-custom-rule (create and manage custom review rules)
+- Notifications: review-notification (configure review notification settings)
+- Age analysis: finding-age-analysis (analyze finding age and lifecycle)
+- Template export: review-template-export (export review templates for reuse)
+- Correlation: finding-correlation (find correlations between findings across reports)
+
+### Tests
+- All 2,267 tests passing (0 failures)
+
 ## [3.87.0] — 2026-03-14
 
 ### Added
