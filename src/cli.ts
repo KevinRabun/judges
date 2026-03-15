@@ -753,6 +753,15 @@ USAGE:
   judges finding-link-graph           Build finding relationship graph
   judges review-audit-trail           Maintain review audit trail
   judges review-compliance-report     Generate compliance reports
+  judges review-quickstart            Interactive quickstart guide
+  judges review-interactive           Step-by-step finding walkthrough
+  judges finding-explain              Explain findings in detail
+  judges review-ide-sync              Sync results to IDE format
+  judges finding-filter-view          Filter findings by criteria
+  judges review-tenant-config         Manage team config profiles
+  judges finding-code-context         Show code context for findings
+  judges finding-resolution-track     Track finding resolution status
+  judges review-onboard-checklist     Team onboarding checklist
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4580,6 +4589,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-compliance-report") {
     const { runReviewComplianceReport } = await import("./commands/review-compliance-report.js");
     runReviewComplianceReport(argv);
+    return;
+  }
+
+  // ─── Review Quickstart Command ────────────────────────────────────
+  if (args.command === "review-quickstart") {
+    const { runReviewQuickstart } = await import("./commands/review-quickstart.js");
+    runReviewQuickstart(argv);
+    return;
+  }
+
+  // ─── Review Interactive Command ───────────────────────────────────
+  if (args.command === "review-interactive") {
+    const { runReviewInteractive } = await import("./commands/review-interactive.js");
+    runReviewInteractive(argv);
+    return;
+  }
+
+  // ─── Finding Explain Command ──────────────────────────────────────
+  if (args.command === "finding-explain") {
+    const { runFindingExplain } = await import("./commands/finding-explain.js");
+    runFindingExplain(argv);
+    return;
+  }
+
+  // ─── Review IDE Sync Command ──────────────────────────────────────
+  if (args.command === "review-ide-sync") {
+    const { runReviewIdeSync } = await import("./commands/review-ide-sync.js");
+    runReviewIdeSync(argv);
+    return;
+  }
+
+  // ─── Finding Filter View Command ──────────────────────────────────
+  if (args.command === "finding-filter-view") {
+    const { runFindingFilterView } = await import("./commands/finding-filter-view.js");
+    runFindingFilterView(argv);
+    return;
+  }
+
+  // ─── Review Tenant Config Command ─────────────────────────────────
+  if (args.command === "review-tenant-config") {
+    const { runReviewTenantConfig } = await import("./commands/review-tenant-config.js");
+    runReviewTenantConfig(argv);
+    return;
+  }
+
+  // ─── Finding Code Context Command ─────────────────────────────────
+  if (args.command === "finding-code-context") {
+    const { runFindingCodeContext } = await import("./commands/finding-code-context.js");
+    runFindingCodeContext(argv);
+    return;
+  }
+
+  // ─── Finding Resolution Track Command ─────────────────────────────
+  if (args.command === "finding-resolution-track") {
+    const { runFindingResolutionTrack } = await import("./commands/finding-resolution-track.js");
+    runFindingResolutionTrack(argv);
+    return;
+  }
+
+  // ─── Review Onboard Checklist Command ─────────────────────────────
+  if (args.command === "review-onboard-checklist") {
+    const { runReviewOnboardChecklist } = await import("./commands/review-onboard-checklist.js");
+    runReviewOnboardChecklist(argv);
     return;
   }
 

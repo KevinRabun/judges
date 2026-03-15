@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.94.0] — 2026-03-14
+
+### Added
+- Interactive quickstart guide: review-quickstart
+- Step-by-step finding walkthrough: review-interactive
+- Detailed finding explanations: finding-explain
+- IDE sync (VSCode/JetBrains): review-ide-sync
+- Multi-criteria finding filters: finding-filter-view
+- Tenant/team config profiles: review-tenant-config
+- Code context for findings: finding-code-context
+- Resolution status tracking: finding-resolution-track
+- Onboarding checklists: review-onboard-checklist
+
 ## [3.93.0] — 2026-03-14
 
 ### Added

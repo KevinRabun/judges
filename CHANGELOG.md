@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.94.0] — 2026-03-14
+
+### Added
+- Interactive quickstart guide for new users: review-quickstart
+- Step-by-step finding walkthrough sessions: review-interactive
+- Detailed finding explanations with context: finding-explain
+- Sync review results to IDE formats (VSCode/JetBrains): review-ide-sync
+- Multi-criteria finding filtering and viewing: finding-filter-view
+- Per-tenant/team configuration profiles: review-tenant-config
+- Surrounding code context for findings: finding-code-context
+- Finding resolution status tracking over time: finding-resolution-track
+- Team onboarding checklists for adoption: review-onboard-checklist
+
 ## [3.93.0] — 2026-03-14
 
 ### Added
