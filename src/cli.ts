@@ -744,6 +744,15 @@ USAGE:
   judges finding-pattern-detect       Detect recurring finding patterns
   judges review-coverage-gap          Identify review coverage gaps
   judges review-feedback-loop         Track review feedback over time
+  judges review-slack-format          Format review summaries for Slack
+  judges review-config-template       Generate config templates
+  judges finding-fix-suggest          Suggest fixes for findings
+  judges review-progress-track        Track review progress over time
+  judges finding-ownership-map        Map findings to code owners
+  judges review-report-schedule       Manage report schedules
+  judges finding-link-graph           Build finding relationship graph
+  judges review-audit-trail           Maintain review audit trail
+  judges review-compliance-report     Generate compliance reports
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4508,6 +4517,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-feedback-loop") {
     const { runReviewFeedbackLoop } = await import("./commands/review-feedback-loop.js");
     runReviewFeedbackLoop(argv);
+    return;
+  }
+
+  // ─── Review Slack Format Command ──────────────────────────────────
+  if (args.command === "review-slack-format") {
+    const { runReviewSlackFormat } = await import("./commands/review-slack-format.js");
+    runReviewSlackFormat(argv);
+    return;
+  }
+
+  // ─── Review Config Template Command ───────────────────────────────
+  if (args.command === "review-config-template") {
+    const { runReviewConfigTemplate } = await import("./commands/review-config-template.js");
+    runReviewConfigTemplate(argv);
+    return;
+  }
+
+  // ─── Finding Fix Suggest Command ──────────────────────────────────
+  if (args.command === "finding-fix-suggest") {
+    const { runFindingFixSuggest } = await import("./commands/finding-fix-suggest.js");
+    runFindingFixSuggest(argv);
+    return;
+  }
+
+  // ─── Review Progress Track Command ────────────────────────────────
+  if (args.command === "review-progress-track") {
+    const { runReviewProgressTrack } = await import("./commands/review-progress-track.js");
+    runReviewProgressTrack(argv);
+    return;
+  }
+
+  // ─── Finding Ownership Map Command ────────────────────────────────
+  if (args.command === "finding-ownership-map") {
+    const { runFindingOwnershipMap } = await import("./commands/finding-ownership-map.js");
+    runFindingOwnershipMap(argv);
+    return;
+  }
+
+  // ─── Review Report Schedule Command ───────────────────────────────
+  if (args.command === "review-report-schedule") {
+    const { runReviewReportSchedule } = await import("./commands/review-report-schedule.js");
+    runReviewReportSchedule(argv);
+    return;
+  }
+
+  // ─── Finding Link Graph Command ───────────────────────────────────
+  if (args.command === "finding-link-graph") {
+    const { runFindingLinkGraph } = await import("./commands/finding-link-graph.js");
+    runFindingLinkGraph(argv);
+    return;
+  }
+
+  // ─── Review Audit Trail Command ───────────────────────────────────
+  if (args.command === "review-audit-trail") {
+    const { runReviewAuditTrail } = await import("./commands/review-audit-trail.js");
+    runReviewAuditTrail(argv);
+    return;
+  }
+
+  // ─── Review Compliance Report Command ─────────────────────────────
+  if (args.command === "review-compliance-report") {
+    const { runReviewComplianceReport } = await import("./commands/review-compliance-report.js");
+    runReviewComplianceReport(argv);
     return;
   }
 

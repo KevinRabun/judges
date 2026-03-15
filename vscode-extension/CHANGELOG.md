@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.93.0] — 2026-03-14
+
+### Added
+- Slack-formatted review summaries: review-slack-format
+- Config template generation: review-config-template
+- Finding fix suggestions: finding-fix-suggest
+- Review progress tracking: review-progress-track
+- Finding ownership mapping: finding-ownership-map
+- Report scheduling: review-report-schedule
+- Finding link graphs: finding-link-graph
+- Review audit trails: review-audit-trail
+- Compliance report generation: review-compliance-report
+
 ## [3.92.0] — 2026-03-14
 
 ### Added

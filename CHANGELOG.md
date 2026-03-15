@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.93.0] — 2026-03-14
+
+### Added
+- Format review summaries for Slack-compatible output: review-slack-format
+- Generate config templates for common review scenarios: review-config-template
+- Suggest fixes for findings with code-level recommendations: finding-fix-suggest
+- Track review progress across multiple runs: review-progress-track
+- Map findings to code owners and maintainers: finding-ownership-map
+- Manage scheduled report generation: review-report-schedule
+- Build finding relationship graphs for dependency analysis: finding-link-graph
+- Maintain review audit trails with full history: review-audit-trail
+- Generate compliance reports from review findings: review-compliance-report
+
 ## [3.92.0] — 2026-03-14
 
 ### Added

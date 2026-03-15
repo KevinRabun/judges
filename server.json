@@ -7,12 +7,12 @@
     "url": "https://github.com/kevinrabun/judges",
     "source": "github"
   },
-  "version": "3.92.0",
+  "version": "3.93.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@kevinrabun/judges",
-      "version": "3.92.0",
+      "version": "3.93.0",
       "transport": {
         "type": "stdio"
       }
