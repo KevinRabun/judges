@@ -789,6 +789,15 @@ USAGE:
   judges review-rollout-plan          Generate phased rollout plan
   judges finding-annotation-layer     Add annotations to findings
   judges review-gate-config           Configure quality gates
+  judges review-language-profile      Analyze findings by language
+  judges finding-cwe-lookup           Look up CWE details for findings
+  judges review-cicd-integrate        Generate CI/CD integration configs
+  judges finding-patch-preview        Preview patch modifications
+  judges review-org-dashboard         Organization review dashboard
+  judges finding-duplicate-detect     Detect duplicate findings
+  judges finding-priority-matrix      Urgency x impact priority matrix
+  judges review-sla-config            Configure SLA targets
+  judges review-report-archive        Archive review reports
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4868,6 +4877,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-gate-config") {
     const { runReviewGateConfig } = await import("./commands/review-gate-config.js");
     runReviewGateConfig(argv);
+    return;
+  }
+
+  // ─── Review Language Profile Command ─────────────────────────────
+  if (args.command === "review-language-profile") {
+    const { runReviewLanguageProfile } = await import("./commands/review-language-profile.js");
+    runReviewLanguageProfile(argv);
+    return;
+  }
+
+  // ─── Finding CWE Lookup Command ─────────────────────────────────
+  if (args.command === "finding-cwe-lookup") {
+    const { runFindingCweLookup } = await import("./commands/finding-cwe-lookup.js");
+    runFindingCweLookup(argv);
+    return;
+  }
+
+  // ─── Review CICD Integrate Command ──────────────────────────────
+  if (args.command === "review-cicd-integrate") {
+    const { runReviewCicdIntegrate } = await import("./commands/review-cicd-integrate.js");
+    runReviewCicdIntegrate(argv);
+    return;
+  }
+
+  // ─── Finding Patch Preview Command ──────────────────────────────
+  if (args.command === "finding-patch-preview") {
+    const { runFindingPatchPreview } = await import("./commands/finding-patch-preview.js");
+    runFindingPatchPreview(argv);
+    return;
+  }
+
+  // ─── Review Org Dashboard Command ───────────────────────────────
+  if (args.command === "review-org-dashboard") {
+    const { runReviewOrgDashboard } = await import("./commands/review-org-dashboard.js");
+    runReviewOrgDashboard(argv);
+    return;
+  }
+
+  // ─── Finding Duplicate Detect Command ───────────────────────────
+  if (args.command === "finding-duplicate-detect") {
+    const { runFindingDuplicateDetect } = await import("./commands/finding-duplicate-detect.js");
+    runFindingDuplicateDetect(argv);
+    return;
+  }
+
+  // ─── Finding Priority Matrix Command ────────────────────────────
+  if (args.command === "finding-priority-matrix") {
+    const { runFindingPriorityMatrix } = await import("./commands/finding-priority-matrix.js");
+    runFindingPriorityMatrix(argv);
+    return;
+  }
+
+  // ─── Review SLA Config Command ──────────────────────────────────
+  if (args.command === "review-sla-config") {
+    const { runReviewSlaConfig } = await import("./commands/review-sla-config.js");
+    runReviewSlaConfig(argv);
+    return;
+  }
+
+  // ─── Review Report Archive Command ──────────────────────────────
+  if (args.command === "review-report-archive") {
+    const { runReviewReportArchive } = await import("./commands/review-report-archive.js");
+    runReviewReportArchive(argv);
     return;
   }
 

@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.98.0] — 2026-03-14
+
+### Added
+- Analyze review findings distribution by language: review-language-profile
+- Look up CWE details for finding rule IDs: finding-cwe-lookup
+- Generate CI/CD integration configs (GitHub Actions, GitLab, Azure Pipelines, Jenkins): review-cicd-integrate
+- Preview how patches would modify source files: finding-patch-preview
+- Organization-wide review dashboard: review-org-dashboard
+- Detect duplicate or near-duplicate findings: finding-duplicate-detect
+- Create urgency x impact priority matrix: finding-priority-matrix
+- Configure SLA targets for review resolution: review-sla-config
+- Archive and manage historical review reports: review-report-archive
+
 ## [3.97.0] — 2026-03-14
 
 ### Added

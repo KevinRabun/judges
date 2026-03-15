@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.98.0] — 2026-03-14
+
+### Added
+- Language profile analysis: review-language-profile
+- CWE lookup: finding-cwe-lookup
+- CI/CD integration configs: review-cicd-integrate
+- Patch preview: finding-patch-preview
+- Org dashboard: review-org-dashboard
+- Duplicate detection: finding-duplicate-detect
+- Priority matrix: finding-priority-matrix
+- SLA configuration: review-sla-config
+- Report archive: review-report-archive
+
 ## [3.97.0] — 2026-03-14
 
 ### Added
