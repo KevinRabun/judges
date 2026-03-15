@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.109.0] — 2026-03-14
+
+### Added
+- **finding-compliance-tag** — Tag findings with compliance framework identifiers (SOC2, PCI-DSS, GDPR)
+- **review-team-coverage** — Show review coverage distribution across team members
+- **finding-severity-rebalance** — Rebalance finding severities based on project context
+- **review-stakeholder-notify** — Format notifications for different stakeholder roles
+- **finding-fix-playbook** — Generate step-by-step fix playbooks for common finding patterns
+- **review-adoption-score** — Calculate project adoption readiness score
+- **finding-dedup-merge** — Merge duplicate findings across review runs
+- **review-team-rotation** — Manage reviewer rotation schedules
+- **review-goal-track** — Track team review quality goals over time
+
 ## [3.108.0] — 2026-03-14
 
 ### Added

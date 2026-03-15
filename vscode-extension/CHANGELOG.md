@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.109.0] — 2026-03-14
+
+### Added
+- Compliance tagging: finding-compliance-tag
+- Team coverage analysis: review-team-coverage
+- Severity rebalance: finding-severity-rebalance
+- Stakeholder notifications: review-stakeholder-notify
+- Fix playbook generation: finding-fix-playbook
+- Adoption scoring: review-adoption-score
+- Dedup merge: finding-dedup-merge
+- Team rotation: review-team-rotation
+- Goal tracking: review-goal-track
+
 ## [3.108.0] — 2026-03-14
 
 ### Added

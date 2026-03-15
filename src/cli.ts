@@ -888,6 +888,15 @@ USAGE:
   judges finding-remediation-cost    Remediation cost estimate
   judges review-digest-gen           Review digest
   judges finding-recurrence-check    Recurrence check
+  judges finding-compliance-tag      Compliance tagging
+  judges review-team-coverage        Team coverage analysis
+  judges finding-severity-rebalance  Severity rebalance
+  judges review-stakeholder-notify   Stakeholder notifications
+  judges finding-fix-playbook        Fix playbook generation
+  judges review-adoption-score       Adoption score
+  judges finding-dedup-merge         Dedup merge across runs
+  judges review-team-rotation        Team rotation
+  judges review-goal-track           Goal tracking
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5660,6 +5669,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-recurrence-check") {
     const { runFindingRecurrenceCheck } = await import("./commands/finding-recurrence-check.js");
     runFindingRecurrenceCheck(argv);
+    return;
+  }
+
+  // ─── Finding Compliance Tag Command ──────────────────────────────
+  if (args.command === "finding-compliance-tag") {
+    const { runFindingComplianceTag } = await import("./commands/finding-compliance-tag.js");
+    runFindingComplianceTag(argv);
+    return;
+  }
+
+  // ─── Review Team Coverage Command ────────────────────────────────
+  if (args.command === "review-team-coverage") {
+    const { runReviewTeamCoverage } = await import("./commands/review-team-coverage.js");
+    runReviewTeamCoverage(argv);
+    return;
+  }
+
+  // ─── Finding Severity Rebalance Command ──────────────────────────
+  if (args.command === "finding-severity-rebalance") {
+    const { runFindingSeverityRebalance } = await import("./commands/finding-severity-rebalance.js");
+    runFindingSeverityRebalance(argv);
+    return;
+  }
+
+  // ─── Review Stakeholder Notify Command ───────────────────────────
+  if (args.command === "review-stakeholder-notify") {
+    const { runReviewStakeholderNotify } = await import("./commands/review-stakeholder-notify.js");
+    runReviewStakeholderNotify(argv);
+    return;
+  }
+
+  // ─── Finding Fix Playbook Command ────────────────────────────────
+  if (args.command === "finding-fix-playbook") {
+    const { runFindingFixPlaybook } = await import("./commands/finding-fix-playbook.js");
+    runFindingFixPlaybook(argv);
+    return;
+  }
+
+  // ─── Review Adoption Score Command ───────────────────────────────
+  if (args.command === "review-adoption-score") {
+    const { runReviewAdoptionScore } = await import("./commands/review-adoption-score.js");
+    runReviewAdoptionScore(argv);
+    return;
+  }
+
+  // ─── Finding Dedup Merge Command ─────────────────────────────────
+  if (args.command === "finding-dedup-merge") {
+    const { runFindingDedupMerge } = await import("./commands/finding-dedup-merge.js");
+    runFindingDedupMerge(argv);
+    return;
+  }
+
+  // ─── Review Team Rotation Command ────────────────────────────────
+  if (args.command === "review-team-rotation") {
+    const { runReviewTeamRotation } = await import("./commands/review-team-rotation.js");
+    runReviewTeamRotation(argv);
+    return;
+  }
+
+  // ─── Review Goal Track Command ───────────────────────────────────
+  if (args.command === "review-goal-track") {
+    const { runReviewGoalTrack } = await import("./commands/review-goal-track.js");
+    runReviewGoalTrack(argv);
     return;
   }
 
