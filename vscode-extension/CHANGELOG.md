@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.100.0] — 2026-03-14
+
+### Added
+- Finding auto-triage: finding-auto-triage
+- Stakeholder reporting: review-stakeholder-report
+- Change impact analysis: finding-change-impact
+- Deployment gate checks: review-deployment-gate
+- Environment configuration: review-environment-config
+- False positive learning: finding-false-positive-learn
+- Multi-repo config sync: review-multi-repo-sync
+- Session replay: review-session-replay
+- Context enrichment: finding-context-enrich
+
 ## [3.99.0] — 2026-03-14
 
 ### Added

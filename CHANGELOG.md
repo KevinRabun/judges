@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.100.0] — 2026-03-14
+
+### Added
+- Auto-triage findings by severity, confidence, and rules: finding-auto-triage
+- Generate stakeholder-facing summaries from review verdicts: review-stakeholder-report
+- Assess impact of code changes on existing findings: finding-change-impact
+- Configure deployment gates with threshold-based blocking: review-deployment-gate
+- Manage per-environment review configurations: review-environment-config
+- Track and learn from false positive patterns: finding-false-positive-learn
+- Synchronize review configs across multiple repositories: review-multi-repo-sync
+- Replay and inspect past review sessions: review-session-replay
+- Enrich findings with surrounding code context: finding-context-enrich
+
 ## [3.99.0] — 2026-03-14
 
 ### Added

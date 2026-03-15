@@ -807,6 +807,15 @@ USAGE:
   judges finding-reachability-check   Check finding reachability
   judges review-audit-export          Export audit data
   judges review-pipeline-status       Monitor pipeline status
+  judges finding-auto-triage          Auto-triage findings
+  judges review-stakeholder-report    Stakeholder summaries
+  judges finding-change-impact        Assess change impact
+  judges review-deployment-gate       Deployment gate checks
+  judges review-environment-config    Per-environment config
+  judges finding-false-positive-learn Track false positives
+  judges review-multi-repo-sync       Multi-repo config sync
+  judges review-session-replay        Replay past sessions
+  judges finding-context-enrich       Enrich finding context
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -5012,6 +5021,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-pipeline-status") {
     const { runReviewPipelineStatus } = await import("./commands/review-pipeline-status.js");
     runReviewPipelineStatus(argv);
+    return;
+  }
+
+  // ─── Finding Auto Triage Command ────────────────────────────────────
+  if (args.command === "finding-auto-triage") {
+    const { runFindingAutoTriage } = await import("./commands/finding-auto-triage.js");
+    runFindingAutoTriage(argv);
+    return;
+  }
+
+  // ─── Review Stakeholder Report Command ──────────────────────────────
+  if (args.command === "review-stakeholder-report") {
+    const { runReviewStakeholderReport } = await import("./commands/review-stakeholder-report.js");
+    runReviewStakeholderReport(argv);
+    return;
+  }
+
+  // ─── Finding Change Impact Command ──────────────────────────────────
+  if (args.command === "finding-change-impact") {
+    const { runFindingChangeImpact } = await import("./commands/finding-change-impact.js");
+    runFindingChangeImpact(argv);
+    return;
+  }
+
+  // ─── Review Deployment Gate Command ─────────────────────────────────
+  if (args.command === "review-deployment-gate") {
+    const { runReviewDeploymentGate } = await import("./commands/review-deployment-gate.js");
+    runReviewDeploymentGate(argv);
+    return;
+  }
+
+  // ─── Review Environment Config Command ──────────────────────────────
+  if (args.command === "review-environment-config") {
+    const { runReviewEnvironmentConfig } = await import("./commands/review-environment-config.js");
+    runReviewEnvironmentConfig(argv);
+    return;
+  }
+
+  // ─── Finding False Positive Learn Command ───────────────────────────
+  if (args.command === "finding-false-positive-learn") {
+    const { runFindingFalsePositiveLearn } = await import("./commands/finding-false-positive-learn.js");
+    runFindingFalsePositiveLearn(argv);
+    return;
+  }
+
+  // ─── Review Multi Repo Sync Command ─────────────────────────────────
+  if (args.command === "review-multi-repo-sync") {
+    const { runReviewMultiRepoSync } = await import("./commands/review-multi-repo-sync.js");
+    runReviewMultiRepoSync(argv);
+    return;
+  }
+
+  // ─── Review Session Replay Command ──────────────────────────────────
+  if (args.command === "review-session-replay") {
+    const { runReviewSessionReplay } = await import("./commands/review-session-replay.js");
+    runReviewSessionReplay(argv);
+    return;
+  }
+
+  // ─── Finding Context Enrich Command ─────────────────────────────────
+  if (args.command === "finding-context-enrich") {
+    const { runFindingContextEnrich } = await import("./commands/finding-context-enrich.js");
+    runFindingContextEnrich(argv);
     return;
   }
 
