@@ -681,6 +681,15 @@ USAGE:
   judges review-batch-run             Run batch review on multiple files
   judges review-output-filter         Filter and transform review output
   judges finding-timeline-view        Show findings on a timeline
+  judges review-ignore-pattern        Manage review ignore patterns
+  judges finding-quality-gate         Enforce quality gates on findings
+  judges finding-reachability         Analyze finding reachability
+  judges review-merge-check           Pre-merge review validation
+  judges review-workspace-scan        Scan workspace for reviewable files
+  judges finding-context-window       Show findings with code context
+  judges finding-severity-dist        Show severity distribution
+  judges review-report-merge          Merge multiple verdict reports
+  judges review-plugin-config         Manage plugin configuration
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4004,6 +4013,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "finding-timeline-view") {
     const { runFindingTimelineView } = await import("./commands/finding-timeline-view.js");
     runFindingTimelineView(argv);
+    return;
+  }
+
+  // ─── Review Ignore Pattern Command ────────────────────────────────
+  if (args.command === "review-ignore-pattern") {
+    const { runReviewIgnorePattern } = await import("./commands/review-ignore-pattern.js");
+    runReviewIgnorePattern(argv);
+    return;
+  }
+
+  // ─── Finding Quality Gate Command ─────────────────────────────────
+  if (args.command === "finding-quality-gate") {
+    const { runFindingQualityGate } = await import("./commands/finding-quality-gate.js");
+    runFindingQualityGate(argv);
+    return;
+  }
+
+  // ─── Finding Reachability Command ─────────────────────────────────
+  if (args.command === "finding-reachability") {
+    const { runFindingReachability } = await import("./commands/finding-reachability.js");
+    runFindingReachability(argv);
+    return;
+  }
+
+  // ─── Review Merge Check Command ───────────────────────────────────
+  if (args.command === "review-merge-check") {
+    const { runReviewMergeCheck } = await import("./commands/review-merge-check.js");
+    runReviewMergeCheck(argv);
+    return;
+  }
+
+  // ─── Review Workspace Scan Command ────────────────────────────────
+  if (args.command === "review-workspace-scan") {
+    const { runReviewWorkspaceScan } = await import("./commands/review-workspace-scan.js");
+    runReviewWorkspaceScan(argv);
+    return;
+  }
+
+  // ─── Finding Context Window Command ───────────────────────────────
+  if (args.command === "finding-context-window") {
+    const { runFindingContextWindow } = await import("./commands/finding-context-window.js");
+    runFindingContextWindow(argv);
+    return;
+  }
+
+  // ─── Finding Severity Dist Command ────────────────────────────────
+  if (args.command === "finding-severity-dist") {
+    const { runFindingSeverityDist } = await import("./commands/finding-severity-dist.js");
+    runFindingSeverityDist(argv);
+    return;
+  }
+
+  // ─── Review Report Merge Command ──────────────────────────────────
+  if (args.command === "review-report-merge") {
+    const { runReviewReportMerge } = await import("./commands/review-report-merge.js");
+    runReviewReportMerge(argv);
+    return;
+  }
+
+  // ─── Review Plugin Config Command ─────────────────────────────────
+  if (args.command === "review-plugin-config") {
+    const { runReviewPluginConfig } = await import("./commands/review-plugin-config.js");
+    runReviewPluginConfig(argv);
     return;
   }
 

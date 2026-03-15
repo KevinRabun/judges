@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.86.0] — 2026-03-14
+
+### Added
+- Ignore pattern: review-ignore-pattern (ignore pattern management)
+- Quality gate: finding-quality-gate (quality gate enforcement)
+- Reachability: finding-reachability (reachability analysis)
+- Merge check: review-merge-check (merge validation)
+- Workspace scan: review-workspace-scan (workspace scanning)
+- Context window: finding-context-window (code context display)
+- Severity dist: finding-severity-dist (severity distribution)
+- Report merge: review-report-merge (report merging)
+- Plugin config: review-plugin-config (plugin configuration)
+
 ## [3.85.0] — 2026-03-14
 
 ### Added

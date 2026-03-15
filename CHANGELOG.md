@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.86.0] — 2026-03-14
+
+### Added
+- Ignore pattern: review-ignore-pattern (manage review ignore patterns)
+- Quality gate: finding-quality-gate (enforce quality gates on findings)
+- Reachability: finding-reachability (analyze finding reachability)
+- Merge check: review-merge-check (pre-merge review validation)
+- Workspace scan: review-workspace-scan (scan workspace for reviewable files)
+- Context window: finding-context-window (show findings with code context)
+- Severity dist: finding-severity-dist (severity distribution analysis)
+- Report merge: review-report-merge (merge multiple verdict reports)
+- Plugin config: review-plugin-config (manage plugin configuration)
+
 ## [3.85.0] — 2026-03-14
 
 ### Added
