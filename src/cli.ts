@@ -717,6 +717,15 @@ USAGE:
   judges review-perf-profile          Profile review performance
   judges finding-false-positive-log   Track false positive findings
   judges review-guardrail             Define and enforce review guardrails
+  judges review-batch-mode            Batch review processing
+  judges finding-trend-analysis       Analyze finding trends over time
+  judges finding-auto-tag             Auto-tag findings by content
+  judges review-webhook-notify        Configure webhook notifications
+  judges finding-evidence-collect     Collect evidence for findings
+  judges review-compliance-gate       Compliance gate for reviews
+  judges finding-resolution-tracker   Track finding resolutions
+  judges review-threshold-tune        Tune review thresholds
+  judges finding-cluster-group        Group findings into clusters
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4292,6 +4301,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-guardrail") {
     const { runReviewGuardrail } = await import("./commands/review-guardrail.js");
     runReviewGuardrail(argv);
+    return;
+  }
+
+  // ─── Review Batch Mode Command ────────────────────────────────────
+  if (args.command === "review-batch-mode") {
+    const { runReviewBatchMode } = await import("./commands/review-batch-mode.js");
+    runReviewBatchMode(argv);
+    return;
+  }
+
+  // ─── Finding Trend Analysis Command ──────────────────────────────
+  if (args.command === "finding-trend-analysis") {
+    const { runFindingTrendAnalysis } = await import("./commands/finding-trend-analysis.js");
+    runFindingTrendAnalysis(argv);
+    return;
+  }
+
+  // ─── Finding Auto Tag Command ─────────────────────────────────────
+  if (args.command === "finding-auto-tag") {
+    const { runFindingAutoTag } = await import("./commands/finding-auto-tag.js");
+    runFindingAutoTag(argv);
+    return;
+  }
+
+  // ─── Review Webhook Notify Command ────────────────────────────────
+  if (args.command === "review-webhook-notify") {
+    const { runReviewWebhookNotify } = await import("./commands/review-webhook-notify.js");
+    runReviewWebhookNotify(argv);
+    return;
+  }
+
+  // ─── Finding Evidence Collect Command ─────────────────────────────
+  if (args.command === "finding-evidence-collect") {
+    const { runFindingEvidenceCollect } = await import("./commands/finding-evidence-collect.js");
+    runFindingEvidenceCollect(argv);
+    return;
+  }
+
+  // ─── Review Compliance Gate Command ───────────────────────────────
+  if (args.command === "review-compliance-gate") {
+    const { runReviewComplianceGate } = await import("./commands/review-compliance-gate.js");
+    runReviewComplianceGate(argv);
+    return;
+  }
+
+  // ─── Finding Resolution Tracker Command ───────────────────────────
+  if (args.command === "finding-resolution-tracker") {
+    const { runFindingResolutionTracker } = await import("./commands/finding-resolution-tracker.js");
+    runFindingResolutionTracker(argv);
+    return;
+  }
+
+  // ─── Review Threshold Tune Command ────────────────────────────────
+  if (args.command === "review-threshold-tune") {
+    const { runReviewThresholdTune } = await import("./commands/review-threshold-tune.js");
+    runReviewThresholdTune(argv);
+    return;
+  }
+
+  // ─── Finding Cluster Group Command ────────────────────────────────
+  if (args.command === "finding-cluster-group") {
+    const { runFindingClusterGroup } = await import("./commands/finding-cluster-group.js");
+    runFindingClusterGroup(argv);
     return;
   }
 

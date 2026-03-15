@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.90.0] — 2026-03-14
+
+### Added
+- Batch review processing: review-batch-mode
+- Finding trend analysis: finding-trend-analysis
+- Auto-tag findings: finding-auto-tag
+- Webhook notifications: review-webhook-notify
+- Evidence collection: finding-evidence-collect
+- Compliance gate: review-compliance-gate
+- Resolution tracker: finding-resolution-tracker
+- Threshold tuning: review-threshold-tune
+- Finding cluster groups: finding-cluster-group
+
 ## [3.89.0] — 2026-03-14
 
 ### Added

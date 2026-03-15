@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.90.0] — 2026-03-14
+
+### Added
+- Batch review processing for multiple verdict files: review-batch-mode
+- Finding trend analysis across historical reports: finding-trend-analysis
+- Automatic content-based finding tagging: finding-auto-tag
+- Webhook notification configuration and preview: review-webhook-notify
+- Evidence collection with source code snippets: finding-evidence-collect
+- Compliance gate with configurable policies: review-compliance-gate
+- Finding resolution tracker with sync and status updates: finding-resolution-tracker
+- Threshold tuning suggestions based on historical data: review-threshold-tune
+- Finding cluster grouping by rule prefix: finding-cluster-group
+
 ## [3.89.0] — 2026-03-14
 
 ### Added
