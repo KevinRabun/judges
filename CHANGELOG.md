@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.97.0] — 2026-03-14
+
+### Added
+- Define and enforce local code-review policies: review-policy-engine
+- Configure webhook endpoints for review events: review-webhook-dispatch
+- Calculate composite risk scores for findings: finding-risk-score
+- Map findings to compliance frameworks (OWASP, CWE, PCI-DSS): review-compliance-map
+- Forecast finding trends from historical data: finding-trend-forecast
+- Rank findings by estimated business impact: finding-impact-rank
+- Generate phased rollout plans for adoption: review-rollout-plan
+- Add contextual annotations to findings: finding-annotation-layer
+- Configure quality gates for review pipelines: review-gate-config
+
 ## [3.96.0] — 2026-03-14
 
 ### Added

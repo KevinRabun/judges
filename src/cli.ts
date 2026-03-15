@@ -780,6 +780,15 @@ USAGE:
   judges review-output-transform      Transform output formats
   judges review-adoption-metrics      Track adoption metrics
   judges review-workspace-init        Initialize workspace for Judges
+  judges review-policy-engine         Define and enforce review policies
+  judges review-webhook-dispatch      Configure webhook dispatch
+  judges finding-risk-score           Calculate finding risk scores
+  judges review-compliance-map        Map findings to compliance frameworks
+  judges finding-trend-forecast       Forecast finding trends
+  judges finding-impact-rank          Rank findings by business impact
+  judges review-rollout-plan          Generate phased rollout plan
+  judges finding-annotation-layer     Add annotations to findings
+  judges review-gate-config           Configure quality gates
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4796,6 +4805,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-workspace-init") {
     const { runReviewWorkspaceInit } = await import("./commands/review-workspace-init.js");
     runReviewWorkspaceInit(argv);
+    return;
+  }
+
+  // ─── Review Policy Engine Command ────────────────────────────────
+  if (args.command === "review-policy-engine") {
+    const { runReviewPolicyEngine } = await import("./commands/review-policy-engine.js");
+    runReviewPolicyEngine(argv);
+    return;
+  }
+
+  // ─── Review Webhook Dispatch Command ─────────────────────────────
+  if (args.command === "review-webhook-dispatch") {
+    const { runReviewWebhookDispatch } = await import("./commands/review-webhook-dispatch.js");
+    runReviewWebhookDispatch(argv);
+    return;
+  }
+
+  // ─── Finding Risk Score Command ──────────────────────────────────
+  if (args.command === "finding-risk-score") {
+    const { runFindingRiskScore } = await import("./commands/finding-risk-score.js");
+    runFindingRiskScore(argv);
+    return;
+  }
+
+  // ─── Review Compliance Map Command ───────────────────────────────
+  if (args.command === "review-compliance-map") {
+    const { runReviewComplianceMap } = await import("./commands/review-compliance-map.js");
+    runReviewComplianceMap(argv);
+    return;
+  }
+
+  // ─── Finding Trend Forecast Command ──────────────────────────────
+  if (args.command === "finding-trend-forecast") {
+    const { runFindingTrendForecast } = await import("./commands/finding-trend-forecast.js");
+    runFindingTrendForecast(argv);
+    return;
+  }
+
+  // ─── Finding Impact Rank Command ─────────────────────────────────
+  if (args.command === "finding-impact-rank") {
+    const { runFindingImpactRank } = await import("./commands/finding-impact-rank.js");
+    runFindingImpactRank(argv);
+    return;
+  }
+
+  // ─── Review Rollout Plan Command ─────────────────────────────────
+  if (args.command === "review-rollout-plan") {
+    const { runReviewRolloutPlan } = await import("./commands/review-rollout-plan.js");
+    runReviewRolloutPlan(argv);
+    return;
+  }
+
+  // ─── Finding Annotation Layer Command ────────────────────────────
+  if (args.command === "finding-annotation-layer") {
+    const { runFindingAnnotationLayer } = await import("./commands/finding-annotation-layer.js");
+    runFindingAnnotationLayer(argv);
+    return;
+  }
+
+  // ─── Review Gate Config Command ──────────────────────────────────
+  if (args.command === "review-gate-config") {
+    const { runReviewGateConfig } = await import("./commands/review-gate-config.js");
+    runReviewGateConfig(argv);
     return;
   }
 

@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.97.0] — 2026-03-14
+
+### Added
+- Review policy engine: review-policy-engine
+- Webhook dispatch config: review-webhook-dispatch
+- Finding risk scoring: finding-risk-score
+- Compliance framework mapping: review-compliance-map
+- Finding trend forecasting: finding-trend-forecast
+- Business impact ranking: finding-impact-rank
+- Rollout plan generation: review-rollout-plan
+- Finding annotation layer: finding-annotation-layer
+- Quality gate configuration: review-gate-config
+
 ## [3.96.0] — 2026-03-14
 
 ### Added
