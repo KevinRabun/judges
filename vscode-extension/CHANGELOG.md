@@ -4,6 +4,21 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.87.0] — 2026-03-14
+
+### Added
+- Code smell detection: finding-code-smell
+- Related rules lookup: finding-related-rules
+- Token budget estimation: review-token-budget
+- Plugin listing: review-plugin-list
+- Owner assignment: finding-owner-assign
+- Lock file analysis: review-lock-file
+- Pattern library management: finding-pattern-library
+- Status badge generation: review-status-badge
+- Rule explanation: finding-rule-explain
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.86.0] — 2026-03-14
 
 ### Added

@@ -2,6 +2,22 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.87.0] — 2026-03-14
+
+### Added
+- Code smell: finding-code-smell (detect code-smell indicators among findings)
+- Related rules: finding-related-rules (find related rules for a finding)
+- Token budget: review-token-budget (estimate and manage token budget usage)
+- Plugin list: review-plugin-list (list available and active plugins)
+- Owner assign: finding-owner-assign (assign finding owners based on rules)
+- Lock file: review-lock-file (analyze lock files for security issues)
+- Pattern library: finding-pattern-library (manage finding pattern library)
+- Status badge: review-status-badge (generate status badges for review results)
+- Rule explain: finding-rule-explain (explain rules in detail with examples)
+
+### Tests
+- All 2,267 tests passing (0 failures)
+
 ## [3.86.0] — 2026-03-14
 
 ### Added

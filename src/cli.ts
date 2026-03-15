@@ -690,6 +690,15 @@ USAGE:
   judges finding-severity-dist        Show severity distribution
   judges review-report-merge          Merge multiple verdict reports
   judges review-plugin-config         Manage plugin configuration
+  judges finding-code-smell           Detect code-smell indicators
+  judges finding-related-rules        Find related rules for a finding
+  judges review-token-budget          Estimate token budget usage
+  judges review-plugin-list           List available plugins
+  judges finding-owner-assign         Assign finding owners
+  judges review-lock-file             Analyze lock files for security issues
+  judges finding-pattern-library      Manage finding pattern library
+  judges review-status-badge          Generate status badges
+  judges finding-rule-explain         Explain rules in detail
   judges tune                         Analyze project and suggest optimal config
   judges list                         List all available judges
   judges version                      Show version information
@@ -4076,6 +4085,69 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "review-plugin-config") {
     const { runReviewPluginConfig } = await import("./commands/review-plugin-config.js");
     runReviewPluginConfig(argv);
+    return;
+  }
+
+  // ─── Finding Code Smell Command ───────────────────────────────────
+  if (args.command === "finding-code-smell") {
+    const { runFindingCodeSmell } = await import("./commands/finding-code-smell.js");
+    runFindingCodeSmell(argv);
+    return;
+  }
+
+  // ─── Finding Related Rules Command ────────────────────────────────
+  if (args.command === "finding-related-rules") {
+    const { runFindingRelatedRules } = await import("./commands/finding-related-rules.js");
+    runFindingRelatedRules(argv);
+    return;
+  }
+
+  // ─── Review Token Budget Command ──────────────────────────────────
+  if (args.command === "review-token-budget") {
+    const { runReviewTokenBudget } = await import("./commands/review-token-budget.js");
+    runReviewTokenBudget(argv);
+    return;
+  }
+
+  // ─── Review Plugin List Command ───────────────────────────────────
+  if (args.command === "review-plugin-list") {
+    const { runReviewPluginList } = await import("./commands/review-plugin-list.js");
+    runReviewPluginList(argv);
+    return;
+  }
+
+  // ─── Finding Owner Assign Command ─────────────────────────────────
+  if (args.command === "finding-owner-assign") {
+    const { runFindingOwnerAssign } = await import("./commands/finding-owner-assign.js");
+    runFindingOwnerAssign(argv);
+    return;
+  }
+
+  // ─── Review Lock File Command ─────────────────────────────────────
+  if (args.command === "review-lock-file") {
+    const { runReviewLockFile } = await import("./commands/review-lock-file.js");
+    runReviewLockFile(argv);
+    return;
+  }
+
+  // ─── Finding Pattern Library Command ──────────────────────────────
+  if (args.command === "finding-pattern-library") {
+    const { runFindingPatternLibrary } = await import("./commands/finding-pattern-library.js");
+    runFindingPatternLibrary(argv);
+    return;
+  }
+
+  // ─── Review Status Badge Command ──────────────────────────────────
+  if (args.command === "review-status-badge") {
+    const { runReviewStatusBadge } = await import("./commands/review-status-badge.js");
+    runReviewStatusBadge(argv);
+    return;
+  }
+
+  // ─── Finding Rule Explain Command ─────────────────────────────────
+  if (args.command === "finding-rule-explain") {
+    const { runFindingRuleExplain } = await import("./commands/finding-rule-explain.js");
+    runFindingRuleExplain(argv);
     return;
   }
 
