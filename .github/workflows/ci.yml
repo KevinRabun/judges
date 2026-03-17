@@ -61,7 +61,14 @@ jobs:
           CI: true
 
       - name: Test
-        run: npx tsx --test tests/**/*.test.ts
+        shell: bash
+        run: |
+          shopt -s globstar
+          if [[ "${{ matrix.node-version }}" -ge 22 ]]; then
+            npx tsx --test --test-force-exit tests/**/*.test.ts
+          else
+            npx tsx --test tests/**/*.test.ts
+          fi
         env:
           CI: true
 
