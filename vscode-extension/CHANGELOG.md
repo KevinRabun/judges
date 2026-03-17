@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.115.1] — 2026-03-17
+
+### Fixed
+- npm package now includes `dist/agent-loader.js`, `dist/skill-loader.js`, and `dist/context/*.js` — resolves esbuild bundling failures.
+
+### Changed
+- Core engine bumped to `@kevinrabun/judges@^3.115.1`
+
 ## [3.115.0] — 2026-03-17
 
 ### Changed

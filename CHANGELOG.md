@@ -2,6 +2,11 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.115.1] — 2026-03-17
+
+### Fixed
+- npm package missing `dist/agent-loader.js`, `dist/skill-loader.js`, and `dist/context/*.js` — added to `files` array in `package.json`.
+
 ## [3.115.0] — 2026-03-17
 
 ### Fixed
