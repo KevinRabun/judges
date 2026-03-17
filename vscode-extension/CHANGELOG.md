@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.115.0] — 2026-03-17
+
+### Changed
+- Core engine bumped to `@kevinrabun/judges@^3.115.0`
+
+### Fixed
+- CLI `--output` writing in multi-file eval mode, `--min-severity` flag, CI workflow fixes — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.114.0] — 2026-03-17
 
 ### Changed

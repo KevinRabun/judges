@@ -2,6 +2,24 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.115.0] — 2026-03-17
+
+### Fixed
+- CLI `--output` / `-o` flag now works in multi-file (directory) eval mode; previously only single-file mode wrote output files.
+- CLI `parseCliArgs` supports `--flag=value` syntax (e.g., `--min-severity=medium`) in addition to `--flag value`.
+- CI workflow no longer uses `npx judges` (which fails under `npm ci` because a package cannot bin-link itself); switched to `node packages/judges-cli/bin/judges.js` invocation.
+- CI severity gate replaced non-functional `ai-gate --sarif` step with inline SARIF severity check.
+
+### Added
+- `--min-severity` CLI flag to filter evaluation output by minimum severity level.
+- `writeOutputIfSpecified` helper for consistent file output across all format branches.
+- Root `bin` entry in `package.json` for `judges` command.
+
+### Tests
+- Added SARIF output writing tests for both directory and single-file eval modes.
+- Added root package `bin` entry existence assertion.
+- 2 311 tests passing (2 skipped).
+
 ## [3.114.0] — 2026-03-17
 
 ### Added
