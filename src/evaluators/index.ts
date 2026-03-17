@@ -369,7 +369,7 @@ function parseInlineSuppressions(code: string): {
   const activeBlocks = new Map<string, { commentLine: number; reason?: string }>();
 
   // Pattern: // judges-ignore[-next-line|-block] RULE-ID [, RULE-ID ...] [-- reason]
-  const suppressPattern = /(?:\/\/|#|\/\*)[ \t]*judges-ignore(?:-(next-line|block))?[ \t]+(\S[^\n]*)$/gi;
+  const suppressPattern = /(?:\/\/|#|\/\*)[ \t]*judges-ignore(?:-(next-line|block))?[ \t]+(\S[^\n]*)$/i;
   const endBlockPattern = /(?:\/\/|#|\/\*)\s*judges-end-block/i;
 
   for (let i = 0; i < lines.length; i++) {
@@ -391,7 +391,8 @@ function parseInlineSuppressions(code: string): {
     // Parse suppression directives
     let match;
     suppressPattern.lastIndex = 0;
-    while ((match = suppressPattern.exec(line)) !== null) {
+    match = suppressPattern.exec(line);
+    if (match) {
       const modifier = match[1]?.toLowerCase(); // "next-line", "block", or undefined
       let rawContent = match[2];
       if (rawContent.trimEnd().endsWith("*/")) {
@@ -420,10 +421,11 @@ function parseInlineSuppressions(code: string): {
     }
 
     // File-level suppression: // judges-file-ignore RULE-ID [-- reason]
-    const filePattern = /(?:\/\/|#|\/\*)[ \t]*judges-file-ignore[ \t]+(\S[^\n]*)$/gi;
+    const filePattern = /(?:\/\/|#|\/\*)[ \t]*judges-file-ignore[ \t]+(\S[^\n]*)$/i;
     let fileMatch;
     filePattern.lastIndex = 0;
-    while ((fileMatch = filePattern.exec(line)) !== null) {
+    fileMatch = filePattern.exec(line);
+    if (fileMatch) {
       let rawFileContent = fileMatch[1];
       if (rawFileContent.trimEnd().endsWith("*/")) {
         rawFileContent = rawFileContent.replace("*/", "").trimEnd();
