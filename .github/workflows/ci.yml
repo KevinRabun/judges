@@ -65,7 +65,7 @@ jobs:
         run: |
           shopt -s globstar
           # shellcheck disable=SC2086
-          npx tsx --test $FORCE_EXIT_FLAG tests/**/*.test.ts
+          node --import tsx --test $FORCE_EXIT_FLAG tests/**/*.test.ts
         env:
           CI: true
           FORCE_EXIT_FLAG: ${{ matrix.node-version >= 22 && '--test-force-exit' || '' }}
