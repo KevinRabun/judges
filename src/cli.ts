@@ -22,7 +22,7 @@
  *   judges eval --help                                    # show help
  */
 
-import { readFileSync, existsSync, writeFileSync, readdirSync, statSync } from "fs";
+import { readFileSync, existsSync, writeFileSync, readdirSync, statSync, mkdirSync } from "fs";
 import { resolve, extname, dirname, join, relative } from "path";
 import { fileURLToPath } from "url";
 import { matchesGlob } from "./cli-helpers.js";
@@ -115,6 +115,7 @@ interface CliArgs {
   config: string | undefined;
   preset: string | undefined;
   minScore: number | undefined;
+  minSeverity?: string;
   noColor: boolean;
   verbose: boolean;
   quiet: boolean;
@@ -129,6 +130,7 @@ interface CliArgs {
   trace: boolean;
   incremental: boolean;
   noCache: boolean;
+  output?: string;
   skill?: string;
   skillsDir?: string;
 }
@@ -147,6 +149,7 @@ function parseCliArgs(argv: string[]): CliArgs {
     config: undefined,
     preset: undefined,
     minScore: undefined,
+    minSeverity: undefined,
     noColor: false,
     verbose: false,
     quiet: false,
@@ -161,6 +164,7 @@ function parseCliArgs(argv: string[]): CliArgs {
     trace: false,
     incremental: false,
     noCache: false,
+    output: undefined,
     skill: undefined,
     skillsDir: undefined,
   };
@@ -173,19 +177,31 @@ function parseCliArgs(argv: string[]): CliArgs {
   }
 
   for (; i < argv.length; i++) {
-    const arg = argv[i];
+    let arg = argv[i];
+    // Support --flag=value syntax
+    let inlineValue: string | undefined;
+    if (arg.startsWith("--") && arg.includes("=")) {
+      const parts = arg.split(/=(.*)/s);
+      arg = parts[0];
+      inlineValue = parts[1];
+    }
+    const nextValue = () => (inlineValue !== undefined ? inlineValue : argv[++i]);
     switch (arg) {
       case "--file":
       case "-f":
-        args.file = argv[++i];
+        args.file = nextValue();
         break;
       case "--language":
       case "-l":
-        args.language = argv[++i];
+        args.language = nextValue();
         break;
       case "--format":
+      case "-F":
+        args.format = nextValue() as CliArgs["format"];
+        break;
+      case "--output":
       case "-o":
-        args.format = argv[++i] as CliArgs["format"];
+        args.output = nextValue();
         break;
       case "--judge":
       case "-j":
@@ -222,7 +238,10 @@ function parseCliArgs(argv: string[]): CliArgs {
         args.preset = argv[++i];
         break;
       case "--min-score":
-        args.minScore = parseInt(argv[++i], 10);
+        args.minScore = parseInt(nextValue(), 10);
+        break;
+      case "--min-severity":
+        args.minSeverity = nextValue();
         break;
       case "--no-color":
         args.noColor = true;
@@ -570,8 +589,11 @@ function formatTribunalOutput(
   switch (format) {
     case "json":
       return JSON.stringify(verdict, null, 2);
-    case "sarif":
-      return JSON.stringify(verdictToSarif(verdict, filePath), null, 2);
+    case "sarif": {
+      // If filePath is not provided, sarif formatter will still produce a valid log
+      const sarif = verdictToSarif(verdict, filePath);
+      return JSON.stringify(sarif, null, 2);
+    }
     case "markdown":
       return formatVerdictAsMarkdown(verdict);
     case "html":
@@ -583,6 +605,17 @@ function formatTribunalOutput(
     default:
       return formatTextOutput(verdict);
   }
+}
+
+function writeOutputIfSpecified(outputPath: string | undefined, contents: string): void {
+  if (!outputPath) return;
+  const dir = dirname(outputPath);
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch {
+    // directory may already exist
+  }
+  writeFileSync(outputPath, contents, "utf-8");
 }
 
 function formatTextOutput(verdict: ReturnType<typeof evaluateWithTribunal>): string {
@@ -5497,8 +5530,16 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.command === "eval" || args.file) {
     const startTime = Date.now();
 
+    // Resolve output file if provided
+    const outputPath = args.output ? resolve(args.output) : undefined;
+
     // Load config from file or preset
-    const evalConfig = loadEvalConfig(args);
+    let evalConfig = loadEvalConfig(args);
+    // CLI flag override for min-severity (fallback if not provided via config)
+    if (args.minSeverity) {
+      evalConfig = evalConfig || ({} as any);
+      (evalConfig as any).minSeverity = args.minSeverity;
+    }
 
     // Load baseline if specified (from CLI flag — config doesn't carry baseline)
     let loadedBaseline: LoadedBaseline | undefined;
@@ -5510,7 +5551,7 @@ export async function runCli(argv: string[]): Promise<void> {
     const evalOptions = evalConfig ? { config: evalConfig } : undefined;
 
     // ── Multi-file / directory mode ──────────────────────────────────────
-    const target = args.file;
+    const target = args.file || ".";
     if (target && isDirectory(target)) {
       // Merge exclude/include from config if not overridden by CLI
       const excludePatterns = args.exclude.length > 0 ? args.exclude : (evalConfig?.exclude ?? []);
@@ -5554,6 +5595,7 @@ export async function runCli(argv: string[]): Promise<void> {
       let totalFixed = 0;
       let totalFixable = 0;
       let cacheHits = 0;
+      const fileVerdicts: Array<{ filePath: string; verdict: TribunalVerdict }> = [];
 
       // Incremental evaluation: use disk cache to skip unchanged files
       const diskCache = args.noCache ? undefined : new DiskCache<TribunalVerdict>();
@@ -5639,6 +5681,9 @@ export async function runCli(argv: string[]): Promise<void> {
             totalFixed += patchResult.applied;
           }
         }
+
+        // Collect for merged output
+        fileVerdicts.push({ filePath: relPath, verdict });
       }
 
       const elapsed = Date.now() - startTime;
@@ -5662,6 +5707,29 @@ export async function runCli(argv: string[]): Promise<void> {
       }
       console.log(`  Time     : ${elapsed}ms`);
       console.log("");
+
+      // Write merged output when --output is specified
+      if (outputPath && fileVerdicts.length > 0) {
+        // Merge all per-file verdicts into a single combined verdict
+        const allFindings = fileVerdicts.flatMap(({ verdict: v }) => v.findings);
+        const allEvaluations = fileVerdicts.flatMap(({ verdict: v }) => v.evaluations);
+        const mergedVerdict: TribunalVerdict = {
+          overallVerdict: failCount > 0 ? "fail" : totalFindings > 0 ? "warning" : "pass",
+          overallScore:
+            fileVerdicts.length > 0
+              ? Math.round(fileVerdicts.reduce((s, { verdict: v }) => s + v.overallScore, 0) / fileVerdicts.length)
+              : 100,
+          summary: `Multi-file scan: ${files.length} files, ${totalFindings} findings`,
+          evaluations: allEvaluations,
+          findings: allFindings,
+          criticalCount: totalCritical,
+          highCount: totalHigh,
+          timestamp: new Date().toISOString(),
+        };
+        const out = formatTribunalOutput(mergedVerdict, args.format, target);
+        writeOutputIfSpecified(outputPath, out);
+        if (!args.quiet) console.log(`  ✅ Report written to ${args.output}`);
+      }
 
       if (args.failOnFindings && failCount > 0) process.exit(1);
       process.exit(0);
@@ -5707,9 +5775,21 @@ export async function runCli(argv: string[]): Promise<void> {
           evaluation.findings.filter((f) => f.patch).length,
         );
       } else if (args.format === "json") {
-        console.log(JSON.stringify(evaluation, null, 2));
+        const json = JSON.stringify(evaluation, null, 2);
+        if (outputPath) {
+          writeOutputIfSpecified(outputPath, json);
+          if (!args.quiet) console.log(`  ✅ JSON report written to ${args.output}`);
+        } else {
+          console.log(json);
+        }
       } else if (args.format === "markdown") {
-        console.log(formatEvaluationAsMarkdown(evaluation));
+        const md = formatEvaluationAsMarkdown(evaluation);
+        if (outputPath) {
+          writeOutputIfSpecified(outputPath, md);
+          if (!args.quiet) console.log(`  ✅ Markdown report written to ${args.output}`);
+        } else {
+          console.log(md);
+        }
       } else if (args.format === "html") {
         // Wrap single evaluation as a tribunal-like verdict for HTML
         const wrappedVerdict = {
@@ -5722,7 +5802,13 @@ export async function runCli(argv: string[]): Promise<void> {
           highCount: evaluation.findings.filter((f) => f.severity === "high").length,
           timestamp: new Date().toISOString(),
         };
-        console.log(verdictToHtml(wrappedVerdict, resolvedPath || args.file));
+        const html = verdictToHtml(wrappedVerdict, resolvedPath || args.file);
+        if (outputPath) {
+          writeOutputIfSpecified(outputPath, html);
+          if (!args.quiet) console.log(`  ✅ HTML report written to ${args.output}`);
+        } else {
+          console.log(html);
+        }
       } else if (args.format === "pdf") {
         const wrappedForPdf = {
           overallVerdict: evaluation.verdict,
@@ -5734,9 +5820,21 @@ export async function runCli(argv: string[]): Promise<void> {
           highCount: evaluation.findings.filter((f) => f.severity === "high").length,
           timestamp: new Date().toISOString(),
         };
-        console.log(verdictToPdfHtml(wrappedForPdf, resolvedPath || args.file));
+        const pdf = verdictToPdfHtml(wrappedForPdf, resolvedPath || args.file);
+        if (outputPath) {
+          writeOutputIfSpecified(outputPath, pdf);
+          if (!args.quiet) console.log(`  ✅ PDF (HTML) report written to ${args.output}`);
+        } else {
+          console.log(pdf);
+        }
       } else {
-        console.log(formatSingleJudgeTextOutput(evaluation));
+        const out = formatSingleJudgeTextOutput(evaluation);
+        if (outputPath) {
+          writeOutputIfSpecified(outputPath, out);
+          if (!args.quiet) console.log(`  ✅ Report written to ${args.output}`);
+        } else {
+          console.log(out);
+        }
       }
 
       if (args.verbose) {
@@ -5846,15 +5944,45 @@ export async function runCli(argv: string[]): Promise<void> {
         const totalFixable = verdict.evaluations.reduce((s, e) => s + e.findings.filter((f) => f.patch).length, 0);
         printSummaryLine(verdict.overallVerdict, verdict.overallScore, totalFindings, totalFixable);
       } else if (args.format === "html") {
-        console.log(verdictToHtml(verdict, resolvedPath || args.file));
+        const html = verdictToHtml(verdict, resolvedPath || args.file);
+        if (outputPath) {
+          writeOutputIfSpecified(outputPath, html);
+          if (!args.quiet) console.log(`  ✅ HTML report written to ${args.output}`);
+        } else {
+          console.log(html);
+        }
       } else if (args.format === "pdf") {
-        console.log(verdictToPdfHtml(verdict, resolvedPath || args.file));
+        const pdf = verdictToPdfHtml(verdict, resolvedPath || args.file);
+        if (outputPath) {
+          writeOutputIfSpecified(outputPath, pdf);
+          if (!args.quiet) console.log(`  ✅ PDF (HTML) report written to ${args.output}`);
+        } else {
+          console.log(pdf);
+        }
       } else if (args.format === "junit") {
-        console.log(verdictToJUnit(verdict, resolvedPath || args.file));
+        const junit = verdictToJUnit(verdict, resolvedPath || args.file);
+        if (outputPath) {
+          writeOutputIfSpecified(outputPath, junit);
+          if (!args.quiet) console.log(`  ✅ JUnit report written to ${args.output}`);
+        } else {
+          console.log(junit);
+        }
       } else if (args.format === "codeclimate") {
-        console.log(JSON.stringify(verdictToCodeClimate(verdict, resolvedPath || args.file), null, 2));
+        const cc = JSON.stringify(verdictToCodeClimate(verdict, resolvedPath || args.file), null, 2);
+        if (outputPath) {
+          writeOutputIfSpecified(outputPath, cc);
+          if (!args.quiet) console.log(`  ✅ CodeClimate report written to ${args.output}`);
+        } else {
+          console.log(cc);
+        }
       } else {
-        console.log(formatTribunalOutput(verdict, args.format, resolvedPath || args.file));
+        const out = formatTribunalOutput(verdict, args.format, resolvedPath || args.file);
+        if (outputPath) {
+          writeOutputIfSpecified(outputPath, out);
+          if (!args.quiet) console.log(`  ✅ Report written to ${args.output}`);
+        } else {
+          console.log(out);
+        }
       }
 
       if (args.verbose) {

@@ -7572,6 +7572,10 @@ describe("CLI v3.5.0 Routing", () => {
     assert.ok(!indexSrc.includes("const cliCommands = new Set(["));
     assert.ok(cliWrapperSrc.includes("../dist/cli.js"));
     assert.equal(rootPkg.exports["./cli-runtime"], undefined);
+    // Ensure root package exposes a bin so `npx judges` works in CI
+    assert.ok(rootPkg.bin && rootPkg.bin.judges);
+    assert.equal(rootPkg.bin.judges, "packages/judges-cli/bin/judges.js");
+    assert.ok(existsSync(resolve(__dirname, "..", rootPkg.bin.judges)), "bin entry should point to existing judges.js");
   });
 
   it("should support new format options", () => {

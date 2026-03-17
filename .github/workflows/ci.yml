@@ -62,12 +62,25 @@ jobs:
           CI: true
 
       - name: Judges eval (SARIF)
-        run: npx judges eval --format sarif --output artifacts/judges.sarif --min-severity=medium || true
+        run: node packages/judges-cli/bin/judges.js eval src --format sarif --output artifacts/judges.sarif --min-severity=medium || true
         env:
           CI: true
 
       - name: Judges severity gate
-        run: npx judges ai-gate --sarif artifacts/judges.sarif --max-severity high
+        run: |
+          node -e "
+            const fs = require('fs');
+            const sarif = JSON.parse(fs.readFileSync('artifacts/judges.sarif', 'utf-8'));
+            const blocked = ['error'];
+            let found = 0;
+            for (const run of sarif.runs || []) {
+              for (const r of run.results || []) {
+                if (blocked.includes(r.level)) found++;
+              }
+            }
+            if (found > 0) { console.error('Severity gate failed: ' + found + ' high/critical finding(s)'); process.exit(1); }
+            console.log('Severity gate passed');
+          "
         env:
           CI: true
 

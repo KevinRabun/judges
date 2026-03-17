@@ -5,6 +5,9 @@
   "mcpName": "io.github.KevinRabun/judges",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "judges": "packages/judges-cli/bin/judges.js"
+  },
   "exports": {
     ".": {
       "import": "./dist/api.js",

@@ -62,11 +62,16 @@ describe("cli helpers", () => {
       "--max-files",
       "10",
       "--fail-on-findings",
+      "--output=out.sarif",
+      "--min-severity",
+      "high",
       "--help",
     ]);
     assert.equal(args.command, "eval");
     assert.equal(args.file, "src/app.ts");
     assert.equal(args.format, "json");
+    assert.equal(args.output, "out.sarif");
+    assert.equal(args.minSeverity, "high");
     assert.equal(args.judge, "cybersecurity");
     assert.equal(args.baseline, "baseline.json");
     assert.equal(args.config, "config.json");
@@ -202,6 +207,38 @@ describe("runCli dispatch", () => {
       logs.some((l) => l.includes("Usage")),
       "should print help for unknown commands",
     );
+  });
+
+  it("writes SARIF to --output for directory eval", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-cli-output-"));
+    const srcFile = path.join(tmpDir, "sample.ts");
+    fs.writeFileSync(srcFile, "const a: number = 1;\n", "utf-8");
+    const outputFile = path.join(tmpDir, "report.sarif");
+
+    await runCli(["node", "judges", "eval", "--dir", tmpDir, "--format", "sarif", "--output", outputFile]);
+
+    const sarifContent = fs.readFileSync(outputFile, "utf-8");
+    const sarifJson = JSON.parse(sarifContent);
+    assert.ok(sarifJson.version || sarifJson.runs, "SARIF output should be valid json");
+  });
+
+  it("writes SARIF to --output for single file eval", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-cli-output-single-"));
+    const srcFile = path.join(tmpDir, "sample.ts");
+    fs.writeFileSync(srcFile, "// TODO: fix me\nconst foo = 123;\n", "utf-8");
+    const outputFile = path.join(tmpDir, "single-report.sarif");
+
+    await runCli(["node", "judges", "eval", "--file", srcFile, "--format", "sarif", "--output", outputFile]);
+
+    const sarifContent = fs.readFileSync(outputFile, "utf-8");
+    const sarifJson = JSON.parse(sarifContent);
+    assert.ok(sarifJson.version || sarifJson.runs, "SARIF output should be valid json");
   });
 
   it("dispatches license-scan command (new command coverage)", async () => {
