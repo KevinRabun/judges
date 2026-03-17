@@ -90,7 +90,7 @@ jobs:
       - name: Link check (README only)
         if: matrix.node-version == '22'
         run: |
-          npx linkinator README.md --markdown true --verbosity warn --skip 'localhost'
+          npx linkinator README.md --markdown true --verbosity WARNING --skip 'localhost'
         env:
           CI: true
 
