@@ -369,7 +369,6 @@ function parseInlineSuppressions(code: string): {
   const activeBlocks = new Map<string, { commentLine: number; reason?: string }>();
 
   // Pattern: // judges-ignore[-next-line|-block] RULE-ID [, RULE-ID ...] [-- reason]
-  const suppressPattern = /(?:\/\/|#|\/\*)[ \t]*judges-ignore(?:-(next-line|block))?[ \t]+(\S[^\n]*)$/i;
   const endBlockPattern = /(?:\/\/|#|\/\*)\s*judges-end-block/i;
 
   for (let i = 0; i < lines.length; i++) {
@@ -388,54 +387,70 @@ function parseInlineSuppressions(code: string): {
       lineSuppressed.set(lineNum, arr);
     }
 
-    // Parse suppression directives
-    let match;
-    suppressPattern.lastIndex = 0;
-    match = suppressPattern.exec(line);
-    if (match) {
-      const modifier = match[1]?.toLowerCase(); // "next-line", "block", or undefined
-      let rawContent = match[2];
-      if (rawContent.trimEnd().endsWith("*/")) {
-        rawContent = rawContent.replace("*/", "").trimEnd();
-      }
-      const dashSplit = rawContent.split(" -- ");
-      const ruleIds = dashSplit[0].split(/[,\s]+/).filter(Boolean);
-      const reason = dashSplit[1]?.trim() || undefined;
+    // Parse suppression directives (string-based to avoid regex redos)
+    const ignoreIdx = line.indexOf("judges-ignore");
+    if (ignoreIdx >= 0) {
+      const before = line.substring(0, ignoreIdx).trimEnd();
+      if (before.endsWith("//") || before.endsWith("#") || before.endsWith("/*")) {
+        let rest = line.substring(ignoreIdx + "judges-ignore".length);
+        let modifier: string | undefined;
+        if (rest.toLowerCase().startsWith("-next-line")) {
+          modifier = "next-line";
+          rest = rest.substring("-next-line".length);
+        } else if (rest.toLowerCase().startsWith("-block")) {
+          modifier = "block";
+          rest = rest.substring("-block".length);
+        }
+        const trimmedRest = rest.trimStart();
+        if (trimmedRest.length < rest.length && trimmedRest.length > 0) {
+          let rawContent = trimmedRest;
+          if (rawContent.trimEnd().endsWith("*/")) {
+            rawContent = rawContent.replace("*/", "").trimEnd();
+          }
+          const dashSplit = rawContent.split(" -- ");
+          const ruleIds = dashSplit[0].split(/[, \t]+/).filter(Boolean);
+          const reason = dashSplit[1]?.trim() || undefined;
 
-      const kind: SuppressionDirective["kind"] =
-        modifier === "next-line" ? "next-line" : modifier === "block" ? "block" : "line";
-      const targetLine = kind === "next-line" ? lineNum + 1 : lineNum;
+          const kind: SuppressionDirective["kind"] =
+            modifier === "next-line" ? "next-line" : modifier === "block" ? "block" : "line";
+          const targetLine = kind === "next-line" ? lineNum + 1 : lineNum;
 
-      for (const rawId of ruleIds) {
-        const ruleId = rawId === "*" ? "*" : rawId.toUpperCase();
+          for (const rawId of ruleIds) {
+            const ruleId = rawId === "*" ? "*" : rawId.toUpperCase();
 
-        if (kind === "block") {
-          // Start block suppression — applies to all subsequent lines until end-block
-          activeBlocks.set(ruleId, { commentLine: lineNum, reason });
-        } else {
-          const arr = lineSuppressed.get(targetLine) ?? [];
-          arr.push({ ruleId, kind, commentLine: lineNum, reason });
-          lineSuppressed.set(targetLine, arr);
+            if (kind === "block") {
+              // Start block suppression — applies to all subsequent lines until end-block
+              activeBlocks.set(ruleId, { commentLine: lineNum, reason });
+            } else {
+              const arr = lineSuppressed.get(targetLine) ?? [];
+              arr.push({ ruleId, kind, commentLine: lineNum, reason });
+              lineSuppressed.set(targetLine, arr);
+            }
+          }
         }
       }
     }
 
     // File-level suppression: // judges-file-ignore RULE-ID [-- reason]
-    const filePattern = /(?:\/\/|#|\/\*)[ \t]*judges-file-ignore[ \t]+(\S[^\n]*)$/i;
-    let fileMatch;
-    filePattern.lastIndex = 0;
-    fileMatch = filePattern.exec(line);
-    if (fileMatch) {
-      let rawFileContent = fileMatch[1];
-      if (rawFileContent.trimEnd().endsWith("*/")) {
-        rawFileContent = rawFileContent.replace("*/", "").trimEnd();
-      }
-      const fileDashSplit = rawFileContent.split(" -- ");
-      const ruleIds = fileDashSplit[0].split(/[,\s]+/).filter(Boolean);
-      const reason = fileDashSplit[1]?.trim() || undefined;
-      for (const rawId of ruleIds) {
-        const ruleId = rawId === "*" ? "*" : rawId.toUpperCase();
-        globalSuppressed.push({ ruleId, kind: "file", commentLine: lineNum, reason });
+    const fileIgnoreIdx = line.indexOf("judges-file-ignore");
+    if (fileIgnoreIdx >= 0) {
+      const beforeFile = line.substring(0, fileIgnoreIdx).trimEnd();
+      if (beforeFile.endsWith("//") || beforeFile.endsWith("#") || beforeFile.endsWith("/*")) {
+        const fileRest = line.substring(fileIgnoreIdx + "judges-file-ignore".length);
+        const fileTrimmedRest = fileRest.trimStart();
+        if (fileTrimmedRest.length < fileRest.length && fileTrimmedRest.length > 0) {
+          let rawFileContent = fileTrimmedRest;
+          if (rawFileContent.trimEnd().endsWith("*/")) {
+            rawFileContent = rawFileContent.replace("*/", "").trimEnd();
+          }
+          const fileDashSplit = rawFileContent.split(" -- ");
+          const ruleIds = fileDashSplit[0].split(/[, \t]+/).filter(Boolean);
+          const reason = fileDashSplit[1]?.trim() || undefined;
+          for (const rawId of ruleIds) {
+            const ruleId = rawId === "*" ? "*" : rawId.toUpperCase();
+            globalSuppressed.push({ ruleId, kind: "file", commentLine: lineNum, reason });
+          }
+        }
       }
     }
   }
