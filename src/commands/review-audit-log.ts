@@ -4,6 +4,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
+import { userInfo } from "os";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -84,7 +85,7 @@ Data stored in .judges/audit-log.json.
     const action = argv.find((_a: string, i: number) => argv[i - 1] === "--action") || "unknown";
     const command = argv.find((_a: string, i: number) => argv[i - 1] === "--command") || "";
     const result = argv.find((_a: string, i: number) => argv[i - 1] === "--result") || "success";
-    const user = process.env.USER || process.env.USERNAME || "unknown";
+    const user = userInfo().username || "unknown";
 
     const entry: AuditEntry = {
       timestamp: new Date().toISOString(),

@@ -369,7 +369,7 @@ function parseInlineSuppressions(code: string): {
   const activeBlocks = new Map<string, { commentLine: number; reason?: string }>();
 
   // Pattern: // judges-ignore[-next-line|-block] RULE-ID [, RULE-ID ...] [-- reason]
-  const suppressPattern = /(?:\/\/|#|\/\*)\s*judges-ignore(?:-(next-line|block))?\s+(.+)$/gi;
+  const suppressPattern = /(?:\/\/|#|\/\*)[ \t]*judges-ignore(?:-(next-line|block))?[ \t]+(\S[^\n]*)$/i;
   const endBlockPattern = /(?:\/\/|#|\/\*)\s*judges-end-block/i;
 
   for (let i = 0; i < lines.length; i++) {
@@ -391,10 +391,14 @@ function parseInlineSuppressions(code: string): {
     // Parse suppression directives
     let match;
     suppressPattern.lastIndex = 0;
-    while ((match = suppressPattern.exec(line)) !== null) {
+    match = suppressPattern.exec(line);
+    if (match) {
       const modifier = match[1]?.toLowerCase(); // "next-line", "block", or undefined
-      const rawContent = match[2].replace(/\s*\*\/\s*$/, "");
-      const dashSplit = rawContent.split(/\s+--\s+/);
+      let rawContent = match[2];
+      if (rawContent.trimEnd().endsWith("*/")) {
+        rawContent = rawContent.replace("*/", "").trimEnd();
+      }
+      const dashSplit = rawContent.split(" -- ");
       const ruleIds = dashSplit[0].split(/[,\s]+/).filter(Boolean);
       const reason = dashSplit[1]?.trim() || undefined;
 
@@ -417,12 +421,16 @@ function parseInlineSuppressions(code: string): {
     }
 
     // File-level suppression: // judges-file-ignore RULE-ID [-- reason]
-    const filePattern = /(?:\/\/|#|\/\*)\s*judges-file-ignore\s+(.+)$/gi;
+    const filePattern = /(?:\/\/|#|\/\*)[ \t]*judges-file-ignore[ \t]+(\S[^\n]*)$/i;
     let fileMatch;
     filePattern.lastIndex = 0;
-    while ((fileMatch = filePattern.exec(line)) !== null) {
-      const rawFileContent = fileMatch[1].replace(/\s*\*\/\s*$/, "");
-      const fileDashSplit = rawFileContent.split(/\s+--\s+/);
+    fileMatch = filePattern.exec(line);
+    if (fileMatch) {
+      let rawFileContent = fileMatch[1];
+      if (rawFileContent.trimEnd().endsWith("*/")) {
+        rawFileContent = rawFileContent.replace("*/", "").trimEnd();
+      }
+      const fileDashSplit = rawFileContent.split(" -- ");
       const ruleIds = fileDashSplit[0].split(/[,\s]+/).filter(Boolean);
       const reason = fileDashSplit[1]?.trim() || undefined;
       for (const rawId of ruleIds) {
@@ -927,9 +935,11 @@ export function evaluateWithTribunal(
     const modelFindings = calibrated.filter((f) => f.ruleId.startsWith("MFPR-"));
     if (modelFindings.length > 0) {
       // Extract detected model name from the finding title
-      const modelMatch = modelFindings[0].title.match(/matches\s+(.+?)\s+generation/);
-      if (modelMatch) {
-        const detectedModel = modelMatch[1];
+      const title = modelFindings[0].title;
+      const mIdx = title.indexOf("matches ");
+      const gIdx = mIdx >= 0 ? title.indexOf(" generation", mIdx + 8) : -1;
+      if (mIdx >= 0 && gIdx > mIdx) {
+        const detectedModel = title.substring(mIdx + 8, gIdx).trim();
         const feedbackStore = loadFeedbackStore();
         if (feedbackStore.entries.length > 0) {
           const modelProfile = buildModelCalibrationProfile(feedbackStore, detectedModel);

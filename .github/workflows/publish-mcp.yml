@@ -89,14 +89,16 @@ jobs:
 
       - name: Publish server to MCP Registry
         run: |
-          OUTPUT=$(./mcp-publisher publish 2>&1) && echo "$OUTPUT" || {
+          if OUTPUT=$(./mcp-publisher publish 2>&1); then
+            echo "$OUTPUT"
+          else
             if echo "$OUTPUT" | grep -qi "duplicate version"; then
               echo "Version already published to MCP Registry — skipping"
             else
               echo "$OUTPUT"
               exit 1
             fi
-          }
+          fi
 
       # ── Publish VS Code Extension to Marketplace ────────────
 
