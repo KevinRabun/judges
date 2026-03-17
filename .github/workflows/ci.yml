@@ -64,13 +64,11 @@ jobs:
         shell: bash
         run: |
           shopt -s globstar
-          if [[ "${{ matrix.node-version }}" -ge 22 ]]; then
-            npx tsx --test --test-force-exit tests/**/*.test.ts
-          else
-            npx tsx --test tests/**/*.test.ts
-          fi
+          # shellcheck disable=SC2086
+          npx tsx --test $FORCE_EXIT_FLAG tests/**/*.test.ts
         env:
           CI: true
+          FORCE_EXIT_FLAG: ${{ matrix.node-version >= 22 && '--test-force-exit' || '' }}
 
       - name: Test with coverage (Node 22 only)
         if: matrix.node-version == '22'
