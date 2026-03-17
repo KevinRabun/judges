@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Schema for agent frontmatter used in agents/*.judge.md (legacy .agent.md tolerated)",
+  "title": "Judges Agent Frontmatter (.judge.md)",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "domain": { "type": "string" },
+    "rulePrefix": { "type": "string" },
+    "description": { "type": "string" },
+    "tableDescription": { "type": "string" },
+    "promptDescription": { "type": "string" },
+    "script": { "type": "string" },
+    "priority": { "type": "number" }
+  },
+  "required": [
+    "id",
+    "name",
+    "domain",
+    "rulePrefix",
+    "description",
+    "tableDescription",
+    "promptDescription"
+  ]
+}

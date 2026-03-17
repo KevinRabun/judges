@@ -1,8 +1,29 @@
 # Adding a New Judge — Step-by-Step
 
 When adding a new judge to the Judges Panel, follow these steps exactly.
-All judges self-register with the unified `JudgeRegistry` via side-effect imports.
-The `src/judges/index.ts` barrel file triggers registration by importing each judge module.
+All judges now load from **agent files** (`agents/<id>.judge.md`). The registry bootstraps from the agents directory at runtime. Evaluators remain in `src/evaluators/` and are referenced via the `script:` field in the agent frontmatter.
+
+> ℹ️ Back-compat: legacy `.agent.md` files are still readable, but **all new agents must use `.judge.md`**.
+
+The legacy side-effect imports in `src/judges/index.ts` have been removed. If you need to add a judge, follow the agent-native workflow below.
+
+---
+
+## 0. Create/Update Agent File (`agents/<id>.judge.md`)
+
+Frontmatter fields:
+- `id`, `name`, `domain`, `rulePrefix`, `description`, `tableDescription`, `promptDescription`
+- `script`: relative path to evaluator module (e.g., `../src/evaluators/cybersecurity.ts`)
+- `priority`: integer ordering (lower runs earlier; `999` reserved for `false-positive-review`)
+
+Body becomes the **system prompt** (persona + evaluation criteria). See existing agents for patterns.
+
+You can regenerate agents from the registry with:
+```bash
+npm run generate:agents        # skip existing
+npm run generate:agents:force  # overwrite
+npm run validate:agents        # sanity check against registry
+```
 
 ---
 

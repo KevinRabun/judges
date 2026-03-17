@@ -15,6 +15,14 @@
 2. Open any supported file and save — findings appear inline immediately.
 3. Type `@judges` in Copilot Chat for a deep review with AI-powered contextual analysis.
 
+## Troubleshooting
+
+- **LLM Benchmark disabled by default** → Enable via **Settings → Judges → Llm Benchmark Enabled** or set `JUDGES_LLM_BENCHMARK_ENABLED=true` before launching VS Code. Defaults reduced (sampleSize=32, maxOutputTokens=1024, maxHeapMb=1024) to protect the extension host.
+- **Extension host OOM / unresponsive / listener leak warnings** → If you see `potential listener LEAK` or heap reaching >1 GiB, stop the benchmark, reload window, and reduce: `judges.llmBenchmark.sampleSize`, `maxOutputTokens`, `concurrency` (keep at 1), `responseSnapshotChars`. The runner now truncates responses, enforces heap guards, throttles logs, and caps concurrency (max 2).
+- **Failed to fetch remote embeddings cache (404)** → Emitted by Copilot. Benign; Copilot falls back automatically. Judges does not depend on these assets. You can toggle `GitHub Copilot: Tools / Embeddings` off to silence it.
+- **"No activated agent with id 'github.copilot.editsAgent'"** → Symptom of extension host restart. Run **Developer: Reload Window** and retry.
+
+
 ## Chat Commands — `@judges`
 
 | Command | What it does |
@@ -75,6 +83,7 @@ Or run **Judges: Add CI Workflow** from the Command Palette to generate the work
 | **Judges: Evaluate Workspace** | Evaluate all supported files with progress reporting |
 | **Judges: Deep Review (Layer 1 + Layer 2)** | Pattern analysis + AI contextual review — opens markdown report |
 | **Judges: Refine Findings with AI** | LLM-powered false-positive filtering |
+| **Judges: Run Skill (Quick Pick)** | Select and run an agentic skill (e.g., `ai-code-review`, `security-review`, `release-gate`) |
 | **Judges: Clear Diagnostics** | Remove all Judges diagnostics |
 | **Judges: Show Results Panel** | Open the Judges findings tree view |
 | **Judges: Configure MCP Server** | Write `.vscode/mcp.json` for team sharing |

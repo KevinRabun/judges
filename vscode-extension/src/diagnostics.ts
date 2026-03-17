@@ -543,6 +543,17 @@ export class JudgesDiagnosticProvider {
       }
 
       if (!isContentPolicyRefusal(responseText)) {
+        // Validate LLM output for well-formed rule IDs/severities (hallucination fencing)
+        try {
+          const prefixes = new Set(findings.map((f) => f.ruleId.split("-")[0]));
+          const validator = await import("@kevinrabun/judges/api");
+          const { errors } = validator.extractValidatedLlmFindings(responseText, prefixes);
+          if (errors?.length) {
+            md += `> ⚠️ LLM validation warnings: ${errors.join("; ")}\n\n`;
+          }
+        } catch (err) {
+          md += `> ⚠️ LLM validation failed: ${err instanceof Error ? err.message : String(err)}\n\n`;
+        }
         md += responseText;
       } else {
         // Retry with simplified prompt

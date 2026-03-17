@@ -210,4 +210,41 @@ describe("runCli dispatch", () => {
     await runCli(["license-scan", "--format", "json"]);
     assert.deepEqual(calls, [["license-scan", "--format", "json"]]);
   });
+
+  it("lists skills via CLI", async () => {
+    const logs: string[] = [];
+    const origTable = console.table;
+    console.table = (rows?: any) => logs.push(JSON.stringify(rows));
+    try {
+      await runCli(["skills"]);
+      assert.ok(logs.length > 0, "should print skills table");
+      assert.ok(logs.some((l) => l.includes("ai-code-review")));
+    } finally {
+      console.table = origTable;
+    }
+  });
+
+  it("runs a skill via CLI", async () => {
+    const code = "export const hello = (n) => `Hello ${n}`;";
+    const tmp = "./tmp-skill-test.js";
+    const { writeFileSync, rmSync } = await import("node:fs");
+    writeFileSync(tmp, code, "utf-8");
+    try {
+      await runCli(["skill", "ai-code-review", "--file", tmp, "--language", "javascript", "--format", "json"]);
+    } finally {
+      rmSync(tmp, { force: true });
+    }
+  });
+
+  it("lists skills via CLI with --format plain", async () => {
+    const logs: string[] = [];
+    const origLog = console.log;
+    console.log = (msg?: any) => logs.push(String(msg));
+    try {
+      await runCli(["skills", "--format", "plain"]);
+      assert.ok(logs.some((l) => l.includes("ai-code-review")));
+    } finally {
+      console.log = origLog;
+    }
+  });
 });

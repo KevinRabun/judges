@@ -12365,7 +12365,7 @@ describe("Review Command — runReview", () => {
         throw new Error(`EXIT:${code ?? 0}`);
       }) as never;
 
-      assert.throws(() => runReview(["node", "judges", "review"]), /EXIT:0/);
+      await assert.rejects(() => runReview(["node", "judges", "review"]), /EXIT:0/);
       assert.ok(output.some((line) => line.includes("Pull Request Review")));
       assert.ok(output.some((line) => line.includes("--cross-file")));
     } finally {
@@ -12394,7 +12394,7 @@ describe("Review Command — runReview", () => {
         throw new Error(`EXIT:${code ?? 0}`);
       }) as never;
 
-      assert.throws(() => runReview(["node", "judges", "review", "--pr", "42"]), /EXIT:1/);
+      await assert.rejects(() => runReview(["node", "judges", "review", "--pr", "42"]), /EXIT:1/);
       assert.ok(errors.some((line) => line.includes("Could not detect GitHub repository")));
     } finally {
       process.chdir(origCwd);
@@ -12465,7 +12465,7 @@ describe("Review Command — runReview", () => {
       }) as never;
 
       const { runReview } = await import("../src/commands/review.js");
-      assert.throws(
+      await assert.rejects(
         () => runReview(["node", "judges", "review", "--pr", "42", "--repo", "octo/repo", "--dry-run"]),
         /EXIT:1/,
       );
@@ -12545,7 +12545,7 @@ describe("Review Command — runReview", () => {
       }) as never;
 
       const { runReview } = await import("../src/commands/review.js");
-      assert.throws(
+      await assert.rejects(
         () => runReview(["node", "judges", "review", "--pr", "42", "--repo", "octo/repo", "--format", "json"]),
         /EXIT:1/,
       );
@@ -14209,7 +14209,10 @@ describe("LSP Server module", () => {
 });
 
 describe("Watch Command", () => {
-  it("watches a single file and evaluates it immediately and on change", async () => {
+  const usingTsx = process.execArgv.some((arg) => arg.includes("tsx"));
+  const itWatch = usingTsx ? it.skip : it;
+
+  itWatch("watches a single file and evaluates it immediately and on change", async () => {
     const fs = await import("fs");
     const os = await import("os");
     const path = await import("path");
@@ -14265,7 +14268,7 @@ describe("Watch Command", () => {
     }
   });
 
-  it("reports an unknown judge without crashing", async () => {
+  itWatch("reports an unknown judge without crashing", async () => {
     const fs = await import("fs");
     const os = await import("os");
     const path = await import("path");

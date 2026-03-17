@@ -4,6 +4,16 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.114.0] — 2026-03-17
+
+### Changed
+- Core engine bumped to `@kevinrabun/judges@^3.114.0`
+- LLM benchmark runner import switched to `pathToFileURL` for ESM/Windows compatibility; env toggles and heap guard remain default-disabled.
+
+### Fixed
+- ESM test failures (`require is not defined`) in extension tests resolved via `createRequire` + `pathToFileURL`.
+- CLI review pipeline test harness now uses `await assert.rejects` to avoid unhandled rejections when stubbing `process.exit`.
+
 ## [3.113.0] — 2026-03-17
 
 ### Changed

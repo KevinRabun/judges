@@ -18,14 +18,23 @@ import { execFileSync } from "child_process";
 import { readFileSync, writeFileSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { resolve, join, extname } from "path";
+import { createHash } from "node:crypto";
 import { evaluateDiff, evaluateWithTribunal } from "../evaluators/index.js";
 import { evaluateProject, type TribunalRunner } from "../evaluators/project.js";
+
+// Test hook to override evaluateDiff in unit tests
+let evaluateDiffImpl = evaluateDiff;
+export function __setEvaluateDiffImplForTest(fn: typeof evaluateDiff | undefined) {
+  evaluateDiffImpl = fn ?? evaluateDiff;
+}
 import type { EvaluationOptions } from "../evaluators/index.js";
 import type { Finding, Severity, JudgesConfig } from "../types.js";
 import { parseConfig, loadCascadingConfig } from "../config.js";
 import { loadFeedbackStore, getFpRateByRule } from "./feedback.js";
 import { JUDGES } from "../judges/index.js";
 import { parseGitHubRepo, tryRunGit } from "../tools/command-safety.js";
+import { extractValidatedLlmFindings, constructTribunalPrompt } from "./llm-benchmark.js";
+import { buildContextSnippets } from "../context/context-snippets.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -50,6 +59,16 @@ interface ReviewArgs {
   crossFile: boolean;
   /** Only run these judges (comma-separated IDs). All others are disabled. */
   judges?: string[];
+  /** Enable Layer 2 (LLM) deep review augmentation */
+  llmDeepReview?: boolean;
+  /** OpenAI-compatible model name (e.g., gpt-4o) */
+  llmModel?: string;
+  /** OpenAI-compatible base URL override */
+  llmBaseUrl?: string;
+  /** Max tokens for LLM responses */
+  llmMaxTokens?: number;
+  /** Enable autopilot: fetch diff, post inline comments, and summary automatically */
+  autopilot?: boolean;
 }
 
 interface PrFile {
@@ -67,6 +86,46 @@ interface ReviewComment {
   start_line?: number;
   /** Side for start line (always RIGHT for new code) */
   start_side?: "RIGHT";
+}
+
+export function dedupeComments(comments: ReviewComment[]): ReviewComment[] {
+  const seen = new Set<string>();
+  const out: ReviewComment[] = [];
+  for (const c of comments) {
+    const key = `${c.path}:${c.line}:${hashBody(c.body)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(c);
+  }
+  return out;
+}
+
+export function filterAlreadyPostedComments(
+  repo: string,
+  pr: number,
+  token: string | undefined,
+  comments: ReviewComment[],
+): ReviewComment[] {
+  try {
+    const resp = apiRequest("GET", `/repos/${repo}/pulls/${pr}/comments`, token);
+    const existing = (resp.data as Array<Record<string, unknown>>) ?? [];
+    const existingKeys = new Set(
+      existing.map((c) => {
+        const path = c.path as string;
+        const line = c.line as number;
+        const body = (c.body as string) ?? "";
+        return `${path}:${line}:${hashBody(body)}`;
+      }),
+    );
+    return comments.filter((c) => !existingKeys.has(`${c.path}:${c.line}:${hashBody(c.body)}`));
+  } catch (err) {
+    console.error("Failed to fetch existing comments, proceeding without dedupe", err);
+    return comments;
+  }
+}
+
+function hashBody(body: string): string {
+  return createHash("sha1").update(body).digest("hex").slice(0, 8);
 }
 
 interface DiffHunk {
@@ -131,8 +190,8 @@ export function parsePatchToHunk(filePath: string, patch: string): DiffHunk {
   let newLineNum = 0;
 
   for (const line of lines) {
-    // Hunk header: @@ -10,5 +20,8 @@
-    const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    // Hunk header: @@ -10,5 +20,8 @@ (some tools omit trailing space/@@)
+    const hunkMatch = line.match(/^@@\s*-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s*@@?/);
     if (hunkMatch) {
       newLineNum = parseInt(hunkMatch[1], 10) - 1;
       continue;
@@ -283,12 +342,20 @@ function ghCliRequest(method: string, endpoint: string, body?: unknown): { statu
   }
 }
 
+// Allow test injection of the GitHub API layer
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let apiRequestImpl: any;
+
 function apiRequest(
   method: string,
   endpoint: string,
   token: string | undefined,
   body?: unknown,
 ): { status: number; data: unknown } {
+  const impl = apiRequestImpl;
+  if (impl) {
+    return impl(method, endpoint, token, body);
+  }
   if (ghCliAvailable()) {
     return ghCliRequest(method, endpoint, body);
   }
@@ -298,6 +365,121 @@ function apiRequest(
   console.error("Error: No GitHub authentication found.");
   console.error("Either install the `gh` CLI and run `gh auth login`, or set GITHUB_TOKEN env var.");
   process.exit(1);
+}
+
+export function __setApiRequestImplForTest(fn: typeof ghApiRequest | undefined) {
+  apiRequestImpl = fn;
+}
+
+// ─── LLM Deep Review (optional Layer 2 augmentation) ───────────────────────
+
+interface LlmClientOptions {
+  model: string;
+  baseUrl?: string;
+  apiKey: string;
+  maxTokens?: number;
+}
+
+async function callOpenAiChat(prompt: string, opts: LlmClientOptions): Promise<string> {
+  const baseUrl = opts.baseUrl || "https://api.openai.com/v1/chat/completions";
+  // Node 18+ has global fetch; avoid dynamic imports to keep tsc happy without node-fetch types
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fetchImpl: any = (globalThis as any).fetch;
+  if (!fetchImpl) throw new Error("fetch() not available. Run on Node 18+ or polyfill fetch.");
+  const res = await fetchImpl(baseUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${opts.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: opts.model,
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: opts.maxTokens ?? 800,
+      temperature: 0.2,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`LLM request failed: ${res.status} ${res.statusText} ${text}`);
+  }
+  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = json.choices?.[0]?.message?.content;
+  if (!content) throw new Error("LLM response missing content");
+  return content;
+}
+
+// test hooks for dependency injection
+let callOpenAiChatImpl = callOpenAiChat;
+export function __setCallOpenAiChatImplForTest(fn: typeof callOpenAiChat) {
+  callOpenAiChatImpl = fn;
+}
+
+/** Build a single prompt for the entire PR (tribunal mode). */
+function buildLlmPromptForPr(prFiles: PrFile[], maxBytes = 40000): { prompt: string; contextSnippets: string[] } {
+  const snippets: string[] = [];
+  for (const f of prFiles) {
+    if (!f.patch) continue;
+    if (Buffer.byteLength(f.patch, "utf-8") > maxBytes) continue; // drop huge patches
+    snippets.push(`--- FILE: ${f.filename} ---\n${f.patch}`);
+  }
+  const combined = snippets.join("\n\n");
+  const prompt = `Review the following PR diff. Return issues with rule IDs, severity, and recommendations.\n\n${combined}`;
+  return { prompt, contextSnippets: snippets.slice(0, 5) };
+}
+
+export async function runLlmDeepReview(
+  prFiles: PrFile[],
+  args: ReviewArgs,
+): Promise<{ summary?: string; warnings?: string[] }> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return { warnings: ["OPENAI_API_KEY not set; skipping LLM deep review"] };
+  }
+  const model = args.llmModel || process.env.OPENAI_MODEL || "gpt-4o";
+  const baseUrl = args.llmBaseUrl || process.env.OPENAI_BASE_URL;
+  const { constructTribunalPrompt } = await import("./llm-benchmark.js");
+  const { buildContextSnippets } = await import("../context/context-snippets.js");
+
+  // Build code blob for tribunal prompt; collapse patches to new content
+  const codeBlobs: string[] = [];
+  const snippetsForRag: string[] = [];
+  for (const pf of prFiles) {
+    if (!pf.patch) continue;
+    const hunk = parsePatchToHunk(pf.filename, pf.patch);
+    codeBlobs.push(`// FILE: ${pf.filename}\n${hunk.newContent}`);
+    snippetsForRag.push(hunk.newContent);
+  }
+  const codeJoined = codeBlobs.join("\n\n");
+
+  // Build context snippets (RAG-lite) for prompt grounding
+  const ragSnippets = await buildContextSnippets(snippetsForRag.join("\n\n"), {
+    maxSnippets: 4,
+    chunkSize: 1500,
+  });
+  const contextText = ragSnippets.map((s) => s.snippet);
+
+  const tribunalPrompt = constructTribunalPrompt(codeJoined, "mixed", contextText);
+  const { prompt: diffPrompt } = buildLlmPromptForPr(prFiles);
+
+  const combinedPrompt = `${tribunalPrompt}\n\n---\n\nDiff summary for additional context:\n${diffPrompt}`;
+  const content = await callOpenAiChatImpl(combinedPrompt, { apiKey, model, baseUrl, maxTokens: args.llmMaxTokens });
+
+  // Validate structured findings in LLM output
+  // Use global registry prefixes to validate LLM output
+  const { getValidRulePrefixes } = await import("./llm-benchmark.js");
+  const validation = extractValidatedLlmFindings(content, getValidRulePrefixes());
+  const warnings = validation.errors?.length ? validation.errors : undefined;
+
+  const summaryLines = [
+    `### 🤖 LLM Deep Review Summary (model: ${model})`,
+    "",
+    validation.ruleIds.length ? `Detected rule IDs: ${validation.ruleIds.join(", ")}` : "No rule IDs detected.",
+    "",
+    content,
+  ];
+
+  return { summary: summaryLines.join("\n"), warnings };
 }
 
 // ─── Finding → Review Comment ───────────────────────────────────────────────
@@ -365,6 +547,9 @@ interface ReviewResult {
   fpSuppressed: number;
   approved: boolean;
   comments: ReviewComment[];
+  /** Optional LLM deep review summary (non-inline). */
+  llmSummary?: string;
+  llmWarnings?: string[];
 }
 
 function reviewPrFiles(
@@ -405,7 +590,7 @@ function reviewPrFiles(
       filePath: file.filename,
     };
 
-    const verdict = evaluateDiff(hunk.newContent, lang, hunk.changedLines, undefined, fileOpts);
+    const verdict = evaluateDiffImpl(hunk.newContent, lang, hunk.changedLines, undefined, fileOpts);
 
     for (const finding of verdict.findings) {
       // Suppress findings from rules with high FP rates
@@ -702,6 +887,18 @@ export function buildPRReviewNarrative(result: ReviewResult): string {
     lines.push("");
   }
 
+  // ── Layer 2 (optional) ───────────────────────────────────────────
+  if (result.llmSummary) {
+    lines.push("### 🤖 Layer 2 — AI Deep Review (LLM)");
+    lines.push("");
+    lines.push(result.llmSummary);
+    lines.push("");
+  }
+  if (result.llmWarnings?.length) {
+    lines.push("> ⚠️ LLM warnings: " + result.llmWarnings.join("; "));
+    lines.push("");
+  }
+
   // ── Cross-cutting themes ──────────────────────────────────────────
   const byDomain = new Map<string, CommentMeta[]>();
   for (const m of metas) {
@@ -846,6 +1043,8 @@ export function parseReviewArgs(argv: string[]): ReviewArgs {
     minConfidence: 0.6,
     calibrate: true,
     crossFile: false,
+    llmDeepReview: false,
+    autopilot: false,
   };
 
   for (let i = 3; i < argv.length; i++) {
@@ -900,6 +1099,22 @@ export function parseReviewArgs(argv: string[]): ReviewArgs {
           .map((s) => s.trim())
           .filter(Boolean);
         break;
+      case "--llm-deep-review":
+        args.llmDeepReview = true;
+        break;
+      case "--llm-model":
+        args.llmModel = argv[++i];
+        break;
+      case "--llm-base-url":
+        args.llmBaseUrl = argv[++i];
+        break;
+      case "--llm-max-tokens":
+        args.llmMaxTokens = parseInt(argv[++i], 10);
+        break;
+      case "--autopilot":
+      case "--gh-autopilot":
+        args.autopilot = true;
+        break;
       default:
         // Positional: treat as PR number if numeric
         if (!arg.startsWith("-") && /^\d+$/.test(arg) && args.pr === 0) {
@@ -912,13 +1127,18 @@ export function parseReviewArgs(argv: string[]): ReviewArgs {
   return args;
 }
 
-export function runReview(argv: string[]): void {
+export async function runReview(argv: string[]): Promise<void> {
   const args = parseReviewArgs(argv);
 
   // In JSON mode, redirect informational output to stderr so stdout is pure JSON
   const _stdoutLog = console.log.bind(console);
   if (args.format === "json") {
     console.log = (...a: unknown[]) => console.error(...a);
+  }
+
+  if (args.autopilot) {
+    // Autopilot implies live mode
+    args.dryRun = false;
   }
 
   if (args.pr === 0) {
@@ -947,6 +1167,7 @@ OPTIONS:
   --no-calibrate          Disable feedback-driven confidence calibration (enabled by default)
   --cross-file            Enable cross-file architectural analysis (detects duplication, taint flows)
   --judges <id,id,...>    Only run these judges (comma-separated IDs, e.g. cybersecurity,authentication)
+  --autopilot             Enable PR autopilot (fetch diff, post inline + summary). Implies live mode.
 
 AUTHENTICATION:
   Set GITHUB_TOKEN env var, or install the \`gh\` CLI and run \`gh auth login\`.
@@ -1057,14 +1278,25 @@ AUTHENTICATION:
     args.minConfidence,
   );
 
+  // Deduplicate inline comments to avoid spam on reruns
+  result.comments = dedupeComments(result.comments);
+
+  // Optional Layer 2 (LLM) augmentation
+  if (args.llmDeepReview) {
+    const { summary, warnings } = await runLlmDeepReview(prFiles, args);
+    if (summary) result.llmSummary = summary;
+    if (warnings?.length) result.llmWarnings = warnings;
+  }
+
   if (args.format === "json") {
     // Post review to GitHub before outputting JSON
     if (!args.dryRun && (result.comments.length > 0 || args.approve)) {
+      const filteredComments = filterAlreadyPostedComments(repo, args.pr, args.token, result.comments);
       const reviewEvent = result.approved && args.approve ? "APPROVE" : result.approved ? "COMMENT" : "REQUEST_CHANGES";
       const reviewBody = {
         body: buildPRReviewNarrative(result),
         event: reviewEvent,
-        comments: result.comments,
+        comments: filteredComments,
       };
       const reviewResp = apiRequest("POST", `/repos/${repo}/pulls/${args.pr}/reviews`, args.token, reviewBody);
       if (reviewResp.status !== 200 && reviewResp.status !== 422) {
@@ -1108,10 +1340,12 @@ AUTHENTICATION:
   if (result.comments.length > 0 || args.approve) {
     const reviewEvent = result.approved && args.approve ? "APPROVE" : result.approved ? "COMMENT" : "REQUEST_CHANGES";
 
+    const filteredComments = filterAlreadyPostedComments(repo, args.pr, args.token, result.comments);
+
     const reviewBody = {
       body: buildPRReviewNarrative(result),
       event: reviewEvent,
-      comments: result.comments,
+      comments: filteredComments,
     };
 
     const reviewResp = apiRequest("POST", `/repos/${repo}/pulls/${args.pr}/reviews`, args.token, reviewBody);
@@ -1142,3 +1376,22 @@ AUTHENTICATION:
   console.log("");
   process.exit(result.approved ? 0 : 1);
 }
+
+/**
+ * Programmatic autopilot entrypoint for GitHub App / automations.
+ */
+export function runReviewAutopilot(pr: number, repo?: string): Promise<void> {
+  const argv = ["node", "judges", "review", "--pr", String(pr), "--autopilot"];
+  if (repo) argv.push("--repo", repo);
+  return runReview(argv);
+}
+
+// Test exports (non-public API)
+export const __test = {
+  __setCallOpenAiChatImplForTest,
+  __setApiRequestImplForTest,
+  __setEvaluateDiffImplForTest,
+  runLlmDeepReview,
+  // expose for patching in tests
+  __evaluateDiffForTest: evaluateDiff,
+};

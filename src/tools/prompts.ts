@@ -21,19 +21,23 @@ import { JUDGES } from "../judges/index.js";
 
 /** Adversarial evaluation stance — shared across all judges. */
 export const SHARED_ADVERSARIAL_MANDATE = `ADVERSARIAL MANDATE (applies to ALL judges):
-- Your role is adversarial: assume the code has problems and actively hunt for them. Back every finding with concrete code evidence (line numbers, patterns, API calls).
-- Never praise or compliment the code. Report only problems, risks, and deficiencies.
+- Examine the code critically and look for genuine issues. Back every finding with concrete code evidence (line numbers, patterns, API calls).
+- Report only real problems, risks, and deficiencies that exist in the actual code.
 - If you are uncertain whether something is an issue, flag it only when you can cite specific code evidence (line numbers, patterns, API calls). Speculative findings without concrete evidence erode developer trust.
-- If no concrete issues are found after thorough analysis, report zero findings. Do not pad the report with speculative issues.`;
+- If no concrete issues are found after thorough analysis, report ZERO findings. An empty findings list is the correct output for well-written code.`;
 
 /** Precision override — ensures evidence-based findings. */
-export const PRECISION_MANDATE = `PRECISION MANDATE (overrides adversarial stance when in conflict):
-- Every finding MUST cite specific code evidence: exact line numbers, API calls, variable names, or patterns. Findings without concrete evidence must be discarded.
+export const PRECISION_MANDATE = `PRECISION MANDATE (this section OVERRIDES the adversarial mandate whenever they conflict):
+- Every finding MUST cite specific code evidence: exact line numbers, API calls, variable names, or patterns. Findings without concrete evidence MUST be discarded — no exceptions.
 - Do NOT flag the absence of a feature or pattern unless you can identify the specific code location where it SHOULD have been implemented and explain WHY it is required for THIS code.
 - Speculative, hypothetical, or "just in case" findings erode developer trust. Only flag issues you are confident exist in the actual code.
 - Prefer fewer, high-confidence findings over many uncertain ones. Quality of findings matters more than quantity.
 - If the code is genuinely well-written with no real issues, reporting ZERO findings is the correct and expected behavior. Do not manufacture findings to avoid an empty report.
-- Clean, well-structured code exists. Acknowledge it by not forcing false issues.`;
+- Clean, well-structured code exists. Acknowledge it by not forcing false issues.
+- RECOGNIZE SECURE PATTERNS: Code using established security libraries and patterns (e.g. helmet, bcrypt/argon2, parameterized queries, input validation, CSRF tokens, rate limiters, proper TLS) is correctly implementing security. Do NOT flag these as insufficient or suggest alternatives unless a concrete vulnerability exists.
+- SCOPE LIMITATION: Only evaluate code that is actually present. Do NOT flag missing features, tests, logging, documentation, error handling, or infrastructure that may exist in other files. Evaluate what IS provided, not what COULD be elsewhere.
+- CONFIDENCE THRESHOLD: Only report findings where you are highly confident (≥80%) that a real, exploitable issue or concrete deficiency exists in the provided code. When in doubt, do NOT report.
+- FALSE POSITIVE COST: A false positive is MORE harmful than a missed finding. False positives erode developer trust and cause real issues to be ignored. When uncertain, silence is better than a questionable finding.`;
 
 // ─── Criteria Extraction ─────────────────────────────────────────────────────
 
@@ -85,8 +89,9 @@ export function getCondensedCriteria(systemPrompt: string): string {
  */
 export function registerPrompts(server: McpServer): void {
   // ── Per-judge prompts ──────────────────────────────────────────────────
-  // Each prompt includes the judge's full systemPrompt + precision mandate
-  // so the LLM has complete evaluation criteria for single-judge reviews.
+  // Each prompt uses condensed criteria (adversarial mandate stripped) plus
+  // the shared mandates, mirroring the tribunal architecture for consistency
+  // and better precision on clean code.
   for (const judge of JUDGES) {
     server.prompt(
       `judge-${judge.id}`,
@@ -97,11 +102,16 @@ export function registerPrompts(server: McpServer): void {
         context: z.string().optional().describe("Additional context about the code"),
       },
       async ({ code, language, context }) => {
+        const persona = judge.systemPrompt.substring(0, judge.systemPrompt.indexOf("\n\n"));
+        const criteria = getCondensedCriteria(judge.systemPrompt);
         const userMessage =
-          `${judge.systemPrompt}\n\n${PRECISION_MANDATE}\n\n` +
+          `${persona}\n\n` +
+          `${SHARED_ADVERSARIAL_MANDATE}\n\n` +
+          `${PRECISION_MANDATE}\n\n` +
+          `${criteria}\n\n` +
           `Please evaluate the following ${language} code:\n\n\`\`\`${language}\n${code}\n\`\`\`` +
           (context ? `\n\nAdditional context: ${context}` : "") +
-          `\n\nProvide your evaluation as structured findings with rule IDs (prefix: ${judge.rulePrefix}-), severity levels (critical/high/medium/low/info), descriptions, and actionable recommendations. End with an overall score (0-100) and verdict (pass/warning/fail).`;
+          `\n\nProvide your evaluation as structured findings with rule IDs (prefix: ${judge.rulePrefix}-), severity levels (critical/high/medium/low/info), descriptions, and actionable recommendations. If no issues meet the confidence threshold, report zero findings explicitly. End with an overall score (0-100) and verdict (pass/warning/fail).`;
 
         return {
           messages: [
@@ -147,6 +157,7 @@ export function registerPrompts(server: McpServer): void {
         `2. Verdict (PASS / WARNING / FAIL)\n` +
         `3. Score (0-100)\n` +
         `4. Specific findings with rule IDs (using each judge's rule prefix), severity, and recommendations\n\n` +
+        `For judges where no issues meet the confidence threshold, report a PASS verdict with zero findings.\n\n` +
         `Then provide an OVERALL TRIBUNAL VERDICT that synthesizes all judges' input.\n\n` +
         `## The Judges\n\n${judgeInstructions}\n\n` +
         `## Code to Evaluate\n\n\`\`\`${language}\n${code}\n\`\`\`` +

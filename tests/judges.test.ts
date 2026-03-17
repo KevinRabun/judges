@@ -121,6 +121,11 @@ describe("Judge Registry", () => {
     assert.equal(JUDGES.length, 45);
   });
 
+  it("registry should be populated via agent loader (no side-effect judge imports)", () => {
+    const src = readFileSync("src/judges/index.ts", "utf-8");
+    assert.ok(!/import\s+"\.\/.+\.js"/g.test(src), "Expected no side-effect judge imports in index.ts");
+  });
+
   it("should allow lookup of every judge by ID", () => {
     for (const judge of JUDGES) {
       const found = getJudge(judge.id);

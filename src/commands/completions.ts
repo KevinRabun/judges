@@ -24,6 +24,8 @@ const COMMANDS = [
   "ci-templates",
   "completions",
   "docs",
+  "skill",
+  "skills",
 ];
 const FORMATS = ["text", "json", "sarif", "markdown", "html", "junit", "codeclimate"];
 const PRESETS = ["strict", "lenient", "security-only", "startup"];
@@ -32,8 +34,22 @@ function getJudgeIds(): string[] {
   return getJudgeSummaries().map((j) => j.id);
 }
 
+function getSkillIds(): string[] {
+  try {
+    const { listSkills } = require("../skill-loader.js") as { listSkills: (dir: string) => { id: string }[] };
+    const { resolve } = require("node:path");
+    const skillsDir = resolve(__dirname, "..", "..", "skills");
+    const skills = listSkills(skillsDir);
+    return skills.map((s) => s.id);
+  } catch {
+    return [];
+  }
+}
+
 function generateBash(): string {
   const judgeIds = getJudgeIds().join(" ");
+  const skillIds = getSkillIds().join(" ");
+  void skillIds; // satisfy lint
   return `# judges shell completions for bash
 # Add to ~/.bashrc: eval "$(judges completions bash)"
 
@@ -47,6 +63,7 @@ _judges_completions() {
   formats="${FORMATS.join(" ")}"
   judges="${judgeIds}"
   presets="${PRESETS.join(" ")}"
+  skills="${skillIds}"
 
   case "\${prev}" in
     judges)
@@ -65,6 +82,10 @@ _judges_completions() {
       COMPREPLY=( $(compgen -W "\${presets}" -- "\${cur}") )
       return 0
       ;;
+    --skill|-S)
+      COMPREPLY=( $(compgen -W "\${skills}" -- "\${cur}") )
+      return 0
+      ;;
     --file|-f|--baseline|-b|--config|--output)
       COMPREPLY=( $(compgen -f -- "\${cur}") )
       return 0
@@ -72,9 +93,9 @@ _judges_completions() {
   esac
 
   if [[ "\${cur}" == -* ]]; then
-    COMPREPLY=( $(compgen -W "--file --language --format --judge --help --fail-on-findings --baseline --summary --apply --preset --config --min-score --no-color --verbose --quiet" -- "\${cur}") )
+    COMPREPLY=( $(compgen -W "--file --language --format --judge --skill --skills-dir --help --fail-on-findings --baseline --summary --apply --preset --config --min-score --no-color --verbose --quiet" -- "\${cur}") )
   else
-    COMPREPLY=( $(compgen -W "\${commands}" -- "\${cur}") )
+    COMPREPLY=( $(compgen -W "\${commands} ${skillIds}" -- "\${cur}") )
   fi
 }
 
@@ -84,6 +105,8 @@ complete -F _judges_completions judges
 
 function generateZsh(): string {
   const judgeIds = getJudgeIds().join(" ");
+  const skillIds = getSkillIds().join(" ");
+  void skillIds;
   return `# judges shell completions for zsh
 # Add to ~/.zshrc: eval "$(judges completions zsh)"
 
@@ -104,6 +127,9 @@ _judges() {
     '-o[Output format]:format:compadd -a formats' \\
     '--judge[Specific judge]:judge:compadd -a judges' \\
     '-j[Specific judge]:judge:compadd -a judges' \\
+    '--skill[Skill id]:skill:compadd -a skills' \\
+    '-S[Skill id]:skill:compadd -a skills' \\
+    '--skills-dir[Skills directory]:skills-dir:_files' \\
     '--preset[Config preset]:preset:compadd -a presets' \\
     '--config[Config file]:config:_files' \\
     '--baseline[Baseline file]:baseline:_files' \\
@@ -125,6 +151,8 @@ compdef _judges judges
 
 function generateFish(): string {
   const judgeIds = getJudgeIds();
+  const skillIds = getSkillIds();
+  void skillIds;
   const lines = [
     "# judges shell completions for fish",
     "# Save to ~/.config/fish/completions/judges.fish",
@@ -140,6 +168,8 @@ function generateFish(): string {
   lines.push("complete -c judges -l language -s l -r -d 'Language override'");
   lines.push(`complete -c judges -l format -s o -r -a '${FORMATS.join(" ")}' -d 'Output format'`);
   lines.push(`complete -c judges -l judge -s j -r -a '${judgeIds.join(" ")}' -d 'Specific judge'`);
+  lines.push(`complete -c judges -l skill -s S -r -a '${skillIds.join(" ")}' -d 'Skill identifier'`);
+  lines.push(`complete -c judges -l skills-dir -rF -d 'Skills directory'`);
   lines.push(`complete -c judges -l preset -r -a '${PRESETS.join(" ")}' -d 'Config preset'`);
   lines.push("complete -c judges -l config -rF -d 'Config file'");
   lines.push("complete -c judges -l baseline -s b -rF -d 'Baseline file'");
@@ -157,6 +187,8 @@ function generateFish(): string {
 
 function generatePowerShell(): string {
   const judgeIds = getJudgeIds();
+  const skillIds = getSkillIds();
+  void skillIds;
   return `# judges shell completions for PowerShell
 # Add to $PROFILE: judges completions powershell | Invoke-Expression
 

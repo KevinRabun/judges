@@ -8,14 +8,17 @@
  * - Prompt construction (mirrors MCP-served prompts exactly)
  * - Scoring logic (same methodology as L1 deterministic benchmark)
  *
- * The actual LLM API calls live in scripts/run-llm-benchmark.ts,
- * keeping the npm package free of LLM API dependencies.
+ * LLM API calling is intentionally kept out of the npm package. Wire this
+ * to your preferred provider in a thin runner script (or use the CLI
+ * command `judges llm-benchmark`). The former helper script
+ * `scripts/run-llm-benchmark.ts` has been removed.
  */
 
 import type { JudgeDefinition } from "../types.js";
 import type { BenchmarkCase, CategoryResult, JudgeBenchmarkResult, DifficultyResult } from "./benchmark.js";
 import { JUDGES } from "../judges/index.js";
 import { getCondensedCriteria, SHARED_ADVERSARIAL_MANDATE, PRECISION_MANDATE } from "../tools/prompts.js";
+import { extractAndValidateLlmFindings, mergeFindings } from "../probabilistic/llm-response-validator.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -87,8 +90,12 @@ export interface LlmCaseResult {
  * Extract unique rule IDs from LLM response text.
  * Matches patterns like CYBER-001, SEC-003, AUTH-001, etc.
  */
+export function getValidRulePrefixes(): Set<string> {
+  return new Set(JUDGES.map((j) => j.rulePrefix));
+}
+
 export function parseLlmRuleIds(response: string): string[] {
-  const validPrefixes = new Set(JUDGES.map((j) => j.rulePrefix));
+  const validPrefixes = getValidRulePrefixes();
   const pattern = /\b([A-Z]{2,})-(\d{3})\b/g;
   const found = new Set<string>();
   let match;
@@ -100,6 +107,17 @@ export function parseLlmRuleIds(response: string): string[] {
   return [...found];
 }
 
+/**
+ * Preferred entrypoint: extract findings from raw LLM text with validation. Falls back to regex rule-id scan.
+ */
+export function extractValidatedLlmFindings(response: string, prefixes?: Set<string>) {
+  const validPrefixes = prefixes ?? getValidRulePrefixes();
+  const primary = extractAndValidateLlmFindings(response, validPrefixes);
+  // Fallback regex scan (for unstructured responses)
+  const fallbackRuleIds = parseLlmRuleIds(response);
+  return mergeFindings(primary, fallbackRuleIds);
+}
+
 // ─── Prompt Construction ────────────────────────────────────────────────────
 // These construct the exact same prompts served via MCP, ensuring the
 // benchmark tests the same prompts real users experience.
@@ -107,35 +125,57 @@ export function parseLlmRuleIds(response: string): string[] {
 
 /**
  * Construct a per-judge prompt — identical to the MCP-served `judge-{id}` prompt.
+ * Uses condensed criteria (adversarial mandate stripped) plus shared mandates,
+ * mirroring the tribunal architecture for consistency and better precision.
  */
-export function constructPerJudgePrompt(judge: JudgeDefinition, code: string, language: string): string {
+export function constructPerJudgePrompt(
+  judge: JudgeDefinition,
+  code: string,
+  language: string,
+  contextSnippets: string[] = [],
+): string {
+  const persona = judge.systemPrompt.substring(0, judge.systemPrompt.indexOf("\n\n"));
+  const criteria = getCondensedCriteria(judge.systemPrompt);
+  const contextSection = contextSnippets.length
+    ? `## Repository Context\n\n${contextSnippets.map((s) => `- ${s.replace(/\n/g, " ")}`).join("\n")}\n\n`
+    : "";
   return (
-    `${judge.systemPrompt}\n\n${PRECISION_MANDATE}\n\n` +
+    `${persona}\n\n` +
+    `${SHARED_ADVERSARIAL_MANDATE}\n\n` +
+    `${PRECISION_MANDATE}\n\n` +
+    contextSection +
+    `${criteria}\n\n` +
     `Please evaluate the following ${language} code:\n\n\`\`\`${language}\n${code}\n\`\`\`` +
-    `\n\nProvide your evaluation as structured findings with rule IDs (prefix: ${judge.rulePrefix}-), severity levels (critical/high/medium/low/info), descriptions, and actionable recommendations. End with an overall score (0-100) and verdict (pass/warning/fail).`
+    `\n\nProvide your evaluation as structured findings with rule IDs (prefix: ${judge.rulePrefix}-), severity levels (critical/high/medium/low/info), descriptions, and actionable recommendations. If no issues meet the confidence threshold, report zero findings explicitly. End with an overall score (0-100) and verdict (pass/warning/fail).`
   );
 }
 
 /**
  * Construct the full-tribunal prompt — identical to the MCP-served `full-tribunal` prompt.
  */
-export function constructTribunalPrompt(code: string, language: string): string {
+export function constructTribunalPrompt(code: string, language: string, contextSnippets: string[] = []): string {
   const judgeInstructions = JUDGES.map(
     (j) =>
       `### ${j.name} — ${j.domain}\n**Rule prefix:** \`${j.rulePrefix}-\`\n\n${getCondensedCriteria(j.systemPrompt)}`,
   ).join("\n\n---\n\n");
+
+  const contextSection = contextSnippets.length
+    ? `## Repository Context\n\n${contextSnippets.map((s) => `- ${s.replace(/\n/g, " ")}`).join("\n")}\n\n`
+    : "";
 
   return (
     `You are the Judges Panel — a panel of ${JUDGES.length} expert judges who independently evaluate code for quality, security, and operational readiness.\n\n` +
     `## Universal Evaluation Directives\n\n` +
     `${SHARED_ADVERSARIAL_MANDATE}\n\n` +
     `${PRECISION_MANDATE}\n\n` +
+    contextSection +
     `## Evaluation Instructions\n\n` +
     `Evaluate the following ${language} code from the perspective of ALL ${JUDGES.length} judges below. For each judge, provide:\n` +
     `1. Judge name and domain\n` +
     `2. Verdict (PASS / WARNING / FAIL)\n` +
     `3. Score (0-100)\n` +
     `4. Specific findings with rule IDs (using each judge's rule prefix), severity, and recommendations\n\n` +
+    `For judges where no issues meet the confidence threshold, report a PASS verdict with zero findings.\n\n` +
     `Then provide an OVERALL TRIBUNAL VERDICT that synthesizes all judges' input.\n\n` +
     `## The Judges\n\n${judgeInstructions}\n\n` +
     `## Code to Evaluate\n\n\`\`\`${language}\n${code}\n\`\`\``
@@ -215,7 +255,6 @@ export function scoreLlmCase(
   rawResponse: string,
   tokensUsed?: number,
 ): LlmCaseResult {
-  const _expectedPrefixes = new Set(tc.expectedRuleIds.map((r) => r.split("-")[0]));
   const detectedPrefixes = new Set(detectedRuleIds.map((r) => r.split("-")[0]));
 
   const matchedExpected = tc.expectedRuleIds.filter((expected) => {

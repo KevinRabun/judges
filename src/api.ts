@@ -155,6 +155,29 @@ export type { CustomRule, JudgesPlugin, PluginRegistration } from "./plugins.js"
 // ─── Judge Registry ──────────────────────────────────────────────────────────
 export { JudgeRegistry, defaultRegistry } from "./judge-registry.js";
 
+// ─── Agent Markdown Loader ───────────────────────────────────────────────────
+export {
+  parseFrontmatter,
+  validateFrontmatter,
+  parseAgentFile,
+  resolveEvaluator,
+  agentToJudgeDefinition,
+  loadAgentDirectory,
+  loadAndRegisterAgents,
+} from "./agent-loader.js";
+export type { AgentFrontmatter, ParsedAgent } from "./agent-loader.js";
+
+// ─── Skill Loader ───────────────────────────────────────────────────────────
+export {
+  parseSkillFrontmatter,
+  validateSkillFrontmatter,
+  parseSkillFile,
+  loadSkillDirectory,
+  listSkills,
+  runSkill,
+} from "./skill-loader.js";
+export type { SkillFrontmatter, ParsedSkill } from "./skill-loader.js";
+
 // ─── AI Code Fingerprinting ─────────────────────────────────────────────────
 export { fingerprintCode, fingerprintToFindings } from "./fingerprint.js";
 export type { AiFingerprint, AiSignal } from "./fingerprint.js";
@@ -262,8 +285,16 @@ export {
   computeLlmMetrics,
   formatLlmSnapshotMarkdown,
   formatLayerComparisonMarkdown,
+  extractValidatedLlmFindings,
+  getValidRulePrefixes,
 } from "./commands/llm-benchmark.js";
 export type { LlmBenchmarkSnapshot, LlmCaseResult } from "./commands/llm-benchmark.js";
+export type { LlmFinding, ValidationResult } from "./probabilistic/llm-response-validator.js";
+
+// Review autopilot (GitHub App / scripts)
+export { runReviewAutopilot, dedupeComments, filterAlreadyPostedComments } from "./commands/review.js";
+export { buildContextSnippets } from "./context/context-snippets.js";
+export { EmbeddingCache, FallbackEmbeddingProvider, getOrCreateEmbedding } from "./context/embedding-cache.js";
 
 // ─── Config Sharing & Policy ─────────────────────────────────────────────────
 export {

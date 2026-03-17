@@ -171,6 +171,43 @@ export function applyPatches(
   return { result: lines.join("\n"), applied, skipped, overlapped };
 }
 
+/**
+ * Generate a unified diff for a single patch candidate. Useful for git apply fallback.
+ */
+export function toUnifiedDiff(filePath: string, patch: Patch): string {
+  const header = `--- a/${filePath}\n+++ b/${filePath}`;
+  const hunkHeader = `@@ -${patch.startLine},${patch.endLine - patch.startLine + 1} +${patch.startLine},${patch.endLine - patch.startLine + 1} @@`;
+  const oldLines = patch.oldText.split(/\r?\n/).map((l) => `-${l}`);
+  const newLines = patch.newText.split(/\r?\n/).map((l) => `+${l}`);
+  return [header, hunkHeader, ...oldLines, ...newLines].join("\n") + "\n";
+}
+
+/**
+ * Try to apply a patch via `git apply` (with 3-way merge) as a fallback when direct text replacement fails.
+ */
+export function tryGitApply(filePath: string, patch: Patch): boolean {
+  try {
+    const diff = toUnifiedDiff(filePath, patch);
+    const { execFileSync } = require("node:child_process");
+    const { tmpdir } = require("node:os");
+    const { writeFileSync, unlinkSync } = require("node:fs");
+    const tmp = require("node:path").join(tmpdir(), `.judges-patch-${Date.now()}.diff`);
+    writeFileSync(tmp, diff, "utf-8");
+    try {
+      execFileSync("git", ["apply", "--3way", "--reject", tmp], { stdio: "ignore" });
+      return true;
+    } finally {
+      try {
+        unlinkSync(tmp);
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    return false;
+  }
+}
+
 // ─── Multi-File Patch Coordination ──────────────────────────────────────────
 
 /** A group of patches scoped to a single file within a cross-file fix set. */
@@ -234,7 +271,7 @@ export function collectPatchSet(findings: Finding[], defaultPath: string, fileMa
  */
 export function applyPatchSet(
   patchSet: PatchSet,
-  options: { apply?: boolean; filter?: PatchFilter; basePath?: string } = {},
+  options: { apply?: boolean; filter?: PatchFilter; basePath?: string; gitApplyFallback?: boolean } = {},
 ): PatchSetResult {
   const results: PatchSetResult = {
     files: [],
@@ -275,6 +312,17 @@ export function applyPatchSet(
       writeFileSync(absPath, result, "utf-8");
     }
 
+    // If we skipped patches due to mismatched context, optionally try git apply fallback
+    if (options.apply && skipped > 0 && options.gitApplyFallback) {
+      for (const p of patches) {
+        const ok = tryGitApply(group.filePath, p.patch);
+        if (ok) {
+          results.totalApplied++;
+          results.totalSkipped = Math.max(0, results.totalSkipped - 1);
+        }
+      }
+    }
+
     results.files.push({ filePath: group.filePath, applied, skipped, overlapped });
     results.totalApplied += applied;
     results.totalSkipped += skipped;
@@ -294,6 +342,7 @@ interface FixArgs {
   severity: string | undefined;
   lines: string | undefined;
   apply: boolean;
+  gitApplyFallback?: boolean;
 }
 
 export function parseFixArgs(argv: string[]): FixArgs {
@@ -305,6 +354,7 @@ export function parseFixArgs(argv: string[]): FixArgs {
     severity: undefined,
     lines: undefined,
     apply: false,
+    gitApplyFallback: false,
   };
 
   for (let i = 3; i < argv.length; i++) {
@@ -314,6 +364,9 @@ export function parseFixArgs(argv: string[]): FixArgs {
       case "--apply":
       case "-a":
         args.apply = true;
+        break;
+      case "--git-apply":
+        args.gitApplyFallback = true;
         break;
       case "--language":
       case "-l":

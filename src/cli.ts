@@ -35,6 +35,7 @@ import {
   formatVerdictAsMarkdown,
   formatEvaluationAsMarkdown,
 } from "./evaluators/index.js";
+import { runSkill } from "./skill-loader.js";
 import { getJudge, getJudgeSummaries } from "./judges/index.js";
 import { verdictToSarif } from "./formatters/sarif.js";
 import { verdictToHtml } from "./formatters/html.js";
@@ -128,6 +129,8 @@ interface CliArgs {
   trace: boolean;
   incremental: boolean;
   noCache: boolean;
+  skill?: string;
+  skillsDir?: string;
 }
 
 function parseCliArgs(argv: string[]): CliArgs {
@@ -158,6 +161,8 @@ function parseCliArgs(argv: string[]): CliArgs {
     trace: false,
     incremental: false,
     noCache: false,
+    skill: undefined,
+    skillsDir: undefined,
   };
 
   // First non-flag arg is the command
@@ -185,6 +190,14 @@ function parseCliArgs(argv: string[]): CliArgs {
       case "--judge":
       case "-j":
         args.judge = argv[++i];
+        break;
+      case "--skill":
+      case "-S":
+        args.skill = argv[++i];
+        if (!args.command) args.command = "skill";
+        break;
+      case "--skills-dir":
+        args.skillsDir = argv[++i];
         break;
       case "--help":
       case "-h":
@@ -256,6 +269,11 @@ function parseCliArgs(argv: string[]): CliArgs {
         args.noCache = true;
         break;
       default:
+        // Positional skill id support: `judges skill ai-code-review --file src/app.ts`
+        if (args.command === "skill" && !arg.startsWith("-") && !args.skill) {
+          args.skill = arg;
+          break;
+        }
         // If it looks like a file path (not a flag), treat as --file
         if (!arg.startsWith("-") && !args.file) {
           args.file = arg;
@@ -285,6 +303,8 @@ function printHelp(): void {
     ["judges watch <path>", "Watch files and re-evaluate on save"],
     ["judges lsp", "Start LSP server for editor integration"],
     ["judges report <dir>", "Generate project-level report"],
+    ["judges skill <skill-id> [--file <path>]", "Run an agentic skill workflow"],
+    ["judges skills", "List available skills"],
     ["judges hook install", "Install pre-commit git hook"],
     ["judges diff", "Evaluate only changed lines from a diff"],
     ["judges deps [dir]", "Analyze dependencies for supply-chain risks"],
@@ -778,6 +798,48 @@ export async function runCli(argv: string[]): Promise<void> {
   if (args.help || (!args.command && !args.file)) {
     printHelp();
     process.exit(0);
+  }
+
+  // ─── Skill Command ─────────────────────────────────────────────────────
+  if (args.command === "skills" || args.command === "skills:list") {
+    const { listSkills } = await import("./skill-loader.js");
+    const skillsDir = args.skillsDir || resolve(fileURLToPath(import.meta.url), "..", "..", "skills");
+    const skills = listSkills(skillsDir);
+    // Pretty print
+    const rows = skills.map((s) => ({
+      id: s.id,
+      name: s.name,
+      tags: (s.tags || []).join(", "),
+      agents: s.agents.join(", "),
+      description: s.description,
+    }));
+    console.table(rows);
+    return;
+  }
+
+  if (args.command === "skill") {
+    const skillId = args.skill || args.judge; // allow --skill or --judge alias
+    if (!skillId) {
+      console.error("Missing skill id. Usage: judges skill <skill-id> --file <path>");
+      process.exit(1);
+    }
+
+    const code = args.file ? readFileSync(args.file, "utf-8") : readFileSync(0, "utf-8");
+
+    const language = args.language || detectLanguage(args.file);
+    if (!language) {
+      console.error("Unable to detect language. Provide --language.");
+      process.exit(1);
+    }
+
+    const verdict = await runSkill(skillId, code, language, { skillsDir: args.skillsDir });
+    if (args.format === "json") {
+      console.log(JSON.stringify(verdict, null, 2));
+    } else {
+      const markdown = formatVerdictAsMarkdown(verdict);
+      console.log(markdown);
+    }
+    return;
   }
 
   // ─── Init Command ──────────────────────────────────────────────────────

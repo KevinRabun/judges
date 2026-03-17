@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: CI
 
 on:
@@ -20,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: actionlint
-        uses: rhysd/actionlint@v1.7.11
+        uses: docker://rhysd/actionlint:1.7.0
 
   build-and-test:
     runs-on: ubuntu-latest
@@ -57,6 +58,16 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          CI: true
+
+      - name: Judges eval (SARIF)
+        run: npx judges eval --format sarif --output artifacts/judges.sarif --min-severity=medium || true
+        env:
+          CI: true
+
+      - name: Judges severity gate
+        run: npx judges ai-gate --sarif artifacts/judges.sarif --max-severity high
         env:
           CI: true
 

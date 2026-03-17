@@ -150,6 +150,46 @@ export function activate(context: vscode.ExtensionContext): void {
       );
     }),
 
+    // ─── Skills Quick Pick ────────────────────────────────────────────────
+    vscode.commands.registerCommand("judges.skills.quickPick", async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        vscode.window.showWarningMessage("Judges: Open a file to run a skill.");
+        return;
+      }
+      const doc = editor.document;
+      const code = doc.getText();
+      const lang = doc.languageId || "plaintext";
+
+      // Lazy import to avoid bundling issues
+      const judgesApi = await import("@kevinrabun/judges");
+      const skills = judgesApi.listSkills?.(require("node:path").join(__dirname, "..", "skills")) || [];
+      if (!skills.length) {
+        vscode.window.showWarningMessage("Judges: No skills found. Ensure the skills/ directory exists.");
+        return;
+      }
+      const pick = await vscode.window.showQuickPick(
+        skills.map((s: any) => ({
+          label: s.name || s.id,
+          description: s.id,
+          detail: s.description,
+          skill: s.id,
+        })),
+        { placeHolder: "Select a Judges skill to run" },
+      );
+      if (!pick) return;
+      const verdict = await judgesApi.runSkill?.(pick.skill, code, lang);
+      if (!verdict) {
+        vscode.window.showWarningMessage(`Judges skill '${pick.skill}' returned no verdict.`);
+        return;
+      }
+      // Render to output channel
+      const out = vscode.window.createOutputChannel("Judges Skills");
+      out.show(true);
+      out.appendLine(`# Skill: ${pick.skill}`);
+      out.appendLine(JSON.stringify(verdict, null, 2));
+    }),
+
     vscode.commands.registerCommand("judges.deepReview", async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {

@@ -1,78 +1,66 @@
 /**
- * Judge barrel — side-effect imports trigger self-registration with the
- * unified JudgeRegistry. Each judge file imports its own evaluator and
- * calls `defaultRegistry.register()`, so this file just needs to import
- * each module for its side effects.
+ * Judge registry bootstrap (agent-native).
  *
- * To add a new built-in judge:
- *   1. Create `src/judges/my-judge.ts` (with self-registration)
- *   2. Create `src/evaluators/my-judge.ts` (analyzer)
- *   3. Add a side-effect import here: `import "./my-judge.js";`
+ * Judges are now sourced from `.judge.md` files in the `agents/` folder (legacy
+ * `.agent.md` still supported). Each agent frontmatter references an evaluator
+ * script (in `src/evaluators/`), and the agent loader registers them with the
+ * unified `JudgeRegistry`.
+ *
+ * Legacy side-effect imports have been removed. If you need to add a judge, add
+ * an agent file and (optionally) an evaluator script, then run:
+ *   - `npm run generate:agents` (to sync)
+ *   - `npm run validate:agents`
  */
 
 import type { JudgeDefinition } from "../types.js";
 import { defaultRegistry } from "../judge-registry.js";
+import { loadAndRegisterAgents } from "../agent-loader.js";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-// ─── Side-effect imports — each judge self-registers on import ───────────────
-import "./data-security.js";
-import "./cybersecurity.js";
-import "./cost-effectiveness.js";
-import "./scalability.js";
-import "./cloud-readiness.js";
-import "./software-practices.js";
-import "./accessibility.js";
-import "./api-design.js";
-import "./reliability.js";
-import "./observability.js";
-import "./performance.js";
-import "./compliance.js";
-import "./data-sovereignty.js";
-import "./testing.js";
-import "./documentation.js";
-import "./internationalization.js";
-import "./dependency-health.js";
-import "./concurrency.js";
-import "./ethics-bias.js";
-import "./maintainability.js";
-import "./error-handling.js";
-import "./authentication.js";
-import "./database.js";
-import "./caching.js";
-import "./configuration-management.js";
-import "./backwards-compatibility.js";
-import "./portability.js";
-import "./ux.js";
-import "./logging-privacy.js";
-import "./rate-limiting.js";
-import "./ci-cd.js";
-import "./code-structure.js";
-import "./agent-instructions.js";
-import "./ai-code-safety.js";
-import "./framework-safety.js";
-import "./iac-security.js";
-import "./security.js";
-import "./hallucination-detection.js";
-import "./intent-alignment.js";
-import "./api-contract.js";
-import "./multi-turn-coherence.js";
-import "./model-fingerprint.js";
-import "./over-engineering.js";
-import "./logic-review.js";
-import "./false-positive-review.js";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+let agentsLoaded = false;
+
+function loadDefaultAgents() {
+  if (agentsLoaded) return;
+  const agentsDir = resolve(__dirname, "..", "..", "agents");
+  loadAndRegisterAgents(agentsDir, defaultRegistry);
+  agentsLoaded = true;
+}
+
+// ─── Optional Agent Loader Integration ──────────────────────────────────────
+/**
+ * Load judges (agent-native). Loads agents from the default `agents/` folder
+ * and returns the current registry snapshot.
+ */
+export async function loadJudges(): Promise<JudgeDefinition[]> {
+  loadDefaultAgents();
+  return defaultRegistry.getJudges();
+}
+
+/**
+ * Load agent-based judges from a directory of `.judge.md` files (legacy
+ * `.agent.md` supported). This enables hybrid operation where file-based
+ * agents can augment or replace built-in judges. If a judge is already
+ * registered, it is skipped.
+ */
+export function loadAgentJudges(dir: string = resolve(__dirname, "..", "..", "agents")): number {
+  agentsLoaded = false; // allow re-run to pick up new agents if dir changes
+  const count = loadAndRegisterAgents(dir, defaultRegistry);
+  agentsLoaded = true;
+  return count;
+}
 
 // ─── Re-exports backed by the registry ──────────────────────────────────────
 
 /**
- * The panel of judges that comprise the Judges Panel.
- *
- * Each judge is a specialized evaluator with deep expertise in a single domain.
- * They operate independently and produce structured findings with
- * severity-rated, actionable recommendations.
- *
- * Note: this snapshot is taken at module-load time, after all built-in judges
- * have self-registered via the side-effect imports above.
+ * Snapshot of the currently registered judges. (Agent-native)
  */
-export const JUDGES: JudgeDefinition[] = defaultRegistry.getJudges();
+export const JUDGES: JudgeDefinition[] = (() => {
+  loadDefaultAgents();
+  return defaultRegistry.getJudges();
+})();
 
 /**
  * Look up a judge by ID.

@@ -1,0 +1,37 @@
+trigger:
+  - main
+
+pr:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - checkout: self
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '22.x'
+  - script: npm ci
+    displayName: Install dependencies
+
+  - script: |
+      npx judges eval --format sarif --output $(Build.SourcesDirectory)/artifacts/judges.sarif --min-severity=medium || true
+    displayName: Run Judges (deterministic)
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.SourcesDirectory)/artifacts'
+      ArtifactName: 'judges'
+
+  - script: |
+      npx judges ai-gate --sarif $(Build.SourcesDirectory)/artifacts/judges.sarif --max-severity high
+    displayName: Enforce severity gate
+
+  - script: |
+      if [ -n "${OPENAI_API_KEY}" ]; then
+        npx judges review --pr $(System.PullRequest.PullRequestNumber) --llm-deep-review --dry-run || true
+      fi
+    displayName: Optional LLM Deep Review
+    env:
+      OPENAI_API_KEY: $(OPENAI_API_KEY)

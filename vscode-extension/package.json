@@ -2,7 +2,7 @@
   "name": "judges-panel",
   "displayName": "Judges Panel",
   "description": "45 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.113.0",
+  "version": "3.114.0",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -80,6 +80,7 @@
         "contents": "Save a file to run 45 judges automatically, or click below.\n[Evaluate Current File](command:judges.evaluateFile)\n[Evaluate Workspace](command:judges.evaluateWorkspace)\n[Open @judges Chat](command:workbench.action.chat.open)"
       }
     ],
+
     "commands": [
       {
         "command": "judges.evaluateFile",
@@ -99,6 +100,12 @@
         "command": "judges.fixFile",
         "title": "Judges: Auto-Fix Current File",
         "icon": "$(wrench)"
+      },
+      {
+        "command": "judges.skills.quickPick",
+        "title": "Judges: Run Skill (Quick Pick)",
+        "category": "Judges",
+        "icon": "$(lightbulb)"
       },
       {
         "command": "judges.fixAll",
@@ -349,8 +356,72 @@
           "default": [],
           "items": { "type": "string" },
           "description": "Glob patterns to include only matching files in workspace evaluation."
+        },        "judges.llmBenchmark.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable LLM benchmark runner (disabled by default to protect extension host memory). Env override: JUDGES_LLM_BENCHMARK_ENABLED=true"
         },
-        "judges.maxFiles": {
+        "judges.llmBenchmark.sampleSize": {
+          "type": "number",
+          "default": 32,
+          "minimum": 1,
+          "description": "Number of stratified benchmark cases to run for LLM benchmark. Set env JUDGES_LLM_BENCHMARK_SAMPLE_SIZE to override at runtime."
+        },
+        "judges.llmBenchmark.maxOutputTokens": {
+          "type": "number",
+          "default": 1024,
+          "minimum": 128,
+          "description": "Maximum output tokens requested per LLM call. Env override: JUDGES_LLM_BENCHMARK_MAX_OUTPUT_TOKENS. Lowering reduces memory/latency."
+        },
+        "judges.llmBenchmark.concurrency": {
+          "type": "number",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 2,
+          "description": "Parallel LLM requests. 1 strongly recommended to avoid stream leaks. Env override: JUDGES_LLM_BENCHMARK_CONCURRENCY."
+        },
+        "judges.llmBenchmark.interRequestDelayMs": {
+          "type": "number",
+          "default": 500,
+          "minimum": 0,
+          "description": "Delay between sequential LLM requests to avoid throttling. Env override: JUDGES_LLM_BENCHMARK_INTER_DELAY_MS."
+        },
+        "judges.llmBenchmark.maxRetries": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "description": "Retries for empty/error responses. Env override: JUDGES_LLM_BENCHMARK_MAX_RETRIES."
+        },
+        "judges.llmBenchmark.retryBaseDelayMs": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 0,
+          "description": "Base delay for exponential backoff (ms). Env override: JUDGES_LLM_BENCHMARK_RETRY_BASE_MS."
+        },
+        "judges.llmBenchmark.maxConsecutiveEmpty": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "description": "Abort if this many consecutive LLM calls return empty. Env override: JUDGES_LLM_BENCHMARK_MAX_EMPTY."
+        },
+        "judges.llmBenchmark.responseSnapshotChars": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 128,
+          "description": "Truncate stored raw LLM responses to this many characters to reduce memory. Env override: JUDGES_LLM_BENCHMARK_RESPONSE_SNAPSHOT_CHARS."
+        },
+        "judges.llmBenchmark.maxHeapMb": {
+          "type": "number",
+          "default": 1024,
+          "minimum": 256,
+          "description": "Soft heap guard (MB). Benchmark aborts if heapUsed exceeds this. Env override: JUDGES_LLM_BENCHMARK_MAX_HEAP_MB."
+        },
+        "judges.llmBenchmark.logMemoryEvery": {
+          "type": "number",
+          "default": 20,
+          "minimum": 1,
+          "description": "Log memory stats every N LLM calls. Env override: JUDGES_LLM_BENCHMARK_LOG_MEMORY_EVERY."
+        },        "judges.maxFiles": {
           "type": "number",
           "default": 50,
           "description": "Maximum number of files to evaluate in workspace mode."
@@ -497,7 +568,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@kevinrabun/judges": "^3.113.0"
+    "@kevinrabun/judges": "^3.114.0"
   },
   "overrides": {
     "yauzl": "^3.2.1"

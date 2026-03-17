@@ -154,6 +154,15 @@ judges eval --min-score 80 src/api.ts
 # One-line summary for scripts
 judges eval --summary src/api.ts
 
+# Agentic skills (orchestrated judge sets)
+judges skill ai-code-review --file src/app.ts
+judges skill security-review --file src/api.ts --format json
+judges skill release-gate --file src/app.ts
+judges skills   # list available skills
+
+> Full catalog: [`docs/skills.md`](docs/skills.md)
+
+
 # List all 45 judges
 judges list
 ```

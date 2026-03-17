@@ -7,8 +7,9 @@
  */
 
 import * as vscode from "vscode";
+import process from "node:process";
 import { JUDGES, BENCHMARK_CASES } from "@kevinrabun/judges/api";
-import type { BenchmarkCase, JudgeDefinition } from "@kevinrabun/judges/api";
+import type { BenchmarkCase, JudgeDefinition, LlmBenchmarkSnapshot, LlmCaseResult } from "@kevinrabun/judges/api";
 import {
   parseLlmRuleIds,
   scoreLlmCase,
@@ -16,8 +17,9 @@ import {
   constructPerJudgePrompt,
   constructTribunalPrompt,
   selectStratifiedSample,
+  extractValidatedLlmFindings,
+  getValidRulePrefixes,
 } from "@kevinrabun/judges/api";
-import type { LlmBenchmarkSnapshot, LlmCaseResult } from "@kevinrabun/judges/api";
 import { formatStandaloneBenchmarkReport } from "./llm-benchmark-format";
 
 // ─── Output Channel ─────────────────────────────────────────────────────────
@@ -32,6 +34,16 @@ function log(msg: string): void {
   }
   const ts = new Date().toISOString().slice(11, 19);
   _outputChannel.appendLine(`[${ts}] ${msg}`);
+}
+
+// Throttle UI log spam to avoid listener growth in VS Code chat widgets
+const logThrottles = new Map<string, number>();
+function logOnce(key: string, msg: string, windowMs = 30_000): void {
+  const now = Date.now();
+  const last = logThrottles.get(key) ?? 0;
+  if (now - last < windowMs) return;
+  logThrottles.set(key, now);
+  log(msg);
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -71,6 +83,8 @@ interface BenchmarkCheckpoint {
   modelName: string;
   provider: string;
   sampleCaseIds: string[];
+  /** snapshot of config used for this run to guard resume correctness */
+  config?: Partial<BenchmarkConfig> & { sampleSize?: number; maxOutputTokens?: number; concurrency?: number };
   startTime: number;
   phase: "per-judge" | "tribunal" | "complete";
   perJudgeEntries: PerJudgeEntry[];
@@ -126,6 +140,12 @@ async function deleteCheckpoint(): Promise<void> {
 
 async function resolveModel(token: vscode.CancellationToken): Promise<vscode.LanguageModelChat> {
   const models = await vscode.lm.selectChatModels();
+  // Defensive: dispose any lingering handles to avoid listener accumulation
+  try {
+    vscode.lm.onDidChangeSelectedChatModel(() => undefined).dispose?.();
+  } catch {
+    /* ignore */
+  }
   if (models.length === 0) {
     throw new Error(
       "No language model available. Make sure you have a Copilot subscription " + "and a model selected in VS Code.",
@@ -147,9 +167,160 @@ function selectRelevantJudges(tc: BenchmarkCase): JudgeDefinition[] {
     return [...JUDGES];
   }
 
-  const expectedPrefixes = new Set(tc.expectedRuleIds.map((r) => r.split("-")[0]));
+  const expectedPrefixes = new Set(tc.expectedRuleIds.map((r: string) => r.split("-")[0]));
 
-  return JUDGES.filter((j) => expectedPrefixes.has(j.rulePrefix));
+  return JUDGES.filter((j: JudgeDefinition) => expectedPrefixes.has(j.rulePrefix));
+}
+
+// ─── Configuration ──────────────────────────────────────────────────────────
+
+interface BenchmarkConfig {
+  sampleSize: number;
+  /** max tokens requested per call (output side) */
+  maxOutputTokens: number;
+  /** number of parallel LLM requests (1 recommended for streaming stability) */
+  concurrency: number;
+  /**
+   * Optional guard to completely disable benchmark runs in CI/unstable hosts.
+   * Allows VS Code settings to set to false to skip wiring UI commands.
+   */
+  enabled: boolean;
+
+  /** delay between sequential requests to avoid throttling */
+  interRequestDelayMs: number;
+  /** retries for empty responses */
+  maxRetries: number;
+  retryBaseDelayMs: number;
+  /** abort after N consecutive empty responses */
+  maxConsecutiveEmpty: number;
+  /** truncate raw response snapshots to this many chars to limit memory */
+  responseSnapshotChars: number;
+  /** abort if heap exceeds this many MB (soft guard) */
+  maxHeapMb: number;
+  /** log memory every N calls */
+  logMemoryEvery: number;
+}
+
+const DEFAULT_CONFIG: BenchmarkConfig = {
+  enabled: false, // default disabled to protect users; enable via settings/env explicitly
+  sampleSize: 32, // was 64; lower default for safety
+  maxOutputTokens: 1024, // was 2048
+  concurrency: 1,
+  interRequestDelayMs: 500,
+  maxRetries: 2,
+  retryBaseDelayMs: 2000,
+  maxConsecutiveEmpty: 5,
+  responseSnapshotChars: 1000,
+  maxHeapMb: 1024, // ~1GiB guard for extension host; previously 1536
+  logMemoryEvery: 20,
+};
+
+function readEnvInt(raw: string | undefined): number | undefined {
+  if (!raw) return undefined;
+  const v = Number(raw);
+  return Number.isFinite(v) ? v : undefined;
+}
+
+function getBenchmarkConfig(): BenchmarkConfig {
+  const cfg = vscode.workspace.getConfiguration("judges");
+  // Settings override defaults
+  const envEnabled = (process.env.JUDGES_LLM_BENCHMARK_ENABLED ?? "").toLowerCase() === "true";
+  const settingEnabled = cfg.get<boolean>("llmBenchmark.enabled");
+  const enabled = envEnabled || (settingEnabled ?? DEFAULT_CONFIG.enabled);
+  const sampleSize =
+    readEnvInt(process.env.JUDGES_LLM_BENCHMARK_SAMPLE_SIZE) ??
+    cfg.get<number>("llmBenchmark.sampleSize") ??
+    DEFAULT_CONFIG.sampleSize;
+  const maxOutputTokens =
+    readEnvInt(process.env.JUDGES_LLM_BENCHMARK_MAX_OUTPUT_TOKENS) ??
+    cfg.get<number>("llmBenchmark.maxOutputTokens") ??
+    DEFAULT_CONFIG.maxOutputTokens;
+  const concurrency =
+    readEnvInt(process.env.JUDGES_LLM_BENCHMARK_CONCURRENCY) ??
+    cfg.get<number>("llmBenchmark.concurrency") ??
+    DEFAULT_CONFIG.concurrency;
+  const interRequestDelayMs =
+    readEnvInt(process.env.JUDGES_LLM_BENCHMARK_INTER_DELAY_MS) ??
+    cfg.get<number>("llmBenchmark.interRequestDelayMs") ??
+    DEFAULT_CONFIG.interRequestDelayMs;
+  const maxRetries =
+    readEnvInt(process.env.JUDGES_LLM_BENCHMARK_MAX_RETRIES) ??
+    cfg.get<number>("llmBenchmark.maxRetries") ??
+    DEFAULT_CONFIG.maxRetries;
+  const retryBaseDelayMs =
+    readEnvInt(process.env.JUDGES_LLM_BENCHMARK_RETRY_BASE_MS) ??
+    cfg.get<number>("llmBenchmark.retryBaseDelayMs") ??
+    DEFAULT_CONFIG.retryBaseDelayMs;
+  const maxConsecutiveEmpty =
+    readEnvInt(process.env.JUDGES_LLM_BENCHMARK_MAX_EMPTY) ??
+    cfg.get<number>("llmBenchmark.maxConsecutiveEmpty") ??
+    DEFAULT_CONFIG.maxConsecutiveEmpty;
+  const responseSnapshotChars =
+    readEnvInt(process.env.JUDGES_LLM_BENCHMARK_RESPONSE_SNAPSHOT_CHARS) ??
+    cfg.get<number>("llmBenchmark.responseSnapshotChars") ??
+    DEFAULT_CONFIG.responseSnapshotChars;
+  const maxHeapMb =
+    readEnvInt(process.env.JUDGES_LLM_BENCHMARK_MAX_HEAP_MB) ??
+    cfg.get<number>("llmBenchmark.maxHeapMb") ??
+    DEFAULT_CONFIG.maxHeapMb;
+  const logMemoryEvery =
+    readEnvInt(process.env.JUDGES_LLM_BENCHMARK_LOG_MEMORY_EVERY) ??
+    cfg.get<number>("llmBenchmark.logMemoryEvery") ??
+    DEFAULT_CONFIG.logMemoryEvery;
+
+  return {
+    enabled,
+    sampleSize,
+    maxOutputTokens,
+    concurrency: Math.max(1, concurrency), // guard bad input
+    interRequestDelayMs,
+    maxRetries,
+    retryBaseDelayMs,
+    maxConsecutiveEmpty,
+    responseSnapshotChars,
+    maxHeapMb,
+    logMemoryEvery,
+  } satisfies BenchmarkConfig;
+}
+
+function truncateResponse(response: string, maxChars: number): string {
+  if (response.length <= maxChars) return response;
+  return `${response.slice(0, maxChars)}\n…(truncated ${response.length - maxChars} chars)`;
+}
+
+function logMemory(prefix: string): void {
+  try {
+    const mem = process.memoryUsage();
+    const heapMb = mem.heapUsed / 1024 / 1024;
+    const rssMb = mem.rss / 1024 / 1024;
+    log(`${prefix} | heapUsed=${heapMb.toFixed(1)} MB rss=${rssMb.toFixed(1)} MB`);
+  } catch {
+    /* ignore */
+  }
+}
+
+function enforceHeapGuard(maxHeapMb: number): void {
+  try {
+    const mem = process.memoryUsage();
+    const heapMb = mem.heapUsed / 1024 / 1024;
+    if (heapMb >= maxHeapMb) {
+      throw new Error(
+        `Aborting benchmark: heap usage ${heapMb.toFixed(1)} MB exceeded guard (${maxHeapMb} MB). ` +
+          `Adjust settings via judges.llmBenchmark.maxHeapMb or env JUDGES_LLM_BENCHMARK_MAX_HEAP_MB.`,
+      );
+    }
+  } catch (err) {
+    if (err instanceof Error) throw err;
+  }
+}
+
+function maybeGc(): void {
+  try {
+    // Only works if VS Code ran extension host with --expose-gc (not guaranteed)
+    (globalThis as any).gc?.();
+  } catch {
+    /* ignore */
+  }
 }
 
 // ─── Concurrency Limiter ────────────────────────────────────────────────────
@@ -160,22 +331,34 @@ function selectRelevantJudges(tc: BenchmarkCase): JudgeDefinition[] {
  * reliably support concurrent streaming requests — concurrent calls
  * return empty response streams.
  */
-const DEFAULT_CONCURRENCY = 1;
+const DEFAULT_CONCURRENCY = DEFAULT_CONFIG.concurrency;
 
 /** Delay between sequential LLM requests to avoid rate limiting (ms) */
-const INTER_REQUEST_DELAY_MS = 300;
+const INTER_REQUEST_DELAY_MS = DEFAULT_CONFIG.interRequestDelayMs;
 
 /** Maximum retries for an empty LLM response */
-const MAX_RETRIES = 3;
+const MAX_RETRIES = DEFAULT_CONFIG.maxRetries;
 
 /** Base delay for exponential backoff on retry (ms) */
-const RETRY_BASE_DELAY_MS = 2000;
+const RETRY_BASE_DELAY_MS = DEFAULT_CONFIG.retryBaseDelayMs;
 
 /** Abort the benchmark if this many consecutive calls return empty */
-const MAX_CONSECUTIVE_EMPTY = 10;
+const MAX_CONSECUTIVE_EMPTY = DEFAULT_CONFIG.maxConsecutiveEmpty;
 
 /** Maximum output tokens to request from the model */
-const MAX_OUTPUT_TOKENS = 4096;
+const MAX_OUTPUT_TOKENS = DEFAULT_CONFIG.maxOutputTokens;
+
+/** How many raw response chars to store in memory */
+const MAX_RESPONSE_SNAPSHOT_CHARS = DEFAULT_CONFIG.responseSnapshotChars;
+
+/** Soft heap guard (MB) */
+const DEFAULT_MAX_HEAP_MB = DEFAULT_CONFIG.maxHeapMb;
+
+/** Log memory for every N calls */
+const DEFAULT_LOG_MEMORY_EVERY = DEFAULT_CONFIG.logMemoryEvery;
+
+// Current run config (populated at runtime inside runLlmBenchmark)
+let _config: BenchmarkConfig = DEFAULT_CONFIG;
 
 // ─── Empty Response Tracking ────────────────────────────────────────────────
 
@@ -195,15 +378,19 @@ async function runWithConcurrency<T>(
   const results: T[] = new Array(tasks.length);
   let nextIndex = 0;
 
+  // Cap concurrency to avoid listener thundering herd; safety max = 2
+  const boundedConcurrency = Math.min(Math.max(1, concurrency), 2);
+
   async function worker(): Promise<void> {
     while (!token.isCancellationRequested) {
       const idx = nextIndex++;
       if (idx >= tasks.length) break;
+      enforceHeapGuard(_config.maxHeapMb ?? DEFAULT_MAX_HEAP_MB);
       results[idx] = await tasks[idx]();
     }
   }
 
-  const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, () => worker());
+  const workers = Array.from({ length: Math.min(boundedConcurrency, tasks.length) }, () => worker());
   await Promise.all(workers);
   return results;
 }
@@ -222,22 +409,32 @@ function delay(ms: number): Promise<void> {
 async function healthCheckModel(model: vscode.LanguageModelChat, token: vscode.CancellationToken): Promise<boolean> {
   const messages = [vscode.LanguageModelChatMessage.User("Reply with exactly: HEALTH_OK")];
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     if (token.isCancellationRequested) return false;
+    // Guard in case host is already near OOM
     try {
-      const response = await model.sendRequest(messages, { modelOptions: { max_tokens: 32 } }, token);
+      enforceHeapGuard(_config.maxHeapMb ?? DEFAULT_MAX_HEAP_MB);
+    } catch (err) {
+      logOnce("health-oom", `Health check aborted: ${String((err as Error).message ?? err)}`);
+      return false;
+    }
+    try {
+      const response = await model.sendRequest(messages, { modelOptions: { max_tokens: 16 } }, token);
       let text = "";
       for await (const chunk of response.text) {
         text += chunk;
       }
       if (text.trim().length > 0) {
-        log(`Health check passed (attempt ${attempt + 1}): "${text.trim().slice(0, 80)}"`);
+        logOnce("health-ok", `Health check passed (attempt ${attempt + 1}): "${text.trim().slice(0, 80)}"`);
         return true;
       }
-      log(`Health check: empty response on attempt ${attempt + 1}`);
+      logOnce("health-empty", `Health check: empty response on attempt ${attempt + 1}`);
       await delay(RETRY_BASE_DELAY_MS);
     } catch (error) {
-      log(`Health check error on attempt ${attempt + 1}: ${error instanceof Error ? error.message : String(error)}`);
+      logOnce(
+        "health-error",
+        `Health check error on attempt ${attempt + 1}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       await delay(RETRY_BASE_DELAY_MS);
     }
   }
@@ -252,30 +449,49 @@ async function sendPrompt(
   const messages = [vscode.LanguageModelChatMessage.User(prompt)];
   _totalCalls++;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  // Early guard to avoid entering LLM stream if heap is already high
+  enforceHeapGuard(_config.maxHeapMb ?? DEFAULT_MAX_HEAP_MB);
+
+  const maxRetries = _config.maxRetries ?? MAX_RETRIES;
+  const maxTokens = _config.maxOutputTokens ?? MAX_OUTPUT_TOKENS;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (token.isCancellationRequested) return "";
 
     try {
-      const response = await model.sendRequest(messages, { modelOptions: { max_tokens: MAX_OUTPUT_TOKENS } }, token);
+      const response = await model.sendRequest(
+        messages,
+        {
+          modelOptions: { max_tokens: Math.min(maxTokens, _config.maxOutputTokens ?? MAX_OUTPUT_TOKENS) },
+        },
+        token,
+      );
 
+      // Try to dispose of response listeners proactively
+      const disposables: vscode.Disposable[] = [];
+      const cleanup = () => disposables.forEach((d) => d.dispose());
       let text = "";
-      for await (const chunk of response.text) {
-        if (token.isCancellationRequested) break;
-        text += chunk;
+      try {
+        for await (const chunk of response.text) {
+          if (token.isCancellationRequested) break;
+          text += chunk;
+        }
+      } finally {
+        cleanup();
       }
 
       // If the model returned a non-empty response, accept it
       if (text.trim().length > 0) {
         _consecutiveEmpty = 0;
         // Small delay between requests to avoid overwhelming the API
-        await delay(INTER_REQUEST_DELAY_MS);
+        await delay(_config.interRequestDelayMs ?? INTER_REQUEST_DELAY_MS);
         return text;
       }
 
       // Empty response — retry with backoff unless exhausted
-      if (attempt < MAX_RETRIES) {
-        const backoff = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
-        log(`Empty response on attempt ${attempt + 1}/${MAX_RETRIES + 1}, retrying in ${backoff}ms…`);
+      if (attempt < maxRetries) {
+        const backoff = (_config.retryBaseDelayMs ?? RETRY_BASE_DELAY_MS) * Math.pow(2, attempt);
+        log(`Empty response on attempt ${attempt + 1}/${maxRetries + 1}, retrying in ${backoff}ms…`);
         await delay(backoff);
       }
     } catch (error) {
@@ -283,15 +499,15 @@ async function sendPrompt(
       if (error instanceof vscode.CancellationError) return "";
 
       // Retry on transient errors (e.g. HTTP/2 protocol errors)
-      if (attempt < MAX_RETRIES) {
-        const backoff = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+      if (attempt < maxRetries) {
+        const backoff = (_config.retryBaseDelayMs ?? RETRY_BASE_DELAY_MS) * Math.pow(2, attempt);
         log(
-          `sendRequest error on attempt ${attempt + 1}/${MAX_RETRIES + 1}: ${error instanceof Error ? error.message : String(error)}. Retrying in ${backoff}ms…`,
+          `sendRequest error on attempt ${attempt + 1}/${maxRetries + 1}: ${error instanceof Error ? error.message : String(error)}. Retrying in ${backoff}ms…`,
         );
         await delay(backoff);
       } else {
         log(
-          `sendRequest failed after ${MAX_RETRIES + 1} attempts: ${error instanceof Error ? error.message : String(error)}`,
+          `sendRequest failed after ${maxRetries + 1} attempts: ${error instanceof Error ? error.message : String(error)}`,
         );
         throw error;
       }
@@ -302,12 +518,13 @@ async function sendPrompt(
   _consecutiveEmpty++;
   _totalEmpty++;
   log(
-    `All ${MAX_RETRIES + 1} retries returned empty (consecutive: ${_consecutiveEmpty}, total: ${_totalEmpty}/${_totalCalls})`,
+    `All ${maxRetries + 1} retries returned empty (consecutive: ${_consecutiveEmpty}, total: ${_totalEmpty}/${_totalCalls})`,
   );
 
-  if (_consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
+  const maxEmpty = _config.maxConsecutiveEmpty ?? MAX_CONSECUTIVE_EMPTY;
+  if (_consecutiveEmpty >= maxEmpty) {
     const msg =
-      `Aborting: ${MAX_CONSECUTIVE_EMPTY} consecutive LLM calls returned empty responses. ` +
+      `Aborting: ${maxEmpty} consecutive LLM calls returned empty responses. ` +
       `The model (${model.name || model.id}) does not appear to be responding. ` +
       `Check the "Judges LLM Benchmark" output channel and VS Code developer console for details.`;
     log(msg);
@@ -359,7 +576,7 @@ async function runPerJudgeBenchmark(
     });
   }
 
-  const tasks = remainingPairs.map((p) => async () => {
+  const tasks = remainingPairs.map((p: { tc: BenchmarkCase; judge: JudgeDefinition; caseIdx: number }) => async () => {
     onProgress({
       message: `Per-judge: ${p.tc.id} → ${p.judge.name} (${completed + 1}/${totalCalls})`,
       completed,
@@ -368,12 +585,17 @@ async function runPerJudgeBenchmark(
 
     const prompt = constructPerJudgePrompt(p.judge, p.tc.code, p.tc.language);
     const response = await sendPrompt(model, prompt, token);
-    const ruleIds = parseLlmRuleIds(response);
+    const validation = extractValidatedLlmFindings(response, getValidRulePrefixes());
+    if (validation.errors.length) {
+      log(`⚠️ [${p.tc.id}/${p.judge.id}] LLM validation warnings: ${validation.errors.join("; ")}`);
+    }
+    const ruleIds = validation.ruleIds.length ? validation.ruleIds : parseLlmRuleIds(response);
 
     caseRuleIds[p.caseIdx].push(...ruleIds);
-    const responseEntry = `[${p.judge.id}]: ${response}`;
+    const responseEntry = `[${p.judge.id}]: ${truncateResponse(response, _config.responseSnapshotChars ?? MAX_RESPONSE_SNAPSHOT_CHARS)}`;
     caseResponses[p.caseIdx].push(responseEntry);
 
+    // Persist a minimal checkpoint entry to limit memory usage
     checkpoint.perJudgeEntries.push({
       caseIdx: p.caseIdx,
       judgeId: p.judge.id,
@@ -384,13 +606,20 @@ async function runPerJudgeBenchmark(
     completed++;
     sinceLastSave++;
 
+    // Soft heap guard & telemetry every N calls
+    if (_totalCalls > 0 && _totalCalls % (_config.logMemoryEvery ?? DEFAULT_LOG_MEMORY_EVERY) === 0) {
+      logMemory(`Memory after ${_totalCalls} calls`);
+      enforceHeapGuard(_config.maxHeapMb ?? DEFAULT_MAX_HEAP_MB);
+      maybeGc();
+    }
+
     if (sinceLastSave >= CHECKPOINT_SAVE_INTERVAL) {
       sinceLastSave = 0;
       await saveCheckpoint(checkpoint);
     }
   });
 
-  await runWithConcurrency(tasks, DEFAULT_CONCURRENCY, token);
+  await runWithConcurrency(tasks, _config.concurrency ?? DEFAULT_CONCURRENCY, token);
 
   // Final save after per-judge completes
   await saveCheckpoint(checkpoint);
@@ -432,7 +661,7 @@ async function runTribunalBenchmark(
     });
   }
 
-  const tasks = remaining.map((item) => async () => {
+  const tasks = remaining.map((item: { tc: BenchmarkCase; idx: number }) => async () => {
     const idx = ++completed;
     onProgress({
       message: `Tribunal: ${item.tc.id} (${idx}/${cases.length})`,
@@ -442,13 +671,29 @@ async function runTribunalBenchmark(
 
     const prompt = constructTribunalPrompt(item.tc.code, item.tc.language);
     const response = await sendPrompt(model, prompt, token);
-    const ruleIds = parseLlmRuleIds(response);
-    const result = scoreLlmCase(item.tc, ruleIds, response);
+    const validation = extractValidatedLlmFindings(response, getValidRulePrefixes());
+    if (validation.errors.length) {
+      log(`⚠️ [${item.tc.id}/tribunal] LLM validation warnings: ${validation.errors.join("; ")}`);
+    }
+    const ruleIds = validation.ruleIds.length ? validation.ruleIds : parseLlmRuleIds(response);
+    const result = scoreLlmCase(
+      item.tc,
+      ruleIds,
+      truncateResponse(response, _config.responseSnapshotChars ?? MAX_RESPONSE_SNAPSHOT_CHARS),
+    );
 
     results[item.idx] = result;
     checkpoint.tribunalEntries.push({ caseIdx: item.idx, result });
 
     sinceLastSave++;
+
+    // Soft heap guard & telemetry every N calls
+    if (_totalCalls > 0 && _totalCalls % (_config.logMemoryEvery ?? DEFAULT_LOG_MEMORY_EVERY) === 0) {
+      logMemory(`Memory after ${_totalCalls} calls (tribunal phase)`);
+      enforceHeapGuard(_config.maxHeapMb ?? DEFAULT_MAX_HEAP_MB);
+      maybeGc();
+    }
+
     if (sinceLastSave >= CHECKPOINT_SAVE_INTERVAL) {
       sinceLastSave = 0;
       await saveCheckpoint(checkpoint);
@@ -457,7 +702,7 @@ async function runTribunalBenchmark(
     return result;
   });
 
-  await runWithConcurrency(tasks, DEFAULT_CONCURRENCY, token);
+  await runWithConcurrency(tasks, _config.concurrency ?? DEFAULT_CONCURRENCY, token);
 
   // Final save
   await saveCheckpoint(checkpoint);
@@ -478,6 +723,26 @@ export async function runLlmBenchmark(
   storageUri: vscode.Uri,
   chatModel?: vscode.LanguageModelChat,
 ): Promise<BenchmarkRunResult> {
+  // 0. Load config (settings/env)
+  _config = getBenchmarkConfig();
+  if (!_config.enabled) {
+    const msg =
+      "LLM benchmark is disabled by default to protect the VS Code extension host. Enable via settings (judges.llmBenchmark.enabled) or env JUDGES_LLM_BENCHMARK_ENABLED=true.";
+    logOnce("benchmark-disabled", msg, 60_000);
+    throw new Error(msg);
+  }
+  // guard against extreme values
+  if (_config.sampleSize > 200) {
+    const warn = `sampleSize ${_config.sampleSize} is high; capping to 200 for stability.`;
+    logOnce("cap-sample", warn, 60_000);
+    _config.sampleSize = 200;
+  }
+  if (_config.maxOutputTokens > 4096) {
+    const warn = `maxOutputTokens ${_config.maxOutputTokens} is high; capping to 4096 for stability.`;
+    logOnce("cap-tokens", warn, 60_000);
+    _config.maxOutputTokens = 4096;
+  }
+
   // 1. Resolve model
   const model = chatModel ?? (await resolveModel(token));
   const modelName = model.name || model.id;
@@ -497,6 +762,15 @@ export async function runLlmBenchmark(
   log(
     `Model details: id=${model.id}, family=${model.family}, vendor=${model.vendor}, version=${model.version}, maxInputTokens=${model.maxInputTokens}`,
   );
+  log(
+    `Benchmark config: enabled=${_config.enabled}, sampleSize=${_config.sampleSize}, maxOutputTokens=${_config.maxOutputTokens}, concurrency=${_config.concurrency}, interDelayMs=${_config.interRequestDelayMs}, maxRetries=${_config.maxRetries}, maxHeapMb=${_config.maxHeapMb}`,
+  );
+  if (_config.concurrency > 1) {
+    logOnce(
+      "concurrency-warning",
+      "Using concurrency >1 may trigger listener leak warnings in VS Code chat UI; consider sticking to 1.",
+    );
+  }
 
   // 1b. Health check — verify the model responds before burning hours
   onProgress({ message: "Verifying model health…", completed: 0, total: 1 });
@@ -510,10 +784,12 @@ export async function runLlmBenchmark(
     throw new Error(msg);
   }
 
-  // 2. Select stratified sample
-  const sampleSize = 200;
+  // 2. Select stratified sample (configurable)
+  const sampleSize = Math.min(_config.sampleSize ?? DEFAULT_CONFIG.sampleSize, BENCHMARK_CASES.length);
   const cases = selectStratifiedSample(BENCHMARK_CASES, sampleSize);
-  const sampleCaseIds = cases.map((c) => c.id);
+  const sampleCaseIds = cases.map((c: BenchmarkCase) => c.id);
+  log(`Selected stratified sample of ${sampleSize} cases (configurable via judges.llmBenchmark.sampleSize).`);
+  enforceHeapGuard(_config.maxHeapMb ?? DEFAULT_MAX_HEAP_MB);
 
   // 3. Set storage URI and check for existing checkpoint
   _storageUri = storageUri;
@@ -527,13 +803,18 @@ export async function runLlmBenchmark(
   let resumed = false;
 
   if (checkpoint) {
-    // Verify same sample
+    // Verify same sample AND same config snapshot (guard against config changes between runs)
     const sameModel = checkpoint.modelName === modelName;
     const sameSample =
       checkpoint.sampleCaseIds.length === sampleCaseIds.length &&
       checkpoint.sampleCaseIds.every((id, i) => id === sampleCaseIds[i]);
+    const configSnap = checkpoint.config || {};
+    const sameConfig =
+      (configSnap.sampleSize ?? _config.sampleSize) === _config.sampleSize &&
+      (configSnap.maxOutputTokens ?? _config.maxOutputTokens) === _config.maxOutputTokens &&
+      (configSnap.concurrency ?? _config.concurrency) === _config.concurrency;
 
-    if (sameModel && sameSample && checkpoint.phase !== "complete") {
+    if (sameModel && sameSample && sameConfig && checkpoint.phase !== "complete") {
       const pjDone = checkpoint.perJudgeEntries.length;
       const trDone = checkpoint.tribunalEntries.length;
       const choice = await vscode.window.showInformationMessage(
@@ -548,7 +829,7 @@ export async function runLlmBenchmark(
         checkpoint = undefined;
       }
     } else {
-      // Different model/sample or already complete — discard
+      // Different model/sample/config or already complete — discard
       checkpoint = undefined;
     }
   }
@@ -559,6 +840,11 @@ export async function runLlmBenchmark(
       modelName,
       provider,
       sampleCaseIds,
+      config: {
+        sampleSize: _config.sampleSize,
+        maxOutputTokens: _config.maxOutputTokens,
+        concurrency: _config.concurrency,
+      },
       startTime: Date.now(),
       phase: "per-judge",
       perJudgeEntries: [],
@@ -751,3 +1037,12 @@ export async function saveResultsToWorkspace(storageUri: vscode.Uri): Promise<vs
   const reportUri = vscode.Uri.joinPath(benchmarksDir, "llm-benchmark-report.md");
   return reportUri;
 }
+
+// Internal test hooks (not part of public extension API)
+export const __test = {
+  truncateResponse,
+  enforceHeapGuard,
+  getBenchmarkConfig,
+  logMemory,
+  maybeGc,
+};

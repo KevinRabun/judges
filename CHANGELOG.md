@@ -2,6 +2,17 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.114.0] — 2026-03-17
+
+### Added
+- GitHub App autopilot/test hooks (`__setEvaluateWithTribunalForTest`, `__setEvaluateProjectForTest`), enabling deterministic inline review tests.
+- CLI `judges review` diff parsing now accepts relaxed hunk headers (e.g., `@@ -1,1 +1,2 @@` variants) and supports FP/LLM augmentation hooks in tests.
+- VS Code extension LLM benchmark runner import uses `pathToFileURL` for ESM-safe dynamic imports on Windows paths.
+
+### Fixed
+- ESM runner `require is not defined` errors in tests by switching to `createRequire`, `pathToFileURL`, and `node:crypto` `createHash` imports; `process.exit` stubs now use `await assert.rejects` to avoid unhandled rejections.
+- `parsePatchToHunk` regex accepts GitHub API diff formats; prevents missed changed-lines when plus/minus headers differ.
+
 ## [3.113.0] — 2026-03-17
 
 ### Added
@@ -925,8 +936,8 @@ All notable changes to **@kevinrabun/judges** are documented here.
 
 ### Added — LLM Prompt Benchmark (Layer 2)
 - **`src/commands/llm-benchmark.ts`** — New module with types, rule-ID parser, prompt construction, stratified sampling, scoring, and markdown formatting for LLM-based benchmark results
-- **`scripts/run-llm-benchmark.ts`** — Standalone LLM benchmark runner supporting OpenAI and Anthropic APIs; configurable via env vars (`LLM_API_KEY`, `LLM_MODEL`, `LLM_PROVIDER`); supports `--sample`, `--mode tribunal|per-judge`, `--dry-run`; saves snapshot JSON to `benchmarks/`
-- **`npm run benchmark:llm`** — New npm script to run LLM benchmarks
+- **`judges llm-benchmark`** — CLI command for LLM benchmarks (provider-agnostic; wire to your own runner)
+- **Removed:** `scripts/run-llm-benchmark.ts` and `npm run benchmark:llm` (legacy helper). Use the CLI command or build a thin runner that consumes `src/commands/llm-benchmark`.
 - **`benchmarks/` directory** — Storage for LLM benchmark snapshot results (latest + timestamped archives)
 
 ### Improved — Benchmark Report Methodology

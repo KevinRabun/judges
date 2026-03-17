@@ -26,6 +26,16 @@ import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { evaluateWithTribunal } from "./evaluators/index.js";
 import { evaluateProject, type TribunalRunner } from "./evaluators/project.js";
 import type { Finding, Severity } from "./types.js";
+import {
+  extractValidatedLlmFindings,
+  getValidRulePrefixes,
+  constructTribunalPrompt,
+} from "./commands/llm-benchmark.js";
+import { buildContextSnippets } from "./context/context-snippets.js";
+
+// Test override hooks (exported for tsx/node:test to avoid esbuild inlining)
+export let evaluateWithTribunalImpl = evaluateWithTribunal;
+export let evaluateProjectImpl = evaluateProject;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -48,6 +58,8 @@ export interface GitHubAppConfig {
   diffOnly?: boolean;
   /** Path to .judgesrc.json config (optional) */
   configPath?: string;
+  /** Enable Layer 2 (LLM) deep review augmentation */
+  llmDeepReview?: boolean;
 }
 
 interface WebhookPayload {
@@ -163,12 +175,20 @@ export function generateJwt(appId: string, privateKey: string): string {
 
 // ─── GitHub API Helper ──────────────────────────────────────────────────────
 
+// Test hook for API injection
+let ghApiImpl:
+  | ((method: string, path: string, token: string, body?: unknown) => Promise<{ status: number; data: unknown }>)
+  | undefined;
+
 async function ghApi(
   method: string,
   path: string,
   token: string,
   body?: unknown,
 ): Promise<{ status: number; data: unknown }> {
+  if (ghApiImpl) {
+    return ghApiImpl(method, path, token, body);
+  }
   const { default: https } = await import("https");
   const payload = body ? JSON.stringify(body) : "";
   return new Promise((resolve, reject) => {
@@ -201,9 +221,61 @@ async function ghApi(
   });
 }
 
+export function __setGhApiImplForTest(fn: typeof ghApi | undefined) {
+  ghApiImpl = fn;
+}
+
+// ─── LLM Helper (optional Layer 2 augmentation) ────────────────────────────
+interface LlmOptions {
+  apiKey: string;
+  model: string;
+  baseUrl?: string;
+  maxTokens?: number;
+}
+
+async function callOpenAiChat(prompt: string, opts: LlmOptions): Promise<string> {
+  // Node 18+ provides global fetch
+  const fetchImpl = (globalThis as { fetch?: typeof fetch }).fetch;
+  if (!fetchImpl) throw new Error("fetch() not available. Run on Node 18+ or polyfill fetch.");
+  const url = opts.baseUrl || "https://api.openai.com/v1/chat/completions";
+  const res = await fetchImpl(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${opts.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: opts.model,
+      max_tokens: opts.maxTokens ?? 800,
+      temperature: 0,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`LLM request failed: ${res.status} ${res.statusText} ${text}`);
+  }
+  const json = (await res.json()) as unknown;
+  const content: string | undefined = (json as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]
+    ?.message?.content;
+  if (!content) throw new Error("LLM response missing content");
+  return content.trim();
+}
+
+// Test hook
+let callOpenAiChatImpl = callOpenAiChat;
+export function __setCallOpenAiChatImplForTest(fn: typeof callOpenAiChat) {
+  callOpenAiChatImpl = fn;
+}
+
 // ─── Installation Token ─────────────────────────────────────────────────────
+// Test hook
+let getInstallationTokenImpl:
+  | ((appId: string, privateKey: string, installationId: number) => Promise<string>)
+  | undefined;
 
 async function getInstallationToken(appId: string, privateKey: string, installationId: number): Promise<string> {
+  if (getInstallationTokenImpl) return getInstallationTokenImpl(appId, privateKey, installationId);
   const jwt = generateJwt(appId, privateKey);
   const res = await ghApi("POST", `/app/installations/${installationId}/access_tokens`, jwt);
   const data = res.data as { token?: string };
@@ -236,7 +308,8 @@ export function parsePatchToHunk(filePath: string, patch: string): DiffHunk {
   let newLineNum = 0;
 
   for (const line of lines) {
-    const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    // Hunk header: @@ -10,5 +20,8 @@ (some tools omit trailing space/@@)
+    const hunkMatch = line.match(/^@@\s*-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s*@@?/);
     if (hunkMatch) {
       newLineNum = parseInt(hunkMatch[1], 10) - 1;
       continue;
@@ -319,7 +392,9 @@ async function reviewPullRequest(
     if (!hunk.newContent.trim()) continue;
 
     try {
-      const verdict = evaluateWithTribunal(hunk.newContent, lang, undefined, {
+      // indirection to allow test overrides even when bundlers inline imports
+      const evalFn = getEvaluateWithTribunalImpl();
+      const verdict = evalFn(hunk.newContent, lang, undefined, {
         filePath: file.filename,
         includeAstFindings: true,
       });
@@ -353,8 +428,8 @@ async function reviewPullRequest(
   }
   if (projectFiles.length >= 2) {
     try {
-      const runner: TribunalRunner = { evaluateWithTribunal };
-      const projectVerdict = evaluateProject(runner, projectFiles);
+      const runner: TribunalRunner = { evaluateWithTribunal: evaluateWithTribunalImpl };
+      const projectVerdict = evaluateProjectImpl(runner, projectFiles);
       for (const f of projectVerdict.architecturalFindings ?? []) {
         if (!meetsSeverityThreshold(f.severity, minSeverity)) continue;
         allFindings.push({ ...f, _file: projectFiles[0].path, _changedLines: [] });
@@ -362,6 +437,42 @@ async function reviewPullRequest(
     } catch {
       // Cross-file failure should not block the review
     }
+  }
+
+  // 2c. Optional Layer 2 (LLM) augmentation — append summary comment
+  let llmSummary: string | undefined;
+  try {
+    if (process.env.OPENAI_API_KEY && config.llmDeepReview !== false) {
+      const codeBlobs: string[] = [];
+      const snippetsForRag: string[] = [];
+      for (const file of prFiles) {
+        if (!file.patch) continue;
+        const hunk = parsePatchToHunk(file.filename, file.patch);
+        codeBlobs.push(`// FILE: ${file.filename}\n${hunk.newContent}`);
+        snippetsForRag.push(hunk.newContent);
+      }
+      const combinedCode = codeBlobs.join("\n\n");
+      const ragSnippets = await buildContextSnippets(snippetsForRag.join("\n\n"), {
+        maxSnippets: 4,
+        chunkSize: 1500,
+      });
+      const contextText = ragSnippets.map((s) => s.snippet);
+      const tribunalPrompt = constructTribunalPrompt(combinedCode, "mixed", contextText);
+      const content = await callOpenAiChatImpl(tribunalPrompt, {
+        apiKey: process.env.OPENAI_API_KEY!,
+        model: process.env.OPENAI_MODEL || "gpt-4o",
+        baseUrl: process.env.OPENAI_BASE_URL,
+        maxTokens: 800,
+      });
+      const validation = extractValidatedLlmFindings(content, getValidRulePrefixes());
+      const warnings = validation.errors?.length ? `\n\n⚠️ Validation warnings: ${validation.errors.join("; ")}` : "";
+      llmSummary =
+        `### 🤖 LLM Deep Review (model: ${process.env.OPENAI_MODEL || "gpt-4o"})\n` +
+        (validation.ruleIds.length ? `Detected rule IDs: ${validation.ruleIds.join(", ")}` : "No rule IDs detected.") +
+        `\n\n${content}${warnings}`;
+    }
+  } catch (err) {
+    llmSummary = `⚠️ LLM deep review failed: ${String((err as Error).message ?? err)}`;
   }
 
   // 3. Build review comments
@@ -450,6 +561,10 @@ async function reviewPullRequest(
   }
   if (allFindings.length === 0) {
     summaryLines.push("✅ No findings — code looks good!");
+  }
+
+  if (typeof llmSummary === "string") {
+    summaryLines.push("", llmSummary);
   }
 
   const reviewBody = summaryLines.join("\n");
@@ -687,8 +802,36 @@ export function loadAppConfig(): GitHubAppConfig {
     autoApprove: process.env.JUDGES_AUTO_APPROVE === "true",
     diffOnly: process.env.JUDGES_DIFF_ONLY !== "false",
     configPath: process.env.JUDGES_CONFIG_PATH,
+    llmDeepReview: process.env.JUDGES_LLM_DEEP_REVIEW !== "false", // default on if key exists
   };
 }
+
+// Test hooks (non-public)
+export function __setEvaluateWithTribunalForTest(fn: typeof evaluateWithTribunal | undefined) {
+  evaluateWithTribunalImpl = fn ?? evaluateWithTribunal;
+}
+export function __setEvaluateProjectForTest(fn: typeof evaluateProject | undefined) {
+  evaluateProjectImpl = fn ?? evaluateProject;
+}
+export function getEvaluateWithTribunalImpl() {
+  return evaluateWithTribunalImpl;
+}
+export function __getEvaluateWithTribunalImplForTest() {
+  return evaluateWithTribunalImpl;
+}
+
+export const __test = {
+  __setCallOpenAiChatImplForTest,
+  __getInstallationTokenForTest: (fn: typeof getInstallationToken) => {
+    getInstallationTokenImpl = fn;
+  },
+  __setGhApiImplForTest,
+  __setEvaluateWithTribunalForTest,
+  __setEvaluateProjectForTest,
+  __getEvaluateWithTribunalImplForTest,
+  parsePatchToHunk,
+  reviewPullRequest,
+};
 
 // ─── Standalone HTTP Server ─────────────────────────────────────────────────
 
