@@ -25,7 +25,7 @@
 import { readFileSync, existsSync, writeFileSync, readdirSync, statSync } from "fs";
 import { resolve, extname, dirname, join, relative } from "path";
 import { fileURLToPath } from "url";
-import { globToRegex, matchesGlob, collectFiles as helperCollectFiles, dispatchCommand } from "./cli-helpers.js";
+import { matchesGlob } from "./cli-helpers.js";
 // Re-export helpers for tests/backward compatibility
 export { globToRegex, matchesGlob } from "./cli-helpers.js";
 
@@ -51,7 +51,7 @@ import { DiskCache } from "./disk-cache.js";
 import { contentHash } from "./cache.js";
 import { formatComparisonReport, formatFullComparisonMatrix, TOOL_PROFILES } from "./comparison.js";
 import { loadOverrideStore, applyOverrides } from "./commands/override.js";
-import { matchGlobPath, runGit } from "./tools/command-safety.js";
+import { runGit } from "./tools/command-safety.js";
 
 // ─── Language Detection from Extension ──────────────────────────────────────
 
