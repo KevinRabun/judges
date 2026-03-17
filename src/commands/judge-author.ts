@@ -78,7 +78,7 @@ ${scaffold.rules
   .map(
     (r) => `  {
     id: "${r.id}",
-    pattern: /${r.pattern.replace(/\//g, "\\/")}/g,
+    pattern: /${r.pattern.replace(/\\/g, "\\\\").replace(/\//g, "\\/")}/g,
     message: "${r.message}",
     severity: "${r.severity}",
   },`,

@@ -45,7 +45,7 @@ describe("github-app extended", () => {
   it("detectLanguage and generateJwt helper coverage", () => {
     assert.equal(detectLanguage("src/main.swift"), "swift");
     assert.equal(detectLanguage("Dockerfile"), "dockerfile");
-    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 1024 });
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
     const pem = privateKey.export({ type: "pkcs1", format: "pem" }).toString();
     const jwt = generateJwt("123", pem);
     assert.equal(jwt.split(".").length, 3);

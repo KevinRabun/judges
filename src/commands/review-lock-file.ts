@@ -47,7 +47,7 @@ function analyzeNpmLock(content: string): LockFileIssue[] {
 
     // check for git dependencies
     const resolved = String(info.resolved || "");
-    if (resolved.startsWith("git+") || resolved.startsWith("git://") || resolved.includes("github.com")) {
+    if (resolved.startsWith("git+") || resolved.startsWith("git://") || /(:?\/\/|@)github\.com[\/:]/.test(resolved)) {
       issues.push({
         type: "git-dependency",
         package: name,
@@ -89,7 +89,7 @@ function analyzeYarnLock(content: string): LockFileIssue[] {
       });
     }
 
-    if (line.includes("resolved") && (line.includes("github.com") || line.includes("git+"))) {
+    if (line.includes("resolved") && (/(:?\/\/|@)github\.com[\/:]/.test(line) || line.includes("git+"))) {
       issues.push({
         type: "git-dependency",
         package: currentPkg,

@@ -6,6 +6,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
+import { userInfo } from "os";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -158,10 +159,7 @@ Options:
     const decision = argv.find((_a: string, i: number) => argv[i - 1] === "--decision") as KbEntry["decision"];
     const reason = argv.find((_a: string, i: number) => argv[i - 1] === "--reason");
     const approvedBy =
-      argv.find((_a: string, i: number) => argv[i - 1] === "--approved-by") ||
-      process.env.USER ||
-      process.env.USERNAME ||
-      "unknown";
+      argv.find((_a: string, i: number) => argv[i - 1] === "--approved-by") || userInfo().username || "unknown";
     const scope = argv.find((_a: string, i: number) => argv[i - 1] === "--scope");
     const tagsStr = argv.find((_a: string, i: number) => argv[i - 1] === "--tags");
     const expiresStr = argv.find((_a: string, i: number) => argv[i - 1] === "--expires-in");

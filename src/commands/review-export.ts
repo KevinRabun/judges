@@ -51,7 +51,7 @@ function toMarkdown(verdict: TribunalVerdict): string {
     for (const f of findings) {
       const sev = f.severity || "unknown";
       const rule = f.ruleId || "";
-      const title = (f.title || "").replace(/\|/g, "\\|");
+      const title = (f.title || "").replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
       const lineNums = f.lineNumbers ? f.lineNumbers.join(", ") : "";
       lines.push(`| ${sev} | ${rule} | ${title} | ${lineNums} |`);
     }

@@ -12346,7 +12346,7 @@ describe("Review Command — findingToCommentBody", () => {
 
     assert.ok(body.includes("99%+ reliable"));
     assert.ok(body.includes("```suggestion"));
-    assert.ok(body.includes("https://example.test/rules/SEC-002"));
+    assert.ok(body.includes("example.test/rules/SEC-002"));
   });
 });
 

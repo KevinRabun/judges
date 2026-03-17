@@ -38,7 +38,7 @@ PASSWORD="secret123"
 DB_HOST="localhost"
 
 function connect_db() {
-  mysql -u root -p\${PASSWORD} -h \${DB_HOST}
+  mysql -u root -p${"$"}{PASSWORD} -h ${"$"}{DB_HOST}
 }
 
 eval "$USER_INPUT"

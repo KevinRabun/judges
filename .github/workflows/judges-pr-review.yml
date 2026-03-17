@@ -44,14 +44,16 @@ jobs:
         id: review_result
         run: |
           if [ -f judges-review-result.json ] && jq -e '.filesAnalyzed' judges-review-result.json > /dev/null 2>&1; then
-            echo "files=$(jq -r '.filesAnalyzed' judges-review-result.json)" >> "$GITHUB_OUTPUT"
-            echo "findings=$(jq -r '.totalFindings' judges-review-result.json)" >> "$GITHUB_OUTPUT"
-            echo "comments=$(jq -r '.commentsPosted' judges-review-result.json)" >> "$GITHUB_OUTPUT"
-            echo "approved=$(jq -r '.approved' judges-review-result.json)" >> "$GITHUB_OUTPUT"
-            echo "critical=$(jq -r '.criticalCount' judges-review-result.json)" >> "$GITHUB_OUTPUT"
-            echo "high=$(jq -r '.highCount' judges-review-result.json)" >> "$GITHUB_OUTPUT"
-            echo "suppressed=$(jq -r '.fpSuppressed' judges-review-result.json)" >> "$GITHUB_OUTPUT"
-            echo "success=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "files=$(jq -r '.filesAnalyzed' judges-review-result.json)"
+              echo "findings=$(jq -r '.totalFindings' judges-review-result.json)"
+              echo "comments=$(jq -r '.commentsPosted' judges-review-result.json)"
+              echo "approved=$(jq -r '.approved' judges-review-result.json)"
+              echo "critical=$(jq -r '.criticalCount' judges-review-result.json)"
+              echo "high=$(jq -r '.highCount' judges-review-result.json)"
+              echo "suppressed=$(jq -r '.fpSuppressed' judges-review-result.json)"
+              echo "success=true"
+            } >> "$GITHUB_OUTPUT"
           else
             echo "success=false" >> "$GITHUB_OUTPUT"
           fi

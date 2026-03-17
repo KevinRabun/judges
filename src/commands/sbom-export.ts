@@ -43,7 +43,7 @@ function parsePackageJson(): SbomComponent[] {
         type: "library",
         name,
         version: String(ver).replace(/^[\^~>=<]+/, ""),
-        purl: `pkg:npm/${name.replace("/", "%2F")}@${String(ver).replace(/^[\^~>=<]+/, "")}`,
+        purl: `pkg:npm/${name.replaceAll("/", "%2F")}@${String(ver).replace(/^[\^~>=<]+/, "")}`,
         scope: "required",
         licenses: [],
       });
@@ -53,7 +53,7 @@ function parsePackageJson(): SbomComponent[] {
         type: "library",
         name,
         version: String(ver).replace(/^[\^~>=<]+/, ""),
-        purl: `pkg:npm/${name.replace("/", "%2F")}@${String(ver).replace(/^[\^~>=<]+/, "")}`,
+        purl: `pkg:npm/${name.replaceAll("/", "%2F")}@${String(ver).replace(/^[\^~>=<]+/, "")}`,
         scope: "optional",
         licenses: [],
       });

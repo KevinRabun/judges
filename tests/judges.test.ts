@@ -9278,10 +9278,10 @@ describe("Auto-Fix Patch Engine", () => {
       },
     ];
     const { result, applied } = applyPatches(code, patches);
-    assert.ok(result.includes("https://example.com"));
-    assert.ok(result.includes("https://api.test.com"));
-    assert.ok(!result.includes("http://example.com"));
-    assert.ok(!result.includes("http://api.test.com"));
+    assert.match(result, /https:\/\/example\.com/);
+    assert.match(result, /https:\/\/api\.test\.com/);
+    assert.ok(!/http:\/\/example\.com/.test(result));
+    assert.ok(!/http:\/\/api\.test\.com/.test(result));
     assert.equal(applied, 2);
   });
 });

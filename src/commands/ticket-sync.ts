@@ -133,7 +133,7 @@ async function createLinearIssue(finding: Finding, config: TicketConfig): Promis
     issueCreate(input: {
       teamId: "${config.project}"
       title: "[${finding.severity.toUpperCase()}] ${finding.ruleId}: ${finding.title}"
-      description: "${finding.description.replace(/"/g, '\\"').replace(/\n/g, "\\n")}"
+      description: "${finding.description.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"
       priority: ${priorityMap[finding.severity] ?? 3}
     }) {
       success

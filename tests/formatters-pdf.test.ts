@@ -81,7 +81,7 @@ describe("formatters/pdf", () => {
     assert.match(html, /Judge Testing/);
 
     // Escaping check for potentially dangerous content
-    assert.doesNotMatch(html, /<script>/); // should be escaped
+    assert.doesNotMatch(html, /<script>/i); // should be escaped
     assert.match(html, /&lt;script&gt;/);
 
     // Ensure rule IDs and confidence column render
