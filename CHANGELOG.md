@@ -2,6 +2,11 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.115.2] — 2026-03-17
+
+### Fixed
+- Replaced fragile hand-curated `files` list with `dist/**` glob — ensures all compiled modules (commands, probabilistic, context, etc.) are included in the npm package.
+
 ## [3.115.1] — 2026-03-17
 
 ### Fixed

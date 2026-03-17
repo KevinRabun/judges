@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.115.2] — 2026-03-17
+
+### Fixed
+- npm package `files` glob now ships all dist modules — resolves esbuild bundling failures for `probabilistic/llm-response-validator` and other missing files.
+
+### Changed
+- Core engine bumped to `@kevinrabun/judges@^3.115.2`
+
 ## [3.115.1] — 2026-03-17
 
 ### Fixed
