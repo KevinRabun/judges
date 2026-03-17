@@ -1,7 +1,0 @@
-self-hosted-runner:
-  labels: []
-config-variables: []
-# Disable shellcheck integration — the SC2129/SC2015 style suggestions
-# are not actionable issues and cause false CI failures.
-shellcheck:
-  disable: true
