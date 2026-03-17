@@ -6,6 +6,11 @@ Programmatic API for integrating Judges Panel into applications, pipelines, and 
 npm install @kevinrabun/judges
 ```
 
+> **CLI vs MCP vs API**
+> - **CLI binary:** `@kevinrabun/judges-cli` → provides the `judges` command (use `npx @kevinrabun/judges-cli ...`). **Tip:** set `JUDGES_SHOW_EXPERIMENTAL=1` to print experimental commands in `--help`.
+> - **MCP/API:** `@kevinrabun/judges` → this package; exposes `evaluateCode`, `evaluateCodeV2`, etc., and ships the MCP server.
+> - For one-off runs, you can also use `npx @kevinrabun/judges-cli eval --file app.ts`.
+
 ## Quick Start
 
 ```typescript
@@ -74,6 +79,13 @@ Analyze a unified diff, focusing findings on changed lines.
 | `language?` | `string` | Language override |
 
 **Returns:** `DiffVerdict`
+
+### Baseline helpers
+- `runBaseline(argv: string[])` — CLI entry-point for `judges baseline create|update` (see README for CLI syntax).
+- `createProjectBaseline(dir, exclude?, include?, maxFiles?, language?)`
+- `updateBaseline(existingPath, dir, exclude?, include?, maxFiles?, language?)`
+- `loadBaselineData(path)` — loads v1 or v2 baselines
+- `isBaselined(finding, baseline, code)` — checks if a finding is already baselined
 
 ### `analyzeDependencies(manifestContent, manifestType)`
 
@@ -165,6 +177,21 @@ import { JudgeRegistry, defaultRegistry } from "@kevinrabun/judges/api";
 
 ### `parseConfig(jsonString)`
 Parse a `.judgesrc.json` config string into a `JudgesConfig` object.
+
+### `expandEnvPlaceholders(content)`
+Expands `${ENV_VAR}` placeholders inside config strings. Used by `loadConfigFile` so your `.judgesrc.json` can safely reference environment secrets.
+
+### `loadConfigFile(path)`
+Reads a config file, expands env placeholders, and returns a `JudgesConfig` object. Returns `{}` on failure (safe for CLI flows).
+
+### `mergeConfigs(base, leaf)`
+Merge two configs (leaf wins for scalars; arrays are concatenated and de-duped).
+
+### `resolveExtendsConfig(config, baseDir)`
+Resolves the `extends` chain (supports arrays), detects cycles, and merges configs using `mergeConfigs`.
+
+### `validateJudgeDefinition(def)`
+Returns an array of validation error strings. Empty array means success.
 
 ### `JudgesConfig`
 
@@ -329,3 +356,13 @@ All types are exported from `@kevinrabun/judges/api`:
 | `PolicyProfile` | V2 policy profile name |
 | `CustomRule` | Plugin-defined rule |
 | `JudgesPlugin` | Plugin definition |
+
+---
+
+## CLI Utilities (non-API)
+Some functionality is CLI-only (not exported from the API package). Use <code>@kevinrabun/judges-cli</code> or <code>npx @kevinrabun/judges-cli</code>:
+
+- <code>judges license-scan</code> — dependency license compliance scan (<code>--risk</code>, <code>--category</code>, <code>--format json</code>, <code>--save</code> → <code>.judges-licenses/license-report.json</code>).
+- <code>judges deps</code> — supply-chain risk analysis for manifests.
+
+See README “Additional CLI Commands” or <code>docs/index.html#license-scan</code> for details.

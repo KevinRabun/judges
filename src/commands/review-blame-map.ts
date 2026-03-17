@@ -4,7 +4,7 @@
 
 import type { TribunalVerdict } from "../types.js";
 import { readFileSync, existsSync } from "fs";
-import { execSync } from "child_process";
+import { runGit } from "../tools/command-safety.js";
 
 // ─── CLI ────────────────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ Associates findings with the author who wrote the related code via git blame.
   // Parse git blame
   const authorMap = new Map<number, string>();
   try {
-    const blame = execSync(`git blame --porcelain "${source}"`, { encoding: "utf-8" });
+    const blame = runGit(["blame", "--porcelain", "--", source], { trim: false });
     let currentLine = 0;
     for (const line of blame.split("\n")) {
       const lineMatch = /^[0-9a-f]{40}\s+\d+\s+(\d+)/.exec(line);

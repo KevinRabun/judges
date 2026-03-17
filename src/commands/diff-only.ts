@@ -7,6 +7,7 @@
  */
 
 import type { Finding } from "../types.js";
+import { runGit } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -121,7 +122,6 @@ ideal for CI pipelines reviewing PRs.
   }
 
   const { readFileSync, existsSync } = await import("fs");
-  const { execSync } = await import("child_process");
 
   let diff: string;
 
@@ -131,7 +131,7 @@ ideal for CI pipelines reviewing PRs.
   } else {
     const base = argv.find((_a: string, i: number) => argv[i - 1] === "--base") || "main";
     try {
-      diff = execSync(`git diff ${base}`, { encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 });
+      diff = runGit(["diff", base], { trim: false, maxBuffer: 10 * 1024 * 1024 });
     } catch {
       console.error(`Error: could not run git diff ${base}`);
       process.exit(1);

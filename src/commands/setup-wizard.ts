@@ -58,7 +58,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npx @kevinrabun/judges eval . --preset ${profile.preset} --format sarif --fail-on-findings
+      - run: npx @kevinrabun/judges-cli eval . --preset ${profile.preset} --format sarif --fail-on-findings
 `;
 }
 
@@ -66,7 +66,7 @@ function generateGitLabCI(profile: SetupProfile): string {
   return `judges-review:
   image: node:20
   script:
-    - npx @kevinrabun/judges eval . --preset ${profile.preset} --format sarif --fail-on-findings
+    - npx @kevinrabun/judges-cli eval . --preset ${profile.preset} --format sarif --fail-on-findings
   only:
     - merge_requests
     - main
@@ -172,7 +172,7 @@ based on your team's needs. All data stays local.
     }
 
     console.log("\nSetup complete! Next steps:");
-    console.log("  1. Run: npx @kevinrabun/judges eval <file>");
+    console.log("  1. Run: npx @kevinrabun/judges-cli eval <file>");
     console.log("  2. Customize .judgesrc for your needs");
     console.log("  3. Commit the CI workflow for automated reviews");
     return;

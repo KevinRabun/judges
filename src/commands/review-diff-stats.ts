@@ -2,7 +2,7 @@
  * Review-diff-stats — Statistics about diff/change metrics for reviews.
  */
 
-import { execSync } from "child_process";
+import { runGit } from "../tools/command-safety.js";
 
 // ─── CLI ────────────────────────────────────────────────────────────────────
 
@@ -41,7 +41,7 @@ Shows statistics about code changes including lines added/removed per file.
 
   // Check we're in a git repo
   try {
-    execSync("git rev-parse --git-dir", { encoding: "utf-8" });
+    runGit(["rev-parse", "--git-dir"]);
   } catch {
     console.error("Error: not in a git repository");
     process.exitCode = 1;
@@ -57,7 +57,7 @@ Shows statistics about code changes including lines added/removed per file.
 
   const stats: FileStat[] = [];
   try {
-    const output = execSync(`git diff --numstat ${ref}`, { encoding: "utf-8" });
+    const output = runGit(["diff", "--numstat", ref], { trim: false });
     const extensions = extsStr ? extsStr.split(",").map((e) => e.trim()) : null;
 
     for (const line of output.split("\n").filter(Boolean)) {

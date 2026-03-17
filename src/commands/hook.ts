@@ -18,21 +18,21 @@ function generateHookScript(): string {
 ${HOOK_MARKER}
 # Judges Panel pre-commit hook — evaluate staged files in a single pass.
 
-# Check if judges is available
-if ! command -v judges >/dev/null 2>&1; then
-  echo "  ⚠️  judges not found — skipping pre-commit review"
+# Check if npx is available
+if ! command -v npx >/dev/null 2>&1; then
+  echo "  ⚠️  npx not found — skipping pre-commit review"
   exit 0
 fi
 
 # Single-pass evaluation of all staged files
-judges eval . --staged-only --summary --fail-on-findings
+npx -y @kevinrabun/judges-cli eval . --staged-only --summary --fail-on-findings
 EXIT_CODE=$?
 
 if [ "$EXIT_CODE" -ne 0 ]; then
   echo ""
   echo "  ⛔ Judges found critical issues. Commit blocked."
-  echo "  Run 'judges eval . --staged-only' to see details."
-  echo "  Run 'judges fix <file> --apply' to auto-fix."
+  echo "  Run 'npx -y @kevinrabun/judges-cli eval . --staged-only' to see details."
+  echo "  Run 'npx -y @kevinrabun/judges-cli fix <file> --apply' to auto-fix."
   echo "  Use 'git commit --no-verify' to bypass."
   echo ""
   exit 1

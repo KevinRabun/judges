@@ -154,6 +154,11 @@ Options:
     return;
   }
 
+  if (argv.includes("--version")) {
+    // keep consistent with CLI version handling
+    console.log("judges license-scan v1");
+  }
+
   const format = argv.find((_a: string, i: number) => argv[i - 1] === "--format") || "text";
   let licenses = scanNpmLicenses();
 

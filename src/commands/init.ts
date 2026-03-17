@@ -118,8 +118,8 @@ function generateMcpConfig(): string {
       {
         servers: {
           judges: {
-            command: "judges",
-            args: [],
+            command: "npx",
+            args: ["-y", "@kevinrabun/judges"],
           },
         },
       },
@@ -138,10 +138,10 @@ STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\\.(ts|tsx|j
 if [ -n "$STAGED" ]; then
   echo "Running Judges on staged files..."
   for f in $STAGED; do
-    judges eval "$f" --fail-on-findings 2>/dev/null
+    npx -y @kevinrabun/judges-cli eval "$f" --fail-on-findings 2>/dev/null
     if [ $? -ne 0 ]; then
       echo "\\n  Judges found issues in $f. Commit blocked."
-      echo "  Run 'judges eval $f' to see details, or 'judges fix $f' to auto-fix.\\n"
+      echo "  Run 'npx -y @kevinrabun/judges-cli eval $f' to see details, or 'npx -y @kevinrabun/judges-cli fix $f' to auto-fix.\n"
       exit 1
     fi
   done
@@ -298,7 +298,7 @@ export async function runInit(projectDir: string = "."): Promise<void> {
           const existing = JSON.parse(readFileSync(mcpPath, "utf-8"));
           if (!existing.servers?.judges) {
             existing.servers = existing.servers || {};
-            existing.servers.judges = { command: "judges", args: [] };
+            existing.servers.judges = { command: "npx", args: ["-y", "@kevinrabun/judges"] };
             writeFileSync(mcpPath, JSON.stringify(existing, null, 2) + "\n", "utf-8");
             console.log(`  ✅ Added judges server to existing: .vscode/mcp.json`);
           } else {

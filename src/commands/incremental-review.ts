@@ -4,8 +4,8 @@
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import { createHash } from "crypto";
-import { execSync } from "child_process";
 import { join, dirname } from "path";
+import { runGit } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -25,8 +25,8 @@ function hashContent(content: string): string {
 
 function getGitChangedFiles(since?: string): string[] {
   try {
-    const args = since ? `diff --name-only ${since}` : "diff --name-only HEAD";
-    const output = execSync(`git ${args}`, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+    const args = since ? ["diff", "--name-only", since] : ["diff", "--name-only", "HEAD"];
+    const output = runGit(args);
     if (!output) return [];
     return output.split("\n").filter((f) => f.length > 0);
   } catch {
@@ -36,10 +36,7 @@ function getGitChangedFiles(since?: string): string[] {
 
 function getGitStagedFiles(): string[] {
   try {
-    const output = execSync("git diff --name-only --cached", {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    const output = runGit(["diff", "--name-only", "--cached"]);
     if (!output) return [];
     return output.split("\n").filter((f) => f.length > 0);
   } catch {
@@ -49,7 +46,7 @@ function getGitStagedFiles(): string[] {
 
 function getCurrentCommit(): string {
   try {
-    return execSync("git rev-parse HEAD", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+    return runGit(["rev-parse", "HEAD"]);
   } catch {
     return "unknown";
   }
@@ -201,7 +198,7 @@ files are flagged for review.
     // No git flag — use state-based detection
     // Collect all tracked files from git
     try {
-      const output = execSync("git ls-files", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+      const output = runGit(["ls-files"]);
       targetFiles = output
         .split("\n")
         .filter((f) => f.length > 0 && /\.(ts|js|py|go|rs|java|cs|cpp|c|rb|php|tsx|jsx)$/.test(f));

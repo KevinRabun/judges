@@ -138,9 +138,6 @@ export type { SarifValidationError } from "./formatters/sarif.js";
 export { verdictToCsvRows, verdictsToCsv, findingsToCsv } from "./formatters/csv.js";
 export { verdictToGitHubActions } from "./formatters/github-actions.js";
 
-// ─── CLI ─────────────────────────────────────────────────────────────────────
-export { runCli } from "./cli.js";
-
 // ─── Plugin API ──────────────────────────────────────────────────────────────
 export {
   registerPlugin,

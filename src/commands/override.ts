@@ -14,6 +14,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { resolve, dirname } from "path";
+import { matchGlobPath } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -95,12 +96,13 @@ export function isOverridden(ruleId: string, filePath: string | undefined, store
 
     // If file scope is specified, check it
     if (o.filePaths && o.filePaths.length > 0 && filePath) {
+      const normalizedFilePath = filePath.replace(/\\/g, "/");
       const fileMatches = o.filePaths.some((pattern) => {
-        if (pattern.includes("*")) {
-          const re = new RegExp("^" + pattern.replace(/\*/g, ".*") + "$");
-          return re.test(filePath);
+        const normalizedPattern = pattern.replace(/\\/g, "/");
+        if (normalizedPattern.includes("*") || normalizedPattern.includes("?")) {
+          return matchGlobPath(normalizedFilePath, normalizedPattern);
         }
-        return filePath.includes(pattern);
+        return normalizedFilePath === normalizedPattern || normalizedFilePath.startsWith(`${normalizedPattern}/`);
       });
       if (!fileMatches) continue;
     }
@@ -308,7 +310,10 @@ export function runOverride(argv: string[]): void {
       console.log(`\n  Active overrides${filePath ? ` for ${filePath}` : ""}:`);
       for (const o of active) {
         const scopeMatch =
-          !o.filePaths || o.filePaths.length === 0 || !filePath || o.filePaths.some((p) => filePath.includes(p));
+          !o.filePaths ||
+          o.filePaths.length === 0 ||
+          !filePath ||
+          o.filePaths.some((pattern) => matchGlobPath(filePath, pattern));
         const status = scopeMatch ? "✅ applies" : "⬜ out of scope";
         console.log(`  ${o.ruleId.padEnd(14)} ${status} — ${o.reason.slice(0, 50)}`);
       }

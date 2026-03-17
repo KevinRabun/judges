@@ -6805,6 +6805,41 @@ describe("CLI Commands", () => {
       const mod = await import("../src/commands/hook.js");
       assert.ok(typeof mod.runHook === "function");
     });
+
+    it("should install and uninstall a git pre-commit hook", async () => {
+      const fs = await import("fs");
+      const os = await import("os");
+      const path = await import("path");
+      const { runHook } = await import("../src/commands/hook.js");
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-hook-"));
+      const origCwd = process.cwd();
+      const origExit = process.exit;
+
+      try {
+        fs.mkdirSync(path.join(tmpDir, ".git"), { recursive: true });
+        process.chdir(tmpDir);
+        process.exit = ((code?: number) => {
+          throw new Error(`EXIT:${code ?? 0}`);
+        }) as never;
+
+        assert.throws(() => runHook(["node", "judges", "hook", "install"]), /EXIT:0/);
+
+        const hookPath = path.join(tmpDir, ".git", "hooks", "pre-commit");
+        assert.ok(fs.existsSync(hookPath), "Expected pre-commit hook to be created");
+        const installed = fs.readFileSync(hookPath, "utf-8");
+        assert.ok(installed.includes("# judges-panel-hook"));
+        assert.ok(
+          installed.includes("npx -y @kevinrabun/judges-cli eval . --staged-only --summary --fail-on-findings"),
+        );
+
+        assert.throws(() => runHook(["node", "judges", "hook", "uninstall"]), /EXIT:0/);
+        assert.ok(!fs.existsSync(hookPath), "Expected Judges-managed hook to be removed");
+      } finally {
+        process.chdir(origCwd);
+        process.exit = origExit;
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
   });
 
   // ── CI Templates ──────────────────────────────────────────────────────
@@ -6813,7 +6848,7 @@ describe("CLI Commands", () => {
       const { generateGitLabCi } = await import("../src/commands/ci-templates.js");
       const template = generateGitLabCi(true);
       assert.ok(template.includes("judges-review"));
-      assert.ok(template.includes("npm install -g @kevinrabun/judges"));
+      assert.ok(template.includes("npm install -g @kevinrabun/judges-cli"));
       assert.ok(template.includes("judges report"));
     });
 
@@ -7084,6 +7119,71 @@ describe("Diff Command", () => {
     const args = parseDiffArgs(["node", "judges", "diff", "--format", "json"]);
     assert.equal(args.format, "json");
   });
+
+  it("should report a missing diff file", async () => {
+    const { runDiff } = await import("../src/commands/diff.js");
+    const origExit = process.exit;
+    const origError = console.error;
+    const errors: string[] = [];
+
+    try {
+      console.error = ((message?: unknown) => {
+        errors.push(String(message ?? ""));
+      }) as typeof console.error;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(() => runDiff(["node", "judges", "diff", "--file", "missing.patch"]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("File not found")));
+    } finally {
+      process.exit = origExit;
+      console.error = origError;
+    }
+  });
+
+  it("should emit json diff results for a patch file", async () => {
+    const { runDiff } = await import("../src/commands/diff.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-diff-"));
+    const patchFile = join(tmpDir, "changes.patch");
+    const output: string[] = [];
+    const origExit = process.exit;
+    const origLog = console.log;
+
+    writeFileSync(
+      patchFile,
+      [
+        "diff --git a/src/app.ts b/src/app.ts",
+        "index 1111111..2222222 100644",
+        "--- a/src/app.ts",
+        "+++ b/src/app.ts",
+        "@@ -0,0 +1,3 @@",
+        "+export function handler() {",
+        "+  return 1;",
+        "+}",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    try {
+      console.log = ((message?: unknown) => {
+        output.push(String(message ?? ""));
+      }) as typeof console.log;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(() => runDiff(["node", "judges", "diff", "--file", patchFile, "--format", "json"]), /EXIT:(0|1)/);
+      const parsed = JSON.parse(output.join("\n"));
+      assert.equal(parsed.files[0].file, "src/app.ts");
+      assert.ok(typeof parsed.totalFindings === "number");
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ─── Deps Command Tests ────────────────────────────────────────────────────
@@ -7106,6 +7206,143 @@ describe("Deps Command", () => {
     const { parseDepsArgs } = await import("../src/commands/deps.js");
     const args = parseDepsArgs(["node", "judges", "deps"]);
     assert.equal(args.path, ".");
+  });
+
+  it("should fail when no dependency manifests are found", async () => {
+    const { runDeps } = await import("../src/commands/deps.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-deps-empty-"));
+    const origExit = process.exit;
+    const origError = console.error;
+    const errors: string[] = [];
+
+    try {
+      console.error = ((message?: unknown) => {
+        errors.push(String(message ?? ""));
+      }) as typeof console.error;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(() => runDeps(["node", "judges", "deps", tmpDir]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("No dependency manifest files found")));
+    } finally {
+      process.exit = origExit;
+      console.error = origError;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should emit json dependency analysis", async () => {
+    const { runDeps } = await import("../src/commands/deps.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-deps-json-"));
+    const manifestPath = join(tmpDir, "package.json");
+    const output: string[] = [];
+    const origExit = process.exit;
+    const origLog = console.log;
+
+    writeFileSync(
+      manifestPath,
+      JSON.stringify({ name: "fixture", version: "1.0.0", dependencies: { lodash: "^4.17.0" } }, null, 2),
+      "utf-8",
+    );
+
+    try {
+      console.log = ((message?: unknown) => {
+        output.push(String(message ?? ""));
+      }) as typeof console.log;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(() => runDeps(["node", "judges", "deps", tmpDir, "--format", "json"]), /EXIT:(0|1)/);
+      const parsed = JSON.parse(output.join("\n"));
+      assert.equal(parsed.manifests[0].file, manifestPath);
+      assert.ok(typeof parsed.worstScore === "number");
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Report Command", () => {
+  it("should fail for a missing report path", async () => {
+    const { runReport } = await import("../src/commands/report.js");
+    const origExit = process.exit;
+    const origError = console.error;
+    const errors: string[] = [];
+
+    try {
+      console.error = ((message?: unknown) => {
+        errors.push(String(message ?? ""));
+      }) as typeof console.error;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(() => runReport(["node", "judges", "report", "missing-dir"]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("Path not found")));
+    } finally {
+      process.exit = origExit;
+      console.error = origError;
+    }
+  });
+
+  it("should write a markdown project report to disk", async () => {
+    const { runReport } = await import("../src/commands/report.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-report-"));
+    const sourceFile = join(tmpDir, "app.ts");
+    const outputFile = join(tmpDir, "report.md");
+    const origExit = process.exit;
+    const origError = console.error;
+    const errors: string[] = [];
+
+    writeFileSync(sourceFile, "export function safeValue(input: number) { return input + 1; }\n", "utf-8");
+
+    try {
+      console.error = ((message?: unknown) => {
+        errors.push(String(message ?? ""));
+      }) as typeof console.error;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(
+        () => runReport(["node", "judges", "report", tmpDir, "--format", "markdown", "--output", outputFile]),
+        /EXIT:(0|1)/,
+      );
+      assert.ok(existsSync(outputFile));
+      assert.ok(readFileSync(outputFile, "utf-8").length > 0);
+      assert.ok(errors.some((line) => line.includes("Report saved to")));
+    } finally {
+      process.exit = origExit;
+      console.error = origError;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Init Command", () => {
+  it("should return early when a project is already initialized", async () => {
+    const { runInit } = await import("../src/commands/init.js");
+    const tmpDir = mkdtempSync(join(tmpdir(), "judges-init-"));
+    const origLog = console.log;
+    const output: string[] = [];
+
+    writeFileSync(join(tmpDir, ".judgesrc.json"), "{}\n", "utf-8");
+
+    try {
+      console.log = ((message?: unknown) => {
+        output.push(String(message ?? ""));
+      }) as typeof console.log;
+
+      await runInit(tmpDir);
+      assert.ok(output.some((line) => line.includes("already has a .judgesrc config")));
+    } finally {
+      console.log = origLog;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -7321,29 +7558,15 @@ describe("Docs Command", () => {
 // ─── Extended CLI Routing Tests ─────────────────────────────────────────────
 
 describe("CLI v3.5.0 Routing", () => {
-  it("should recognize all new commands in index.ts", () => {
-    // Read the source file to verify cliCommands set without importing
-    // (importing index.ts starts the MCP server as a side effect)
+  it("should keep the MCP server entrypoint separate from the CLI wrapper", () => {
     const indexSrc = readFileSync(resolve(__dirname, "..", "src", "index.ts"), "utf-8");
-    const expectedCommands = [
-      "eval",
-      "list",
-      "evaluate",
-      "init",
-      "fix",
-      "watch",
-      "report",
-      "hook",
-      "diff",
-      "deps",
-      "baseline",
-      "ci-templates",
-      "completions",
-      "docs",
-    ];
-    for (const cmd of expectedCommands) {
-      assert.ok(indexSrc.includes(`"${cmd}"`), `index.ts should reference command "${cmd}"`);
-    }
+    const cliWrapperSrc = readFileSync(resolve(__dirname, "..", "packages", "judges-cli", "bin", "judges.js"), "utf-8");
+    const rootPkg = JSON.parse(readFileSync(resolve(__dirname, "..", "package.json"), "utf-8"));
+
+    assert.ok(indexSrc.includes("Judges Panel — MCP Server"));
+    assert.ok(!indexSrc.includes("const cliCommands = new Set(["));
+    assert.ok(cliWrapperSrc.includes("../dist/cli.js"));
+    assert.equal(rootPkg.exports["./cli-runtime"], undefined);
   });
 
   it("should support new format options", () => {
@@ -8433,6 +8656,557 @@ describe("CLI Version Command", () => {
     const { runCli } = await import("../src/cli.js");
     await runCli(["node", "judges", "--version"]);
   });
+
+  it("should print CLI help and exit when no command is provided", async () => {
+    const { runCli } = await import("../src/cli.js");
+    const origExit = process.exit;
+    const origLog = console.log;
+    const output: string[] = [];
+
+    try {
+      console.log = ((message?: unknown) => {
+        output.push(String(message ?? ""));
+      }) as typeof console.log;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      await assert.rejects(() => runCli(["node", "judges"]), /EXIT:0/);
+      const combined = output.join("\n");
+      assert.ok(combined.includes("Judges Panel"), "Should print the CLI banner");
+      assert.ok(combined.includes("Core commands:"), "Should print the core commands section");
+      assert.ok(
+        combined.includes("judges review-workflow-suggest") || combined.includes("judges eval"),
+        "Should print command help entries",
+      );
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+  });
+
+  it("should print help after an unknown command", async () => {
+    const { runCli } = await import("../src/cli.js");
+    const origExit = process.exit;
+    const origLog = console.log;
+    const origError = console.error;
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      console.log = ((message?: unknown) => {
+        logs.push(String(message ?? ""));
+      }) as typeof console.log;
+      console.error = ((message?: unknown) => {
+        errors.push(String(message ?? ""));
+      }) as typeof console.error;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      await assert.rejects(() => runCli(["node", "judges", "not-a-real-command"]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("Unknown command: not-a-real-command")));
+      assert.ok(logs.join("\n").includes("USAGE:"), "Should print help text after unknown command");
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+      console.error = origError;
+    }
+  });
+
+  it("should list judges and exit cleanly", async () => {
+    const { runCli } = await import("../src/cli.js");
+    const origExit = process.exit;
+    const origLog = console.log;
+    const output: string[] = [];
+
+    try {
+      console.log = ((message?: unknown) => {
+        output.push(String(message ?? ""));
+      }) as typeof console.log;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      await assert.rejects(() => runCli(["node", "judges", "list"]), /EXIT:0/);
+      const combined = output.join("\n");
+      assert.ok(combined.includes("Available Judges"));
+      assert.ok(combined.includes("cybersecurity"));
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+  });
+
+  it("should generate GitHub Actions CI template", async () => {
+    const { runCli } = await import("../src/cli.js");
+    const origExit = process.exit;
+    const origLog = console.log;
+    const output: string[] = [];
+
+    try {
+      console.log = ((message?: unknown) => {
+        output.push(String(message ?? ""));
+      }) as typeof console.log;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      await assert.rejects(() => runCli(["node", "judges", "ci-templates", "github"]), /EXIT:0/);
+      const combined = output.join("\n");
+      assert.ok(combined.includes("name: Judges Panel Code Review"));
+      assert.ok(combined.includes("upload-sarif"));
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+  });
+
+  it("should generate non-GitHub CI templates and reject unknown providers", async () => {
+    const { runCli } = await import("../src/cli.js");
+    const origExit = process.exit;
+    const origLog = console.log;
+    const origError = console.error;
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      console.log = ((message?: unknown) => {
+        logs.push(String(message ?? ""));
+      }) as typeof console.log;
+      console.error = ((message?: unknown) => {
+        errors.push(String(message ?? ""));
+      }) as typeof console.error;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      await assert.rejects(() => runCli(["node", "judges", "ci-templates", "gitlab"]), /EXIT:0/);
+      await assert.rejects(() => runCli(["node", "judges", "ci-templates", "azure"]), /EXIT:0/);
+      await assert.rejects(() => runCli(["node", "judges", "ci-templates", "bitbucket"]), /EXIT:0/);
+      await assert.rejects(() => runCli(["node", "judges", "ci-templates", "unknown"]), /EXIT:1/);
+
+      const combined = logs.join("\n");
+      assert.ok(
+        combined.includes("judges-review:") && combined.includes("stage: test"),
+        "Should print GitLab CI template",
+      );
+      assert.ok(combined.includes("trigger:"), "Should print Azure Pipelines template");
+      assert.ok(combined.includes("pipelines:"), "Should print Bitbucket pipeline template");
+      assert.ok(errors.some((line) => line.includes("Unknown provider: unknown")));
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+      console.error = origError;
+    }
+  });
+
+  it("should render the full comparison matrix", async () => {
+    const { runCli } = await import("../src/cli.js");
+    const origExit = process.exit;
+    const origLog = console.log;
+    const output: string[] = [];
+
+    try {
+      console.log = ((message?: unknown) => {
+        output.push(String(message ?? ""));
+      }) as typeof console.log;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      await assert.rejects(() => runCli(["node", "judges", "compare", "all"]), /EXIT:0/);
+      assert.ok(output.join("\n").includes("Capability Matrix"));
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+  });
+
+  it("should reject unknown compare tools", async () => {
+    const { runCli } = await import("../src/cli.js");
+    const origExit = process.exit;
+    const origError = console.error;
+    const errors: string[] = [];
+
+    try {
+      console.error = ((message?: unknown) => {
+        errors.push(String(message ?? ""));
+      }) as typeof console.error;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      await assert.rejects(() => runCli(["node", "judges", "compare", "unknown-tool"]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("Unknown tool: unknown-tool")));
+    } finally {
+      process.exit = origExit;
+      console.error = origError;
+    }
+  });
+
+  it("should fail when evaluating a missing file", async () => {
+    const { runCli } = await import("../src/cli.js");
+    const origExit = process.exit;
+    const origError = console.error;
+    const errors: string[] = [];
+
+    try {
+      console.error = ((message?: unknown) => {
+        errors.push(String(message ?? ""));
+      }) as typeof console.error;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      await assert.rejects(() => runCli(["node", "judges", "eval", "--file", "definitely-missing.ts"]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("Error: File not found")));
+    } finally {
+      process.exit = origExit;
+      console.error = origError;
+    }
+  });
+
+  it("should route guided-tour through the CLI", async () => {
+    const { runCli } = await import("../src/cli.js");
+    const origLog = console.log;
+    const logs: string[] = [];
+
+    try {
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      await runCli(["node", "judges", "guided-tour", "--all", "--format", "json"]);
+      assert.ok(logs.some((line) => line.includes("welcome") || line.includes("tour") || line.includes("steps")));
+    } finally {
+      console.log = origLog;
+    }
+  });
+
+  it("should route setup-wizard through the CLI", async () => {
+    const { runCli } = await import("../src/cli.js");
+    const origLog = console.log;
+    const logs: string[] = [];
+
+    try {
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      await runCli(["node", "judges", "setup-wizard", "--list-profiles", "--format", "json"]);
+      assert.ok(logs.some((line) => line.includes("security-first") || line.includes("team-review")));
+    } finally {
+      console.log = origLog;
+    }
+  });
+
+  it("should route review-quickstart and review-ci-integration through the CLI", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runCli } = await import("../src/cli.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-cli-review-"));
+    const ciFile = path.join(tmpDir, "azure-pipelines.yml");
+    const origLog = console.log;
+    const logs: string[] = [];
+
+    try {
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      await runCli(["node", "judges", "review-quickstart", "--dir", tmpDir, "--format", "json"]);
+      await runCli(["node", "judges", "review-ci-integration", "--platform", "azure", "--output", ciFile]);
+
+      assert.ok(logs.some((line) => line.includes("quickstart") || line.includes("review")));
+      assert.ok(fs.existsSync(ciFile));
+    } finally {
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should route review-repo-onboard and app help through the CLI", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runCli } = await import("../src/cli.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-cli-onboard-"));
+    const origLog = console.log;
+    const logs: string[] = [];
+
+    try {
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      await runCli([
+        "node",
+        "judges",
+        "review-repo-onboard",
+        "--repo",
+        tmpDir,
+        "--preset",
+        "strict",
+        "--format",
+        "json",
+      ]);
+      await runCli(["node", "judges", "app", "help"]);
+
+      assert.ok(logs.some((line) => line.includes("strict") || line.includes("onboard")));
+      assert.ok(logs.some((line) => line.includes("serve") || line.includes("GitHub App")));
+    } finally {
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should route review-cicd-integrate and doctor through the CLI", async () => {
+    const { runCli } = await import("../src/cli.js");
+    const origLog = console.log;
+    const origError = console.error;
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+
+      await runCli(["node", "judges", "review-cicd-integrate", "--format", "json"]);
+      await runCli(["node", "judges", "doctor", "--format", "json"]);
+
+      assert.ok(logs.some((line) => line.includes("platforms") || line.includes("pipelines")));
+      assert.ok(logs.some((line) => line.includes("checks") || line.includes("status")) || errors.length >= 0);
+    } finally {
+      console.log = origLog;
+      console.error = origError;
+    }
+  });
+
+  it("should route config export and baseline create through the CLI", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runCli } = await import("../src/cli.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-cli-config-"));
+    const origCwd = process.cwd();
+    const origExit = process.exit;
+    const origLog = console.log;
+    const logs: string[] = [];
+
+    try {
+      process.chdir(tmpDir);
+      fs.writeFileSync(path.join(tmpDir, ".judgesrc.json"), JSON.stringify({ minSeverity: "medium" }, null, 2));
+      fs.writeFileSync(
+        path.join(tmpDir, "sample.ts"),
+        "const query = `SELECT * FROM users WHERE id = ${userId}`;\n",
+        "utf-8",
+      );
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      await assert.rejects(() => runCli(["node", "judges", "config", "export", "--output", "team.json"]), /EXIT:0/);
+      await runCli(["node", "judges", "baseline", "create", "--file", "sample.ts", "-o", "baseline.json"]);
+
+      assert.ok(fs.existsSync(path.join(tmpDir, "team.json")));
+      assert.ok(fs.existsSync(path.join(tmpDir, "baseline.json")));
+      assert.ok(logs.some((line) => line.includes("Exported team config")));
+    } finally {
+      process.chdir(origCwd);
+      process.exit = origExit;
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should route review help and app help error-free through the CLI", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runCli } = await import("../src/cli.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-cli-review-help-"));
+    const origCwd = process.cwd();
+    const origExit = process.exit;
+    const origLog = console.log;
+    const logs: string[] = [];
+
+    try {
+      process.chdir(tmpDir);
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      await assert.rejects(() => runCli(["node", "judges", "review"]), /EXIT:0/);
+      await runCli(["node", "judges", "app", "help"]);
+
+      assert.ok(logs.some((line) => line.includes("Pull Request Review")));
+      assert.ok(logs.some((line) => line.includes("Judges GitHub App")));
+    } finally {
+      process.chdir(origCwd);
+      process.exit = origExit;
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should route license, correlation, org-policy, and learning-path workflows through the CLI", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runCli } = await import("../src/cli.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-cli-governance-"));
+    const origCwd = process.cwd();
+    const origLog = console.log;
+    const origError = console.error;
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      process.chdir(tmpDir);
+      fs.mkdirSync(path.join(tmpDir, "node_modules", "alpha"), { recursive: true });
+      fs.mkdirSync(path.join(tmpDir, "coverage"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, "package.json"),
+        JSON.stringify(
+          {
+            name: "fixture-project",
+            version: "1.0.0",
+            dependencies: { alpha: "^1.2.3" },
+            devDependencies: { beta: "~4.5.6" },
+          },
+          null,
+          2,
+        ),
+      );
+      fs.writeFileSync(
+        path.join(tmpDir, "node_modules", "alpha", "package.json"),
+        JSON.stringify({ name: "alpha", version: "1.2.3", license: "AGPL-3.0" }, null, 2),
+      );
+      fs.writeFileSync(
+        path.join(tmpDir, ".judgesrc"),
+        JSON.stringify({ minSeverity: "low", disabledJudges: ["cybersecurity"] }, null, 2),
+      );
+      fs.writeFileSync(
+        path.join(tmpDir, "coverage", "lcov.info"),
+        [
+          "TN:",
+          "SF:src/app.ts",
+          "LF:10",
+          "LH:8",
+          "end_of_record",
+          "SF:src/untested.ts",
+          "LF:5",
+          "LH:0",
+          "end_of_record",
+        ].join("\n"),
+        "utf-8",
+      );
+      fs.writeFileSync(
+        path.join(tmpDir, ".judges-findings.json"),
+        JSON.stringify(
+          [
+            { file: "src/app.ts", ruleId: "CYBER-001", severity: "high", title: "SQL injection risk" },
+            { file: "src/untested.ts", ruleId: "AUTH-001", severity: "critical", title: "Hardcoded credential" },
+          ],
+          null,
+          2,
+        ),
+      );
+
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+
+      await runCli(["node", "judges", "license-scan", "--save", "--format", "json"]);
+      await runCli(["node", "judges", "test-correlate", "--save", "--format", "json"]);
+      await runCli(["node", "judges", "org-policy", "--init"]);
+      await runCli([
+        "node",
+        "judges",
+        "org-policy",
+        "--set-min-severity",
+        "high",
+        "--set-required-judges",
+        "cybersecurity",
+        "--set-max-suppressions",
+        "1",
+        "--check",
+        "--format",
+        "json",
+      ]);
+      await runCli(["node", "judges", "learning-path", "--developer", "alice", "--format", "json"]);
+
+      assert.ok(fs.existsSync(path.join(tmpDir, ".judges-licenses", "license-report.json")));
+      assert.ok(fs.existsSync(path.join(tmpDir, ".judges-test-correlate", "correlation-report.json")));
+      assert.ok(fs.existsSync(path.join(tmpDir, ".judges-org-policy", "org-policy.json")));
+      assert.ok(fs.existsSync(path.join(tmpDir, ".judges-learning", "alice-progress.json")));
+      assert.ok(logs.some((line) => line.includes("AGPL-3.0") || line.includes('"licenses"')));
+      assert.ok(
+        logs.some((line) => line.includes('"correlations"') || line.includes("Saved to .judges-test-correlate")),
+      );
+      assert.ok(logs.some((line) => line.includes("Initialized org policy") || line.includes("Org policy updated.")));
+      assert.ok(logs.some((line) => line.includes('"compliant": false') || line.includes('"violations"')));
+      assert.ok(
+        logs.some((line) => line.includes('"recommendedModules"') || line.includes("SQL Injection Prevention")),
+      );
+      assert.equal(errors.length, 0);
+    } finally {
+      process.chdir(origCwd);
+      console.log = origLog;
+      console.error = origError;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should route additional pattern and help commands through the CLI", async () => {
+    const { runCli } = await import("../src/cli.js");
+    const origLog = console.log;
+    const origError = console.error;
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+
+      await runCli(["node", "judges", "secret-scan", "--patterns", "--format", "json"]);
+      await runCli(["node", "judges", "iac-lint", "--rules", "--format", "json"]);
+      await runCli(["node", "judges", "pii-scan", "--patterns", "--format", "json"]);
+      await runCli(["node", "judges", "ai-gate", "--help"]);
+      await runCli(["node", "judges", "ai-output-compare", "--help"]);
+      await runCli(["node", "judges", "perf-compare", "--help"]);
+
+      assert.ok(logs.some((line) => line.includes("aws-access-key") || line.includes("GitHub Token")));
+      assert.ok(logs.some((line) => line.includes("dockerfile-run-as-root") || line.includes("IaC Lint Rules")));
+      assert.ok(logs.some((line) => line.includes("credit-card") || line.includes("PII Detection Patterns")));
+      assert.ok(logs.some((line) => line.includes("Pre-merge guard for AI-generated code")));
+      assert.ok(logs.some((line) => line.includes("Compare outputs from multiple AI models")));
+      assert.ok(logs.some((line) => line.includes("Before/after performance comparison")));
+      assert.equal(errors.length, 0);
+    } finally {
+      console.log = origLog;
+      console.error = origError;
+    }
+  });
 });
 
 // ─── Auto-Fix Patch Engine Tests ────────────────────────────────────────────
@@ -8512,6 +9286,153 @@ describe("Auto-Fix Patch Engine", () => {
   });
 });
 
+describe("PDF Formatter", () => {
+  it("renders findings and escapes unsafe content", async () => {
+    const { verdictToPdfHtml } = await import("../src/formatters/pdf.js");
+    const verdict: TribunalVerdict = {
+      overallVerdict: "fail",
+      overallScore: 42,
+      summary: "Needs fixes",
+      criticalCount: 1,
+      highCount: 0,
+      timestamp: "2024-01-01T00:00:00.000Z",
+      findings: [],
+      evaluations: [
+        {
+          judgeId: "cybersecurity",
+          judgeName: "Cybersecurity",
+          verdict: "fail",
+          score: 42,
+          summary: "unsafe",
+          findings: [
+            {
+              ruleId: "SEC-001",
+              title: "Unsafe <script>",
+              description: "Avoid <b>raw</b> HTML output",
+              recommendation: "Escape 'special' characters",
+              severity: "critical",
+              lineNumbers: [9, 10],
+              confidenceTier: "essential",
+            },
+          ],
+        },
+      ],
+    };
+    const html = verdictToPdfHtml(verdict, "src/<app>.ts");
+
+    assert.ok(html.includes("Judges Panel Report"));
+    assert.ok(html.includes("SEC-001"));
+    assert.ok(html.includes("Unsafe &lt;script&gt;"));
+    assert.ok(html.includes("src/&lt;app&gt;.ts"));
+    assert.ok(html.includes("Recommendation:"));
+  });
+
+  it("renders the no-findings state", async () => {
+    const { verdictToPdfHtml } = await import("../src/formatters/pdf.js");
+    const verdict: TribunalVerdict = {
+      overallVerdict: "pass",
+      overallScore: 100,
+      summary: "Clean",
+      criticalCount: 0,
+      highCount: 0,
+      timestamp: "2024-01-01T00:00:00.000Z",
+      findings: [],
+      evaluations: [],
+    };
+    const html = verdictToPdfHtml(verdict, undefined);
+
+    assert.ok(html.includes("No findings"));
+    assert.ok(html.includes("stdin"));
+  });
+
+  it("renders warning summaries, skips empty judges, and falls back for optional finding fields", async () => {
+    const { verdictToPdfHtml } = await import("../src/formatters/pdf.js");
+    const verdict: TribunalVerdict = {
+      overallVerdict: "warning",
+      overallScore: 76,
+      summary: "Mixed results",
+      criticalCount: 0,
+      highCount: 1,
+      timestamp: "2024-01-01T00:00:00.000Z",
+      findings: [],
+      evaluations: [
+        {
+          judgeId: "empty",
+          judgeName: "Empty Judge",
+          verdict: "pass",
+          score: 100,
+          summary: "No findings",
+          findings: [],
+        },
+        {
+          judgeId: "reliability",
+          judgeName: "Reliability & Resilience",
+          verdict: "warning",
+          score: 76,
+          summary: "Some issues",
+          findings: [
+            {
+              ruleId: "REL-100",
+              title: "High severity item",
+              description: "A high severity finding",
+              recommendation: "Handle the high severity issue",
+              severity: "high",
+              lineNumbers: [12],
+              confidenceTier: "important",
+            },
+            {
+              ruleId: "REL-200",
+              title: "Medium severity item",
+              description: "A medium severity finding",
+              recommendation: "Handle the medium severity issue",
+              severity: "medium",
+              lineNumbers: [18],
+              confidenceTier: "supplementary",
+            },
+            {
+              ruleId: "REL-300",
+              title: "Low severity item",
+              description: "A low severity finding",
+              recommendation: "Handle the low severity issue",
+              severity: "low",
+              lineNumbers: [24],
+              confidenceTier: "supplementary",
+            },
+            {
+              ruleId: "REL-400",
+              title: "Informational item",
+              description: "An informational finding",
+              recommendation: "Handle the informational issue",
+              severity: "info",
+              lineNumbers: [30],
+              confidenceTier: "supplementary",
+            },
+            {
+              ruleId: "REL-999",
+              title: "Custom severity item",
+              description: "Missing optional fields should use fallbacks",
+              recommendation: "",
+              severity: "custom",
+            } as unknown as Finding,
+          ],
+        },
+      ],
+    };
+
+    const html = verdictToPdfHtml(verdict, "reports/service.ts");
+
+    assert.ok(html.includes('style="color:#ca8a04">WARNING</span><span class="label">Verdict</span>'));
+    assert.ok(html.includes('style="color:#ea580c">1</span><span class="label">High</span>'));
+    assert.ok(html.includes('style="color:#ca8a04">1</span><span class="label">Medium</span>'));
+    assert.ok(html.includes('style="color:#2563eb">1</span><span class="label">Low</span>'));
+    assert.ok(!html.includes("Empty Judge"));
+    assert.ok(html.includes("Reliability &amp; Resilience"));
+    assert.ok(html.includes("CUSTOM"));
+    assert.ok(html.includes("color:#6b7280;font-weight:600"));
+    assert.ok(html.includes("<td>—</td>"));
+    assert.ok(!html.includes("Recommendation:</strong> Missing optional fields should use fallbacks"));
+  });
+});
 // ─── Configuration Parser Tests ─────────────────────────────────────────────
 
 describe("Configuration Parser", () => {

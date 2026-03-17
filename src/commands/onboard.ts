@@ -137,7 +137,7 @@ export async function runOnboard(argv: string[]): Promise<void> {
   console.log("  4. Run:  judges help data-adapter    # Set up team storage");
   console.log("");
   console.log("  Team members can get started by running:");
-  console.log("    npm install -g @kevinrabun/judges && judges eval .");
+  console.log("    npm install -g @kevinrabun/judges-cli && judges eval .");
   console.log("");
 
   if (!quiet) {
@@ -172,7 +172,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: npm install -g @kevinrabun/judges
+      - run: npm install -g @kevinrabun/judges-cli
       - run: judges eval . --format sarif --baseline .judges-baseline.json > judges.sarif.json
       - uses: github/codeql-action/upload-sarif@v3
         if: always()

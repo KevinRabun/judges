@@ -44,6 +44,75 @@ const SEVERITY_ICON: Record<string, string> = {
   info: "⚪",
 };
 
+function matchWildcardSegment(value: string, pattern: string): boolean {
+  let valueIndex = 0;
+  let patternIndex = 0;
+  let lastStarIndex = -1;
+  let lastMatchIndex = 0;
+
+  while (valueIndex < value.length) {
+    if (
+      patternIndex < pattern.length &&
+      (pattern[patternIndex] === "?" || pattern[patternIndex] === value[valueIndex])
+    ) {
+      valueIndex++;
+      patternIndex++;
+      continue;
+    }
+
+    if (patternIndex < pattern.length && pattern[patternIndex] === "*") {
+      lastStarIndex = patternIndex;
+      patternIndex++;
+      lastMatchIndex = valueIndex;
+      continue;
+    }
+
+    if (lastStarIndex !== -1) {
+      patternIndex = lastStarIndex + 1;
+      lastMatchIndex++;
+      valueIndex = lastMatchIndex;
+      continue;
+    }
+
+    return false;
+  }
+
+  while (patternIndex < pattern.length && pattern[patternIndex] === "*") {
+    patternIndex++;
+  }
+
+  return patternIndex === pattern.length;
+}
+
+function matchGlobPath(filePath: string, pattern: string): boolean {
+  const fileSegments = filePath.replace(/\\/g, "/").split("/").filter(Boolean);
+  const patternSegments = pattern.replace(/\\/g, "/").split("/").filter(Boolean);
+  const memo = new Map<string, boolean>();
+
+  function match(pathIndex: number, patternIndex: number): boolean {
+    const key = `${pathIndex}:${patternIndex}`;
+    const cached = memo.get(key);
+    if (cached !== undefined) return cached;
+
+    let result = false;
+    if (patternIndex === patternSegments.length) {
+      result = pathIndex === fileSegments.length;
+    } else if (patternSegments[patternIndex] === "**") {
+      result =
+        match(pathIndex, patternIndex + 1) || (pathIndex < fileSegments.length && match(pathIndex + 1, patternIndex));
+    } else if (pathIndex < fileSegments.length) {
+      result =
+        matchWildcardSegment(fileSegments[pathIndex], patternSegments[patternIndex]) &&
+        match(pathIndex + 1, patternIndex + 1);
+    }
+
+    memo.set(key, result);
+    return result;
+  }
+
+  return match(0, 0);
+}
+
 // ─── Chat Participant Registration ───────────────────────────────────────────
 
 /**
@@ -379,12 +448,9 @@ async function handleWorkspaceReview(
   // Apply include-pattern filtering when configured
   let filteredUris = uris;
   if (includes.length > 0) {
-    const includeRegexes = includes.map(
-      (g) => new RegExp("^" + g.replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*").replace(/\?/g, ".") + "$"),
-    );
     filteredUris = uris.filter((uri) => {
       const rel = vscode.workspace.asRelativePath(uri).replace(/\\/g, "/");
-      return includeRegexes.some((rx) => rx.test(rel));
+      return includes.some((pattern) => matchGlobPath(rel, pattern));
     });
   }
 

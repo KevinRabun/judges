@@ -92,7 +92,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npx @kevinrabun/judges eval --format sarif --fail-on-findings
+      - run: npx @kevinrabun/judges-cli eval --format sarif --fail-on-findings
 `;
       writeFileSync(workflowPath, workflow);
       steps.push({ name: ".github/workflows/judges.yml", status: "created", detail: "CI workflow" });

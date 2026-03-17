@@ -3,6 +3,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { matchGlobPath } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -35,9 +36,7 @@ function saveConfig(config: IgnoreConfig): void {
 }
 
 function matchesPattern(filePath: string, pattern: string): boolean {
-  // simple glob: * matches any non-slash, ** matches anything
-  const regexStr = pattern.replace(/\./g, "\\.").replace(/\*\*/g, "§§").replace(/\*/g, "[^/]*").replace(/§§/g, ".*");
-  return new RegExp(`^${regexStr}$`).test(filePath) || new RegExp(regexStr).test(filePath);
+  return matchGlobPath(filePath, pattern);
 }
 
 export function isIgnored(filePath: string): boolean {

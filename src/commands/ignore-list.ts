@@ -4,25 +4,12 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join, relative } from "path";
+import { matchGlobPath } from "../tools/command-safety.js";
 
 // ─── Simple glob matcher ────────────────────────────────────────────────────
 
-function globToRegex(pattern: string): RegExp {
-  const regex = pattern
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&") // Escape special regex chars (but not * and ?)
-    .replace(/\*\*/g, "{{GLOBSTAR}}") // Temp placeholder for **
-    .replace(/\*/g, "[^/]*") // * matches anything except /
-    .replace(/\?/g, "[^/]") // ? matches single char except /
-    .replace(/\{\{GLOBSTAR\}\}/g, ".*"); // ** matches everything including /
-  return new RegExp(`^${regex}$`);
-}
-
 function matchGlob(filePath: string, pattern: string): boolean {
-  try {
-    return globToRegex(pattern).test(filePath);
-  } catch {
-    return false;
-  }
+  return matchGlobPath(filePath, pattern);
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────

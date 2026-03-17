@@ -136,9 +136,8 @@ $ judges eval --file examples/sample-vulnerable-api-fixed.ts
 Judges outputs standard SARIF 2.1.0 for CI/CD integration:
 
 ```bash
-$ judges eval --file app.ts --format sarif > results.sarif
+judges eval --file app.ts --format sarif > results.sarif
 ```
-
 The SARIF output includes:
 - Full rule definitions with help URIs
 - Precise file locations with line numbers

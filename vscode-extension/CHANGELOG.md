@@ -4,6 +4,12 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.113.0] — 2026-03-17
+
+### Changed
+- Core engine bumped to `@kevinrabun/judges@^3.113.0`
+- Docs accuracy updates, coverage runner improvements, CI enhancements — see [core CHANGELOG](../CHANGELOG.md) for full details
+
 ## [3.112.0] — 2026-03-14
 
 ### Added

@@ -18,9 +18,19 @@ npm test
 2. **Create a branch** from `main`: `git checkout -b feature/your-feature`
 3. **Make changes** and add tests
 4. **Build**: `npm run build`
-5. **Test**: `npm test` — all 1220+ tests must pass
-6. **Commit** with a clear message
-7. **Open a PR** against `main`
+5. **Test**: `npm test` — all tests must pass
+6. **Coverage**: `npm run test:coverage` — thresholds enforced via `.c8rc.json` (current: lines ≥80, statements ≥80, branches ≥75, functions ≥65). Uses `scripts/run-tests-with-coverage.mjs` to normalize c8 exit codes on Windows CI. **Current temporary exclusion:** `src/cli.ts` (see “Coverage notes” below)
+7. **Commit** with a clear message
+8. **Open a PR** against `main`
+
+### Coverage notes
+- Coverage config lives in `.c8rc.json` (reporters: text, lcov, json-summary). Thresholds are pulled by `scripts/run-tests-with-coverage.mjs` so CI stays in sync.
+- Temporary exclusion: `src/cli.ts` is excluded while we refactor dispatch into testable helpers. Please do **not** remove the exclusion until CLI tests are added; once done, remove both the c8 exclusion and the `/* c8 ignore file */` comment at the top of `src/cli.ts`.
+- To inspect gaps:
+  ```bash
+  node -e "const s=require('./coverage/coverage-summary.json');const e=Object.entries(s).filter(([k])=>k!=='total');e.sort((a,b)=>a[1].lines.pct-b[1].lines.pct);console.table(e.slice(0,10).map(([k,v])=>({file:k.replace(process.cwd(),'').replace(/^\\/,'')||'total', pct:v.lines.pct.toFixed(2)})))"
+  ```
+- HTML reports: `coverage/lcov-report/index.html`
 
 ## Code Standards
 

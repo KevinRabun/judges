@@ -15,7 +15,7 @@ judges-review:
   stage: test
   image: node:22-slim
   before_script:
-    - npm install -g @kevinrabun/judges
+    - npm install -g @kevinrabun/judges-cli
   script:
     - judges report . --format markdown${failOnFindings ? " --fail-on-findings" : ""}
   rules:
@@ -55,7 +55,7 @@ steps:
       versionSpec: "22.x"
     displayName: "Install Node.js"
 
-  - script: npm install -g @kevinrabun/judges
+  - script: npm install -g @kevinrabun/judges-cli
     displayName: "Install Judges"
 
   - script: judges report . --format markdown
@@ -93,7 +93,7 @@ pipelines:
           name: Judges Code Review
           image: node:22-slim
           script:
-            - npm install -g @kevinrabun/judges
+            - npm install -g @kevinrabun/judges-cli
             - judges report . --format markdown${failOnFindings ? " --fail-on-findings" : ""}
 `;
 }

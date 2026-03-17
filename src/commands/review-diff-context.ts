@@ -3,7 +3,7 @@
  */
 
 import { readFileSync, existsSync } from "fs";
-import { execSync } from "child_process";
+import { runGit } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -134,7 +134,7 @@ understand the broader code landscape around changes.
   try {
     const diffArgs = staged ? ["diff", "--staged"] : ["diff", ref];
     if (fileFilter) diffArgs.push("--", fileFilter);
-    diffText = execSync(`git ${diffArgs.join(" ")}`, { encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 });
+    diffText = runGit(diffArgs, { trim: false, maxBuffer: 10 * 1024 * 1024 });
   } catch {
     console.error("Error: Could not run git diff. Are you in a git repository?");
     process.exitCode = 1;

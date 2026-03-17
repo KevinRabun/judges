@@ -4,6 +4,7 @@
 
 import { readFileSync, existsSync } from "fs";
 import type { TribunalVerdict } from "../types.js";
+import { stripWildcards } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ function mapOwnership(verdict: TribunalVerdict, owners: OwnerMapping[]): Ownersh
     const rulePrefix = f.ruleId.split("-")[0];
 
     for (const o of owners) {
-      if (o.pattern.includes(rulePrefix) || f.ruleId.includes(o.pattern.replace("*", ""))) {
+      if (o.pattern.includes(rulePrefix) || f.ruleId.includes(stripWildcards(o.pattern))) {
         assignedOwner = o.owner;
         break;
       }

@@ -1,0 +1,52 @@
+{
+  "name": "@kevinrabun/judges-cli",
+  "version": "3.113.0",
+  "description": "CLI wrapper for the Judges code review toolkit.",
+  "type": "module",
+  "main": "dist/cli.js",
+  "exports": {
+    ".": {
+      "import": "./dist/cli.js",
+      "types": "./dist/cli.d.ts"
+    },
+    "./runtime": {
+      "import": "./dist/cli.js",
+      "types": "./dist/cli.d.ts"
+    }
+  },
+  "bin": {
+    "judges": "bin/judges.js"
+  },
+  "files": [
+    "bin/judges.js",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/prepare-cli-package.mjs"
+  },
+  "keywords": [
+    "judges",
+    "cli",
+    "code-review",
+    "mcp"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KevinRabun/judges.git",
+    "directory": "packages/judges-cli"
+  },
+  "homepage": "https://github.com/KevinRabun/judges#readme",
+  "bugs": {
+    "url": "https://github.com/KevinRabun/judges/issues"
+  },
+  "author": "kevinrabun",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "typescript": "^5.9.3",
+    "web-tree-sitter": "^0.26.6",
+    "zod": "^4.3.6"
+  }
+}

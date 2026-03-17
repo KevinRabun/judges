@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.113.0] — 2026-03-17
+
+### Added
+- Docs accuracy updates (patch count now **200+**, experimental commands note, README link fixes, markdown lint config).
+- CLI helpers exported (`cli-helpers.ts`), consolidated import handling, and `printHelp` clarifies GA vs experimental commands.
+- Coverage runner (`scripts/run-tests-with-coverage.mjs`) reads `.c8rc.json` thresholds and normalizes c8 exit codes; CI link check for README; `actionlint` job added.
+- VS Code extension dep bump to `@kevinrabun/judges@^3.113.0`; compile verified (esbuild warnings about `import.meta` in CJS remain non-blocking).
+
+### Fixed
+- `expandEnvPlaceholders` and `validateJudgeDefinition` now exported from `src/config.ts` (fixes `tests/config-ext.test.ts`).
+- README localhost link rendered as code to avoid linkinator failures; migration guide patch count corrected; CLI import conflict resolved.
+
 ## [3.112.0] — 2026-03-14
 
 ### Added

@@ -24,7 +24,7 @@ function buildSteps(projectDir: string): QuickstartStep[] {
     {
       number: 1,
       title: "Install Judges",
-      description: "npm install -g @kevinrabun/judges",
+      description: "npm install -g @kevinrabun/judges-cli",
       status: "done",
     },
     {

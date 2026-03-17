@@ -4,6 +4,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
+import { matchWildcardText } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ Subcommands:
 
 Options:
   --rule <ruleId>       Rule ID to whitelist
-  --pattern <regex>     Regex pattern to match safe code
+  --pattern <text>      Wildcard pattern to match safe code (* and ? supported)
   --reason <text>       Reason for whitelisting
   --by <name>           Who added the entry
   --id <id>             Whitelist entry ID
@@ -95,11 +96,8 @@ Whitelist data stored in .judges/whitelist.json.
       return;
     }
 
-    // Validate the regex pattern
-    try {
-      new RegExp(pattern);
-    } catch {
-      console.error("Error: --pattern is not a valid regex.");
+    if (pattern.length > 512) {
+      console.error("Error: --pattern is too long.");
       process.exitCode = 1;
       return;
     }
@@ -140,11 +138,7 @@ Whitelist data stored in .judges/whitelist.json.
     }
     const matches = store.entries.filter((e) => {
       if (e.ruleId !== ruleId && e.ruleId !== "*") return false;
-      try {
-        return new RegExp(e.pattern).test(code);
-      } catch {
-        return false;
-      }
+      return matchWildcardText(code, e.pattern);
     });
     if (matches.length > 0) {
       console.log(`✓ Code is whitelisted by ${matches.length} entry/entries:`);

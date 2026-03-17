@@ -177,9 +177,6 @@ const MAX_CONSECUTIVE_EMPTY = 10;
 /** Maximum output tokens to request from the model */
 const MAX_OUTPUT_TOKENS = 4096;
 
-/** How often to compute and log interim scores (every N completed cases) */
-const INTERIM_SCORE_INTERVAL = 10;
-
 // ─── Empty Response Tracking ────────────────────────────────────────────────
 
 let _consecutiveEmpty = 0;
@@ -247,14 +244,6 @@ async function healthCheckModel(model: vscode.LanguageModelChat, token: vscode.C
   return false;
 }
 
-/** Non-retryable error patterns — retrying these will always produce the same result */
-const NON_RETRYABLE_PATTERNS = ["response too long", "content filter", "content_filter"];
-
-function isNonRetryable(error: unknown): boolean {
-  const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
-  return NON_RETRYABLE_PATTERNS.some((p) => msg.includes(p));
-}
-
 async function sendPrompt(
   model: vscode.LanguageModelChat,
   prompt: string,
@@ -266,20 +255,21 @@ async function sendPrompt(
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     if (token.isCancellationRequested) return "";
 
-    let partialText = "";
     try {
       const response = await model.sendRequest(messages, { modelOptions: { max_tokens: MAX_OUTPUT_TOKENS } }, token);
 
+      let text = "";
       for await (const chunk of response.text) {
         if (token.isCancellationRequested) break;
-        partialText += chunk;
+        text += chunk;
       }
 
       // If the model returned a non-empty response, accept it
-      if (partialText.trim().length > 0) {
+      if (text.trim().length > 0) {
         _consecutiveEmpty = 0;
+        // Small delay between requests to avoid overwhelming the API
         await delay(INTER_REQUEST_DELAY_MS);
-        return partialText;
+        return text;
       }
 
       // Empty response — retry with backoff unless exhausted
@@ -289,26 +279,8 @@ async function sendPrompt(
         await delay(backoff);
       }
     } catch (error) {
-      if (token.isCancellationRequested) return partialText || "";
-      if (error instanceof vscode.CancellationError) return partialText || "";
-
-      // If we collected partial text before the error, use it instead of retrying
-      if (partialText.trim().length > 0) {
-        log(
-          `Stream interrupted after ${partialText.length} chars: ${error instanceof Error ? error.message : String(error)}. Using partial response.`,
-        );
-        _consecutiveEmpty = 0;
-        await delay(INTER_REQUEST_DELAY_MS);
-        return partialText;
-      }
-
-      // Non-retryable errors (e.g. "Response too long") — don't waste time retrying
-      if (isNonRetryable(error)) {
-        log(`Non-retryable error: ${error instanceof Error ? error.message : String(error)}. Skipping case.`);
-        _totalEmpty++;
-        await delay(INTER_REQUEST_DELAY_MS);
-        return "";
-      }
+      if (token.isCancellationRequested) return "";
+      if (error instanceof vscode.CancellationError) return "";
 
       // Retry on transient errors (e.g. HTTP/2 protocol errors)
       if (attempt < MAX_RETRIES) {
@@ -343,42 +315,6 @@ async function sendPrompt(
   }
 
   return "";
-}
-
-// ─── Interim Scoring ────────────────────────────────────────────────────────
-
-function gradeFromF1(f1: number): string {
-  if (f1 >= 0.9) return "A";
-  if (f1 >= 0.8) return "B";
-  if (f1 >= 0.7) return "C";
-  if (f1 >= 0.6) return "D";
-  return "F";
-}
-
-function logInterimScore(mode: string, results: LlmCaseResult[], casesDone: number, casesTotal: number): void {
-  let tp = 0,
-    fn = 0,
-    fp = 0,
-    detected = 0;
-  for (const r of results) {
-    const caseTP = r.expectedRuleIds.length - r.missedRuleIds.length;
-    tp += caseTP;
-    fn += r.missedRuleIds.length;
-    fp += r.falsePositiveRuleIds.length;
-    if (r.passed) detected++;
-  }
-  const precision = tp + fp > 0 ? tp / (tp + fp) : 1;
-  const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
-  const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
-  const detRate = results.length > 0 ? detected / results.length : 0;
-  const grade = gradeFromF1(f1);
-
-  log(
-    `── ${mode} interim (${casesDone}/${casesTotal} cases) ──  ` +
-      `Grade: ${grade}  F1: ${(f1 * 100).toFixed(1)}%  ` +
-      `Prec: ${(precision * 100).toFixed(1)}%  Recall: ${(recall * 100).toFixed(1)}%  ` +
-      `Det: ${(detRate * 100).toFixed(1)}%  TP:${tp} FN:${fn} FP:${fp}`,
-  );
 }
 
 // ─── Per-Judge Benchmark ────────────────────────────────────────────────────
@@ -423,21 +359,6 @@ async function runPerJudgeBenchmark(
     });
   }
 
-  // Track how many judges remain per case for interim scoring
-  const judgesPerCase: number[] = cases.map(() => 0);
-  const judgesDonePerCase: number[] = cases.map(() => 0);
-  for (const p of pairs) judgesPerCase[p.caseIdx]++;
-  for (const key of completedKeys) {
-    const idx = parseInt(key.split(":")[0], 10);
-    judgesDonePerCase[idx]++;
-  }
-  let completedCases = cases.filter((_, i) => judgesDonePerCase[i] >= judgesPerCase[i]).length;
-  let nextInterim = Math.ceil((completedCases + 1) / INTERIM_SCORE_INTERVAL) * INTERIM_SCORE_INTERVAL;
-
-  log(
-    `Per-judge: ${totalCalls} total calls, ${completed} from checkpoint, ${completedCases} cases fully done, next interim at case ${nextInterim}`,
-  );
-
   const tasks = remainingPairs.map((p) => async () => {
     onProgress({
       message: `Per-judge: ${p.tc.id} → ${p.judge.name} (${completed + 1}/${totalCalls})`,
@@ -462,24 +383,6 @@ async function runPerJudgeBenchmark(
 
     completed++;
     sinceLastSave++;
-
-    // Track per-case completion for interim scoring
-    judgesDonePerCase[p.caseIdx]++;
-    if (judgesDonePerCase[p.caseIdx] >= judgesPerCase[p.caseIdx]) {
-      completedCases++;
-      if (completedCases >= nextInterim) {
-        // Score all fully-completed cases so far
-        const interimResults = cases
-          .map((tc, i) => {
-            if (judgesDonePerCase[i] < judgesPerCase[i]) return undefined;
-            const uniqueIds = [...new Set(caseRuleIds[i])];
-            return scoreLlmCase(tc, uniqueIds, "");
-          })
-          .filter((r): r is LlmCaseResult => r !== undefined);
-        logInterimScore("Per-Judge", interimResults, completedCases, cases.length);
-        nextInterim += INTERIM_SCORE_INTERVAL;
-      }
-    }
 
     if (sinceLastSave >= CHECKPOINT_SAVE_INTERVAL) {
       sinceLastSave = 0;
@@ -529,8 +432,6 @@ async function runTribunalBenchmark(
     });
   }
 
-  let nextInterim = Math.ceil((completed + 1) / INTERIM_SCORE_INTERVAL) * INTERIM_SCORE_INTERVAL;
-
   const tasks = remaining.map((item) => async () => {
     const idx = ++completed;
     onProgress({
@@ -551,13 +452,6 @@ async function runTribunalBenchmark(
     if (sinceLastSave >= CHECKPOINT_SAVE_INTERVAL) {
       sinceLastSave = 0;
       await saveCheckpoint(checkpoint);
-    }
-
-    // Interim scoring
-    if (completed >= nextInterim) {
-      const scored = results.filter((r): r is LlmCaseResult => r !== undefined);
-      logInterimScore("Tribunal", scored, completed, cases.length);
-      nextInterim += INTERIM_SCORE_INTERVAL;
     }
 
     return result;

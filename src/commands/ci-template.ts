@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: npm install -g @kevinrabun/judges
+      - run: npm install -g @kevinrabun/judges-cli
       - name: Run Judges evaluation
         run: |
           judges eval --file "src/**/*.ts" --format sarif --fail-on-findings > judges.sarif
@@ -47,7 +47,7 @@ judges-review:
   image: node:20
   stage: test
   script:
-    - npm install -g @kevinrabun/judges
+    - npm install -g @kevinrabun/judges-cli
     - judges eval --file "src/**/*.ts" --format sarif > judges.sarif
     - judges eval --file "src/**/*.ts" --format codeclimate > codeclimate.json
   artifacts:
@@ -70,7 +70,7 @@ steps:
     inputs:
       versionSpec: "20.x"
 
-  - script: npm install -g @kevinrabun/judges
+  - script: npm install -g @kevinrabun/judges-cli
     displayName: "Install Judges"
 
   - script: judges eval --file "src/**/*.ts" --format sarif > judges.sarif
@@ -94,7 +94,7 @@ pipelines:
           caches:
             - node
           script:
-            - npm install -g @kevinrabun/judges
+            - npm install -g @kevinrabun/judges-cli
             - judges eval --file "src/**/*.ts" --format json > judges-results.json
             - judges eval --file "src/**/*.ts" --format text
           artifacts:
@@ -112,7 +112,7 @@ jobs:
       - checkout
       - run:
           name: Install Judges
-          command: npm install -g @kevinrabun/judges
+          command: npm install -g @kevinrabun/judges-cli
       - run:
           name: Run evaluation
           command: judges eval --file "src/**/*.ts" --format sarif > judges.sarif

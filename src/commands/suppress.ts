@@ -6,6 +6,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
+import { matchGlobPath } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -54,13 +55,7 @@ function generateId(): string {
 }
 
 function matchesGlob(filePath: string, glob: string): boolean {
-  const regex = glob
-    .replace(/\./g, "\\.")
-    .replace(/\*\*/g, "§DOUBLESTAR§")
-    .replace(/\*/g, "[^/]*")
-    .replace(/§DOUBLESTAR§/g, ".*")
-    .replace(/\?/g, ".");
-  return new RegExp(`^${regex}$`).test(filePath);
+  return matchGlobPath(filePath, glob);
 }
 
 export function addSuppression(opts: {

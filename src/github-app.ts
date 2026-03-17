@@ -112,7 +112,7 @@ interface WebhookResult {
 
 // ─── Language Detection ─────────────────────────────────────────────────────
 
-const EXT_TO_LANG: Record<string, string> = {
+export const EXT_TO_LANG: Record<string, string> = {
   ".ts": "typescript",
   ".tsx": "typescript",
   ".js": "javascript",
@@ -141,7 +141,7 @@ const EXT_TO_LANG: Record<string, string> = {
   ".sql": "sql",
 };
 
-function detectLanguage(filePath: string): string | undefined {
+export function detectLanguage(filePath: string): string | undefined {
   const ext = filePath.toLowerCase().match(/\.[^.]+$/)?.[0] ?? "";
   if (filePath.toLowerCase().includes("dockerfile")) return "dockerfile";
   return EXT_TO_LANG[ext];
@@ -151,7 +151,7 @@ function detectLanguage(filePath: string): string | undefined {
 
 import { sign as cryptoSign, createPrivateKey } from "crypto";
 
-function generateJwt(appId: string, privateKey: string): string {
+export function generateJwt(appId: string, privateKey: string): string {
   const now = Math.floor(Date.now() / 1000);
   const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
   const payload = Buffer.from(JSON.stringify({ iat: now - 60, exp: now + 600, iss: appId })).toString("base64url");
@@ -229,7 +229,7 @@ export function verifyWebhookSignature(payload: string, signature: string | unde
 
 // ─── Diff Parsing ───────────────────────────────────────────────────────────
 
-function parsePatchToHunk(filePath: string, patch: string): DiffHunk {
+export function parsePatchToHunk(filePath: string, patch: string): DiffHunk {
   const lines = patch.split("\n");
   const newLines: string[] = [];
   const changedLineNumbers: number[] = [];
@@ -748,6 +748,7 @@ export function startAppServer(config: GitHubAppConfig): void {
  * `judges app serve` — Start the GitHub App webhook server.
  */
 export function runAppCommand(args: string[]): void {
+  if (process.env.JUDGES_TEST_DRY_RUN) return;
   const subcommand = args[0];
 
   if (subcommand === "serve") {

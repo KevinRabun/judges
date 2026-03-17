@@ -14,6 +14,8 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import type { CodeStructure, FunctionInfo } from "./types.js";
 
 // Support both ESM (import.meta.url) and CJS (esbuild bundle) environments.
@@ -104,6 +106,43 @@ const _moduleDir: string = _importMetaUrl
 // In dist: dist/ast/ → ../../grammars/
 // In vscode bundle: out/ → ../grammars/ (but tree-sitter gracefully degrades)
 const GRAMMAR_DIR = join(_moduleDir, "..", "..", "grammars");
+const GRAMMAR_CACHE_DIR = join(homedir(), ".judges", "grammars");
+const GRAMMAR_BASE_URL =
+  process.env.JUDGES_GRAMMAR_BASE_URL?.replace(/\/+$/, "") ||
+  "https://raw.githubusercontent.com/KevinRabun/judges/main/grammars";
+
+async function downloadGrammar(file: string, targetPath: string): Promise<boolean> {
+  if (typeof fetch !== "function") return false;
+
+  const tempPath = `${targetPath}.tmp`;
+  try {
+    const response = await fetch(`${GRAMMAR_BASE_URL}/${file}`);
+    if (!response.ok) return false;
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    mkdirSync(GRAMMAR_CACHE_DIR, { recursive: true });
+    writeFileSync(tempPath, bytes);
+    renameSync(tempPath, targetPath);
+    return true;
+  } catch {
+    try {
+      unlinkSync(tempPath);
+    } catch {
+      // ignore cleanup errors
+    }
+    return false;
+  }
+}
+
+async function ensureGrammarPath(file: string): Promise<string | null> {
+  const bundledPath = join(GRAMMAR_DIR, file);
+  if (existsSync(bundledPath)) return bundledPath;
+
+  const cachedPath = join(GRAMMAR_CACHE_DIR, file);
+  if (existsSync(cachedPath)) return cachedPath;
+
+  const downloaded = await downloadGrammar(file, cachedPath);
+  return downloaded ? cachedPath : null;
+}
 
 async function ensureInit(): Promise<boolean> {
   if (initPromise) return initPromise;
@@ -125,7 +164,9 @@ async function getLanguage(lang: string): Promise<TreeSitterLanguage | null> {
   const file = GRAMMAR_FILES[lang];
   if (!file) return null;
   try {
-    const grammar = await parserModule!.Language.load(join(GRAMMAR_DIR, file));
+    const grammarPath = await ensureGrammarPath(file);
+    if (!grammarPath) return null;
+    const grammar = await parserModule!.Language.load(grammarPath);
     languageCache.set(lang, grammar);
     return grammar;
   } catch {

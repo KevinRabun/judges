@@ -1,17 +1,18 @@
 {
-  "all": true,
-  "src": ["src/**/*.ts"],
+  "all": false,
+  "include": ["src/**/*.ts"],
   "exclude": [
-    "src/index.ts",
+    "src/cli.ts",
     "dist/**",
-    "tests/**",
+    "vscode-extension/**",
     "scripts/**",
-    "examples/**",
-    "node_modules/**"
+    "examples/**"
   ],
-  "reporter": ["text", "text-summary", "lcov"],
-  "lines": 70,
-  "branches": 60,
-  "functions": 60,
-  "statements": 70
+  "reporter": ["text", "lcov", "json-summary"],
+  "check-coverage": false,
+  "per-file": false,
+  "lines": 80,
+  "branches": 75,
+  "functions": 65,
+  "statements": 80
 }

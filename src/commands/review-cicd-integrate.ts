@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npx @kevinrabun/judges eval --file \${{ github.event.pull_request.head.sha }} --format sarif --fail-on-findings
+      - run: npx @kevinrabun/judges-cli eval --file \${{ github.event.pull_request.head.sha }} --format sarif --fail-on-findings
 `,
   },
   "gitlab-ci": {
@@ -28,7 +28,7 @@ jobs:
   stage: test
   image: node:20
   script:
-    - npx @kevinrabun/judges eval --format sarif --fail-on-findings
+    - npx @kevinrabun/judges-cli eval --format sarif --fail-on-findings
   only:
     - merge_requests
 `,
@@ -43,7 +43,7 @@ steps:
   - task: NodeTool@0
     inputs:
       versionSpec: '20.x'
-  - script: npx @kevinrabun/judges eval --format sarif --fail-on-findings
+  - script: npx @kevinrabun/judges-cli eval --format sarif --fail-on-findings
     displayName: 'Run Judges Review'
 `,
   },
@@ -54,7 +54,7 @@ steps:
     stages {
         stage('Judges Review') {
             steps {
-                sh 'npx @kevinrabun/judges eval --format sarif --fail-on-findings'
+                sh 'npx @kevinrabun/judges-cli eval --format sarif --fail-on-findings'
             }
         }
     }

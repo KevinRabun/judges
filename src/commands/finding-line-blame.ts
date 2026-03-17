@@ -6,8 +6,8 @@
  */
 
 import { readFileSync, existsSync } from "fs";
-import { execSync } from "child_process";
 import type { TribunalVerdict } from "../types.js";
+import { runGit } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -32,10 +32,7 @@ function getBlameForLines(file: string, lines: number[]): BlameInfo[] {
 
   for (const line of lines) {
     try {
-      const output = execSync(`git blame -L ${line},${line} --porcelain "${file}"`, {
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "pipe"],
-      });
+      const output = runGit(["blame", "-L", `${line},${line}`, "--porcelain", "--", file], { trim: false });
 
       let author = "unknown";
       let date = "";

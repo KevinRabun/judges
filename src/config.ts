@@ -10,6 +10,16 @@ import type { JudgesPlugin } from "./plugins.js";
 import { registerPlugin } from "./plugins.js";
 import { ConfigError } from "./errors.js";
 import { normalizeLanguage } from "./language-patterns.js";
+import { matchGlobPath } from "./tools/command-safety.js";
+
+// Expand ${ENV_VAR} placeholders in config strings
+export function expandEnvPlaceholders(content: string): string {
+  if (!content) return content;
+  return content.replace(/\$\{([^}]+)\}/g, (_match, varName) => {
+    const envVal = process.env[varName];
+    return envVal !== undefined ? envVal : "";
+  });
+}
 
 const VALID_SEVERITIES = new Set<Severity>(["critical", "high", "medium", "low", "info"]);
 const VALID_FORMATS = new Set(["text", "json", "sarif", "markdown", "html", "junit", "codeclimate"]);
@@ -18,6 +28,31 @@ const VALID_FORMATS = new Set(["text", "json", "sarif", "markdown", "html", "jun
 const SEVERITY_RANK: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
 function severityRank(s: Severity): number {
   return SEVERITY_RANK[s] ?? 4;
+}
+
+/**
+ * Validate a JudgeDefinition object. Returns an array of error messages. Empty
+ * array means validation passed.
+ */
+export function validateJudgeDefinition(def: Partial<JudgeDefinition>): string[] {
+  const errors: string[] = [];
+  const requiredStringFields: (keyof JudgeDefinition)[] = [
+    "id",
+    "name",
+    "domain",
+    "description",
+    "rulePrefix",
+    "tableDescription",
+    "promptDescription",
+    "systemPrompt",
+  ];
+  for (const field of requiredStringFields) {
+    const val = def[field];
+    if (typeof val !== "string" || val.trim().length === 0) {
+      errors.push(`Missing or invalid field: ${String(field)}`);
+    }
+  }
+  return errors;
 }
 
 /**
@@ -457,6 +492,20 @@ export function mergeConfigs(...configs: JudgesConfig[]): JudgesConfig {
   return merged;
 }
 
+/** Lightweight loader for tests and CLI helpers.
+ * Reads a JSON config file, expands env placeholders (${VARS}), and parses it.
+ * Returns {} on any failure to keep CLI flows resilient.
+ */
+export async function loadConfigFile(path: string): Promise<JudgesConfig> {
+  try {
+    const content = readFileSync(path, "utf-8");
+    const expanded = expandEnvPlaceholders(content);
+    return parseConfig(expanded);
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Resolve `extends` references in a config. Each value in `extends` is treated
  * as a file path (relative to `baseDir`). The referenced configs are loaded
@@ -698,31 +747,7 @@ export function applyOverridesForFile(config: JudgesConfig, filePath: string): J
  * - `?` matches exactly one character except `/`
  */
 function globMatch(path: string, pattern: string): boolean {
-  // Escape regex special chars except *, ?, and /
-  let regex = "";
-  for (let i = 0; i < pattern.length; i++) {
-    const ch = pattern[i];
-    if (ch === "*") {
-      if (pattern[i + 1] === "*") {
-        // ** — match anything including path separators
-        regex += ".*";
-        i++; // skip second *
-        // Skip optional trailing /
-        if (pattern[i + 1] === "/") i++;
-      } else {
-        // * — match anything except /
-        regex += "[^/]*";
-      }
-    } else if (ch === "?") {
-      regex += "[^/]";
-    } else if (".+^${}()|[]\\".includes(ch)) {
-      regex += "\\" + ch;
-    } else {
-      regex += ch;
-    }
-  }
-
-  return new RegExp("^" + regex + "$", "i").test(path);
+  return matchGlobPath(path, pattern);
 }
 
 // ─── Language Profile Application ────────────────────────────────────────────

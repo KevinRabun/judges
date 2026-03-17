@@ -5,7 +5,7 @@
 
 import { readFileSync, readdirSync, statSync, existsSync } from "fs";
 import { join, extname, relative } from "path";
-import { execSync } from "child_process";
+import { matchGlobPath, runGit } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -76,17 +76,7 @@ function collectSourceFiles(dir: string, max = 500): string[] {
 // ─── Analysis ───────────────────────────────────────────────────────────────
 
 function matchesPattern(filepath: string, pattern: string): boolean {
-  if (pattern.endsWith("*")) {
-    return filepath.startsWith(pattern.slice(0, -1));
-  }
-  if (pattern.startsWith("*")) {
-    return filepath.endsWith(pattern.slice(1));
-  }
-  if (pattern.includes("*")) {
-    const regex = new RegExp("^" + pattern.replace(/\*/g, ".*") + "$");
-    return regex.test(filepath);
-  }
-  return filepath.startsWith(pattern) || filepath === pattern;
+  return matchGlobPath(filepath, pattern) || filepath.startsWith(pattern) || filepath === pattern;
 }
 
 function getRecentAuthors(dir: string, filepath: string, months = 6): string[] {
@@ -94,11 +84,10 @@ function getRecentAuthors(dir: string, filepath: string, months = 6): string[] {
     const since = new Date();
     since.setMonth(since.getMonth() - months);
     const dateStr = since.toISOString().split("T")[0];
-    const output = execSync(`git log --since="${dateStr}" --format="%ae" -- "${filepath}"`, {
+    const output = runGit(["log", `--since=${dateStr}`, "--format=%ae", "--", filepath], {
       cwd: dir,
-      encoding: "utf-8",
       timeout: 5000,
-    }).trim();
+    });
     if (!output) return [];
     return [...new Set(output.split("\n"))];
   } catch {

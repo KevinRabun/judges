@@ -7,8 +7,8 @@
  */
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { execSync } from "child_process";
 import type { Finding } from "../types.js";
+import { tryRunGit } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -29,11 +29,7 @@ const RETRO_FILE = ".judges-retro.json";
 // ─── Core ───────────────────────────────────────────────────────────────────
 
 function getFileAtCommit(file: string, commit: string): string | null {
-  try {
-    return execSync(`git show ${commit}:${file}`, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
-  } catch {
-    return null;
-  }
+  return tryRunGit(["show", `${commit}:${file}`], { trim: false });
 }
 
 function checkSuppressions(findings: Finding[]): { suppressed: boolean; rules: string[] } {

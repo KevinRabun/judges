@@ -2,9 +2,9 @@
  * Blame-review — git-blame integrated historical finding attribution.
  */
 
-import { execSync } from "child_process";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join, extname } from "path";
+import { runGit, tryRunGit } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -66,22 +66,19 @@ const PATTERNS: { name: string; severity: string; regex: RegExp }[] = [
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function isGitRepo(): boolean {
-  try {
-    execSync("git rev-parse --is-inside-work-tree", { stdio: "pipe", timeout: 5000 });
-    return true;
-  } catch {
-    return false;
-  }
+  return tryRunGit(["rev-parse", "--is-inside-work-tree"], { timeout: 5000 }) !== null;
 }
 
 function gitBlameFile(filePath: string, since?: string): BlameEntry[] {
   try {
-    const sinceArg = since ? ` --since="${since}"` : "";
-    const out = execSync(`git blame --line-porcelain${sinceArg} -- "${filePath}"`, {
-      stdio: ["pipe", "pipe", "pipe"],
+    const args = ["blame", "--line-porcelain"];
+    if (since) args.push(`--since=${since}`);
+    args.push("--", filePath);
+    const out = runGit(args, {
       timeout: 15000,
       maxBuffer: 10 * 1024 * 1024,
-    }).toString();
+      trim: false,
+    });
 
     const entries: BlameEntry[] = [];
     const lines = out.split("\n");

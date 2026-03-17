@@ -41,7 +41,7 @@ judges eval src/
   accessibility, database, API design, error handling, and more.
 - **No per-rule config needed** — Judges auto-selects relevant rules per language.
 - **Confidence scores** — every finding has a 0-1 confidence score with evidence basis.
-- **Auto-fix patches** — 114 deterministic patches, no plugin installation needed.
+- **Auto-fix patches** — 200+ deterministic patches, no plugin installation needed.
 
 ---
 

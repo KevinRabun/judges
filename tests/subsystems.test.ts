@@ -32,10 +32,20 @@ import {
   checkPlugins,
   runDoctorChecks,
   formatDoctorReport,
+  runDoctor,
 } from "../src/commands/doctor.js";
 import type { DoctorReport } from "../src/commands/doctor.js";
 import { computeLanguageCoverage, formatCoverageReport, detectFileLanguage } from "../src/commands/coverage.js";
-import { createSnapshotStore, recordSnapshot, computeTrend, formatTrendReport } from "../src/commands/snapshot.js";
+import {
+  createSnapshotStore,
+  recordSnapshot,
+  computeTrend,
+  formatTrendReport,
+  formatTrendReportHtml,
+  computeMetrics,
+  detectRegressions,
+  formatRegressionAlerts,
+} from "../src/commands/snapshot.js";
 import type { SnapshotStore } from "../src/commands/snapshot.js";
 import { findJudgeForRule, computeRuleHitMetrics, formatRuleHitReport } from "../src/commands/rule-metrics.js";
 import {
@@ -86,6 +96,36 @@ import {
   getContextWindow,
 } from "../src/evaluators/shared.js";
 import { analyzeCodeStructure } from "../src/evaluators/code-structure.js";
+import { analyzeAccessibility } from "../src/evaluators/accessibility.js";
+import { analyzeApiContract } from "../src/evaluators/api-contract.js";
+import { analyzeConcurrency } from "../src/evaluators/concurrency.js";
+import { analyzeErrorHandling } from "../src/evaluators/error-handling.js";
+import { analyzeEthicsBias } from "../src/evaluators/ethics-bias.js";
+import { analyzeHallucinationDetection } from "../src/evaluators/hallucination-detection.js";
+import { analyzeIntentAlignment } from "../src/evaluators/intent-alignment.js";
+import { analyzeLogicReview } from "../src/evaluators/logic-review.js";
+import { analyzeMaintainability } from "../src/evaluators/maintainability.js";
+import { analyzeMultiTurnCoherence } from "../src/evaluators/multi-turn-coherence.js";
+import { analyzeBackwardsCompatibility } from "../src/evaluators/backwards-compatibility.js";
+import { analyzeCiCd } from "../src/evaluators/ci-cd.js";
+import { analyzeConfigurationManagement } from "../src/evaluators/configuration-management.js";
+import { analyzeCostEffectiveness } from "../src/evaluators/cost-effectiveness.js";
+import { analyzeDataSecurity } from "../src/evaluators/data-security.js";
+import { analyzeDependencyHealth } from "../src/evaluators/dependency-health.js";
+import { analyzeDocumentation } from "../src/evaluators/documentation.js";
+import { analyzeDependencies } from "../src/evaluators/dependencies.js";
+import { analyzeScalability } from "../src/evaluators/scalability.js";
+import { analyzeSecurity } from "../src/evaluators/security.js";
+import { analyzeOverEngineering } from "../src/evaluators/over-engineering.js";
+import { analyzeFrameworkSafety } from "../src/evaluators/framework-safety.js";
+import { analyzeCybersecurity } from "../src/evaluators/cybersecurity.js";
+import { analyzeIacSecurity } from "../src/evaluators/iac-security.js";
+import { analyzePortability } from "../src/evaluators/portability.js";
+import { analyzeRateLimiting } from "../src/evaluators/rate-limiting.js";
+import { analyzeReliability } from "../src/evaluators/reliability.js";
+import { analyzeSoftwarePractices } from "../src/evaluators/software-practices.js";
+import { analyzeTesting } from "../src/evaluators/testing.js";
+import { analyzeUx } from "../src/evaluators/ux.js";
 import { JUDGES } from "../src/judges/index.js";
 import type { Finding, Severity } from "../src/types.js";
 import { estimateFindingConfidenceWithBasis } from "../src/scoring.js";
@@ -109,6 +149,1825 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
     ...overrides,
   };
 }
+
+function assertFindingTitles(findings: Finding[], expectedTitles: string[]): void {
+  const titles = findings.map((finding) => finding.title);
+  for (const title of expectedTitles) {
+    assert.ok(titles.includes(title), `Expected finding title: ${title}`);
+  }
+}
+
+describe("High-yield evaluator coverage", () => {
+  it("should flag broad general security anti-patterns across multiple languages", () => {
+    const javascriptCode = [
+      'import express from "express";',
+      'import fs from "node:fs";',
+      'import path from "node:path";',
+      'import jwt from "jsonwebtoken";',
+      'import { createHash } from "node:crypto";',
+      "const app = express();",
+      'const BASE_DIR = "/srv/app/uploads";',
+      'app.post("/login", (req, res) => {',
+      "  const password = req.body.password;",
+      "  const query = `SELECT * FROM users WHERE email = '${req.body.email}' AND role = '${req.body.role}'`;",
+      '  const digest = createHash("md5").update(password).digest("hex");',
+      "  const filePath = path.join(BASE_DIR, req.query.file);",
+      '  fs.readFileSync(filePath, "utf8");',
+      '  fetch("http://internal.corp.example/auth", { headers: { Authorization: req.body.token } });',
+      "  const targetUrl = req.query.url;",
+      "  fetch(targetUrl);",
+      "  const merged = Object.assign({}, defaults, req.body);",
+      "  jwt.verify(req.body.token, process.env.JWT_SECRET);",
+      "  User.update({ ...req.body, merged });",
+      "  const nextUrl = req.query.next;",
+      "  res.redirect(nextUrl);",
+      "  if (signature === expected) {",
+      "    return res.json({ ok: true, query, digest });",
+      "  }",
+      "  return res.status(401).end();",
+      "});",
+      "app.listen(3000);",
+    ].join("\n");
+
+    const pythonCode = [
+      "from flask import request",
+      "import pickle",
+      "import requests",
+      "",
+      "def handler():",
+      "    payload = request.data",
+      "    pickle.loads(payload)",
+      '    cmd = request.args.get("cmd")',
+      "    eval(cmd)",
+      '    template = request.args.get("template")',
+      "    render_template_string(template)",
+      '    fmt = request.args.get("format")',
+      '    fmt.format(name=request.args.get("name"))',
+      '    requests.get("https://internal.example", verify=False)',
+    ].join("\n");
+
+    const goCode = [
+      "package main",
+      "",
+      "import (",
+      '  "crypto/tls"',
+      '  "net/http"',
+      '  "os"',
+      '  "path/filepath"',
+      ")",
+      "",
+      "func download(w http.ResponseWriter, r *http.Request) {",
+      '  filename := r.URL.Query().Get("file")',
+      '  fullPath := filepath.Join("/srv/data", filename)',
+      "  os.ReadFile(fullPath)",
+      '  var iv = []byte("0123456789abcdef")',
+      "  _ = iv",
+      "  transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}",
+      "  _ = transport",
+      "}",
+    ].join("\n");
+
+    const javaCode = [
+      "import javax.xml.parsers.DocumentBuilderFactory;",
+      "import java.util.Random;",
+      "",
+      "class InsecureXml {",
+      "  void parse(String xml) throws Exception {",
+      "    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();",
+      "    Random random = new Random();",
+      "    String token = String.valueOf(random.nextInt());",
+      "  }",
+      "}",
+    ].join("\n");
+
+    const rustCode = [
+      "fn read_ptr(ptr: *const u8) -> u8 {",
+      "    unsafe {",
+      "        std::ptr::read(ptr)",
+      "    }",
+      "}",
+    ].join("\n");
+
+    assertFindingTitles(analyzeSecurity(javascriptCode, "typescript"), [
+      "Untrusted input flows into database query construction",
+      "Weak cryptographic algorithm used for sensitive operations",
+      "Uncontrolled file system access with dynamic path construction",
+      "Sensitive data transmitted over unencrypted channel",
+      "API endpoint processes external input without validation",
+      "Web framework missing essential security hardening",
+      "Server-side HTTP request to user-controlled destination",
+      "Unsafe recursive object merge allowing property injection",
+      "Token verification without algorithm restriction",
+      "Direct user input in data modification without field filtering",
+      "Unvalidated redirect to user-controlled destination",
+      "Non-constant-time comparison of cryptographic material",
+    ]);
+
+    assertFindingTitles(analyzeSecurity(pythonCode, "python"), [
+      "Deserialization of data from untrusted sources",
+      "Command injection via unsanitized user input",
+      "Server-side template injection with user-controlled content",
+      "TLS certificate verification disabled",
+      "Format string attack with user-controlled template",
+    ]);
+
+    assertFindingTitles(analyzeSecurity(goCode, "go"), [
+      "Path traversal via user-controlled file path construction",
+      "Insecure cryptographic configuration",
+      "TLS certificate verification disabled",
+    ]);
+
+    assertFindingTitles(analyzeSecurity(javaCode, "java"), [
+      "XML processing without external entity restriction",
+      "Weak random number generator used for security-sensitive operations",
+    ]);
+
+    assertFindingTitles(analyzeSecurity(rustCode, "rust"), [
+      "Unsafe memory operations without safety invariant documentation",
+    ]);
+  });
+
+  it("should flag over-engineering patterns in a small TypeScript file", () => {
+    const code = [
+      'import fs from "node:fs";',
+      'import crypto from "node:crypto";',
+      "",
+      "interface PaymentGateway { charge(amount: number): void; }",
+      "interface NotificationGateway { send(message: string): void; }",
+      "interface AuditGateway { write(event: string): void; }",
+      "interface MetricsGateway { emit(metric: string): void; }",
+      "abstract class UserRepository { abstract save(user: unknown): void; }",
+      "class StripeGateway implements PaymentGateway { charge(amount: number) { void amount; } }",
+      "",
+      "abstract class MegaPlatformService {",
+      "  abstract create(id: string, name: string, tag: string): Promise<void>;",
+      "  abstract update(id: string, name: string, metadata: string): Promise<void>;",
+      "  abstract delete(id: string, reason: string, actor: string): Promise<void>;",
+      "  abstract list(page: string, pageSize: string, sort: string): Promise<void>;",
+      "  abstract archive(id: string, actor: string, timestamp: string): Promise<void>;",
+      "  abstract restore(id: string, actor: string, timestamp: string): Promise<void>;",
+      "  abstract publish(id: string, actor: string, channel: string): Promise<void>;",
+      "  abstract unpublish(id: string, actor: string, channel: string): Promise<void>;",
+      "  abstract notify(id: string, audience: string, template: string): Promise<void>;",
+      "  abstract audit(id: string, before: string, after: string, actor: string): Promise<void>;",
+      "}",
+      "",
+      "class UserBuilder {",
+      "  withName(name: string) { void name; return this; }",
+      "  withEmail(email: string) { void email; return this; }",
+      "  setRole(role: string) { void role; return this; }",
+      '  build() { return { name: "", email: "", role: "" }; }',
+      "}",
+      "",
+      "const ServiceLocator = { get(name: string) { return name; } };",
+      "class EventBus {}",
+      "class AbstractFactory {}",
+      "",
+      "function fetchWrapper(url: string) { return fetch(url); }",
+      "function fileHelper(filePath: string) { return fs.readFileSync(filePath); }",
+      'function cryptoUtil(value: string) { return crypto.createHash("sha256").update(value).digest("hex"); }',
+      "function jsonWrapper(value: unknown) { return JSON.stringify(value); }",
+      "function mathHelper(value: number) { return Math.floor(value); }",
+      "",
+      "type Result<T, U, V> = [T, U, V];",
+      "function mapOne<T, U, V>(first: T, second: U, third: V): Result<T, U, V> { return [first, second, third]; }",
+      "function mapTwo<A, B, C>(first: A, second: B, third: C): [A, B, C] { return [first, second, third]; }",
+      "function mapThree<X, Y, Z>(first: X, second: Y, third: Z): [X, Y, Z] { return [first, second, third]; }",
+      "",
+      "void ServiceLocator;",
+      "void EventBus;",
+      "void AbstractFactory;",
+    ].join("\n");
+
+    assertFindingTitles(analyzeOverEngineering(code, "typescript"), [
+      "Multiple single-implementation abstractions",
+      "Excessive trivial wrappers around standard APIs",
+      "God interface detected",
+      "Builder pattern for simple object",
+      "Enterprise patterns in small codebase",
+      "Excessive generic type parameters",
+    ]);
+  });
+
+  it("should flag React, Express, Next.js, Angular, and Vue framework hazards", () => {
+    const code = [
+      'import express from "express";',
+      'import { useEffect, useState } from "react";',
+      'import rateLimit from "express-rate-limit";',
+      "",
+      "const app = express();",
+      "app.use((err, req, res, next) => { res.status(500).json({ error: err.message }); });",
+      "app.use(express.json());",
+      "app.use(express.urlencoded());",
+      "app.use(express.static(__dirname));",
+      "app.use(rateLimit());",
+      'app.get("/health", (_req, res) => res.send("ok"));',
+      "",
+      "export function BrokenComponent({ enabled, items, html }: { enabled: boolean; items: number[]; html: string }) {",
+      "  const [count, setCount] = useState(0);",
+      "  const state = { count };",
+      "  if (enabled) {",
+      "    const [flag] = useState(true);",
+      "    void flag;",
+      "  }",
+      "  for (const item of items) {",
+      "    const [value] = useState(item);",
+      "    void value;",
+      "  }",
+      "  useEffect(() => {",
+      '    window.addEventListener("resize", () => setCount((value) => value + 1));',
+      "  });",
+      "  useMemo(() => [count], [{ count }]);",
+      "  useEffect(() => { setCount(count + 1); });",
+      "  state.count = count + 1;",
+      "  return (",
+      "    <div>",
+      "      {items.map((item, index) => (",
+      "        <button key={index} onClick={() => setCount(item)}>{item}</button>",
+      "      ))}",
+      "      <button onMouseEnter={() => setCount(1)}>one</button>",
+      "      <button onMouseLeave={() => setCount(2)}>two</button>",
+      "      <button onFocus={() => setCount(3)}>three</button>",
+      "      <button onBlur={() => setCount(4)}>four</button>",
+      "      <button onMouseDown={() => setCount(5)}>five</button>",
+      "      <button onMouseUp={() => setCount(6)}>six</button>",
+      "      <div dangerouslySetInnerHTML={{ __html: html }} />",
+      "    </div>",
+      "  );",
+      "}",
+      "",
+      "export async function getServerSideProps() {",
+      "  return { props: { apiKey: process.env.API_KEY } };",
+      "}",
+      "",
+      "export default function handler(req: NextApiRequest, res: NextApiResponse) {",
+      "  res.status(200).json({ secret: req.query.secret });",
+      "}",
+      "",
+      "sanitizer.bypassSecurityTrustHtml(userHtml);",
+      '<template><div v-html="rawHtml"></div></template>',
+    ].join("\n");
+
+    assertFindingTitles(analyzeFrameworkSafety(code, "typescript"), [
+      "React hook called conditionally — Rules of Hooks violation",
+      "React hook called inside a loop — Rules of Hooks violation",
+      "useEffect subscribes without cleanup — memory leak risk",
+      "Inline object/array in hook dependency array — infinite re-render",
+      "setState in useEffect without dependency array — potential infinite loop",
+      "Express error middleware registered before routes",
+      "Express body parser without size limit — DoS risk",
+      "Express.static serves project root or parent — file exposure risk",
+      "Express app without helmet() — missing security headers",
+      "Next.js getServerSideProps leaks secrets to client props",
+      "Next.js API route without authentication check",
+      "Angular DomSanitizer bypass — XSS risk",
+      "Excessive inline arrow functions in JSX event handlers",
+      "React key prop using array index — may cause render bugs",
+    ]);
+  });
+
+  it("should flag Django, Flask, and FastAPI framework hazards", () => {
+    const code = [
+      "from django import forms",
+      "from django.shortcuts import render",
+      "from django.utils.safestring import mark_safe",
+      "from django.views.decorators.csrf import csrf_exempt",
+      "from flask import Flask, request, render_template_string, Markup, send_file, session",
+      "from fastapi import FastAPI",
+      "",
+      "DEBUG = True",
+      'ALLOWED_HOSTS = ["*"]',
+      'SECRET_KEY = "hardcoded-django-secret"',
+      "SESSION_COOKIE_SECURE = False",
+      "SECURE_SSL_REDIRECT = False",
+      "FILE_UPLOAD_PERMISSIONS = 0o777",
+      "",
+      "app = Flask(__name__)",
+      'app.secret_key = "hardcoded-flask-secret"',
+      "api = FastAPI()",
+      'template = "{{ content|safe }}"',
+      "dangerous_html = mark_safe(user_input)",
+      "",
+      "@csrf_exempt",
+      "def unsafe_view(request):",
+      '    cursor.execute(f"SELECT * FROM users WHERE email = {request.GET[\"email\"]}")',
+      '    return render(request, "unsafe.html", locals())',
+      "",
+      "app.run(debug=True)",
+      'render_template_string(request.args.get("template"))',
+      'Markup(f"<b>{request.args.get(\"name\")}</b>")',
+      'send_file(request.args.get("path"))',
+      'session["user"] = request.args.get("user")',
+      "",
+      '@app.get("/accounts")',
+      "async def list_accounts():",
+      '    database = "users-db"',
+      '    return {"user": "alice", "email": "alice@example.com", "db": database}',
+    ].join("\n");
+
+    assertFindingTitles(analyzeFrameworkSafety(code, "python"), [
+      "Django DEBUG=True — must be False in production",
+      "Django ALLOWED_HOSTS=['*'] — host header injection risk",
+      "Django raw SQL with string interpolation — SQL injection",
+      "Django SECRET_KEY hardcoded — credential exposure",
+      "Django @csrf_exempt — CSRF protection disabled",
+      "Django |safe filter — XSS vulnerability",
+      "Django SESSION_COOKIE_SECURE=False — session hijacking over HTTP",
+      "Django SECURE_SSL_REDIRECT=False — no HTTPS enforcement",
+      "Django mark_safe() with dynamic content — XSS vulnerability",
+      "Django FILE_UPLOAD_PERMISSIONS too permissive",
+      "Django render() with locals()/globals() — data exposure",
+      "Flask debug mode enabled — remote code execution risk",
+      "Flask render_template_string — server-side template injection (SSTI)",
+      "Flask SECRET_KEY hardcoded — session forgery risk",
+      "Flask Markup() with string interpolation — XSS risk",
+      "Flask send_file with user input — path traversal",
+      "FastAPI route with data access but no dependency injection for auth",
+    ]);
+  });
+
+  it("should flag Spring Boot framework hazards", () => {
+    const code = [
+      "import org.springframework.web.bind.annotation.*;",
+      "import org.springframework.security.config.annotation.web.builders.HttpSecurity;",
+      "import org.springframework.data.jpa.repository.Query;",
+      "",
+      "@RestController",
+      '@CrossOrigin("*")',
+      "class AdminController {",
+      '  @RequestMapping("/users")',
+      "  public User users() { return new User(); }",
+      "",
+      '  @RequestMapping("/admins")',
+      "  public User admins() { return new User(); }",
+      "",
+      '  @PostMapping("/create")',
+      "  public User create(",
+      "    @RequestBody UserDto dto,",
+      "    @RequestBody UserDto dto2",
+      "  ) {",
+      '    logger.info("password {}", password);',
+      "    return new User();",
+      "  }",
+      "}",
+      "",
+      "http.csrf().disable();",
+      '@Query("SELECT * FROM users WHERE name = " + name)',
+      "management.endpoints.web.exposure.include=*",
+      'auth.requestMatchers("/admin/**").permitAll()',
+      "objectMapper.activateDefaultTyping(typeValidator)",
+      "spring.datasource.password=supersecret",
+    ].join("\n");
+
+    assertFindingTitles(analyzeFrameworkSafety(code, "java"), [
+      "Spring Security CSRF protection disabled",
+      "Spring @Query with string concatenation — SQL injection",
+      'Spring @CrossOrigin("*") — permissive CORS',
+      "Spring @RequestMapping without HTTP method — accepts all methods",
+      "Spring REST endpoint returns JPA entity directly — data exposure risk",
+      "Spring Boot Actuator — all endpoints exposed",
+      "Spring @RequestBody without @Valid — no input validation",
+      "Spring Security permitAll() on sensitive path",
+      "Jackson default typing enabled — deserialization vulnerability",
+      "Spring Boot hardcoded credentials in configuration",
+      "Spring logging sensitive data — credential exposure",
+    ]);
+  });
+
+  it("should flag ASP.NET Core and Go framework hazards", () => {
+    const csharpCode = [
+      "using Microsoft.AspNetCore.Builder;",
+      "using Microsoft.AspNetCore.Mvc;",
+      "",
+      "var builder = WebApplication.CreateBuilder(args);",
+      'builder.Services.AddCors(options => options.AddPolicy("default", policy => policy.AllowAnyOrigin()));',
+      "var app = builder.Build();",
+      "app.UseDeveloperExceptionPage();",
+      "var problem = Problem(detail: ex.Message);",
+      'var conn = "Server=db;Password=Secret123";',
+      '_logger.LogInformation($"User {userId} logged in");',
+      "",
+      "[ApiController]",
+      "public class UsersController : ControllerBase",
+      "{",
+      "  [IgnoreAntiforgeryToken]",
+      "  [AllowAnonymous]",
+      "  [HttpDelete]",
+      "  public IActionResult DeleteUser([Bind()] UserInput input)",
+      "  {",
+      "    return Ok();",
+      "  }",
+      "",
+      "  [HttpGet]",
+      "  public IActionResult Raw(int id)",
+      "  {",
+      '    return Ok(context.Users.FromSqlRaw($"SELECT * FROM Users WHERE Id = {id}"));',
+      "  }",
+      "}",
+    ].join("\n");
+
+    const goCode = [
+      "package main",
+      "",
+      "import (",
+      '  "fmt"',
+      '  "html/template"',
+      '  "github.com/gin-gonic/gin"',
+      ")",
+      "",
+      "func main() {",
+      "  router := gin.New()",
+      '  proxyName := "nginx"',
+      "  _ = proxyName",
+      '  router.Static("/", ".")',
+      '  router.POST("/users", func(c *gin.Context) {',
+      "    var input UserInput",
+      "    c.ShouldBindJSON(&input)",
+      '    db.Query(fmt.Sprintf("SELECT * FROM users WHERE id = %s", input.ID))',
+      "    safe := template.HTML(input.HTML)",
+      "    _ = safe",
+      "  })",
+      "}",
+    ].join("\n");
+
+    assertFindingTitles(analyzeFrameworkSafety(csharpCode, "csharp"), [
+      "ASP.NET Core CORS allows any origin",
+      "ASP.NET anti-forgery token validation disabled",
+      "ASP.NET raw SQL with string interpolation — SQL injection",
+      "ASP.NET UseDeveloperExceptionPage without environment check",
+      "ASP.NET hardcoded connection string with credentials",
+      "ASP.NET [AllowAnonymous] on sensitive operation",
+      "ASP.NET missing UseHttpsRedirection — no HTTPS enforcement",
+      "ASP.NET mass assignment — unsafe model binding",
+      "ASP.NET string interpolation in logging — structured logging bypass",
+      "ASP.NET ProblemDetails with exception message — information disclosure",
+      "ASP.NET [ApiController] without [Authorize] — no default auth",
+    ]);
+
+    assertFindingTitles(analyzeFrameworkSafety(goCode, "go"), [
+      "Go HTTP binding without input validation",
+      "Go SQL query with string formatting — SQL injection",
+      "Gin TrustedProxies not configured — IP spoofing risk",
+      "Go HTTP static file server at project root — file exposure",
+      "Go template with unsafe HTML casting — XSS risk",
+    ]);
+  });
+
+  it("should flag broad cybersecurity anti-patterns in application code", () => {
+    const code = [
+      "/* eslint-disable */",
+      'import express from "express";',
+      'import session from "express-session";',
+      'import cors from "cors";',
+      "const app = express();",
+      'app.use(cors({ origin: "*", credentials: true }));',
+      'app.use(session({ secret: "admin123", cookie: { secure: false } }));',
+      'app.post("/register", (req, res) => {',
+      "  const html = req.body.html;",
+      "  element.innerHTML = html;",
+      "  eval(req.body.expression);",
+      '  exec("ls " + req.query.cmd);',
+      "  payload.__proto__ = req.body.value;",
+      "  const filter = `(&(uid=${req.query.user}))`;",
+      "  ldap.search(baseDn, filter);",
+      "  fetch(req.query.url);",
+      "  res.redirect(req.query.next);",
+      "  new RegExp(req.query.pattern);",
+      "  render_template_string(req.query.template);",
+      '  res.setHeader("X-User", req.query.header);',
+      "  const weakPassword = req.body.password;",
+      "  if (weakPassword) {",
+      "    res.send(req.query.output);",
+      "  }",
+      '  const adminPassword = "admin";',
+      "  User.update(req.body);",
+      '  const cipher = crypto.createCipheriv("aes-128-ecb", key, null);',
+      '  const query = "SELECT * FROM users WHERE name = " + req.query.name;',
+      '  fetch("http://169.254.169.254/latest/meta-data");',
+      '  const socket = new WebSocket("ws://chat.internal");',
+      "  if (secret === expectedSecret) {",
+      "    res.json({ merged, query, adminPassword, cipher, socket });",
+      "  }",
+      "});",
+    ].join("\n");
+
+    assertFindingTitles(analyzeCybersecurity(code, "typescript"), [
+      "Dangerous eval()/exec() usage",
+      "Potential XSS via innerHTML",
+      "Potential command injection",
+      "Overly permissive CORS configuration",
+      "Potential prototype pollution risk",
+      "Linter/type-checker suppression directives found",
+      "Potential LDAP injection",
+      "Potential Server-Side Request Forgery (SSRF)",
+      "Potential open redirect",
+      "User input in RegExp — ReDoS risk",
+      "Potential Server-Side Template Injection (SSTI)",
+      "Potential HTTP header injection",
+      "No security headers configured",
+      "Insecure session configuration",
+      "Authentication endpoints without rate limiting",
+      "Insecure WebSocket connection (ws://)",
+      "Mass assignment via raw request body",
+      "Cloud metadata endpoint reference",
+      "Insecure encryption mode (ECB)",
+      "Potential SQL injection via string concatenation",
+      "Non-constant-time comparison of secrets",
+    ]);
+  });
+
+  it("should flag Terraform and Dockerfile infrastructure security risks", () => {
+    const terraformCode = [
+      "terraform {",
+      "}",
+      "",
+      'provider "azurerm" {',
+      "  features {}",
+      "}",
+      "",
+      'resource "azurerm_storage_account" "bad" {',
+      '  name = "storageacct"',
+      '  location = "eastus"',
+      "  public_network_access_enabled = true",
+      "  https_only = false",
+      '  min_tls_version = "TLS1_0"',
+      "  infrastructure_encryption_enabled = false",
+      "  enable_logging = false",
+      "  security_rule {",
+      '    source_address_prefix = "*"',
+      '    destination_port_range = "*"',
+      "  }",
+      "}",
+      "",
+      'resource "azurerm_postgresql_flexible_server" "db" {',
+      '  location = "eastus"',
+      '  administrator_password = "SuperSecret123!"',
+      "  public_network_access_enabled = true",
+      "  geo_redundant_backup_enabled = false",
+      "}",
+      "",
+      'resource "azurerm_role_assignment" "owner" {',
+      '  role_definition_name = "Owner"',
+      "}",
+      "",
+      'resource "azurerm_role_definition" "wide" {',
+      "  permissions {",
+      '    actions = ["*"]',
+      "  }",
+      "}",
+    ].join("\n");
+
+    const dockerfileCode = [
+      "FROM node:latest",
+      "WORKDIR /app",
+      "ADD . /app",
+      "ENV DB_PASSWORD=SuperSecret123!",
+      "RUN adduser -D appuser",
+      "COPY package.json ./",
+      'CMD ["node", "index.js"]',
+    ].join("\n");
+
+    assertFindingTitles(analyzeIacSecurity(terraformCode, "terraform"), [
+      "Hardcoded secrets in infrastructure code",
+      "Encryption at rest disabled",
+      "HTTPS/TLS not enforced",
+      "Public access enabled on resource",
+      "Overly permissive network rules (0.0.0.0/0 or wildcard)",
+      "Overly permissive IAM/RBAC assignment",
+      "Logging or monitoring disabled",
+      "Hardcoded resource location",
+      "Insecure TLS version configured",
+      "Backup or disaster recovery disabled",
+      "Missing required_providers block",
+      "No remote backend configured",
+      "Resources without tags",
+    ]);
+
+    assertFindingTitles(analyzeIacSecurity(dockerfileCode, "dockerfile"), [
+      "Docker container running as root",
+      "Secrets exposed in Dockerfile ENV directive",
+      "Dockerfile uses ADD instead of COPY",
+      "Dockerfile FROM uses latest or untagged image",
+    ]);
+  });
+
+  it("should flag broad accessibility issues in JSX and HTML markup", () => {
+    const code = [
+      "<html>",
+      "  <body>",
+      '    <nav className="site-nav">Main navigation</nav>',
+      '    <img src="hero.jpg" />',
+      "    <div onClick={openModal}>Open modal</div>",
+      '    <div role="button">Save</div>',
+      '    <input type="email" placeholder="Email" />',
+      "    <div tabIndex={5}>Focusable</div>",
+      '    <span style={{ color: "red" }}>error status</span>',
+      "    <video autoPlay></video>",
+      '    <button style="outline: none">Continue</button>',
+      "  </body>",
+      "</html>",
+    ].join("\n");
+
+    assertFindingTitles(analyzeAccessibility(code, "tsx"), [
+      "Image missing alt attribute",
+      "Click handler without keyboard equivalent",
+      "Non-semantic element used with ARIA role",
+      "Form input missing label association",
+      "Positive tabIndex used",
+      "Possible color-only status indication",
+      "Auto-playing media detected",
+      "Missing lang attribute on <html>",
+      "No skip navigation link detected",
+      "Focus indicator removed (outline: none)",
+    ]);
+  });
+
+  it("should flag broad API contract issues for unvalidated mutation routes", () => {
+    const code = [
+      'import express from "express";',
+      "const app = express();",
+      'app.post("/users", (req, res) => {',
+      "  const user = req.body.user;",
+      "  req.body);",
+      "  res.status(200).send({ ok: true, user });",
+      "});",
+      'app.put("/users/:id", (req, res) => {',
+      '  const query = "SELECT * FROM users WHERE id = " + req.params.id;',
+      "  res.status(200).send({ ok: true, query });",
+      "});",
+      'app.patch("/users/:id", (req, res) => {',
+      "  const patch = req.body;",
+      "  req.body);",
+      "  res.status(200).send({ ok: true, patch });",
+      "});",
+      'app.get("/users", (_req, res) => {',
+      "  res.send({ users: [] });",
+      "});",
+      'app.get("/health", (_req, res) => {',
+      '  res.send({ status: "ok" });',
+      "});",
+    ].join("\n");
+
+    assertFindingTitles(analyzeApiContract(code, "typescript"), [
+      "Missing input validation on mutation endpoint",
+      "No error responses in API handlers",
+      "Generic 200 status for all responses",
+      "No rate limiting on API endpoints",
+      "No API versioning in route paths",
+    ]);
+  });
+
+  it("should flag ethical risk, bias, and dark-pattern indicators", () => {
+    const code = [
+      "function evaluateApplicant(applicant, bot, user) {",
+      '  if (user.gender === "female") return "deny";',
+      "  let riskScore = 0;",
+      "  riskScore += applicant.incomeScore;",
+      '  if (bot.mode === "auto") reject(applicant);',
+      '  const newsletterOptIn = <input type="checkbox" defaultChecked={true} name="marketing" />;',
+      "  const whitelist = new Set();",
+      '  const dataset = loadDataset("applicants.csv");',
+      "  const prediction = classifyApplicant(dataset, applicant);",
+      '  const urgency = "Only 2 left - act now";',
+      "  navigator.getBattery();",
+      "  let price = 100;",
+      "  price = price + user.regionMultiplier;",
+      "  return { riskScore, whitelist, urgency, price };",
+      "}",
+    ].join("\n");
+
+    assertFindingTitles(analyzeEthicsBias(code, "typescript"), [
+      "Demographic-based conditional logic",
+      "User scoring without explainability",
+      "Automated consequential decision without human review",
+      "Potential dark pattern detected",
+      "Non-inclusive language in code",
+      "ML training data without bias consideration",
+      "Artificial urgency/scarcity pattern",
+      "Potential price discrimination based on user attributes",
+    ]);
+  });
+
+  it("should flag broad scalability bottlenecks and stateful design issues", () => {
+    const code = [
+      'import fs from "node:fs";',
+      'import { execSync } from "node:child_process";',
+      'import crypto from "node:crypto";',
+      "let cache = {};",
+      "let cache = [];",
+      "let sessions = [];",
+      "const registry = new Map();",
+      "const store = {};",
+      "const workers = 4;",
+      "const session = {};",
+      "app.use(express-session());",
+      "function handler(req, res) {",
+      '  fs.readFileSync("data.json", "utf-8");',
+      '  execSync("echo warmup");',
+      '  fetch("https://a.example.com");',
+      '  fetch("https://b.example.com");',
+      '  fetch("https://c.example.com");',
+      '  fetch("https://d.example.com");',
+      '  fetch("https://e.example.com");',
+      '  fetch("https://f.example.com");',
+      "  for (let i = 0; i < items.length; i++) {",
+      "    for (let j = 0; j < records.length; j++) {",
+      '      crypto.pbkdf2Sync("secret", "salt", 1000, 64, "sha512");',
+      "    }",
+      "  }",
+      "  const lock = file.lock(resourceId);",
+      "  res.json({ data: records.findAll() });",
+      '  const socket = new WebSocket("wss://chat.example.com");',
+      "  return { session, lock, socket };",
+      "}",
+    ].join("\n");
+
+    assertFindingTitles(analyzeScalability(code, "typescript"), [
+      "Global mutable state detected",
+      "In-memory data store may not scale",
+      "Synchronous blocking operation",
+      "External calls without timeout",
+      "CPU-intensive computation may block scaling",
+      "No rate limiting detected",
+      "Local file/process locking won't work at scale",
+      "Session storage may require sticky sessions",
+      "Hardcoded thread/worker pool size",
+      "No circuit breaker for external dependencies",
+      "Potentially large response payload",
+      "WebSocket without connection limits",
+    ]);
+  });
+
+  it("should flag broad concurrency hazards in async code", () => {
+    const code = [
+      "let sharedCache = {};",
+      "let queue = [];",
+      "const globalRegistry = new Map();",
+      "async function process(items, db, api, callbackApi, lockA, lockB) {",
+      "  await Promise.all(items.map(async (item) => api.fetch(item)));",
+      "  db.save(items[0]);",
+      "  for (const record of records) {",
+      "    await api.fetch(record.id);",
+      "  }",
+      "  for (const user of users) {",
+      "    await api.post(user);",
+      "  }",
+      "  setInterval(() => refresh(), 1000);",
+      "  const current = await db.get('counter');",
+      "  await db.set('counter', current + 1);",
+      "  new Worker('./worker.js');",
+      "  Promise.resolve(items).then(() => items);",
+      "  callbackApi(items[0], function (err, data) { return data; });",
+      "  await lockA.acquire();",
+      "  await lockB.acquire();",
+      "  const sharedStore = new Map();",
+      "}",
+      "async function mutate() {",
+      "  sharedCache.value = queue.length;",
+      "  globalRegistry.set('latest', sharedCache.value);",
+      "  sharedStore.set('count', sharedCache.value);",
+      "}",
+    ].join("\n");
+
+    assertFindingTitles(analyzeConcurrency(code, "typescript"), [
+      "Unbounded Promise.all with dynamic array",
+      "Shared mutable state in async context",
+      "Potentially missing await on async operation",
+      "Sequential await in loop",
+      "setInterval without clearInterval",
+      "Potential read-modify-write race condition",
+      "Worker/thread creation without pooling",
+      "Mixed callback and promise async patterns",
+      "Shared data structure without synchronization",
+      "Potential deadlock: nested lock acquisition",
+    ]);
+  });
+
+  it("should flag broad error-handling failures in server code", () => {
+    const code = [
+      'import express from "express";',
+      "const app = express();",
+      "var first = Promise.resolve(1).then((value) => value + 1);",
+      "var second = Promise.resolve(2).then((value) => value + 2);",
+      "var third = Promise.resolve(3).then((value) => value + 3);",
+      "var fourth = Promise.resolve(4).then((value) => value + 4);",
+      "async function controller(req, res) {",
+      "  try {",
+      "    doRiskyThing();",
+      "  } catch {",
+      "  }",
+      "  catch () {",
+      "    console.warn('ignored');",
+      "  }",
+      "  try { fallback(); } catch (error) { throw error; }",
+      "  try { recover(); } catch (error) { console.log(error); }",
+      '  throw "bad input";',
+      "  callback(function (err, result) {",
+      "    return result;",
+      "  });",
+      "  console.error('failure a');",
+      "  console.error('failure b');",
+      "  console.error('failure c');",
+      "  console.error('failure d');",
+      '  res.send("Internal server error");',
+      '  res.json("Something went wrong");',
+      "  res.status(500).json(error);",
+      '  res.status(400).json({ message: "bad request" });',
+      '  res.status(500).send("Internal server error");',
+      '  app.get("/users", (req, res) => res.status(500).send("Something went wrong"));',
+      '  app.post("/orders", (req, res) => res.status(500).json(err));',
+      '  app.put("/orders/:id", (req, res) => res.status(400).json({ error: "validation failed" }));',
+      '  app.patch("/orders/:id", (req, res) => res.status(500).send(error.stack));',
+      '  app.delete("/orders/:id", (req, res) => res.status(500).send("Server error"));',
+      '  app.get("/health", (req, res) => res.send({ ok: true }));',
+      "  process.exit(1);",
+      "}",
+    ].join("\n");
+
+    assertFindingTitles(analyzeErrorHandling(code, "typescript"), [
+      "Empty catch/error block swallows errors",
+      "Catch block discards error object",
+      "No global error handler detected",
+      "Generic error messages returned to clients",
+      "Callback pattern without error checking",
+      "Throwing string literals instead of Error objects",
+      "Abrupt process termination instead of proper error handling",
+      "Catch-and-rethrow without added context",
+      "Error caught and only logged — not propagated",
+      "Error responses without error codes",
+      "console.error as sole error reporting strategy",
+      "Promise .then() chain without .catch()",
+      "Stack trace or error internals exposed to client",
+    ]);
+  });
+
+  it("should flag broad logic-review issues in application code", () => {
+    const code = [
+      "if (!authenticated) {",
+      "  grantAccess();",
+      "}",
+      "for (let i = 0; i <= items.length; i++) {",
+      "  use(items[i]);",
+      "}",
+      "const copy = name.substring(0, name.length);",
+      "function validateInput(input) {",
+      "  const normalized = input.trim();",
+      "  const cleaned = normalized.toLowerCase();",
+      "  const auditTrail = cleaned + '-checked';",
+      "  return auditTrail;",
+      "}",
+      "function deleteUser(user) {",
+      "  const identifier = user.id;",
+      "  const note = identifier + '-pending';",
+      "  return note;",
+      "}",
+      "function finish(flag) {",
+      "  return true;",
+      "  doMoreWork(flag);",
+      "}",
+      "if (password === username) {",
+      "  deny();",
+      "}",
+      "try { risky(); } catch (error) {}",
+      "if (isReady === true) {",
+      "  proceed();",
+      "}",
+    ].join("\n");
+
+    assertFindingTitles(analyzeLogicReview(code, "typescript"), [
+      "Possibly inverted security condition",
+      "Off-by-one: loop uses <= array.length",
+      "No-op string/array slice",
+      '"validateInput" never rejects invalid input',
+      '"deleteUser" may not actually delete anything',
+      "Unreachable code after return/throw",
+      "Password compared to username",
+      "Empty catch/except block silently swallows errors",
+      "Redundant boolean comparison",
+    ]);
+  });
+
+  it("should flag broad maintainability problems in a synthetic code sample", () => {
+    const weakTypes = Array.from({ length: 10 }, (_, index) => `const weak${index}: any = source${index};`);
+    const magicNumbers = [
+      "total += 5000;",
+      "timeout += 8080;",
+      "windowSize += 4096;",
+      "buffer += 2048;",
+      "retryAt += 86400;",
+      "poll += 3000;",
+      "limit += 4200;",
+      "sleep += 3600;",
+      "cache += 1024;",
+      "burst += 8000;",
+    ];
+    const techDebt = Array.from({ length: 8 }, (_, index) => `// TODO: debt ${index}`);
+    const commentedCode = Array.from({ length: 11 }, (_, index) => `// const deadCode${index} = oldValue${index};`);
+    const singleLetterVars = Array.from(
+      { length: 11 },
+      (_, index) => `const ${String.fromCharCode(97 + index)} = value${index};`,
+    );
+    const duplicateStrings = [
+      'const labelOne = "Repeated warning string";',
+      'const labelTwo = "Repeated warning string";',
+      'const labelThree = "Repeated warning string";',
+      'const messageOne = "Another repeated message";',
+      'const messageTwo = "Another repeated message";',
+      'const messageThree = "Another repeated message";',
+      'const helpOne = "Shared helper content";',
+      'const helpTwo = "Shared helper content";',
+      'const helpThree = "Shared helper content";',
+    ];
+
+    const code = [
+      'import helperAlpha from "./alpha";',
+      'import helperBeta from "./beta";',
+      'import helperGamma from "./gamma";',
+      'import helperDelta from "./delta";',
+      'import helperEpsilon from "./epsilon";',
+      ...weakTypes,
+      ...magicNumbers,
+      ...techDebt,
+      "var legacyCounter = 0;",
+      "var legacyFlag = true;",
+      "const camelCaseOne = 1;",
+      "const camelCaseTwo = 2;",
+      "const camelCaseThree = 3;",
+      "const camelCaseFour = 4;",
+      "const snake_case_one = 1;",
+      "const snake_case_two = 2;",
+      "const snake_case_three = 3;",
+      "const snake_case_four = 4;",
+      ...commentedCode,
+      "function createWidget(a, b, c, d, e, f) {",
+      "  return [a, b, c, d, e, f].join('-');",
+      "}",
+      ...singleLetterVars,
+      ...duplicateStrings,
+      "function configureFeature(enabled: boolean, visible: boolean, locked: boolean) {",
+      "  return enabled && visible && locked;",
+      "}",
+    ].join("\n");
+
+    assertFindingTitles(analyzeMaintainability(code, "typescript"), [
+      "Weak or unsafe type usage detected",
+      "Magic numbers detected",
+      "Technical debt markers (TODO/FIXME/HACK) found",
+      "'var' declarations reduce maintainability",
+      "Commented-out code detected",
+      "Inconsistent naming conventions (mixed camelCase and snake_case)",
+      "Functions with too many parameters",
+      "Single-letter variable names reduce readability",
+      "Potentially unused imports detected",
+      "Boolean trap — multiple boolean parameters",
+    ]);
+  });
+
+  it("should flag broad software-practice issues in a synthetic module", () => {
+    const weakTypes = Array.from({ length: 15 }, (_, index) => `const weakType${index}: any = payload${index};`);
+    const suppressions = Array.from({ length: 5 }, (_, index) => `// eslint-disable-next-line rule-${index}`);
+    const magicNumbers = [
+      "score += 7777;",
+      "score += 8888;",
+      "score += 9999;",
+      "score += 12345;",
+      "score += 23456;",
+      "score += 34567;",
+      "score += 45678;",
+      "score += 56789;",
+    ];
+    const todos = Array.from({ length: 10 }, (_, index) => `// TODO: practice debt ${index}`);
+    const emptyCatches = Array.from({ length: 5 }, (_, index) => `try { risky${index}(); } catch (err) {}`);
+    const debugLogs = Array.from({ length: 5 }, (_, index) => `console.log("debug ${index}");`);
+
+    const code = [
+      ...suppressions,
+      ...weakTypes,
+      ...magicNumbers,
+      ...todos,
+      ...emptyCatches,
+      'app.post("/submit", (req, res) => use(req.body));',
+      ...debugLogs,
+      "var legacy = 0;",
+      "if (user == owner) {",
+      "  proceed();",
+      "}",
+      "function nested() {",
+      "    if (one) {",
+      "        if (two) {",
+      "            if (three) {",
+      "                if (four) {",
+      "                    if (five) {",
+      "                        perform();",
+      "                    }",
+      "                }",
+      "            }",
+      "        }",
+      "    }",
+      "}",
+      "function callbackHell() {",
+      "  first(() => {",
+      "    second(() => {",
+      "      third(() => {",
+      "        finish();",
+      "      });",
+      "    });",
+      "  });",
+      "}",
+      "function deadEnd() {",
+      "  return;",
+      "  const unreachable = true;",
+      "}",
+      "configureFeature(true, false, true);",
+      "retryCount = 3;",
+      "setTimeout(runAgain, 5000);",
+    ].join("\n");
+
+    assertFindingTitles(analyzeSoftwarePractices(code, "typescript"), [
+      "'any' type usage",
+      "Type-checker / linter error suppression",
+      "TODO/FIXME/HACK comments found",
+      "Empty catch block — errors silently swallowed",
+      "Debug log statements left in code",
+      "'var' keyword used instead of let/const",
+      "Bare except / untyped catch block",
+      "Loose equality (==) instead of strict (===)",
+      "Callback nesting (potential callback hell)",
+      "Multiple boolean parameters (flag arguments)",
+      "Retry logic without exponential backoff",
+    ]);
+  });
+
+  it("should flag broad data-security issues in application code", () => {
+    const writes = Array.from({ length: 6 }, (_, index) => `records.insert({ ssn, medical, index: ${index} });`);
+
+    const code = [
+      'const password = "SuperSecretPass123!";',
+      'const apiKey = "sk-abcdefghijklmnopqrstuvwxyz123456";',
+      'const token = "ghp_abcdefghijklmnopqrstuvwxyz1234567890abcd";',
+      'const connectionString = "postgres://admin:RealPass123@db.example.com/app";',
+      'console.log(password, token, "credit_card");',
+      'crypto.createHash("md5");',
+      'const query = "SELECT * FROM users WHERE id = " + req.params.id;',
+      'fetch("http://api.example.com/data");',
+      "yaml.load(input);",
+      'res.cookie("sid", token);',
+      "const session = jwt.decode(token);",
+      'upload.single("avatar");',
+      "password = req.body.password; user.save(password);",
+      'cors({ origin: "*", credentials: true });',
+      'app.post("/one", createOne);',
+      'app.post("/two", createTwo);',
+      'app.post("/three", createThree);',
+      'app.post("/four", createFour);',
+      'app.post("/five", createFive);',
+      "res.json(error.stack);",
+      'const iv = "1234567890123456";',
+      "const sessionOtp = Math.random();",
+      "readFile(req.query.path);",
+      ...writes,
+      'const url = "https://api.example.com?token=secrettokenvalue123";',
+      'throw new Error("password processing failed");',
+    ].join("\n");
+
+    assertFindingTitles(analyzeDataSecurity(code, "typescript"), [
+      "Hardcoded password detected",
+      "Sensitive data may be logged",
+      "Weak hashing algorithm used",
+      "Unencrypted HTTP connection",
+      "Cookie may lack security flags",
+      "JWT decoded without signature verification",
+      "File upload without type/size validation",
+      "Password may be stored in cleartext",
+      "CORS with credentials and wildcard origin",
+      "No CSRF protection detected",
+      "Stack traces exposed to clients",
+      "Hardcoded encryption key or IV",
+      "Insecure random for security context",
+      "Potential path traversal via user input",
+      "Sensitive data stored without encryption",
+      "Secret or token embedded in URL string",
+      "Sensitive data referenced in error messages",
+    ]);
+  });
+
+  it("should flag backwards-compatibility hazards in evolving APIs", () => {
+    const code = [
+      'app.get("/api/users", listUsers);',
+      'app.post("/api/orders", createOrder);',
+      'app.patch("/api/orders/:id", updateOrder);',
+      "// deprecated endpoint pending removal",
+      "delete response.legacyField;",
+      "res.json({ ok: true });",
+      "res.json([]);",
+      "res.json({ error: false });",
+      '{ "version": "0.0.5" }',
+      "// export const oldApi = newApi;",
+      "function migrate(optional?: string, required: number) { return required; }",
+      "// deprecated enum value retained for now",
+      "enum Status { Active, Legacy }",
+      'app.post("/api/delete-user", removeUser);',
+      "// renamed: oldName",
+    ].join("\n");
+
+    assertFindingTitles(analyzeBackwardsCompatibility(code, "typescript"), [
+      "API endpoints without versioning",
+      "Deprecated code without API deprecation headers",
+      "Field deletion could break consumers",
+      "Multiple response formats — verify contract consistency",
+      "Pre-release version — backwards compatibility expectations unclear",
+      "Commented-out exports may indicate removed API surface",
+      "Function signature with required params after optional — potential breaking change",
+      "HTTP method mismatch — destructive action via POST",
+      "Possible field rename — breaking serialization change",
+    ]);
+  });
+
+  it("should flag brittle and low-value test patterns", () => {
+    const snapshots = Array.from({ length: 6 }, (_, index) => `    expect(view${index}).toMatchSnapshot();`);
+    const mocks = Array.from({ length: 10 }, (_, index) => `  jest.mock("./dep${index}");`);
+
+    const code = [
+      'describe("service", () => {',
+      "  let sharedState = {};",
+      ...mocks,
+      '  it("works", async () => {',
+      '    const response = await fetch("https://api.example.com/users");',
+      '    const createdAt = "2024-12-31";',
+      "    expect(response.status).toBe(200);",
+      "    expect(true).toBe(true);",
+      "    await new Promise((resolve) => setTimeout(resolve, 500));",
+      ...snapshots,
+      "  });",
+      '  test("basic test", async () => {',
+      "    const db = database.connect();",
+      "    expect(result.status).toBe(200);",
+      "    expect(1).toBe(1);",
+      "  });",
+      '  test("test 1", () => {',
+      "    expect(reply.status).toBe(200);",
+      "  });",
+      "});",
+    ].join("\n");
+
+    assertFindingTitles(analyzeTesting(code, "typescript"), [
+      "Vague test names",
+      "Hardcoded dates in tests",
+      "Shared mutable state between tests",
+      "Tests cover only happy path",
+      "Heavy reliance on snapshot testing",
+      "Tautological assertions (always pass)",
+      "Excessive mocking relative to test count",
+    ]);
+  });
+
+  it("should flag additional infrastructure-as-code security misconfigurations", () => {
+    const terraformCode = [
+      "terraform {",
+      "}",
+      'provider "azurerm" {}',
+      'provider "aws" {}',
+      'resource "aws_s3_bucket" "public" {',
+      '  bucket = "open-bucket"',
+      '  acl = "public-read"',
+      "}",
+      'resource "azurerm_resource_group" "rg" {',
+      '  name = "rg-demo"',
+      '  location = "eastus"',
+      "}",
+      'resource "azurerm_mssql_server" "db" {',
+      '  name = "db-demo"',
+      '  location = "eastus"',
+      '  admin_username = "adminuser"',
+      '  admin_password = "SuperSecret123!"',
+      "}",
+      'resource "azurerm_mssql_firewall_rule" "allow_azure" {',
+      '  start_ip_address = "0.0.0.0"',
+      '  end_ip_address = "0.0.0.0"',
+      "}",
+    ].join("\n");
+
+    const bicepCode = [
+      "param adminPassword string",
+      'resource storage "Microsoft.Storage/storageAccounts@2023-01-01" = {',
+      '  name: "demo"',
+      "  location: resourceGroup().location",
+      "}",
+    ].join("\n");
+
+    const armCode = [
+      "{",
+      '  "parameters": {',
+      '    "adminPassword": {',
+      '      "type": "string",',
+      '      "defaultValue": "PlainSecret123!"',
+      "    }",
+      "  }",
+      "}",
+    ].join("\n");
+
+    const dockerfileCode = [
+      "FROM node:latest",
+      "ADD . /app",
+      "ENV API_KEY=abc123secret",
+      "RUN docker run --privileged helper",
+      "RUN npm install",
+    ].join("\n");
+
+    const yamlCode = [
+      "apiVersion: v1",
+      "kind: Pod",
+      "spec:",
+      "  containers:",
+      "    - name: app",
+      "      image: demo:latest",
+      "      privileged: true",
+      "      allowPrivilegeEscalation: true",
+      "      runAsNonRoot: false",
+      "      env:",
+      "        - name: API_KEY",
+      '          value: "plaintext-secret"',
+    ].join("\n");
+
+    assertFindingTitles(analyzeIacSecurity(terraformCode, "terraform"), [
+      "Hardcoded secrets in infrastructure code",
+      "Hardcoded resource location",
+      "Missing required_providers block",
+      "No remote backend configured",
+      "S3 bucket with public access enabled",
+      "Resources without tags",
+      "Password-based authentication without managed identity",
+      "Database firewall allows all Azure services",
+    ]);
+
+    assertFindingTitles(analyzeIacSecurity(bicepCode, "bicep"), ["Sensitive parameter without @secure() decorator"]);
+
+    assertFindingTitles(analyzeIacSecurity(armCode, "arm"), ["ARM template secret parameter has default value"]);
+
+    assertFindingTitles(analyzeIacSecurity(dockerfileCode, "dockerfile"), [
+      "Docker container running in privileged mode",
+      "Secrets exposed in Dockerfile ENV directive",
+      "Dockerfile uses ADD instead of COPY",
+      "Dockerfile FROM uses latest or untagged image",
+    ]);
+
+    assertFindingTitles(analyzeIacSecurity(yamlCode, "yaml"), [
+      "Container running in privileged mode",
+      "Hardcoded secrets in YAML infrastructure code",
+      "Kubernetes container running as root user",
+      "Kubernetes container without resource limits",
+      "Container filesystem is writable",
+    ]);
+  });
+
+  it("should flag intent-alignment drift between names and implementation", () => {
+    const code = [
+      "/**",
+      " * @param userId identifier",
+      " * @param missingParam not real",
+      " */",
+      "function getUserScore(userId) {",
+      "  return 0;",
+      "}",
+      "function validateAccess(token) {",
+      '  throw new Error("not implemented");',
+      "}",
+      "function calculateFee(order) {",
+      "  // TODO implement later",
+      "}",
+      "function noopHandler() {",
+      "  return null;",
+      "}",
+      "function unusedHandler() {",
+      "  return false;",
+      "}",
+      "function sanitizeHtml(input) {",
+      "  return input.trim();",
+      "}",
+      "try {",
+      "  risky();",
+      "} catch (error) {",
+      "}",
+      "async function loadProfile(id) {",
+      "  const profile = id;",
+      "  const derived = profile + 1;",
+      "  return derived;",
+      "}",
+      "for (const item of items) {",
+      "  processAll();",
+      "}",
+      "if (featureFlag) {",
+      "  runTask();",
+      "} else {",
+      "  runTask();",
+      "}",
+    ].join("\n");
+
+    assertFindingTitles(analyzeIntentAlignment(code, "typescript"), [
+      "Security-sensitive stub: `validateAccess()`",
+      "Stub function: `calculateFee()`",
+      "Empty function bodies (2 found)",
+      "Placeholder return in `getUserScore()`",
+      "Docstring references non-existent parameter(s): missingParam",
+      "Silent error swallowing in catch(error)",
+      "Loop variable `item` is never used in body",
+      "If/else branches are identical",
+    ]);
+  });
+
+  it("should flag intra-file coherence contradictions and duplication", () => {
+    const code = [
+      "enabled = true;",
+      "enabled = false;",
+      "export async function duplicate() { return 1; }",
+      "export async function duplicate() { return 2; }",
+      "const config = {",
+      '  "mode": "prod",',
+      '  "mode": "dev",',
+      '  "region": "eastus",',
+      '  "region": "westus",',
+      '  "tier": "gold",',
+      '  "tier": "silver",',
+      "};",
+      "// TODO one",
+      "// TODO two",
+      "// TODO three",
+      "// TODO four",
+      "// TODO five",
+    ].join("\n");
+
+    assertFindingTitles(analyzeMultiTurnCoherence(code, "typescript"), [
+      "Contradictory boolean assignments",
+      "Duplicate function definitions",
+      "Potentially conflicting configuration values",
+    ]);
+  });
+
+  it("should flag hallucinated APIs and suspicious package names", () => {
+    const code = [
+      'import super-auth-helper from "super-auth-helper";',
+      'import service from "auth-internal";',
+      'const data = fs.readFileAsync("./file.txt");',
+      'const out = fs.writeFileAsync("./file.txt", data);',
+      'const value = Object.hasOwnKey(obj, "id");',
+      "const settled = Promise.allResolved(tasks);",
+      'const found = "hello".contains("h");',
+      "const payload = fetch(url).body.json();",
+      'console.log.error("boom");',
+      "const delayed = Promise.resolve(result).delay(100);",
+      "const map = new Map();",
+      'const exists = map.contains("id");',
+      "return new Promise(async (resolve) => { resolve(await work()); });",
+    ].join("\n");
+
+    assertFindingTitles(analyzeHallucinationDetection(code, "typescript"), [
+      "Hallucinated API: fs.readFileAsync()",
+      "Hallucinated API: fs.writeFileAsync()",
+      "Hallucinated API: Object.hasOwnKey()",
+      "Hallucinated API: Promise.allResolved()",
+      "Hallucinated API: String.contains()",
+      "Hallucinated API: fetch().body.json()",
+      "Hallucinated API: console.log.error()",
+      "Hallucinated API: Promise.resolve().delay()",
+      "Possible hallucinated API: Map.contains()",
+      "Anti-pattern: async function inside Promise constructor",
+      'Suspicious package name: "super-auth-helper"',
+    ]);
+  });
+
+  it("should flag missing rate limiting and unbounded request patterns", () => {
+    const filler = Array.from({ length: 65 }, (_, index) => `const filler${index} = ${index};`);
+    const code = [
+      'import express from "express";',
+      'import multer from "multer";',
+      "const app = express();",
+      'const upload = multer({ dest: "/tmp/uploads" });',
+      "app.use(express.json());",
+      'app.get("/users", listUsers);',
+      'app.post("/auth/login", loginUser);',
+      'app.post("/orders", createOrder);',
+      'router.patch("/users/:id", updateUser);',
+      "const everyone = db.find();",
+      'await fetch("https://api.example.com/one");',
+      'await axios.get("https://api.example.com/two");',
+      'await client.request("https://api.example.com/three");',
+      "setInterval(pollQueue, 1000);",
+      'upload.single("avatar");',
+      "const ws = new WebSocketServer();",
+      "let attempts = 0;",
+      "while (attempts < 3) { attempts += 1; syncRemote(); }",
+      ...filler,
+    ].join("\n");
+
+    assertFindingTitles(analyzeRateLimiting(code, "typescript"), [
+      "No rate limiting on API endpoints",
+      "Request body parser without size limit",
+      "Unbounded query results without limit",
+      "No rate limit headers in API responses",
+      "External API calls without retry/backoff strategy",
+      "setInterval without rate control",
+      "Authentication endpoints without rate limiting",
+      "File upload without size or count limits",
+      "API endpoints with no 429 (Too Many Requests) handling",
+      "WebSocket server without connection or message limits",
+      "Retry logic without exponential backoff",
+    ]);
+  });
+
+  it("should flag reliability gaps around retries timeouts and shutdown", () => {
+    const deepAccess = Array.from(
+      { length: 6 },
+      (_, index) => `const value${index} = payload.user.profile.address.city;`,
+    );
+    const writeRoutes = [
+      'app.post("/orders", createOrder);',
+      'app.put("/orders/:id", replaceOrder);',
+      'app.patch("/orders/:id", patchOrder);',
+      'app.post("/payments", createPayment);',
+      'app.post("/refunds", createRefund);',
+    ];
+    const code = [
+      'import express from "express";',
+      "const app = express();",
+      "const db = new Client(connectionString);",
+      "try { riskyOne(); } catch (error) {}",
+      "try { riskyTwo(); } catch (err) {}",
+      "await fetch(primaryUrl);",
+      "await axios.get(backupUrl);",
+      "await fetch(thirdUrl);",
+      "await httpClient.get(fourthUrl);",
+      "await fetch(fifthUrl);",
+      "await axios.get(sixthUrl);",
+      "try { await fetch(profileUrl); } catch (error) { logger.warn(error); }",
+      "try { await fetch(reportUrl); } catch (error) { logger.warn(error); }",
+      ...deepAccess,
+      "process.exit(1);",
+      ...writeRoutes,
+      "new Promise((resolve) => resolve(doOne()));",
+      "new Promise((resolve) => resolve(doTwo()));",
+      "app.listen(3000);",
+    ].join("\n");
+
+    assertFindingTitles(analyzeReliability(code, "typescript"), [
+      "Empty catch block swallows errors",
+      "Network call without timeout",
+      "No retry logic for external calls",
+      "Single connection instead of connection pool",
+      "Deep property access without null checks",
+      "Abrupt process termination detected",
+      "No circuit breaker for external dependencies",
+      "No fallback for failed external call",
+      "Write endpoints without idempotency support",
+      "No graceful shutdown handler",
+      "Promise without rejection handling",
+    ]);
+  });
+
+  it("should flag portability hazards tied to platform assumptions", () => {
+    const code = [
+      'import express from "express";',
+      'import { readFile } from "node:fs/promises";',
+      'import { BlobServiceClient } from "@azure/storage-blob";',
+      "export const root = __dirname;",
+      "const app = express();",
+      'const windowsLog = "C:\\Temp\\logs\\app.txt";',
+      'const unixConfig = "/var/app/config/settings.json";',
+      'const manualPath = "folder/sub/path/file.txt";',
+      'exec("rm -rf /tmp/cache");',
+      'const host = "localhost:3000";',
+      "const raw = await readFile(filePath);",
+      "const appData = process.env.APPDATA;",
+      "const home = process.env.HOME;",
+      'window.localStorage.setItem("token", token);',
+      'document.title = "server";',
+      "const max = Number.MAX_SAFE_INTEGER;",
+      "const buf = Buffer.alloc(99999999);",
+      'process.on("SIGUSR1", reloadConfig);',
+      ...Array.from({ length: 18 }, (_, index) => `const padding${index} = ${index};`),
+    ].join("\n");
+
+    assertFindingTitles(analyzePortability(code, "typescript"), [
+      "OS-specific file paths detected",
+      "Hardcoded path separators in strings",
+      "Platform-specific shell commands",
+      "Cloud vendor SDK used without abstraction layer",
+      "Hardcoded localhost/IP references",
+      "File I/O without explicit line-ending handling",
+      "OS-specific environment variables used directly",
+      "Browser-specific APIs used in server-side code",
+      "__dirname/__filename used in ESM module",
+      "Potential architecture-specific assumptions",
+      "Platform-specific process signals used",
+    ]);
+  });
+
+  it("should flag ci-cd drift in Dockerfiles manifests and workflows", () => {
+    const sourceCode = [
+      "process.exit(1);",
+      "// eslint-disable-next-line no-console",
+      'console.log("debug");',
+      "const run = () => true;",
+    ].join("\n");
+
+    const dockerfileCode = ["FROM node:latest", "WORKDIR /app", "COPY . .", "RUN npm test"].join("\n");
+
+    const workflowCode = [
+      ".github/workflows/ci.yml",
+      "name: ci",
+      "on: [push]",
+      "jobs:",
+      "  build:",
+      "    steps:",
+      "      - run: npm install",
+    ].join("\n");
+
+    const packageCode = [
+      "{",
+      '  "name": "demo-app",',
+      '  "scripts": {',
+      '    "start": "node server.js"',
+      "  },",
+      '  "dependencies": {',
+      '    "express": "^4.18.0"',
+      "  }",
+      "}",
+    ].join("\n");
+
+    assertFindingTitles(analyzeCiCd(sourceCode, "typescript"), [
+      "Hard process termination hinders graceful CI/CD lifecycle",
+      "Static analysis suppression comments detected",
+    ]);
+
+    assertFindingTitles(analyzeCiCd(dockerfileCode, "dockerfile"), [
+      "Docker image using :latest tag",
+      "Dockerfile copies everything without .dockerignore",
+      "Dockerfile without HEALTHCHECK instruction",
+      "Test configuration without coverage tracking",
+      "Docker container runs as root user",
+    ]);
+
+    assertFindingTitles(analyzeCiCd(workflowCode, "yaml"), ["Using 'npm install' instead of 'npm ci' in CI"]);
+
+    assertFindingTitles(analyzeCiCd(packageCode, "json"), ["Package manifest missing test and CI configuration"]);
+  });
+
+  it("should flag configuration-management anti-patterns in app startup code", () => {
+    const code = [
+      'const password = "SuperSecret123!";',
+      'const apiKey = "sk-prod-1234567890abcdef";',
+      'const token = "ghp_abcdefghijklmnopqrstuvwxyz1234567890abcd";',
+      'const private_key = "-----BEGIN KEY-----demo";',
+      "const PORT = 3000;",
+      'const HOST = "api.internal";',
+      'const DATABASE = "postgres://db";',
+      "const TIMEOUT = 5000;",
+      "const ENABLE_SIGNUP = true;",
+      "const FEATURE_BETA = false;",
+      'dotenv.config({ path: ".env" });',
+      'if (NODE_ENV === "production") useProdSettings();',
+      'if (ENVIRONMENT === "staging") useStageSettings();',
+      'if (ENV === "development") useDevSettings();',
+      "const config = { debug: true };",
+      "const connection = createClient({ host: HOST, port: PORT, token });",
+      "app.run({ debug: true });",
+      "setSecret(password);",
+      ...Array.from({ length: 70 }, (_, index) => `const fillerConfig${index} = ${index};`),
+    ].join("\n");
+
+    const envCode = [
+      "const port = process.env.PORT;",
+      "const host = process.env.HOST;",
+      "const apiUrl = process.env.API_URL;",
+      "const authToken = process.env.AUTH_TOKEN;",
+      "connect({ port, host, apiUrl, authToken });",
+      ...Array.from({ length: 40 }, (_, index) => `const envPad${index} = ${index};`),
+    ].join("\n");
+
+    assertFindingTitles(analyzeConfigurationManagement(code, "typescript"), [
+      "Secrets hardcoded in source code",
+      "Configuration values hardcoded instead of externalized",
+      "No environment variable usage detected",
+      "No configuration validation at startup",
+      ".env usage detected — ensure it is not committed",
+      "Feature flags hardcoded as constants",
+      "No secret rotation mechanism detected",
+      "Excessive environment-specific branching in code",
+      "Debug mode or development settings enabled",
+    ]);
+
+    assertFindingTitles(analyzeConfigurationManagement(envCode, "typescript"), [
+      "Environment variable reads without defaults",
+      "No configuration schema or documentation",
+    ]);
+  });
+
+  it("should flag dependency-health issues across source and manifest code", () => {
+    const sourceCode = [
+      'import request from "request";',
+      'import axios from "axios";',
+      'import fetchClient from "node-fetch";',
+      'import helper from "../../src/../../shared/../../core/tool.js";',
+      'import * as toolkit from "toolkit";',
+      'import { alpha, beta, gamma, delta, epsilon, zeta, eta, theta, iota, kappa, lambda, mu } from "big-lib";',
+      'const testKit = require("jest");',
+      'const suspect = require("axois");',
+      ...Array.from({ length: 16 }, (_, index) => `import dep${index} from "pkg-${index}";`),
+      "export function run() { return axios && fetchClient && request && testKit && suspect && helper && toolkit; }",
+    ].join("\n");
+
+    const manifestCode = [
+      "{",
+      '  "name": "dependency-demo",',
+      '  "version": "1.0.0",',
+      '  "scripts": {',
+      '    "postinstall": "node setup.js"',
+      "  },",
+      '  "dependencies": {',
+      '    "left-pad": "latest",',
+      '    "lodash": ">=4.0.0",',
+      '    "chalk": "*"',
+      "  }",
+      "}",
+    ].join("\n");
+
+    assertFindingTitles(analyzeDependencyHealth(sourceCode, "typescript"), [
+      "Deprecated or unmaintained package import",
+      "High import-to-code ratio",
+      "Deeply nested relative imports",
+      "Multiple HTTP client libraries detected",
+      "Barrel or wildcard imports may prevent tree-shaking",
+      "Dev dependency imported in production code",
+      "Potential typosquatting package import",
+    ]);
+
+    assertFindingTitles(analyzeDependencyHealth(manifestCode, "json"), [
+      "Wildcard or 'latest' dependency version",
+      "Overly broad dependency version range",
+      "Missing engines field in package.json",
+      "Install lifecycle scripts detected",
+    ]);
+  });
+
+  it("should flag documentation debt across exported APIs and routes", () => {
+    const todoLines = Array.from({ length: 16 }, (_, index) => `// TODO clean this up ${index}`);
+    const magicNumbers = Array.from(
+      { length: 20 },
+      (_, index) => `if (value === ${200 + index}) notify(${200 + index});`,
+    );
+    const routeLines = [
+      'app.get("/users", listUsers);',
+      'app.post("/users", createUser);',
+      'app.patch("/users/:id", updateUser);',
+      'app.delete("/users/:id", removeUser);',
+      'app.get("/orders", listOrders);',
+      'app.get("/reports", listReports);',
+    ];
+    const code = [
+      "export function fmt(a, b) { return a + b; }",
+      "export function sum(a, b) { return a + b; }",
+      "export function cmp(a, b) { return a - b; }",
+      "export function run(a, b) { return a * b; }",
+      ...routeLines,
+      ...todoLines,
+      ...magicNumbers,
+      ...Array.from({ length: 70 }, (_, index) => `const docPad${index} = ${index};`),
+    ].join("\n");
+
+    assertFindingTitles(analyzeDocumentation(code, "typescript"), [
+      "Exported functions without documentation",
+      "Magic numbers in code",
+      "TODO/FIXME without issue tracking reference",
+      "File missing module-level documentation",
+      "API endpoints without documentation",
+    ]);
+  });
+
+  it("should flag common UX gaps in forms lists feedback and discoverability", () => {
+    const uiStrings = Array.from(
+      { length: 4 },
+      (_, index) => `element${index}.textContent = "Welcome back valued customer";`,
+    );
+    const listMarkup = Array.from({ length: 90 }, (_, index) => `<li onclick="select(${index})">Item ${index}</li>`);
+    const code = [
+      "<form onSubmit={handleSubmit}>",
+      '  <input type="text" />',
+      '  <button type="submit">Save</button>',
+      "</form>",
+      "<script>",
+      'async function handleSubmit() { form.submit(); await fetch("/api/save", { method: "POST" }); await readFile(filePath); }',
+      'showError("Something went wrong");',
+      'displayError("Error");',
+      "res.json(data);",
+      "res.json(results);",
+      'app.post("/delete-account", deleteAccount);',
+      'app.get("/users", listUsers);',
+      "db.find();",
+      "items.map((item) => render(item));",
+      'titleNode.title = "Manage customer billing profile";',
+      'labelNode.label = "Update account security settings";',
+      ...uiStrings,
+      "const observer = new IntersectionObserver(loadMore);",
+      'window.addEventListener("keydown", handleKeys);',
+      ...listMarkup,
+      "</script>",
+    ].join("\n");
+
+    assertFindingTitles(analyzeUx(code, "html"), [
+      "Inline event handlers in HTML",
+      "Form submission without loading/disabled state",
+      "Generic error messages shown to users",
+      "Raw data returned without formatting envelope",
+      "Form inputs without labels or placeholders",
+      "Destructive actions without confirmation",
+      "List endpoints without pagination",
+      "Mutations without success feedback",
+      "File/stream operations without progress indicators",
+      "Multiple hardcoded UI strings detected",
+      "Form submission without client-side validation",
+      "Infinite scroll without scroll position restoration",
+      "Keyboard shortcuts without help/discoverability",
+    ]);
+  });
+
+  it("should flag cost-effectiveness issues in compute-heavy service code", () => {
+    const logs = Array.from({ length: 16 }, (_, index) => `console.log("trace ${index}");`);
+    const eagerLoads = Array.from({ length: 4 }, (_, index) => `query.include("relation${index}");`);
+    const code = [
+      'import { readFileSync } from "node:fs";',
+      "const app = express();",
+      "const db = new Client(connectionString);",
+      "for (const user of users) {",
+      "  for (const order of orders) {",
+      "    total += order.amount;",
+      "  }",
+      "}",
+      "for (const team of teams) {",
+      "  for (const member of team.members) {",
+      "    names += member.name;",
+      "  }",
+      "}",
+      "for (const user of users) {",
+      "  await fetch(`/profiles/${user.id}`);",
+      "}",
+      "for (const order of orders) {",
+      "  await fetch(`/orders/${order.id}`);",
+      "}",
+      "const everyone = db.find({});",
+      'const text = readFileSync(filePath, "utf8");',
+      'for (const part of parts) { report += "#" + part; }',
+      ...logs,
+      "const snapshot = JSON.parse(JSON.stringify(payload));",
+      ...eagerLoads,
+      'app.get("/users", listUsers);',
+      "app.listen(3000);",
+      "const rows = items.map(normalize)",
+      "  .filter(Boolean);",
+      ...Array.from({ length: 40 }, (_, index) => `const costPad${index} = ${index};`),
+    ].join("\n");
+
+    assertFindingTitles(analyzeCostEffectiveness(code, "typescript"), [
+      "Nested loops detected — potential O(n²) complexity",
+      "Potential N+1 query pattern (await in loop)",
+      "Unbounded data query",
+      "Synchronous/blocking file I/O detected",
+      "No caching strategy detected",
+      "String concatenation inside loop",
+      "Excessive logging may increase costs",
+      "Deep cloning may be unnecessary",
+      "Excessive eager loading / data over-fetching",
+      "No response compression configured",
+      "Database connections without pooling",
+    ]);
+  });
+
+  it("should flag manifest-level supply-chain risks and dependency sprawl", () => {
+    const manifest = JSON.stringify(
+      {
+        name: "supply-demo",
+        version: "1.0.0",
+        dependencies: Object.fromEntries([
+          ["axiosx", "^1.0.0"],
+          ["typescript", "^5.0.0"],
+          ["chalk", "*"],
+          ...Array.from({ length: 52 }, (_, index) => [`pkg-${index}`, "^1.0.0"]),
+        ]),
+        devDependencies: {
+          jest: "^29.0.0",
+        },
+      },
+      null,
+      2,
+    );
+
+    assertFindingTitles(analyzeDependencies(manifest, "package.json").findings, [
+      "Unpinned dependency versions",
+      "Large number of production dependencies",
+      "Potentially typosquatted package names",
+      "Development tools in production dependencies",
+      "Reminder: ensure a lockfile is committed",
+    ]);
+  });
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. Scoring — calculateScore
@@ -6838,6 +8697,57 @@ describe("CLI — globToRegex, matchesGlob, collectFiles", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("collectFiles should return a file target directly and ignore missing paths", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-test-"));
+    const filePath = path.join(tmpDir, "single.ts");
+    fs.writeFileSync(filePath, "export const single = true;\n");
+
+    try {
+      const { collectFiles } = await import("../src/cli.js");
+      assert.deepStrictEqual(collectFiles(filePath), [filePath]);
+      assert.deepStrictEqual(collectFiles(path.join(tmpDir, "missing")), []);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("collectFiles should skip default build directories and support sampled limits", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-test-"));
+    const origRandom = Math.random;
+
+    try {
+      fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+      fs.mkdirSync(path.join(tmpDir, "node_modules", "pkg"), { recursive: true });
+      fs.mkdirSync(path.join(tmpDir, "dist"), { recursive: true });
+      for (let i = 0; i < 4; i++) {
+        fs.writeFileSync(path.join(tmpDir, "src", `file${i}.ts`), `export const value${i} = ${i};\n`);
+      }
+      fs.writeFileSync(path.join(tmpDir, "node_modules", "pkg", "ignored.ts"), "export const ignored = true;\n");
+      fs.writeFileSync(path.join(tmpDir, "dist", "ignored.js"), "export const ignored = true;\n");
+
+      Math.random = () => 0;
+
+      const { collectFiles } = await import("../src/cli.js");
+      const allFiles = collectFiles(tmpDir);
+      assert.ok(allFiles.every((file) => !file.includes("node_modules") && !file.includes("dist")));
+
+      const sampled = collectFiles(tmpDir, { maxFiles: 2, sample: true });
+      assert.strictEqual(sampled.length, 2);
+      assert.ok(sampled.every((file) => file.includes(`${path.sep}src${path.sep}`)));
+    } finally {
+      Math.random = origRandom;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ─── Presets — Composition and Stacking ─────────────────────────────────────
@@ -7265,7 +9175,7 @@ describe("Streaming / Batch API", () => {
 // 20. Baseline V2 — Fingerprint Matching & Data Structures
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { computeFindingFingerprint, loadBaselineData, isBaselined } from "../src/commands/baseline.js";
+import { computeFindingFingerprint, loadBaselineData, isBaselined, runBaseline } from "../src/commands/baseline.js";
 import { writeFileSync, unlinkSync, existsSync as fsExists } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -7550,6 +9460,117 @@ describe("Baseline V2 — Fingerprint Matching", () => {
 
     const finding = { ruleId: "DOC-001", title: "Missing docs" };
     assert.ok(isBaselined(finding, bl, code), "Should handle missing lineNumbers with default 0");
+  });
+
+  it("runBaseline should create a single-file v2 baseline", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-baseline-single-"));
+    const sourceFile = path.join(tmpDir, "app.ts");
+    const outputFile = path.join(tmpDir, "baseline.json");
+    const origExit = process.exit;
+
+    try {
+      fs.writeFileSync(sourceFile, 'const password = "ProdSecret123";\neval(userInput);\n', "utf-8");
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(
+        () => runBaseline(["node", "judges", "baseline", "create", "--file", sourceFile, "--output", outputFile]),
+        /EXIT:0/,
+      );
+
+      const baseline = JSON.parse(fs.readFileSync(outputFile, "utf-8"));
+      assert.equal(baseline.version, 2);
+      assert.equal(Object.keys(baseline.files).length, 1);
+      assert.ok(baseline.totalFindings >= 1);
+    } finally {
+      process.exit = origExit;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("runBaseline should update a project baseline and retain resolved findings", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-baseline-update-"));
+    const sourceFile = path.join(tmpDir, "app.ts");
+    const outputFile = path.join(tmpDir, ".judges-baseline.json");
+    const origExit = process.exit;
+
+    try {
+      fs.writeFileSync(sourceFile, 'const password = "ProdSecret123";\neval(userInput);\n', "utf-8");
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(
+        () => runBaseline(["node", "judges", "baseline", "create", "--dir", tmpDir, "--output", outputFile]),
+        /EXIT:0/,
+      );
+      const created = JSON.parse(fs.readFileSync(outputFile, "utf-8"));
+      assert.ok(created.totalFindings >= 1);
+
+      fs.writeFileSync(sourceFile, "const value = 42;\nconsole.log(value);\n", "utf-8");
+
+      assert.throws(
+        () => runBaseline(["node", "judges", "baseline", "update", "--dir", tmpDir, "--output", outputFile]),
+        /EXIT:0/,
+      );
+
+      const updated = JSON.parse(fs.readFileSync(outputFile, "utf-8"));
+      assert.ok(updated.resolvedFindings >= 1);
+      assert.ok(
+        Object.values(updated.files)
+          .flat()
+          .some((finding: any) => finding.status === "resolved"),
+      );
+    } finally {
+      process.exit = origExit;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("runBaseline should handle help and invalid subcommands", () => {
+    const origExit = process.exit;
+
+    try {
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(() => runBaseline(["node", "judges", "baseline", "--help"]), /EXIT:0/);
+      assert.throws(() => runBaseline(["node", "judges", "baseline", "unknown"]), /EXIT:1/);
+    } finally {
+      process.exit = origExit;
+    }
+  });
+
+  it("runBaseline should fail when inputs are missing or no files are found", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-baseline-empty-"));
+    const origExit = process.exit;
+
+    try {
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(() => runBaseline(["node", "judges", "baseline", "create"]), /EXIT:1/);
+      assert.throws(
+        () => runBaseline(["node", "judges", "baseline", "create", "--file", path.join(tmpDir, "missing.ts")]),
+        /EXIT:1/,
+      );
+      assert.throws(() => runBaseline(["node", "judges", "baseline", "create", "--dir", tmpDir]), /EXIT:1/);
+    } finally {
+      process.exit = origExit;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -8660,6 +10681,146 @@ describe("28. Doctor Diagnostics", () => {
     const output = formatDoctorReport(report);
     assert.ok(output.includes("Issues found"));
   });
+
+  it("should validate an existing config file and warn on unknown keys", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-doctor-config-"));
+
+    try {
+      fs.writeFileSync(
+        path.join(tmpDir, ".judgesrc.json"),
+        JSON.stringify({ minSeverity: "high", unknownSetting: true }),
+        "utf-8",
+      );
+
+      const check = checkConfigFile(tmpDir);
+      assert.equal(check.status, "warn");
+      assert.ok(check.message.includes("unknown properties"));
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should fail when the config file is invalid JSON", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-doctor-bad-config-"));
+
+    try {
+      fs.writeFileSync(path.join(tmpDir, ".judgesrc.json"), "{not-json}", "utf-8");
+      const check = checkConfigFile(tmpDir);
+      assert.equal(check.status, "fail");
+      assert.ok(check.message.includes("Config file invalid"));
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should warn on unexpected feedback store format and fail on corruption", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-doctor-feedback-"));
+    const storePath = path.join(tmpDir, ".judges-feedback.json");
+
+    try {
+      fs.writeFileSync(storePath, JSON.stringify({ version: 1, entries: null }), "utf-8");
+      const warnCheck = checkFeedbackStore(tmpDir);
+      assert.equal(warnCheck.status, "warn");
+
+      fs.writeFileSync(storePath, "{broken}", "utf-8");
+      const failCheck = checkFeedbackStore(tmpDir);
+      assert.equal(failCheck.status, "fail");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should classify baseline files across v2, v1-like, unrecognized, and corrupt shapes", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-doctor-baseline-"));
+    const baselinePath = path.join(tmpDir, ".judges-baseline.json");
+
+    try {
+      fs.writeFileSync(baselinePath, JSON.stringify({ version: 2, files: { "src/app.ts": [] } }), "utf-8");
+      assert.equal(checkBaselineFile(tmpDir, {}).status, "pass");
+
+      fs.writeFileSync(baselinePath, JSON.stringify({ ignoredFindings: [{ ruleId: "SEC-001" }] }), "utf-8");
+      assert.equal(checkBaselineFile(tmpDir, {}).status, "warn");
+
+      fs.writeFileSync(baselinePath, JSON.stringify({ hello: "world" }), "utf-8");
+      assert.equal(checkBaselineFile(tmpDir, {}).status, "warn");
+
+      fs.writeFileSync(baselinePath, "{broken}", "utf-8");
+      assert.equal(checkBaselineFile(tmpDir, {}).status, "fail");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should run the doctor CLI in text, json, and help modes", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-doctor-cli-"));
+    const outputs: string[] = [];
+    const origExit = process.exit;
+    const origLog = console.log;
+
+    try {
+      fs.writeFileSync(path.join(tmpDir, ".judgesrc.json"), JSON.stringify({ minSeverity: "high" }), "utf-8");
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+      console.log = ((...parts: unknown[]) => {
+        outputs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      assert.throws(() => runDoctor(["node", "judges", "doctor", tmpDir]), /EXIT:0/);
+      assert.ok(outputs.some((line) => line.includes("Doctor Report")));
+
+      outputs.length = 0;
+      assert.throws(() => runDoctor(["node", "judges", "doctor", "--json", tmpDir]), /EXIT:0/);
+      assert.ok(outputs.some((line) => line.includes('"healthy": true')));
+
+      outputs.length = 0;
+      assert.throws(() => runDoctor(["node", "judges", "doctor", "--help"]), /EXIT:0/);
+      assert.ok(outputs.some((line) => line.includes("Usage: judges doctor")));
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should exit non-zero when the doctor CLI finds failures", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-doctor-fail-"));
+    const origExit = process.exit;
+
+    try {
+      fs.writeFileSync(
+        path.join(tmpDir, ".judgesrc.json"),
+        JSON.stringify({ baseline: "missing-baseline.json" }),
+        "utf-8",
+      );
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(() => runDoctor(["node", "judges", "doctor", tmpDir]), /EXIT:1/);
+    } finally {
+      process.exit = origExit;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // 29. Language Coverage Report (P3-13)
@@ -8877,6 +11038,254 @@ describe("Finding Snapshot & Trend", () => {
     assert.equal(snap.label, "nightly-build");
     const trend = computeTrend(store);
     assert.equal(trend.points[0].label, "nightly-build");
+  });
+
+  it("should recover from invalid snapshot store files and reload persisted snapshots", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { loadSnapshotStore, saveSnapshotStore } = await import("../src/commands/snapshot.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-snapshot-store-"));
+    const storePath = path.join(tmpDir, ".judges-snapshots.json");
+
+    try {
+      fs.writeFileSync(storePath, "{not-json}");
+      const empty = loadSnapshotStore(storePath);
+      assert.equal(empty.snapshots.length, 0);
+
+      recordSnapshot(empty, [makeFinding({ severity: "high" })], "main", "abc123", "ci-run");
+      saveSnapshotStore(empty, storePath);
+
+      const reloaded = loadSnapshotStore(storePath);
+      assert.equal(reloaded.snapshots.length, 1);
+      assert.equal(reloaded.snapshots[0].label, "ci-run");
+      assert.equal(reloaded.metadata.totalRuns, 1);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should load and save snapshots through a data adapter", async () => {
+    const { loadSnapshotsViaAdapter, saveSnapshotsViaAdapter } = await import("../src/commands/snapshot.js");
+    const saved: unknown[] = [];
+    const adapter = {
+      name: "test-adapter",
+      async loadFeedback() {
+        return { version: 1, entries: [], metadata: { createdAt: "", lastUpdated: "" } };
+      },
+      async saveFeedback() {},
+      async loadFindings() {
+        return { version: "1.0.0", lastRunAt: "", runNumber: 0, findings: [] };
+      },
+      async saveFindings() {},
+      async loadSnapshots() {
+        return {
+          version: 1 as const,
+          snapshots: [],
+          metadata: { createdAt: "2024-01-01T00:00:00.000Z", lastUpdated: "2024-01-01T00:00:00.000Z", totalRuns: 0 },
+        };
+      },
+      async saveSnapshots(data: unknown) {
+        saved.push(data);
+      },
+      async loadMetrics() {
+        return {};
+      },
+      async loadJson() {
+        return undefined;
+      },
+      async saveJson() {},
+    };
+
+    const loaded = await loadSnapshotsViaAdapter("project-dir", adapter as any);
+    assert.equal(loaded.version, 1);
+    await saveSnapshotsViaAdapter(loaded, "project-dir", adapter as any);
+    assert.equal(saved.length, 1);
+  });
+
+  it("should format an HTML trend dashboard with escaped labels", () => {
+    const store = createSnapshotStore();
+    recordSnapshot(store, [makeFinding({ severity: "critical", ruleId: "SEC-001" })], "main", "abc", "nightly <prod>");
+    recordSnapshot(store, [makeFinding({ severity: "high", ruleId: "SEC-002" })], "main", "def", "weekly & smoke");
+
+    const html = formatTrendReportHtml(computeTrend(store));
+    assert.ok(html.includes("Findings Trend Dashboard"));
+    assert.ok(html.includes("nightly &lt;prod&gt;"));
+    assert.ok(html.includes("weekly &amp; smoke"));
+    assert.ok(html.includes("<svg viewBox="));
+    assert.ok(html.includes("polyline"));
+  });
+
+  it("should compute snapshot metrics including offenders, averages, resolved, and new rules", () => {
+    const store = createSnapshotStore();
+    recordSnapshot(store, [
+      makeFinding({ ruleId: "SEC-001", severity: "critical" }),
+      makeFinding({ ruleId: "SEC-002", severity: "high" }),
+    ]);
+    recordSnapshot(store, [
+      makeFinding({ ruleId: "SEC-001", severity: "critical" }),
+      makeFinding({ ruleId: "SEC-003", severity: "medium" }),
+    ]);
+
+    store.snapshots[0].timestamp = "2024-01-01T00:00:00.000Z";
+    store.snapshots[1].timestamp = "2024-01-02T00:00:00.000Z";
+
+    const metrics = computeMetrics(store);
+    assert.equal(metrics.distinctRules, 3);
+    assert.equal(metrics.topOffenders[0].ruleId, "SEC-001");
+    assert.equal(metrics.topOffenders[0].occurrences, 2);
+    assert.equal(metrics.averageBySeverity.critical, 1);
+    assert.equal(metrics.averageBySeverity.high, 0.5);
+    assert.deepEqual(metrics.resolvedRules, ["SEC-002"]);
+    assert.deepEqual(metrics.newRules, ["SEC-003"]);
+  });
+
+  it("should return empty metrics for an empty snapshot store", () => {
+    const metrics = computeMetrics(createSnapshotStore());
+    assert.equal(metrics.distinctRules, 0);
+    assert.deepEqual(metrics.topOffenders, []);
+    assert.deepEqual(metrics.resolvedRules, []);
+    assert.deepEqual(metrics.newRules, []);
+  });
+
+  it("should detect spikes, new critical findings, trend reversals, and new rules", () => {
+    const store = createSnapshotStore();
+    recordSnapshot(store, [makeFinding({ ruleId: "SEC-001", severity: "medium" })]);
+    recordSnapshot(store, [makeFinding({ ruleId: "SEC-001", severity: "medium" })]);
+    recordSnapshot(store, []);
+    recordSnapshot(store, [
+      makeFinding({ ruleId: "SEC-001", severity: "high" }),
+      makeFinding({ ruleId: "SEC-002", severity: "critical" }),
+      makeFinding({ ruleId: "SEC-003", severity: "medium" }),
+      makeFinding({ ruleId: "SEC-004", severity: "low" }),
+    ]);
+
+    const alerts = detectRegressions(store, { spikeThreshold: 0.1, windowSize: 3 });
+    const types = alerts.map((alert) => alert.type).sort();
+    assert.deepEqual(types, ["new-critical", "new-rule", "spike", "trend-reversal"]);
+
+    const formatted = formatRegressionAlerts(alerts);
+    assert.ok(formatted.includes("Regression Alerts"));
+    assert.ok(formatted.includes("[spike]"));
+    assert.ok(formatted.includes("[new-critical]"));
+  });
+
+  it("should format a clean regression report when no regressions exist", () => {
+    const store = createSnapshotStore();
+    recordSnapshot(store, [makeFinding({ ruleId: "SEC-001", severity: "medium" })]);
+    recordSnapshot(store, [makeFinding({ ruleId: "SEC-001", severity: "medium" })]);
+
+    const alerts = detectRegressions(store);
+    assert.deepEqual(alerts, []);
+    assert.ok(formatRegressionAlerts(alerts).includes("No regressions detected"));
+  });
+});
+
+describe("Data Adapter", () => {
+  it("uses the filesystem adapter to persist and load data", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { FileSystemAdapter } = await import("../src/data-adapter.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-data-adapter-"));
+    const adapter = new FileSystemAdapter();
+
+    try {
+      await adapter.saveFeedback(
+        {
+          version: 1,
+          entries: [],
+          metadata: { createdAt: "2024-01-01", lastUpdated: "2024-01-01", totalSubmissions: 0 },
+        },
+        tmpDir,
+      );
+      await adapter.saveFindings({ version: "1.0.0", lastRunAt: "2024-01-01", runNumber: 1, findings: [] }, tmpDir);
+      await adapter.saveSnapshots(
+        {
+          version: 1,
+          snapshots: [],
+          metadata: { createdAt: "2024-01-01", lastUpdated: "2024-01-01", totalRuns: 0 },
+        },
+        tmpDir,
+      );
+      await adapter.saveJson("custom", { enabled: true }, tmpDir);
+
+      const feedback = await adapter.loadFeedback(tmpDir);
+      const findings = await adapter.loadFindings(tmpDir);
+      const snapshots = await adapter.loadSnapshots(tmpDir);
+      const custom = await adapter.loadJson<{ enabled: boolean }>("custom", tmpDir);
+      const metrics = await adapter.loadMetrics(tmpDir);
+
+      assert.equal(feedback.version, 1);
+      assert.equal(findings.runNumber, 1);
+      assert.equal(snapshots.version, 1);
+      assert.deepEqual(custom, { enabled: true });
+      assert.ok(metrics.feedbackStore);
+      assert.ok(metrics.findingStore);
+      assert.ok(metrics.snapshotData);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("creates HTTP adapters from config and resolves env vars", async () => {
+    const { createAdapterFromConfig, HttpAdapter } = await import("../src/data-adapter.js");
+    process.env.JUDGES_DATA_TOKEN = "secret-token";
+
+    const adapter = createAdapterFromConfig({
+      type: "http",
+      url: "https://example.test/${JUDGES_DATA_TOKEN}",
+      headers: { Authorization: "Bearer ${JUDGES_DATA_TOKEN}" },
+    });
+
+    assert.ok(adapter instanceof HttpAdapter);
+    assert.equal((adapter as any).baseUrl, "https://example.test/secret-token");
+    assert.equal((adapter as any).headers.Authorization, "Bearer secret-token");
+  });
+
+  it("throws when HTTP adapter config is missing a url", async () => {
+    const { createAdapterFromConfig } = await import("../src/data-adapter.js");
+    assert.throws(() => createAdapterFromConfig({ type: "http" }), /requires 'url'/);
+  });
+
+  it("uses the active adapter registry and HTTP adapter fallbacks", async () => {
+    const mod = await import("../src/data-adapter.js");
+    const originalFetch = globalThis.fetch;
+    const originalAdapter = mod.getDataAdapter();
+    const calls: Array<{ url: string; method?: string }> = [];
+
+    try {
+      globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+        calls.push({ url: String(input), method: init?.method });
+        if (String(input).includes("missing")) {
+          return { ok: false, json: async () => ({}) } as Response;
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            version: 1,
+            entries: [],
+            metadata: { createdAt: "", lastUpdated: "", totalSubmissions: 0 },
+          }),
+        } as Response;
+      }) as typeof fetch;
+
+      const httpAdapter = new mod.HttpAdapter({ url: "https://example.test/api" });
+      mod.setDataAdapter(httpAdapter);
+      assert.strictEqual(mod.getDataAdapter(), httpAdapter);
+
+      const feedback = await httpAdapter.loadFeedback("project-dir");
+      const missing = await httpAdapter.loadJson("missing", "project-dir");
+      await httpAdapter.saveJson("custom", { value: 1 }, "project-dir");
+
+      assert.equal(feedback.version, 1);
+      assert.equal(missing, undefined);
+      assert.ok(calls.some((call) => call.url.includes("/feedback?project=project-dir")));
+      assert.ok(calls.some((call) => call.url.includes("/data/custom?project=project-dir") && call.method === "PUT"));
+    } finally {
+      mod.setDataAdapter(originalAdapter);
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 
@@ -9836,6 +12245,47 @@ describe("Review Command — parseReviewArgs", () => {
     assert.strictEqual(args.approve, true, "Should set approve");
     assert.strictEqual(args.minSeverity, "error", "Should set minSeverity");
   });
+
+  it("should parse positional PR number and extended review flags", async () => {
+    const { parseReviewArgs } = await import("../src/commands/review.js");
+    const args = parseReviewArgs([
+      "node",
+      "judges",
+      "review",
+      "42",
+      "--format",
+      "json",
+      "--max-comments",
+      "7",
+      "--config",
+      ".judgesrc.json",
+      "--confidence",
+      "0.35",
+      "--min-confidence",
+      "0.7",
+      "--cross-file",
+      "--judges",
+      "security, cybersecurity , framework-safety",
+    ]);
+
+    assert.strictEqual(args.pr, 42);
+    assert.strictEqual(args.format, "json");
+    assert.strictEqual(args.maxComments, 7);
+    assert.strictEqual(args.configPath, ".judgesrc.json");
+    assert.strictEqual(args.confidence, 0.35);
+    assert.strictEqual(args.minConfidence, 0.7);
+    assert.strictEqual(args.crossFile, true);
+    assert.deepStrictEqual(args.judges, ["security", "cybersecurity", "framework-safety"]);
+  });
+
+  it("should toggle calibration flags correctly", async () => {
+    const { parseReviewArgs } = await import("../src/commands/review.js");
+    const disabled = parseReviewArgs(["node", "judges", "review", "--pr", "1", "--no-calibrate"]);
+    const enabled = parseReviewArgs(["node", "judges", "review", "--pr", "1", "--no-calibrate", "--calibrate"]);
+
+    assert.strictEqual(disabled.calibrate, false);
+    assert.strictEqual(enabled.calibrate, true);
+  });
 });
 
 describe("Review Command — parsePatchToHunk", () => {
@@ -9878,6 +12328,799 @@ describe("Review Command — findingToCommentBody", () => {
     assert.ok(body.includes("SQL Injection"), "Should include title");
     assert.ok(body.includes("parameterized"), "Should include recommendation");
   });
+
+  it("should include reliability tags, suggestion blocks, and references", async () => {
+    const { findingToCommentBody } = await import("../src/commands/review.js");
+    const body = findingToCommentBody(
+      makeFinding({
+        ruleId: "SEC-002",
+        severity: "critical",
+        title: "Use trusted parser",
+        description: "Untrusted input reaches a parser.",
+        recommendation: "Switch to the safe parser.",
+        suggestedFix: "safeParse(input)",
+        reference: "https://example.test/rules/SEC-002",
+      }),
+      0.08,
+    );
+
+    assert.ok(body.includes("99%+ reliable"));
+    assert.ok(body.includes("```suggestion"));
+    assert.ok(body.includes("https://example.test/rules/SEC-002"));
+  });
+});
+
+describe("Review Command — runReview", () => {
+  it("prints help when no PR number is provided", async () => {
+    const { runReview } = await import("../src/commands/review.js");
+    const origExit = process.exit;
+    const origLog = console.log;
+    const output: string[] = [];
+
+    try {
+      console.log = ((...parts: unknown[]) => {
+        output.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(() => runReview(["node", "judges", "review"]), /EXIT:0/);
+      assert.ok(output.some((line) => line.includes("Pull Request Review")));
+      assert.ok(output.some((line) => line.includes("--cross-file")));
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+    }
+  });
+
+  it("fails cleanly when no repository can be detected", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runReview } = await import("../src/commands/review.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-review-no-repo-"));
+    const origCwd = process.cwd();
+    const origExit = process.exit;
+    const origError = console.error;
+    const errors: string[] = [];
+
+    try {
+      process.chdir(tmpDir);
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(() => runReview(["node", "judges", "review", "--pr", "42"]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("Could not detect GitHub repository")));
+    } finally {
+      process.chdir(origCwd);
+      process.exit = origExit;
+      console.error = origError;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("supports dry-run review output with a mocked gh CLI", async () => {
+    const { createRequire, syncBuiltinESMExports } = await import("module");
+    const require = createRequire(import.meta.url);
+    const childProcess = require("child_process") as typeof import("child_process");
+    const origExecFileSync = childProcess.execFileSync;
+    const origExit = process.exit;
+    const origLog = console.log;
+    const origError = console.error;
+    const output: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      childProcess.execFileSync = ((
+        file: string,
+        args?: readonly string[] | undefined,
+        options?: { encoding?: BufferEncoding },
+      ) => {
+        const result = (text: string) => (options?.encoding ? text : Buffer.from(text, "utf-8"));
+        const argv = [...(args ?? [])];
+        if (file === "gh" && argv[0] === "--version") {
+          return result("gh version 2.0.0");
+        }
+        if (file === "gh" && argv[0] === "api") {
+          const methodIndex = argv.indexOf("-X");
+          const method = methodIndex >= 0 ? argv[methodIndex + 1] : "GET";
+          const endpoint = argv[argv.length - 1];
+          if (endpoint === "/repos/octo/repo/pulls/42/files") {
+            return result(
+              JSON.stringify([
+                {
+                  filename: "src/app.ts",
+                  status: "modified",
+                  patch:
+                    '@@ -0,0 +1,5 @@\n+export function handler(req, res) {\n+  const password = "superSecretProdPwd123!";\n+  const query = "SELECT * FROM users WHERE id = " + req.query.id;\n+  return res.json({ password, query });\n+}',
+                },
+              ]),
+            );
+          }
+          if (method === "POST" && endpoint === "/repos/octo/repo/pulls/42/reviews") {
+            return result(JSON.stringify({ id: 123, event: "REQUEST_CHANGES" }));
+          }
+          if (method === "POST" && endpoint === "/repos/octo/repo/issues/42/comments") {
+            return result(JSON.stringify({ id: 456 }));
+          }
+          return result(JSON.stringify({ method, endpoint }));
+        }
+        return origExecFileSync(file, args, options as Parameters<typeof childProcess.execFileSync>[2]);
+      }) as typeof childProcess.execFileSync;
+      syncBuiltinESMExports();
+
+      console.log = ((...parts: unknown[]) => {
+        output.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      const { runReview } = await import("../src/commands/review.js");
+      assert.throws(
+        () => runReview(["node", "judges", "review", "--pr", "42", "--repo", "octo/repo", "--dry-run"]),
+        /EXIT:1/,
+      );
+      assert.ok(output.some((line) => line.includes("dry-run (preview only)")));
+      assert.ok(output.some((line) => line.includes("Would post ") && line.includes(" inline comment")));
+      assert.ok(output.some((line) => line.includes("REQUEST_CHANGES")));
+      assert.ok(errors.length === 0);
+    } finally {
+      childProcess.execFileSync = origExecFileSync;
+      syncBuiltinESMExports();
+      process.exit = origExit;
+      console.log = origLog;
+      console.error = origError;
+    }
+  });
+
+  it("supports JSON review output and live posting with a mocked gh CLI", async () => {
+    const { createRequire, syncBuiltinESMExports } = await import("module");
+    const require = createRequire(import.meta.url);
+    const childProcess = require("child_process") as typeof import("child_process");
+    const origExecFileSync = childProcess.execFileSync;
+    const requests: string[] = [];
+    const origExit = process.exit;
+    const origLog = console.log;
+    const origError = console.error;
+    const output: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      childProcess.execFileSync = ((
+        file: string,
+        args?: readonly string[] | undefined,
+        options?: { encoding?: BufferEncoding },
+      ) => {
+        const result = (text: string) => (options?.encoding ? text : Buffer.from(text, "utf-8"));
+        const argv = [...(args ?? [])];
+        if (file === "gh" && argv[0] === "--version") {
+          return result("gh version 2.0.0");
+        }
+        if (file === "gh" && argv[0] === "api") {
+          const methodIndex = argv.indexOf("-X");
+          const method = methodIndex >= 0 ? argv[methodIndex + 1] : "GET";
+          const endpoint = argv[argv.length - 1];
+          requests.push(`${method} ${endpoint}`);
+          if (endpoint === "/repos/octo/repo/pulls/42/files") {
+            return result(
+              JSON.stringify([
+                {
+                  filename: "src/app.ts",
+                  status: "modified",
+                  patch:
+                    '@@ -0,0 +1,5 @@\n+export function handler(req, res) {\n+  const password = "superSecretProdPwd123!";\n+  const query = "SELECT * FROM users WHERE id = " + req.query.id;\n+  return res.json({ password, query });\n+}',
+                },
+              ]),
+            );
+          }
+          if (method === "POST" && endpoint === "/repos/octo/repo/pulls/42/reviews") {
+            return result(JSON.stringify({ id: 321, state: "COMMENTED" }));
+          }
+          if (method === "POST" && endpoint === "/repos/octo/repo/issues/42/comments") {
+            return result(JSON.stringify({ id: 654 }));
+          }
+          return result(JSON.stringify({ method, endpoint }));
+        }
+        return origExecFileSync(file, args, options as Parameters<typeof childProcess.execFileSync>[2]);
+      }) as typeof childProcess.execFileSync;
+      syncBuiltinESMExports();
+
+      console.log = ((...parts: unknown[]) => {
+        output.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      const { runReview } = await import("../src/commands/review.js");
+      assert.throws(
+        () => runReview(["node", "judges", "review", "--pr", "42", "--repo", "octo/repo", "--format", "json"]),
+        /EXIT:1/,
+      );
+
+      const parsed = JSON.parse(output.join("\n"));
+      assert.strictEqual(parsed.filesAnalyzed, 1);
+      assert.ok(parsed.totalFindings >= 1);
+      assert.ok(Array.isArray(parsed.comments));
+      assert.ok(requests.includes("GET /repos/octo/repo/pulls/42/files"));
+      assert.ok(requests.includes("POST /repos/octo/repo/pulls/42/reviews"));
+      assert.ok(errors.some((line) => line.includes("live (will post comments)")));
+    } finally {
+      childProcess.execFileSync = origExecFileSync;
+      syncBuiltinESMExports();
+      process.exit = origExit;
+      console.log = origLog;
+      console.error = origError;
+    }
+  });
+});
+
+describe("Guided setup and onboarding commands", () => {
+  it("runs the guided tour in JSON mode and initializes a starter config", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runGuidedTour } = await import("../src/commands/guided-tour.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-guided-tour-"));
+    const origCwd = process.cwd();
+    const origLog = console.log;
+    const output: string[] = [];
+
+    try {
+      process.chdir(tmpDir);
+      console.log = ((...parts: unknown[]) => {
+        output.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      runGuidedTour(["guided-tour", "--all", "--format", "json"]);
+      const tracks = JSON.parse(output.join("\n"));
+      assert.ok(Array.isArray(tracks));
+      assert.ok(tracks.some((track: { id: string }) => track.id === "quickstart"));
+
+      output.length = 0;
+      runGuidedTour(["guided-tour", "--init"]);
+      assert.ok(fs.existsSync(path.join(tmpDir, ".judgesrc")));
+
+      output.length = 0;
+      runGuidedTour(["guided-tour", "--all"]);
+      assert.ok(fs.existsSync(path.join(tmpDir, ".judges-tour")));
+      assert.ok(output.some((line) => line.includes("Quick Start")));
+    } finally {
+      process.chdir(origCwd);
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("lists setup profiles, generates CI, and initializes project files", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runSetupWizard } = await import("../src/commands/setup-wizard.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-setup-wizard-"));
+    const origLog = console.log;
+    const origError = console.error;
+    const origExitCode = process.exitCode;
+    const output: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      console.log = ((...parts: unknown[]) => {
+        output.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+
+      runSetupWizard(["setup-wizard", "--list-profiles", "--format", "json"]);
+      const profiles = JSON.parse(output.join("\n"));
+      assert.ok(profiles["quick-start"]);
+      assert.ok(profiles["security-first"]);
+
+      output.length = 0;
+      runSetupWizard(["setup-wizard", "--profile", "security-first", "--generate-ci", "gitlab-ci"]);
+      assert.ok(output.join("\n").includes("judges-review:"));
+      assert.ok(output.join("\n").includes("node:20"));
+
+      output.length = 0;
+      runSetupWizard(["setup-wizard", "--profile", "team-review", "--init", "--output", tmpDir]);
+      assert.ok(fs.existsSync(path.join(tmpDir, ".judgesrc")));
+      assert.ok(fs.existsSync(path.join(tmpDir, ".github", "workflows", "judges-review.yml")));
+
+      output.length = 0;
+      process.exitCode = undefined;
+      runSetupWizard(["setup-wizard", "--profile", "missing-profile"]);
+      assert.strictEqual(process.exitCode, 1);
+      assert.ok(errors.some((line) => line.includes("Unknown profile")));
+    } finally {
+      process.exitCode = origExitCode;
+      console.log = origLog;
+      console.error = origError;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("generates review quickstart and CI integration artifacts", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runReviewQuickstart } = await import("../src/commands/review-quickstart.js");
+    const { runReviewCiIntegration } = await import("../src/commands/review-ci-integration.js");
+    const { runReviewCicdIntegrate } = await import("../src/commands/review-cicd-integrate.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-review-guides-"));
+    const ciFile = path.join(tmpDir, "azure-pipelines.yml");
+    const cicdFile = path.join(tmpDir, "gitlab.yml");
+    const origLog = console.log;
+    const origError = console.error;
+    const origExitCode = process.exitCode;
+    const output: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      console.log = ((...parts: unknown[]) => {
+        output.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+
+      runReviewQuickstart(["review-quickstart", "--dir", tmpDir, "--init"]);
+      assert.ok(fs.existsSync(path.join(tmpDir, ".judgesrc")));
+
+      output.length = 0;
+      runReviewQuickstart(["review-quickstart", "--dir", tmpDir, "--format", "json"]);
+      const steps = JSON.parse(output.join("\n"));
+      assert.ok(Array.isArray(steps));
+      assert.ok(steps.some((step: { title: string }) => step.title === "Create Configuration"));
+
+      output.length = 0;
+      runReviewCiIntegration(["review-ci-integration", "--platform", "azure", "--output", ciFile]);
+      assert.ok(fs.existsSync(ciFile));
+      assert.ok(fs.readFileSync(ciFile, "utf-8").includes("PublishBuildArtifacts"));
+
+      output.length = 0;
+      errors.length = 0;
+      process.exitCode = undefined;
+      fs.writeFileSync(path.join(tmpDir, "existing.yml"), "existing\n", "utf-8");
+      runReviewCiIntegration([
+        "review-ci-integration",
+        "--platform",
+        "github",
+        "--output",
+        path.join(tmpDir, "existing.yml"),
+      ]);
+      assert.strictEqual(process.exitCode, 1);
+      assert.ok(errors.some((line) => line.includes("file already exists")));
+
+      output.length = 0;
+      runReviewCicdIntegrate(["review-cicd-integrate", "--format", "json"]);
+      const platformList = JSON.parse(output.join("\n"));
+      assert.ok(platformList.platforms.includes("github-actions"));
+
+      output.length = 0;
+      runReviewCicdIntegrate(["review-cicd-integrate", "--platform", "gitlab-ci", "--out", cicdFile]);
+      assert.ok(fs.existsSync(cicdFile));
+      assert.ok(fs.readFileSync(cicdFile, "utf-8").includes("merge_requests"));
+
+      process.exitCode = undefined;
+      runReviewCicdIntegrate(["review-cicd-integrate", "--platform", "does-not-exist"]);
+      assert.strictEqual(process.exitCode, 1);
+      assert.ok(errors.some((line) => line.includes("Unknown platform")));
+    } finally {
+      process.exitCode = origExitCode;
+      console.log = origLog;
+      console.error = origError;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("onboards a repository and runs the team onboarding flow", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runReviewRepoOnboard } = await import("../src/commands/review-repo-onboard.js");
+    const { runOnboard } = await import("../src/commands/onboard.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-review-onboard-"));
+    const origLog = console.log;
+    const output: string[] = [];
+
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".github"), { recursive: true });
+      fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, "src", "app.ts"), "export const value = 1;\n", "utf-8");
+      console.log = ((...parts: unknown[]) => {
+        output.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      runReviewRepoOnboard(["review-repo-onboard", "--repo", tmpDir, "--preset", "strict", "--format", "json"]);
+      const onboardSummary = JSON.parse(output.join("\n"));
+      assert.strictEqual(onboardSummary.preset, "strict");
+      assert.ok(fs.existsSync(path.join(tmpDir, ".judgesrc")));
+      assert.ok(fs.existsSync(path.join(tmpDir, ".judges-baseline.json")));
+      assert.ok(fs.existsSync(path.join(tmpDir, ".github", "workflows", "judges.yml")));
+
+      output.length = 0;
+      await runOnboard(["node", "judges", "onboard", tmpDir, "--quiet"]);
+      assert.ok(fs.existsSync(path.join(tmpDir, ".judgesrc.json")) || fs.existsSync(path.join(tmpDir, ".judgesrc")));
+      assert.ok(fs.existsSync(path.join(tmpDir, ".vscode", "mcp.json")));
+      assert.ok(fs.existsSync(path.join(tmpDir, ".gitignore")));
+      assert.ok(output.some((line) => line.includes("Onboarding Complete")));
+    } finally {
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("GitHub App helpers", () => {
+  it("verifies webhook signatures and ignores unsupported webhook events", async () => {
+    const { verifyWebhookSignature, handleWebhook } = await import("../src/github-app.js");
+    const crypto = await import("crypto");
+    const payload = JSON.stringify({ action: "closed" });
+    const secret = "judges-secret";
+    const signature = `sha256=${crypto.createHmac("sha256", secret).update(payload).digest("hex")}`;
+
+    assert.strictEqual(verifyWebhookSignature(payload, signature, secret), true);
+    assert.strictEqual(verifyWebhookSignature(payload, undefined, secret), false);
+    assert.strictEqual(verifyWebhookSignature(payload, `${signature}x`, secret), false);
+
+    const ignoredEvent = await handleWebhook("ping", payload, signature, {
+      appId: "1",
+      privateKey: "key",
+      webhookSecret: secret,
+    });
+    assert.strictEqual(ignoredEvent.status, 200);
+    assert.ok(ignoredEvent.body.includes("Ignored event"));
+
+    const actionPayload = JSON.stringify({
+      action: "closed",
+      pull_request: {
+        number: 1,
+        head: { sha: "a", ref: "a" },
+        base: { sha: "b", ref: "b" },
+        title: "t",
+        user: { login: "octo" },
+      },
+      repository: { full_name: "octo/repo", owner: { login: "octo" }, name: "repo" },
+      installation: { id: 1 },
+    });
+    const actionSignature = `sha256=${crypto.createHmac("sha256", secret).update(actionPayload).digest("hex")}`;
+
+    const ignoredAction = await handleWebhook("pull_request", actionPayload, actionSignature, {
+      appId: "1",
+      privateKey: "key",
+      webhookSecret: secret,
+    });
+    assert.strictEqual(ignoredAction.status, 200);
+    assert.ok(ignoredAction.body.includes("Ignored action"));
+  });
+
+  it("rejects invalid signatures and malformed pull_request payloads", async () => {
+    const { handleWebhook } = await import("../src/github-app.js");
+    const crypto = await import("crypto");
+    const secret = "judges-secret";
+    const payload = JSON.stringify({ action: "opened" });
+    const signature = `sha256=${crypto.createHmac("sha256", secret).update(payload).digest("hex")}`;
+
+    const invalidSig = await handleWebhook("pull_request", payload, "sha256=bad", {
+      appId: "1",
+      privateKey: "key",
+      webhookSecret: secret,
+    });
+    assert.strictEqual(invalidSig.status, 401);
+    assert.ok(invalidSig.body.includes("Invalid webhook signature"));
+
+    const missingFields = await handleWebhook("pull_request", payload, signature, {
+      appId: "1",
+      privateKey: "key",
+      webhookSecret: secret,
+    });
+    assert.strictEqual(missingFields.status, 400);
+    assert.ok(missingFields.body.includes("Missing pull_request"));
+  });
+
+  it("ignores non-command and non-created issue_comment webhook events", async () => {
+    const { handleWebhook } = await import("../src/github-app.js");
+    const crypto = await import("crypto");
+    const secret = "judges-secret";
+
+    const editedPayload = JSON.stringify({
+      action: "edited",
+      comment: { id: 1, body: "/judges re-review", user: { login: "octo" } },
+      issue: { number: 7, pull_request: { url: "https://api.github.com/repos/octo/repo/pulls/7" } },
+      repository: { full_name: "octo/repo", owner: { login: "octo" }, name: "repo" },
+      installation: { id: 1 },
+    });
+    const editedSignature = `sha256=${crypto.createHmac("sha256", secret).update(editedPayload).digest("hex")}`;
+    const editedResult = await handleWebhook("issue_comment", editedPayload, editedSignature, {
+      appId: "1",
+      privateKey: "key",
+      webhookSecret: secret,
+    });
+    assert.strictEqual(editedResult.status, 200);
+    assert.ok(editedResult.body.includes("Ignored non-created comment"));
+
+    const plainCommentPayload = JSON.stringify({
+      action: "created",
+      comment: { id: 2, body: "looks good to me", user: { login: "octo" } },
+      issue: { number: 7, pull_request: { url: "https://api.github.com/repos/octo/repo/pulls/7" } },
+      repository: { full_name: "octo/repo", owner: { login: "octo" }, name: "repo" },
+      installation: { id: 1 },
+    });
+    const plainSignature = `sha256=${crypto.createHmac("sha256", secret).update(plainCommentPayload).digest("hex")}`;
+    const plainResult = await handleWebhook("issue_comment", plainCommentPayload, plainSignature, {
+      appId: "1",
+      privateKey: "key",
+      webhookSecret: secret,
+    });
+    assert.strictEqual(plainResult.status, 200);
+    assert.ok(plainResult.body.includes("No /judges command found"));
+  });
+
+  it("loads app config from env and prints CLI help for unknown subcommands", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { loadAppConfig, runAppCommand } = await import("../src/github-app.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-app-config-"));
+    const keyPath = path.join(tmpDir, "app.pem");
+    const origEnv = {
+      JUDGES_APP_ID: process.env.JUDGES_APP_ID,
+      JUDGES_PRIVATE_KEY: process.env.JUDGES_PRIVATE_KEY,
+      JUDGES_PRIVATE_KEY_PATH: process.env.JUDGES_PRIVATE_KEY_PATH,
+      JUDGES_WEBHOOK_SECRET: process.env.JUDGES_WEBHOOK_SECRET,
+      JUDGES_APP_PORT: process.env.JUDGES_APP_PORT,
+      JUDGES_MIN_SEVERITY: process.env.JUDGES_MIN_SEVERITY,
+      JUDGES_MAX_COMMENTS: process.env.JUDGES_MAX_COMMENTS,
+      JUDGES_AUTO_APPROVE: process.env.JUDGES_AUTO_APPROVE,
+      JUDGES_DIFF_ONLY: process.env.JUDGES_DIFF_ONLY,
+    };
+    const origLog = console.log;
+    const output: string[] = [];
+
+    try {
+      fs.writeFileSync(keyPath, "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n", "utf-8");
+      process.env.JUDGES_APP_ID = "99";
+      delete process.env.JUDGES_PRIVATE_KEY;
+      process.env.JUDGES_PRIVATE_KEY_PATH = keyPath;
+      process.env.JUDGES_WEBHOOK_SECRET = "secret";
+      process.env.JUDGES_APP_PORT = "4567";
+      process.env.JUDGES_MIN_SEVERITY = "high";
+      process.env.JUDGES_MAX_COMMENTS = "12";
+      process.env.JUDGES_AUTO_APPROVE = "true";
+      process.env.JUDGES_DIFF_ONLY = "false";
+
+      const config = loadAppConfig();
+      assert.strictEqual(config.appId, "99");
+      assert.strictEqual(config.port, 4567);
+      assert.strictEqual(config.minSeverity, "high");
+      assert.strictEqual(config.maxComments, 12);
+      assert.strictEqual(config.autoApprove, true);
+      assert.strictEqual(config.diffOnly, false);
+
+      console.log = ((...parts: unknown[]) => {
+        output.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+      runAppCommand(["help"]);
+      assert.ok(output.some((line) => line.includes("Judges GitHub App")));
+      assert.ok(output.some((line) => line.includes("judges app serve")));
+
+      delete process.env.JUDGES_APP_ID;
+      assert.throws(() => loadAppConfig(), /JUDGES_APP_ID/);
+
+      process.env.JUDGES_APP_ID = "99";
+      delete process.env.JUDGES_PRIVATE_KEY_PATH;
+      assert.throws(() => loadAppConfig(), /JUDGES_PRIVATE_KEY/);
+
+      process.env.JUDGES_PRIVATE_KEY_PATH = keyPath;
+      delete process.env.JUDGES_WEBHOOK_SECRET;
+      assert.throws(() => loadAppConfig(), /JUDGES_WEBHOOK_SECRET/);
+    } finally {
+      process.env.JUDGES_APP_ID = origEnv.JUDGES_APP_ID;
+      process.env.JUDGES_PRIVATE_KEY = origEnv.JUDGES_PRIVATE_KEY;
+      process.env.JUDGES_PRIVATE_KEY_PATH = origEnv.JUDGES_PRIVATE_KEY_PATH;
+      process.env.JUDGES_WEBHOOK_SECRET = origEnv.JUDGES_WEBHOOK_SECRET;
+      process.env.JUDGES_APP_PORT = origEnv.JUDGES_APP_PORT;
+      process.env.JUDGES_MIN_SEVERITY = origEnv.JUDGES_MIN_SEVERITY;
+      process.env.JUDGES_MAX_COMMENTS = origEnv.JUDGES_MAX_COMMENTS;
+      process.env.JUDGES_AUTO_APPROVE = origEnv.JUDGES_AUTO_APPROVE;
+      process.env.JUDGES_DIFF_ONLY = origEnv.JUDGES_DIFF_ONLY;
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("starts the app server and handles health and missing routes", async () => {
+    const { createRequire, syncBuiltinESMExports } = await import("module");
+    const require = createRequire(import.meta.url);
+    const http = require("http") as typeof import("http");
+    const origCreateServer = http.createServer;
+    const origLog = console.log;
+    const output: string[] = [];
+    let listenedPort = -1;
+    let capturedHandler:
+      | ((req: import("http").IncomingMessage, res: import("http").ServerResponse) => void | Promise<void>)
+      | undefined;
+
+    try {
+      http.createServer = ((handler: typeof capturedHandler) => {
+        capturedHandler = handler;
+        return {
+          listen: (port: number, callback?: () => void) => {
+            listenedPort = port;
+            callback?.();
+          },
+        };
+      }) as unknown as typeof http.createServer;
+      syncBuiltinESMExports();
+
+      console.log = ((...parts: unknown[]) => {
+        output.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      const { startAppServer } = await import("../src/github-app.js");
+      startAppServer({ appId: "1", privateKey: "key", webhookSecret: "secret", port: 3456 });
+
+      assert.strictEqual(listenedPort, 3456);
+      assert.ok(output.some((line) => line.includes("listening on port 3456")));
+      assert.ok(capturedHandler, "Expected HTTP request handler to be captured");
+
+      const makeResponse = () => {
+        const state = { status: 0, headers: {} as Record<string, string>, body: "" };
+        const res = {
+          writeHead(status: number, headers: Record<string, string>) {
+            state.status = status;
+            state.headers = headers;
+          },
+          end(body?: string) {
+            state.body = body ?? "";
+          },
+        } as unknown as import("http").ServerResponse;
+        return { res, state };
+      };
+
+      const health = makeResponse();
+      await capturedHandler!({ url: "/health", method: "GET" } as import("http").IncomingMessage, health.res);
+      assert.strictEqual(health.state.status, 200);
+      assert.ok(health.state.body.includes("judges-github-app"));
+
+      const missing = makeResponse();
+      await capturedHandler!({ url: "/missing", method: "GET" } as import("http").IncomingMessage, missing.res);
+      assert.strictEqual(missing.state.status, 404);
+      assert.ok(missing.state.body.includes("Not found"));
+    } finally {
+      http.createServer = origCreateServer;
+      syncBuiltinESMExports();
+      console.log = origLog;
+    }
+  });
+
+  it("returns a 500 response when the webhook server receives signed malformed JSON", async () => {
+    const { PassThrough } = await import("stream");
+    const { createRequire, syncBuiltinESMExports } = await import("module");
+    const crypto = await import("crypto");
+    const require = createRequire(import.meta.url);
+    const http = require("http") as typeof import("http");
+    const origCreateServer = http.createServer;
+    const origError = console.error;
+    const errors: string[] = [];
+    let capturedHandler:
+      | ((req: import("http").IncomingMessage, res: import("http").ServerResponse) => void | Promise<void>)
+      | undefined;
+
+    try {
+      http.createServer = ((handler: typeof capturedHandler) => {
+        capturedHandler = handler;
+        return {
+          listen: (_port: number, callback?: () => void) => {
+            callback?.();
+          },
+        };
+      }) as unknown as typeof http.createServer;
+      syncBuiltinESMExports();
+
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+
+      const { startAppServer } = await import("../src/github-app.js");
+      startAppServer({ appId: "1", privateKey: "key", webhookSecret: "secret", port: 3456 });
+      assert.ok(capturedHandler, "Expected HTTP request handler to be captured");
+
+      const req = new PassThrough() as import("http").IncomingMessage;
+      const malformedBody = '{"action":"opened"';
+      const signature = `sha256=${crypto.createHmac("sha256", "secret").update(malformedBody).digest("hex")}`;
+      Object.assign(req, {
+        url: "/webhook",
+        method: "POST",
+        headers: {
+          "x-github-event": "pull_request",
+          "x-hub-signature-256": signature,
+        },
+      });
+
+      const responseState = { status: 0, body: "" };
+      let resolveResponse: (() => void) | undefined;
+      const responseDone = new Promise<void>((resolve) => {
+        resolveResponse = resolve;
+      });
+      const res = {
+        writeHead(status: number) {
+          responseState.status = status;
+        },
+        end(body?: string) {
+          responseState.body = body ?? "";
+          resolveResponse?.();
+        },
+      } as unknown as import("http").ServerResponse;
+
+      await capturedHandler!(req, res);
+      req.end(malformedBody);
+      await responseDone;
+
+      assert.strictEqual(responseState.status, 500);
+      assert.ok(responseState.body.includes("Internal error"));
+      assert.ok(errors.some((line) => line.includes("Webhook handler error:")));
+    } finally {
+      http.createServer = origCreateServer;
+      syncBuiltinESMExports();
+      console.error = origError;
+    }
+  });
+
+  it("runs app serve with a port override using a mocked HTTP server", async () => {
+    const { createRequire, syncBuiltinESMExports } = await import("module");
+    const require = createRequire(import.meta.url);
+    const http = require("http") as typeof import("http");
+    const origCreateServer = http.createServer;
+    const origEnv = {
+      JUDGES_APP_ID: process.env.JUDGES_APP_ID,
+      JUDGES_PRIVATE_KEY: process.env.JUDGES_PRIVATE_KEY,
+      JUDGES_PRIVATE_KEY_PATH: process.env.JUDGES_PRIVATE_KEY_PATH,
+      JUDGES_WEBHOOK_SECRET: process.env.JUDGES_WEBHOOK_SECRET,
+    };
+    let listenedPort = -1;
+
+    try {
+      http.createServer = ((_handler: unknown) => {
+        return {
+          listen: (port: number, callback?: () => void) => {
+            listenedPort = port;
+            callback?.();
+          },
+        };
+      }) as unknown as typeof http.createServer;
+      syncBuiltinESMExports();
+
+      process.env.JUDGES_APP_ID = "88";
+      process.env.JUDGES_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n";
+      delete process.env.JUDGES_PRIVATE_KEY_PATH;
+      process.env.JUDGES_WEBHOOK_SECRET = "secret";
+
+      const { runAppCommand } = await import("../src/github-app.js");
+      runAppCommand(["serve", "--port", "4567"]);
+      assert.strictEqual(listenedPort, 4567);
+    } finally {
+      http.createServer = origCreateServer;
+      syncBuiltinESMExports();
+      process.env.JUDGES_APP_ID = origEnv.JUDGES_APP_ID;
+      process.env.JUDGES_PRIVATE_KEY = origEnv.JUDGES_PRIVATE_KEY;
+      process.env.JUDGES_PRIVATE_KEY_PATH = origEnv.JUDGES_PRIVATE_KEY_PATH;
+      process.env.JUDGES_WEBHOOK_SECRET = origEnv.JUDGES_WEBHOOK_SECRET;
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -9914,6 +13157,155 @@ describe("Tune Command — parseTuneArgs", () => {
     const { parseTuneArgs } = await import("../src/commands/tune.js");
     const args = parseTuneArgs(["node", "judges", "tune", "--max-files", "50"]);
     assert.strictEqual(args.maxFiles, 50, "Should parse max-files");
+  });
+});
+
+describe("Tune Command — runTune", () => {
+  it("detects framework and writes a config when apply is enabled", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runTune } = await import("../src/commands/tune.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-tune-"));
+    const logs: string[] = [];
+    const origLog = console.log;
+
+    try {
+      fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, "package.json"),
+        JSON.stringify({ dependencies: { next: "14.2.0", react: "18.3.0" } }, null, 2),
+      );
+      fs.writeFileSync(
+        path.join(tmpDir, "src", "page.tsx"),
+        'export default function Page() { const password = "ProdSecret123!"; return <main>Hello</main>; }',
+      );
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      runTune(["node", "judges", "tune", "--dir", tmpDir, "--max-files", "5", "--apply"]);
+
+      const configPath = path.join(tmpDir, ".judgesrc.json");
+      assert.ok(fs.existsSync(configPath), "should write .judgesrc.json");
+      const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      assert.strictEqual(config.preset, "nextjs");
+      assert.ok(logs.some((line) => line.includes("Detected framework: Next.js")));
+      assert.ok(logs.some((line) => line.includes("Recommended .judgesrc.json")));
+    } finally {
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("writes a tuned config when a config already exists", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runTune } = await import("../src/commands/tune.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-tune-existing-"));
+    const origLog = console.log;
+
+    try {
+      fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, ".judgesrc.json"), '{"preset":"existing"}\n');
+      fs.writeFileSync(path.join(tmpDir, "src", "index.ts"), "export const answer = 42;\n");
+      console.log = (() => {}) as typeof console.log;
+
+      runTune(["node", "judges", "tune", "--dir", tmpDir, "--apply"]);
+
+      const tunedPath = path.join(tmpDir, ".judgesrc.tuned.json");
+      assert.ok(fs.existsSync(tunedPath), "should write .judgesrc.tuned.json when .judgesrc.json exists");
+    } finally {
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits successfully when no analyzable source files are found", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runTune } = await import("../src/commands/tune.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-tune-empty-"));
+    const logs: string[] = [];
+    const origLog = console.log;
+    const origExit = process.exit;
+
+    try {
+      fs.writeFileSync(path.join(tmpDir, "README.md"), "placeholder\n");
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(() => runTune(["node", "judges", "tune", "--dir", tmpDir]), /EXIT:0/);
+      assert.ok(logs.some((line) => line.includes("No source files found to analyze.")));
+    } finally {
+      console.log = origLog;
+      process.exit = origExit;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Init Command — runInit", () => {
+  it("generates project files from interactive answers", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { createRequire, syncBuiltinESMExports } = await import("module");
+    const require = createRequire(import.meta.url);
+    const readlineBuiltin = require("readline");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-init-"));
+    const answers = ["2", "3", "y", "i18n, documentation", "y", "n", "y", "y", "y", "y", "y"];
+    let closed = false;
+    const origCreateInterface = readlineBuiltin.createInterface;
+
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".husky"), { recursive: true });
+      fs.mkdirSync(path.join(tmpDir, ".vscode"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".vscode", "mcp.json"),
+        JSON.stringify({ servers: { existing: { command: "node", args: ["server.js"] } } }, null, 2),
+      );
+
+      readlineBuiltin.createInterface = (() => ({
+        question(_prompt: string, callback: (answer: string) => void) {
+          callback(answers.shift() ?? "");
+        },
+        close() {
+          closed = true;
+        },
+      })) as typeof readlineBuiltin.createInterface;
+      syncBuiltinESMExports();
+
+      const { runInit } = await import("../src/commands/init.js");
+      await runInit(tmpDir);
+
+      const judgesRc = JSON.parse(fs.readFileSync(path.join(tmpDir, ".judgesrc.json"), "utf-8"));
+      assert.strictEqual(judgesRc.policyProfile, "startup");
+      assert.strictEqual(judgesRc.minSeverity, "high");
+      assert.deepStrictEqual(judgesRc.disabledJudges, ["i18n", "documentation"]);
+      assert.ok(fs.existsSync(path.join(tmpDir, ".github", "workflows", "judges.yml")));
+      assert.ok(fs.existsSync(path.join(tmpDir, ".gitlab-ci.judges.yml")));
+      assert.ok(fs.existsSync(path.join(tmpDir, "azure-pipelines.judges.yml")));
+      assert.ok(fs.existsSync(path.join(tmpDir, ".husky", "pre-commit")));
+      assert.ok(closed, "readline interface should be closed");
+
+      const mcpConfig = JSON.parse(fs.readFileSync(path.join(tmpDir, ".vscode", "mcp.json"), "utf-8"));
+      assert.ok(mcpConfig.servers.existing, "existing MCP config should be preserved");
+      assert.deepStrictEqual(mcpConfig.servers.judges.args, ["-y", "@kevinrabun/judges"]);
+
+      const preCommit = fs.readFileSync(path.join(tmpDir, ".husky", "pre-commit"), "utf-8");
+      assert.ok(preCommit.includes("@kevinrabun/judges-cli"));
+    } finally {
+      readlineBuiltin.createInterface = origCreateInterface;
+      syncBuiltinESMExports();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -10299,6 +13691,153 @@ describe("parseFixArgs — selective fix flags", () => {
   });
 });
 
+describe("runFix CLI", () => {
+  it("fails when no file is specified", async () => {
+    const { runFix } = await import("../src/commands/fix.js");
+    const origExit = process.exit;
+    const origError = console.error;
+    const errors: string[] = [];
+
+    try {
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+
+      assert.throws(() => runFix(["node", "judges", "fix"]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("No file specified")));
+    } finally {
+      process.exit = origExit;
+      console.error = origError;
+    }
+  });
+
+  it("fails when the target file does not exist", async () => {
+    const { runFix } = await import("../src/commands/fix.js");
+    const origExit = process.exit;
+    const origError = console.error;
+    const errors: string[] = [];
+
+    try {
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+
+      assert.throws(() => runFix(["node", "judges", "fix", "missing-file.ts"]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("File not found")));
+    } finally {
+      process.exit = origExit;
+      console.error = origError;
+    }
+  });
+
+  it("fails on invalid --lines syntax and unknown judges", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runFix } = await import("../src/commands/fix.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-fix-errors-"));
+    const filePath = path.join(tmpDir, "app.js");
+    const origExit = process.exit;
+    const origError = console.error;
+    const errors: string[] = [];
+
+    try {
+      fs.writeFileSync(filePath, "const result = eval(userInput);\n", "utf-8");
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+
+      assert.throws(() => runFix(["node", "judges", "fix", filePath, "--lines", "bad-range"]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("Invalid --lines format")));
+
+      errors.length = 0;
+      assert.throws(() => runFix(["node", "judges", "fix", filePath, "--judge", "nope"]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("Unknown judge")));
+    } finally {
+      process.exit = origExit;
+      console.error = origError;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("supports dry-run previews and filtered no-op exits", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runFix } = await import("../src/commands/fix.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-fix-dry-run-"));
+    const filePath = path.join(tmpDir, "app.js");
+    const origExit = process.exit;
+    const origLog = console.log;
+    const logs: string[] = [];
+
+    try {
+      fs.writeFileSync(filePath, "const result = eval(userInput);\n", "utf-8");
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      assert.throws(() => runFix(["node", "judges", "fix", filePath]), /EXIT:0/);
+      assert.ok(logs.some((line) => line.includes("Auto-Fix")));
+      assert.ok(logs.some((line) => line.includes("Dry run")));
+      assert.ok(fs.readFileSync(filePath, "utf-8").includes("eval(userInput)"));
+
+      logs.length = 0;
+      assert.throws(() => runFix(["node", "judges", "fix", filePath, "--rule", "DOES-NOT-EXIST"]), /EXIT:0/);
+      assert.ok(logs.some((line) => line.includes("No auto-fixable findings match the criteria")));
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("applies fixes in place and verifies the result", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runFix } = await import("../src/commands/fix.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-fix-apply-"));
+    const filePath = path.join(tmpDir, "app.js");
+    const origExit = process.exit;
+    const origLog = console.log;
+    const logs: string[] = [];
+
+    try {
+      fs.writeFileSync(filePath, "const result = eval(userInput);\n", "utf-8");
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      runFix(["node", "judges", "fix", filePath, "--apply"]);
+      const updated = fs.readFileSync(filePath, "utf-8");
+      assert.ok(updated.includes("new Function(userInput)()"));
+      assert.ok(!updated.includes("eval(userInput)"));
+      assert.ok(logs.some((line) => line.includes("Applied 1 fix(es)")));
+      assert.ok(logs.some((line) => line.includes("Verifying fixes") || line.includes("Verification:")));
+    } finally {
+      process.exit = origExit;
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Scaffold Plugin — parseScaffoldArgs
 // ═══════════════════════════════════════════════════════════════════════════
@@ -10307,6 +13846,169 @@ describe("Scaffold Plugin Command", () => {
   it("module exports runScaffoldPlugin function", async () => {
     const mod = await import("../src/commands/scaffold-plugin.js");
     assert.ok(typeof mod.runScaffoldPlugin === "function", "should export runScaffoldPlugin");
+  });
+
+  it("creates a starter plugin project", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runScaffoldPlugin } = await import("../src/commands/scaffold-plugin.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-plugin-"));
+
+    try {
+      runScaffoldPlugin(["node", "judges", "scaffold-plugin", "acme-plugin", "--dir", tmpDir]);
+
+      const root = path.join(tmpDir, "acme-plugin");
+      assert.ok(fs.existsSync(path.join(root, "package.json")));
+      assert.ok(fs.existsSync(path.join(root, "tsconfig.json")));
+      assert.ok(fs.existsSync(path.join(root, "README.md")));
+      assert.ok(fs.existsSync(path.join(root, "src", "index.ts")));
+      assert.ok(fs.existsSync(path.join(root, "src", "rules", "example-rule.ts")));
+
+      const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf-8"));
+      assert.equal(pkg.name, "acme-plugin");
+      assert.equal(pkg.peerDependencies["@kevinrabun/judges"], "*");
+
+      const readme = fs.readFileSync(path.join(root, "README.md"), "utf-8");
+      assert.ok(readme.includes("# acme-plugin"));
+      assert.ok(readme.includes('"plugins": ["acme-plugin"]'));
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Override Command", () => {
+  it("matches exact, wildcard, and scoped overrides", async () => {
+    const { isOverridden, applyOverrides } = await import("../src/commands/override.js");
+    const store = {
+      version: 1 as const,
+      overrides: [
+        {
+          ruleId: "SEC-*",
+          reason: "approved",
+          filePaths: ["src/**"],
+          createdAt: "2024-01-01T00:00:00.000Z",
+          active: true,
+        },
+        {
+          ruleId: "AUTH-001",
+          reason: "expired",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          expiresAt: "2024-01-02T00:00:00.000Z",
+          active: true,
+        },
+      ],
+      metadata: {
+        createdAt: "2024-01-01T00:00:00.000Z",
+        lastUpdated: "2024-01-01T00:00:00.000Z",
+      },
+    };
+
+    assert.ok(isOverridden("SEC-123", "src/app.ts", store));
+    assert.equal(isOverridden("SEC-123", "tests/app.test.ts", store), undefined);
+    assert.equal(isOverridden("AUTH-001", "src/app.ts", store), undefined);
+
+    const findings = [{ ruleId: "SEC-123" }, { ruleId: "AUTH-001" }, { ruleId: "PERF-001" }];
+    const result = applyOverrides(findings, store, "src/app.ts");
+    assert.deepEqual(result.active, [{ ruleId: "AUTH-001" }, { ruleId: "PERF-001" }]);
+    assert.equal(result.overridden.length, 1);
+  });
+
+  it("loads and saves override stores from disk", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { loadOverrideStore, saveOverrideStore } = await import("../src/commands/override.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-overrides-"));
+
+    try {
+      const empty = loadOverrideStore(tmpDir);
+      assert.equal(empty.overrides.length, 0);
+
+      empty.overrides.push({
+        ruleId: "SEC-001",
+        reason: "accepted risk",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        active: true,
+      });
+      saveOverrideStore(empty, tmpDir);
+
+      const reloaded = loadOverrideStore(tmpDir);
+      assert.equal(reloaded.overrides.length, 1);
+      assert.equal(reloaded.overrides[0].ruleId, "SEC-001");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("supports add, list, check, and revoke subcommands", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runOverride } = await import("../src/commands/override.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-override-cli-"));
+    const origCwd = process.cwd();
+    const origLog = console.log;
+    const output: string[] = [];
+
+    try {
+      process.chdir(tmpDir);
+      console.log = ((message?: unknown) => {
+        output.push(String(message ?? ""));
+      }) as typeof console.log;
+
+      runOverride([
+        "node",
+        "judges",
+        "override",
+        "add",
+        "--rule",
+        "SEC-001",
+        "--reason",
+        "Mitigated by gateway",
+        "--approver",
+        "jane@example.com",
+        "--file",
+        "src/**",
+      ]);
+      runOverride(["node", "judges", "override", "list"]);
+      runOverride(["node", "judges", "override", "check", "--file", "src/app.ts"]);
+      runOverride(["node", "judges", "override", "revoke", "--rule", "SEC-001", "--by", "lead@example.com"]);
+
+      const combined = output.join("\n");
+      assert.ok(combined.includes("Override added"));
+      assert.ok(combined.includes("Active Overrides"));
+      assert.ok(combined.includes("SEC-001"));
+      assert.ok(combined.includes("applies"));
+      assert.ok(combined.includes("Revoked 1 override"));
+    } finally {
+      process.chdir(origCwd);
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits on unknown subcommands", async () => {
+    const { runOverride } = await import("../src/commands/override.js");
+    const origExit = process.exit;
+    const origError = console.error;
+    const errors: string[] = [];
+
+    try {
+      console.error = ((message?: unknown) => {
+        errors.push(String(message ?? ""));
+      }) as typeof console.error;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      assert.throws(() => runOverride(["node", "judges", "override", "unknown"]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("Unknown override subcommand")));
+    } finally {
+      process.exit = origExit;
+      console.error = origError;
+    }
   });
 });
 
@@ -10349,6 +14051,256 @@ describe("LSP Server module", () => {
   it("exports runLsp function", async () => {
     const mod = await import("../src/commands/lsp.js");
     assert.ok(typeof mod.runLsp === "function", "should export runLsp");
+  });
+
+  it("handles initialize, unknown requests, shutdown, and end over stdio", async () => {
+    const mod = await import("../src/commands/lsp.js");
+    const handlers = new Map<string, Array<(...args: any[]) => void>>();
+    let output = "";
+
+    const origSetEncoding = process.stdin.setEncoding;
+    const origOn = process.stdin.on;
+    const origWrite = process.stdout.write;
+    const origExit = process.exit;
+
+    try {
+      process.stdin.setEncoding = (() => {}) as typeof process.stdin.setEncoding;
+      process.stdin.on = ((event: string, handler: (...args: any[]) => void) => {
+        const list = handlers.get(event) || [];
+        list.push(handler);
+        handlers.set(event, list);
+        return process.stdin;
+      }) as typeof process.stdin.on;
+      process.stdout.write = ((chunk: string | Uint8Array) => {
+        output += Buffer.isBuffer(chunk) ? chunk.toString("utf-8") : String(chunk);
+        return true;
+      }) as typeof process.stdout.write;
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+
+      mod.runLsp(["node", "judges", "lsp"]);
+
+      const dataHandlers = handlers.get("data") || [];
+      const endHandlers = handlers.get("end") || [];
+      assert.strictEqual(dataHandlers.length, 1, "should register a data handler");
+      assert.strictEqual(endHandlers.length, 1, "should register an end handler");
+
+      const sendMessage = (message: unknown): void => {
+        const body = JSON.stringify(message);
+        dataHandlers[0](`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
+      };
+
+      sendMessage({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
+      sendMessage({ jsonrpc: "2.0", id: 2, method: "workspace/unknownRequest", params: {} });
+      sendMessage({ jsonrpc: "2.0", id: 3, method: "shutdown" });
+
+      assert.ok(output.includes('"id":1'));
+      assert.ok(output.includes('"capabilities"'));
+      assert.ok(output.includes('"id":2'));
+      assert.ok(output.includes('"code":-32601'));
+      assert.ok(output.includes('"id":3'));
+
+      assert.throws(() => endHandlers[0](), /EXIT:0/);
+    } finally {
+      process.stdin.setEncoding = origSetEncoding;
+      process.stdin.on = origOn;
+      process.stdout.write = origWrite;
+      process.exit = origExit;
+    }
+  });
+
+  it("handles open, change, save, codeAction, and close notifications", async () => {
+    const mod = await import("../src/commands/lsp.js");
+    const handlers = new Map<string, Array<(...args: any[]) => void>>();
+    let output = "";
+
+    const origSetEncoding = process.stdin.setEncoding;
+    const origOn = process.stdin.on;
+    const origWrite = process.stdout.write;
+    const origSetTimeout = globalThis.setTimeout;
+    const origClearTimeout = globalThis.clearTimeout;
+
+    try {
+      process.stdin.setEncoding = (() => {}) as typeof process.stdin.setEncoding;
+      process.stdin.on = ((event: string, handler: (...args: any[]) => void) => {
+        const list = handlers.get(event) || [];
+        list.push(handler);
+        handlers.set(event, list);
+        return process.stdin;
+      }) as typeof process.stdin.on;
+      process.stdout.write = ((chunk: string | Uint8Array) => {
+        output += Buffer.isBuffer(chunk) ? chunk.toString("utf-8") : String(chunk);
+        return true;
+      }) as typeof process.stdout.write;
+      globalThis.setTimeout = ((fn: (...args: any[]) => void) => {
+        fn();
+        return 1 as unknown as ReturnType<typeof setTimeout>;
+      }) as typeof setTimeout;
+      globalThis.clearTimeout = (() => undefined) as typeof clearTimeout;
+
+      mod.runLsp(["node", "judges", "lsp"]);
+
+      const dataHandlers = handlers.get("data") || [];
+      assert.strictEqual(dataHandlers.length, 1, "should register a data handler");
+
+      const sendMessage = (message: unknown): void => {
+        const body = JSON.stringify(message);
+        dataHandlers[0](`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
+      };
+
+      const uri = "file:///tmp/judges-lsp-sample.ts";
+      sendMessage({
+        jsonrpc: "2.0",
+        method: "textDocument/didOpen",
+        params: {
+          textDocument: {
+            uri,
+            languageId: "typescript",
+            version: 1,
+            text: 'const password = "ProdSecret123";\nconsole.log(password);\n',
+          },
+        },
+      });
+      sendMessage({
+        jsonrpc: "2.0",
+        method: "textDocument/didChange",
+        params: {
+          textDocument: { uri, version: 2 },
+          contentChanges: [{ text: "const answer = 42;\n" }],
+        },
+      });
+      sendMessage({
+        jsonrpc: "2.0",
+        method: "textDocument/didSave",
+        params: {
+          textDocument: { uri },
+          text: "const value = 7;\n",
+        },
+      });
+      sendMessage({
+        jsonrpc: "2.0",
+        id: 99,
+        method: "textDocument/codeAction",
+        params: {
+          textDocument: { uri },
+          range: {},
+          context: { diagnostics: [] },
+        },
+      });
+      sendMessage({
+        jsonrpc: "2.0",
+        method: "textDocument/didClose",
+        params: { textDocument: { uri } },
+      });
+
+      assert.ok(output.includes('"textDocument/publishDiagnostics"'));
+      assert.ok(output.includes('"id":99'));
+      assert.ok(output.includes('"result"'));
+      assert.ok(output.includes('"diagnostics":[]'), "close should publish empty diagnostics");
+    } finally {
+      process.stdin.setEncoding = origSetEncoding;
+      process.stdin.on = origOn;
+      process.stdout.write = origWrite;
+      globalThis.setTimeout = origSetTimeout;
+      globalThis.clearTimeout = origClearTimeout;
+    }
+  });
+});
+
+describe("Watch Command", () => {
+  it("watches a single file and evaluates it immediately and on change", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { createRequire, syncBuiltinESMExports } = await import("module");
+    const require = createRequire(import.meta.url);
+    const fsBuiltin = require("fs");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-watch-"));
+    const filePath = path.join(tmpDir, "sample.ts");
+    const logs: string[] = [];
+    const handlers = new Map<string, (...args: any[]) => void>();
+    const watcher = {
+      on(event: string, handler: (...args: any[]) => void) {
+        handlers.set(event, handler);
+        return watcher;
+      },
+    };
+
+    const origWatch = fsBuiltin.watch;
+    const origSetTimeout = globalThis.setTimeout;
+    const origClearTimeout = globalThis.clearTimeout;
+    const origLog = console.log;
+
+    try {
+      fs.writeFileSync(filePath, 'const secret = "prodSecret123";\nconsole.log(secret);\n');
+      fsBuiltin.watch = (() => watcher) as typeof fsBuiltin.watch;
+      syncBuiltinESMExports();
+      globalThis.setTimeout = ((fn: (...args: any[]) => void) => {
+        fn();
+        return 1 as unknown as ReturnType<typeof setTimeout>;
+      }) as typeof setTimeout;
+      globalThis.clearTimeout = (() => undefined) as typeof clearTimeout;
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      const { runWatch } = await import("../src/commands/watch.js");
+      runWatch(["node", "judges", "watch", filePath]);
+      handlers.get("change")?.("change", path.basename(filePath));
+
+      assert.ok(logs.some((line) => line.includes("Watch Mode")));
+      assert.ok(
+        logs.some((line) => line.includes(path.basename(filePath))),
+        "should report the watched file",
+      );
+      assert.ok(handlers.has("change"), "should register a change handler");
+    } finally {
+      fsBuiltin.watch = origWatch;
+      syncBuiltinESMExports();
+      globalThis.setTimeout = origSetTimeout;
+      globalThis.clearTimeout = origClearTimeout;
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("reports an unknown judge without crashing", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { createRequire, syncBuiltinESMExports } = await import("module");
+    const require = createRequire(import.meta.url);
+    const fsBuiltin = require("fs");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-watch-judge-"));
+    const filePath = path.join(tmpDir, "sample.ts");
+    const errors: string[] = [];
+    const watcher = {
+      on() {
+        return watcher;
+      },
+    };
+    const origWatch = fsBuiltin.watch;
+    const origError = console.error;
+
+    try {
+      fs.writeFileSync(filePath, "export const value = 1;\n");
+      fsBuiltin.watch = (() => watcher) as typeof fsBuiltin.watch;
+      syncBuiltinESMExports();
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+
+      const { runWatch } = await import("../src/commands/watch.js");
+      runWatch(["node", "judges", "watch", filePath, "--judge", "missing-judge"]);
+
+      assert.ok(errors.some((line) => line.includes("Unknown judge: missing-judge")));
+    } finally {
+      fsBuiltin.watch = origWatch;
+      syncBuiltinESMExports();
+      console.error = origError;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 // ═══════════════════════════════════════════════════════════════════════════
@@ -10765,6 +14717,246 @@ describe("Config Merge — mergeConfigs", () => {
     const overlay = { minSeverity: "high" as const };
     const merged = mergeConfigs(base, overlay);
     assert.strictEqual(merged.minSeverity, "high");
+  });
+});
+
+describe("Team Config — export/import and CLI", () => {
+  it("exports current project config from .judgesrc.json", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { exportTeamConfig } = await import("../src/commands/config-share.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-config-export-"));
+
+    try {
+      fs.writeFileSync(
+        path.join(tmpDir, ".judgesrc.json"),
+        JSON.stringify({ minSeverity: "medium", disabledJudges: ["documentation"] }, null, 2),
+      );
+      const exported = exportTeamConfig(tmpDir);
+      assert.strictEqual(exported.version, "1.0.0");
+      assert.strictEqual(exported.name, path.basename(tmpDir));
+      assert.strictEqual(exported.config.minSeverity, "medium");
+      assert.deepStrictEqual(exported.config.disabledJudges, ["documentation"]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("imports and merges a shared config into an existing .judgesrc", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { importTeamConfig } = await import("../src/commands/config-share.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-config-import-"));
+    const sourceFile = path.join(tmpDir, "team-config.json");
+
+    try {
+      fs.writeFileSync(path.join(tmpDir, ".judgesrc"), JSON.stringify({ disabledJudges: ["documentation"] }, null, 2));
+      fs.writeFileSync(
+        sourceFile,
+        JSON.stringify(
+          {
+            version: "1.0.0",
+            name: "team",
+            config: { minSeverity: "high", disabledJudges: ["testing"] },
+          },
+          null,
+          2,
+        ),
+      );
+
+      importTeamConfig(sourceFile, tmpDir);
+
+      const merged = JSON.parse(fs.readFileSync(path.join(tmpDir, ".judgesrc"), "utf-8"));
+      assert.strictEqual(merged.minSeverity, "high");
+      assert.ok(merged.disabledJudges.includes("documentation"));
+      assert.ok(merged.disabledJudges.includes("testing"));
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("parses config subcommands, source, and output flags", async () => {
+    const { parseConfigArgs } = await import("../src/commands/config-share.js");
+    const args = parseConfigArgs(["node", "judges", "config", "import", "team.json", "--output", "out.json"]);
+    assert.strictEqual(args.subcommand, "import");
+    assert.strictEqual(args.source, "team.json");
+    assert.strictEqual(args.output, "out.json");
+  });
+
+  it("exports a team config file via the CLI", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runConfig } = await import("../src/commands/config-share.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-config-cli-"));
+    const origCwd = process.cwd();
+    const origExit = process.exit;
+    const origLog = console.log;
+    const logs: string[] = [];
+
+    try {
+      process.chdir(tmpDir);
+      fs.writeFileSync(path.join(tmpDir, ".judgesrc.json"), JSON.stringify({ minSeverity: "medium" }, null, 2));
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      assert.throws(() => runConfig(["node", "judges", "config", "export", "--output", "team.json"]), /EXIT:0/);
+      assert.ok(fs.existsSync(path.join(tmpDir, "team.json")));
+      assert.ok(logs.some((line) => line.includes("Exported team config")));
+    } finally {
+      process.chdir(origCwd);
+      process.exit = origExit;
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails validation when no policy lock exists", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runConfig } = await import("../src/commands/config-share.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-config-validate-"));
+    const origCwd = process.cwd();
+    const origExit = process.exit;
+    const origError = console.error;
+    const errors: string[] = [];
+
+    try {
+      process.chdir(tmpDir);
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+      console.error = ((...parts: unknown[]) => {
+        errors.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.error;
+
+      assert.throws(() => runConfig(["node", "judges", "config", "validate"]), /EXIT:1/);
+      assert.ok(errors.some((line) => line.includes("No .judges-policy-lock.json found")));
+    } finally {
+      process.chdir(origCwd);
+      process.exit = origExit;
+      console.error = origError;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("writes and reads a policy lock, then validates a compliant config", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { writePolicyLock, readPolicyLock, runConfig } = await import("../src/commands/config-share.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-config-lock-"));
+    const origCwd = process.cwd();
+    const origExit = process.exit;
+    const origLog = console.log;
+    const logs: string[] = [];
+
+    try {
+      fs.writeFileSync(
+        path.join(tmpDir, ".judgesrc.json"),
+        JSON.stringify({ minSeverity: "high", disabledJudges: ["documentation"] }, null, 2),
+      );
+      const lock = writePolicyLock(tmpDir, "https://example.com/team.json");
+      assert.strictEqual(lock.maxMinSeverity, "high");
+      assert.ok(readPolicyLock(tmpDir));
+
+      process.chdir(tmpDir);
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      assert.throws(() => runConfig(["node", "judges", "config", "validate"]), /EXIT:0/);
+      assert.ok(logs.some((line) => line.includes("Config complies with org policy")));
+    } finally {
+      process.chdir(origCwd);
+      process.exit = origExit;
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("imports configs via the CLI and shows help for unknown subcommands", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { runConfig } = await import("../src/commands/config-share.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-config-import-cli-"));
+    const sourceFile = path.join(tmpDir, "team.json");
+    const origCwd = process.cwd();
+    const origExit = process.exit;
+    const origLog = console.log;
+    const logs: string[] = [];
+
+    try {
+      fs.writeFileSync(
+        sourceFile,
+        JSON.stringify({ version: "1.0.0", name: "team", config: { minSeverity: "medium" } }, null, 2),
+      );
+
+      process.chdir(tmpDir);
+      process.exit = ((code?: number) => {
+        throw new Error(`EXIT:${code ?? 0}`);
+      }) as never;
+      console.log = ((...parts: unknown[]) => {
+        logs.push(parts.map((part) => String(part ?? "")).join(" "));
+      }) as typeof console.log;
+
+      assert.throws(() => runConfig(["node", "judges", "config", "import", sourceFile]), /EXIT:0/);
+      assert.ok(fs.existsSync(path.join(tmpDir, ".judgesrc")));
+      assert.ok(logs.some((line) => line.includes("Imported team config")));
+
+      logs.length = 0;
+      assert.throws(() => runConfig(["node", "judges", "config", "unknown"]), /EXIT:0/);
+      assert.ok(logs.some((line) => line.includes("Team Config Management")));
+    } finally {
+      process.chdir(origCwd);
+      process.exit = origExit;
+      console.log = origLog;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("pulls a remote team config over HTTPS and merges it locally", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { pullRemoteConfig } = await import("../src/commands/config-share.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-config-pull-"));
+    const origFetch = globalThis.fetch;
+
+    try {
+      fs.writeFileSync(path.join(tmpDir, ".judgesrc"), JSON.stringify({ disabledJudges: ["documentation"] }, null, 2));
+      globalThis.fetch = (async () =>
+        new Response(
+          JSON.stringify({
+            version: "1.0.0",
+            name: "remote-team",
+            config: { minSeverity: "high", disabledJudges: ["testing"] },
+          }),
+          { status: 200, statusText: "OK" },
+        )) as typeof fetch;
+
+      const pulled = await pullRemoteConfig("https://example.com/team.json", tmpDir);
+      assert.strictEqual(pulled.name, "remote-team");
+
+      const merged = JSON.parse(fs.readFileSync(path.join(tmpDir, ".judgesrc"), "utf-8"));
+      assert.strictEqual(merged.minSeverity, "high");
+      assert.ok(merged.disabledJudges.includes("documentation"));
+      assert.ok(merged.disabledJudges.includes("testing"));
+    } finally {
+      globalThis.fetch = origFetch;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 

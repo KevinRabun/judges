@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install -g @kevinrabun/judges
+      - run: npm install -g @kevinrabun/judges-cli
       - run: judges eval --file \${{ github.event.pull_request.head.sha }} --format sarif --output judges-report.sarif
       - uses: github/codeql-action/upload-sarif@v3
         if: always()
@@ -50,7 +50,7 @@ steps:
   - task: NodeTool@0
     inputs:
       versionSpec: '20.x'
-  - script: npm install -g @kevinrabun/judges
+  - script: npm install -g @kevinrabun/judges-cli
     displayName: 'Install Judges'
   - script: judges eval --format sarif --output judges-report.sarif
     displayName: 'Run Judges Review'
@@ -66,7 +66,7 @@ function gitlabCiTemplate(): string {
   image: node:20
   stage: test
   script:
-    - npm install -g @kevinrabun/judges
+    - npm install -g @kevinrabun/judges-cli
     - judges eval --format sarif --output judges-report.sarif
   artifacts:
     reports:

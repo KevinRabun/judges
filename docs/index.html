@@ -172,6 +172,34 @@
       <p>45 specialized judges evaluating AI-generated code for security, cost, and quality</p>
     </header>
 
+    <section class="section" style="margin-top:-1rem;margin-bottom:2rem;">
+      <h2>Quickstart</h2>
+      <div class="judge-grid">
+        <div class="judge-card">
+          <div class="name">CLI</div>
+          <pre style="font-size:0.85rem; white-space:pre-wrap;">npx @kevinrabun/judges-cli eval --file src/app.ts
+JUDGES_SHOW_EXPERIMENTAL=1 judges --help</pre>
+        </div>
+        <div class="judge-card">
+          <div class="name">GitHub Action</div>
+          <pre style="font-size:0.85rem; white-space:pre-wrap;">uses: KevinRabun/judges@main
+with:
+  fail-on-findings: true
+  upload-sarif: true</pre>
+        </div>
+        <div class="judge-card">
+          <div class="name">API / MCP</div>
+          <pre style="font-size:0.85rem; white-space:pre-wrap;">npm i @kevinrabun/judges
+import { evaluateCode } from "@kevinrabun/judges/api";</pre>
+        </div>
+        <div class="judge-card">
+          <div class="name">Baseline & License</div>
+          <pre style="font-size:0.85rem; white-space:pre-wrap;">judges baseline create --dir .
+judges license-scan --dir .</pre>
+        </div>
+      </div>
+    </section>
+
     <div class="stats-grid">
       <div class="stat-card">
         <div class="value accent">45</div>
@@ -190,7 +218,7 @@
         <div class="label">Critical Issues</div>
       </div>
       <div class="stat-card">
-        <div class="value green" id="stat-tests">1075</div>
+        <div class="value green" id="stat-tests">1666</div>
         <div class="label">Tests Passing</div>
       </div>
     </div>
@@ -285,6 +313,23 @@
           </tr>
         </tbody>
       </table>
+      <div class="callout" style="margin-top:1rem; padding:1rem; border:1px solid var(--border); border-radius:8px; background:rgba(88,166,255,0.08);">
+        <strong>Which package?</strong>
+        <ul style="margin-left:1.5rem; margin-top:0.5rem;">
+          <li><code>@kevinrabun/judges-cli</code> → provides the <code>judges</code> CLI binary.</li>
+          <li><code>@kevinrabun/judges</code> → MCP server + programmatic API (<code>evaluateCode</code>, <code>evaluateCodeV2</code>, etc.).</li>
+        </ul>
+        <small>Node.js ≥ 18 (≥ 20 recommended). For one-off runs, use <code>npx @kevinrabun/judges-cli ...</code>.</small>
+      </div>
+    </div>
+
+    <div class="section" id="license-scan">
+      <h2>License Scan</h2>
+      <p>Audit dependency licenses and flag copyleft / unknown licenses.</p>
+      <div class="code-block" style="margin-bottom:0.5rem;"><code>judges license-scan --format json</code></div>
+      <div class="code-block" style="margin-bottom:0.5rem;"><code>judges license-scan --risk high</code></div>
+      <div class="code-block"><code>judges license-scan --category weak-copyleft --save</code></div>
+      <small>Outputs <code>.judges-licenses/license-report.json</code> when <code>--save</code> is used.</small>
     </div>
 
     <div class="meta">
@@ -380,10 +425,26 @@
       showcaseBody.appendChild(tr);
     });
 
-    // Update stats
+    // Update stats (fallback to showcase data; override below if snapshot exists)
     document.getElementById("stat-repos").textContent = showcaseData.length;
     document.getElementById("stat-findings").textContent = totalFindings;
     document.getElementById("stat-critical").textContent = totalCritical;
+
+    // Optional: override stats from snapshot if available
+    (async () => {
+      try {
+        const res = await fetch('../benchmarks/llm-snapshot-latest.json');
+        if (res.ok) {
+          const data = await res.json();
+          const repos = data?.metadata?.totalRepositories ?? data?.reposAnalyzed ?? null;
+          const findings = data?.metadata?.totalFindings ?? data?.totalFindings ?? null;
+          const critical = data?.metadata?.criticalFindings ?? data?.critical ?? null;
+          if (repos != null) document.getElementById('stat-repos').textContent = repos.toLocaleString();
+          if (findings != null) document.getElementById('stat-findings').textContent = findings.toLocaleString();
+          if (critical != null) document.getElementById('stat-critical').textContent = critical.toLocaleString();
+        }
+      } catch (e) { console.warn('snapshot fetch failed', e); }
+    })();
 
     // Render judge grid
     const judgeGrid = document.getElementById("judge-grid");

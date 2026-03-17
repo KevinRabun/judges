@@ -37,6 +37,11 @@
     }
     header h1 { font-size: 2rem; margin-bottom: 0.25rem; }
     header p { color: var(--text-muted); }
+    header .packages {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
 
     .playground {
       display: grid;
@@ -291,6 +296,9 @@
     <header>
       <h1>Judges Playground</h1>
       <p>Paste code below and evaluate it with 45 specialized judges — entirely client-side simulation</p>
+      <div class="packages" style="margin-top:0.35rem; color: var(--text-muted); font-size: 0.85rem;">
+        CLI: <code>npx @kevinrabun/judges-cli ...</code> · API/MCP: <code>npm i @kevinrabun/judges</code>
+      </div>
     </header>
 
     <div class="samples">
@@ -374,6 +382,10 @@ app.listen(3000);</textarea>
       <code id="cli-copy">npx @kevinrabun/judges eval --file yourfile.ts</code>
       <button onclick="copyCmd()">Copy</button>
     </div>
+    <p style="margin-top:0.75rem; font-size:0.9rem;">
+      <strong>Which package?</strong> <code>@kevinrabun/judges-cli</code> provides the <code>judges</code> CLI binary
+      (use <code>npx @kevinrabun/judges-cli ...</code>), while <code>@kevinrabun/judges</code> is the MCP/API package.
+    </p>
 
     <div class="meta">
       <a href="index.html">Dashboard</a> ·

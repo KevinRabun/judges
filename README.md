@@ -3,15 +3,82 @@
 An MCP (Model Context Protocol) server that provides a panel of **45 specialized judges** to evaluate AI-generated code — acting as an independent quality gate regardless of which project is being reviewed. Combines **deterministic pattern matching & AST analysis** (instant, offline, zero LLM calls) with **LLM-powered deep-review prompts** that let your AI assistant perform expert-persona analysis across all 45 domains.
 
 **Highlights:**
+
 - Includes an **App Builder Workflow (3-step)** demo for release decisions, plain-language risk summaries, and prioritized fixes — see [Try the Demo](#2-try-the-demo).
 - Includes **V2 context-aware evaluation** with policy profiles, evidence calibration, specialty feedback, confidence scoring, and uncertainty reporting.
 - Includes **public repository URL reporting** to clone a repo, run the full tribunal, and output a consolidated markdown report.
+- **200+ deterministic auto-fix patches** (see `src/patches/index.ts`) plus LLM-powered deep review.
+
+> 🧪 Many commands in `printHelp` are experimental/roadmap. By default, we show GA commands only. Set `JUDGES_SHOW_EXPERIMENTAL=1` to reveal stubs; these may not be wired yet.
 
 [![CI](https://github.com/KevinRabun/judges/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinRabun/judges/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![npm downloads](https://img.shields.io/npm/dw/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/tests-1666-brightgreen)](https://github.com/KevinRabun/judges/actions)
+
+> 🔰 **Packages**
+> - **CLI**: `@kevinrabun/judges-cli` → binary `judges` (use `npx @kevinrabun/judges-cli eval --file app.ts`).
+> - **MCP/API**: `@kevinrabun/judges` → programmatic API + MCP server (`npm install @kevinrabun/judges`).
+> - **VS Code extension**: see [`vscode-extension/`](vscode-extension/README.md).
+> - **GitHub Action**: `uses: KevinRabun/judges@main` (see [CI quickstart](#github-action)).
+
+---
+
+## Quickstart
+
+### CLI (one-off)
+```bash
+# Using the CLI package (recommended)
+npx @kevinrabun/judges-cli eval --file src/app.ts
+
+# Show GA commands only (default)
+npx @kevinrabun/judges-cli --help
+
+# Show experimental/roadmap commands
+echo "JUDGES_SHOW_EXPERIMENTAL=1" >> $GITHUB_ENV
+npx @kevinrabun/judges-cli --help
+
+# License scan (supply-chain & license compliance)
+npx @kevinrabun/judges-cli license-scan --dir .
+```
+
+> **CLI vs API:** If you want to embed Judges in your app (MCP/API), install `@kevinrabun/judges`. For the command-line, use `@kevinrabun/judges-cli` (binary `judges`).
+
+### GitHub Action
+```yaml
+name: Judges
+on: [pull_request, push]
+jobs:
+  judges:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: KevinRabun/judges@main
+        with:
+          path: .
+          diff-only: true           # evaluate only changed lines in PRs (default true)
+          fail-on-findings: true    # fail on critical/high findings
+          upload-sarif: true        # upload SARIF to GitHub Code Scanning
+```
+
+### Programmatic API (MCP server included)
+```bash
+npm install @kevinrabun/judges
+```
+```ts
+import { evaluateCode } from "@kevinrabun/judges/api";
+const verdict = evaluateCode("const password = 'ProdSecret';", "typescript");
+console.log(verdict.overallVerdict, verdict.overallScore);
+```
+
+### MCP server
+```bash
+npx @kevinrabun/judges mcp
+# Or programmatically: import { startMcpServer } from "@kevinrabun/judges/mcp";
+```
+
+> Config file: `.judgesrc.json` (supports `${ENV_VAR}` substitution via `expandEnvPlaceholders`). See [Configuration](#configuration).
 
 ---
 
@@ -23,8 +90,8 @@ AI code generators (Copilot, Cursor, Claude, ChatGPT, etc.) write code fast — 
 |---|---|---|---|---|
 | **Scope** | Style + some bugs | Bugs + code smells | Security patterns | **45 domains**: security, cost, compliance, a11y, API design, cloud, UX, … |
 | **AI-generated code focus** | No | No | Partial | **Purpose-built** for AI output failure modes |
-| **Setup** | Config per project | Server + scanner | Cloud or local | **One command**: `npx @kevinrabun/judges eval file.ts` |
-| **Auto-fix patches** | Some | No | No | **114 deterministic patches** — instant, offline |
+| **Setup** | Config per project | Server + scanner | Cloud or local | **One command**: `npx @kevinrabun/judges-cli eval file.ts` |
+| **Auto-fix patches** | Some | No | No | **200+ deterministic patches** — instant, offline |
 | **Non-technical output** | No | Dashboard | No | **Plain-language findings** with What/Why/Next |
 | **MCP native** | No | No | No | **Yes** — works inside Copilot, Claude, Cursor |
 | **SARIF output** | No | Yes | Yes | **Yes** — upload to GitHub Code Scanning |
@@ -40,11 +107,19 @@ AI code generators (Copilot, Cursor, Claude, ChatGPT, etc.) write code fast — 
 
 ## Quick Start
 
+> Prereqs: Node.js **>=18** (>=20 recommended), `npx` available. The `judges` CLI binary ships with **@kevinrabun/judges-cli** (preferred) and also works via `npx @kevinrabun/judges`.
+>
+> Packages:
+> - **CLI:** `npm install -g @kevinrabun/judges-cli` (or `npx @kevinrabun/judges-cli ...`)
+> - **MCP/API:** `npm install @kevinrabun/judges`
+
+Use `@kevinrabun/judges` for the MCP server and programmatic API. Use `@kevinrabun/judges-cli` when you want the `judges` terminal command.
+
 ### Try it now (no clone needed)
 
 ```bash
-# Install globally
-npm install -g @kevinrabun/judges
+# Install the CLI globally
+npm install -g @kevinrabun/judges-cli
 
 # Evaluate any file
 judges eval src/app.ts
@@ -95,6 +170,9 @@ judges fix src/app.ts
 # Apply patches directly
 judges fix src/app.ts --apply
 
+# License compliance scan (copyleft/unknown detection)
+judges license-scan --format json --risk high
+
 # Watch mode — re-evaluate on file save
 judges watch src/
 
@@ -106,6 +184,15 @@ git diff HEAD~1 | judges diff
 
 # Analyze dependencies for supply-chain risks
 judges deps --path . --format json
+
+# Run GitHub App server (zero-config PR reviews)
+judges app serve --port 4567
+
+# Run GitHub PR review (gh CLI required)
+judges review --pr 123 --repo owner/name --diff-only
+
+# Auto-tune presets and configs
+judges tune --dir . --apply
 
 # Create a baseline file to suppress known findings
 judges baseline create --file src/api.ts -o baseline.json
@@ -133,6 +220,33 @@ judges hook install
 # Uninstall pre-commit hook
 judges hook uninstall
 ```
+
+> 🔎 Tip: The CLI help now defaults to **GA commands only**. To see experimental/roadmap commands, run:
+>
+> ```bash
+> JUDGES_SHOW_EXPERIMENTAL=1 judges --help
+> ```
+
+### GitHub App (self-hosted webhook)
+
+Run a zero-config PR reviewer as a GitHub App:
+
+```bash
+# Run the webhook server locally
+judges app serve --port 4567
+```
+
+**Required env vars:**
+- `JUDGES_APP_ID` – GitHub App ID
+- `JUDGES_PRIVATE_KEY` or `JUDGES_PRIVATE_KEY_PATH` – PEM private key
+- `JUDGES_WEBHOOK_SECRET` – signature verification secret
+
+Optional:
+- `JUDGES_MIN_SEVERITY` (default: `medium`)
+- `JUDGES_MAX_COMMENTS` (default: 25)
+- `JUDGES_TEST_DRY_RUN=1` to avoid live network calls during tests
+
+For local testing, you can expose <code>http://localhost:4567/webhook</code> via <code>ngrok http 4567</code> and configure the GitHub App webhook URL accordingly.
 
 ### Use in GitHub Actions
 

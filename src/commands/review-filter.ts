@@ -4,6 +4,7 @@
 
 import { readFileSync, existsSync } from "fs";
 import type { Finding, TribunalVerdict } from "../types.js";
+import { matchWildcardText } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -70,12 +71,9 @@ function matchesCriteria(f: Finding, c: FilterCriteria): boolean {
   if (conf < c.minConfidence || conf > c.maxConfidence) return false;
 
   if (c.titlePattern) {
-    try {
-      const re = new RegExp(c.titlePattern, "i");
-      if (!re.test(f.title || "")) return false;
-    } catch {
-      if (!(f.title || "").toLowerCase().includes(c.titlePattern.toLowerCase())) return false;
-    }
+    const title = (f.title || "").toLowerCase();
+    const pattern = c.titlePattern.toLowerCase();
+    if (!title.includes(pattern) && !matchWildcardText(title, pattern)) return false;
   }
 
   if (c.hasRecommendation === true && !f.recommendation) return false;
@@ -111,7 +109,7 @@ Options:
   --rule <list>            Filter by rule ID (comma-separated)
   --min-confidence <n>     Minimum confidence threshold (0-1)
   --max-confidence <n>     Maximum confidence threshold (0-1)
-  --title <pattern>        Filter by title regex pattern
+  --title <pattern>        Filter by title text or wildcard pattern
   --has-recommendation     Only findings with recommendations
   --no-recommendation      Only findings without recommendations
   --has-patch              Only findings with patches

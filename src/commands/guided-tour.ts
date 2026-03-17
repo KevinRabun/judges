@@ -39,8 +39,8 @@ const TOUR_TRACKS: TourTrack[] = [
         id: "install",
         title: "Step 1: Installation",
         description: "Install Judges globally or as a dev dependency.",
-        command: "npm install -g @kevinrabun/judges",
-        example: "# Or as a dev dependency:\nnpm install --save-dev @kevinrabun/judges",
+        command: "npm install -g @kevinrabun/judges-cli",
+        example: "# Or as a dev dependency:\nnpm install --save-dev @kevinrabun/judges-cli",
         tips: [
           "Use --save-dev for project-specific installations",
           "Global install lets you run 'judges' from anywhere",
@@ -141,7 +141,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install -g @kevinrabun/judges
+      - run: npm install -g @kevinrabun/judges-cli
       - run: judges review src/ --format sarif --output results.sarif
       - uses: github/codeql-action/upload-sarif@v3
         with:

@@ -3,8 +3,8 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { execSync } from "child_process";
 import { dirname } from "path";
+import { runGit } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ Options:
 
   if (subcommand === "mark") {
     try {
-      const commit = execSync("git rev-parse HEAD", { encoding: "utf-8", timeout: 5000 }).trim();
+      const commit = runGit(["rev-parse", "HEAD"], { timeout: 5000 });
       state.lastCommit = commit;
       state.lastTimestamp = new Date().toISOString();
       saveState(state);
@@ -86,10 +86,10 @@ Options:
   let changedFiles: string[];
   try {
     if (sinceCommit) {
-      const output = execSync(`git diff --name-only ${sinceCommit} HEAD`, { encoding: "utf-8", timeout: 10000 });
+      const output = runGit(["diff", "--name-only", sinceCommit, "HEAD"], { timeout: 10000, trim: false });
       changedFiles = output.trim().split("\n").filter(Boolean);
     } else {
-      const output = execSync("git diff --name-only HEAD~1 HEAD", { encoding: "utf-8", timeout: 10000 });
+      const output = runGit(["diff", "--name-only", "HEAD~1", "HEAD"], { timeout: 10000, trim: false });
       changedFiles = output.trim().split("\n").filter(Boolean);
     }
   } catch {
@@ -113,10 +113,9 @@ Options:
     }
     try {
       const ref = sinceCommit || "HEAD~1";
-      const diff = execSync(`git diff ${ref} HEAD -- ${changedFiles.slice(0, 10).join(" ")}`, {
-        encoding: "utf-8",
-        timeout: 10000,
-      });
+      const diffArgs = ["diff", ref, "HEAD"];
+      if (changedFiles.length > 0) diffArgs.push("--", ...changedFiles.slice(0, 10));
+      const diff = runGit(diffArgs, { timeout: 10000, trim: false });
       console.log(diff);
     } catch {
       console.error("Error: could not generate diff");

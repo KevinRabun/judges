@@ -88,7 +88,7 @@ export function checkConfigFile(dir: string): DoctorCheck {
   try {
     const raw = readFileSync(found, "utf-8");
     const parsed = JSON.parse(raw);
-    const result = parseConfig(parsed);
+    const result = parseConfig(raw);
 
     // Check for unknown properties
     const knownKeys = new Set([
@@ -314,7 +314,7 @@ export function runDoctorChecks(dir = "."): DoctorReport {
     if (existsSync(full)) {
       try {
         const raw = readFileSync(full, "utf-8");
-        config = parseConfig(JSON.parse(raw));
+        config = parseConfig(raw);
       } catch {
         // Config parse errors are caught by checkConfigFile
       }

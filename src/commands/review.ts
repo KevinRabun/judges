@@ -14,7 +14,7 @@
  * Requires: GITHUB_TOKEN environment variable (or gh CLI authenticated).
  */
 
-import { execFileSync, execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { readFileSync, writeFileSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { resolve, join, extname } from "path";
@@ -25,6 +25,7 @@ import type { Finding, Severity, JudgesConfig } from "../types.js";
 import { parseConfig, loadCascadingConfig } from "../config.js";
 import { loadFeedbackStore, getFpRateByRule } from "./feedback.js";
 import { JUDGES } from "../judges/index.js";
+import { parseGitHubRepo, tryRunGit } from "../tools/command-safety.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -170,18 +171,8 @@ function getToken(): string | undefined {
 }
 
 function detectRepo(): string | undefined {
-  try {
-    const remote = execSync("git remote get-url origin", { encoding: "utf-8" }).trim();
-    // SSH: git@github.com:owner/repo.git
-    const sshMatch = remote.match(/github\.com[:/]([^/]+\/[^/.]+)/);
-    if (sshMatch) return sshMatch[1];
-    // HTTPS: https://github.com/owner/repo.git
-    const httpsMatch = remote.match(/github\.com\/([^/]+\/[^/.]+)/);
-    if (httpsMatch) return httpsMatch[1];
-  } catch {
-    // Not a git repo or no remote
-  }
-  return undefined;
+  const remote = tryRunGit(["remote", "get-url", "origin"]);
+  return remote ? parseGitHubRepo(remote) : undefined;
 }
 
 function ghApiRequest(

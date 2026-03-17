@@ -98,7 +98,7 @@ runs:
 
     - name: Install Judges
       shell: bash
-      run: npm install -g @kevinrabun/judges@latest
+      run: npm install -g @kevinrabun/judges-cli@latest
 
     - name: Run Judges analysis
       id: run
@@ -143,26 +143,13 @@ runs:
             ARGS+=(eval --file "$INPUT_PATH")
           elif [ -d "$INPUT_PATH" ]; then
             echo "::group::Analyzing directory: $INPUT_PATH"
-            REPORT_ARGS=(
-              npx tsx "$(npm root -g)/@kevinrabun/judges/scripts/generate-public-repo-report.ts"
-              --repoUrl "file://$INPUT_PATH"
-              --quickStart
-              --maxFiles "$INPUT_MAX_FILES"
-              --output judges-report.md
-            )
-            if [ -n "$INPUT_MIN_CONFIDENCE" ] && [ "$INPUT_MIN_CONFIDENCE" != "0" ]; then
-              REPORT_ARGS+=(--minConfidence "$INPUT_MIN_CONFIDENCE")
-            fi
-            "${REPORT_ARGS[@]}" 2>&1 || true
+            REPORT_ARGS=(report "$INPUT_PATH" --format json --output judges-results.json --max-files "$INPUT_MAX_FILES")
+            judges "${REPORT_ARGS[@]}" 2>&1 || true
             echo "::endgroup::"
-            if [ -f judges-report.md ]; then
-              echo "verdict=WARNING" >> "$GITHUB_OUTPUT"
-              echo "score=0" >> "$GITHUB_OUTPUT"
-              echo "findings=0" >> "$GITHUB_OUTPUT"
-              echo "critical=0" >> "$GITHUB_OUTPUT"
-              echo "high=0" >> "$GITHUB_OUTPUT"
+            if [ ! -f judges-results.json ]; then
+              echo "::error::Failed to generate judges-results.json for directory analysis"
+              exit 1
             fi
-            exit 0
           else
             echo "::error::Path not found: $INPUT_PATH"
             exit 1
@@ -173,6 +160,7 @@ runs:
           if [ -n "$INPUT_PRESET" ]; then ARGS+=(--preset "$INPUT_PRESET"); fi
           if [ -n "$INPUT_CONFIG" ]; then ARGS+=(--config "$INPUT_CONFIG"); fi
           if [ "$INPUT_FIX" = "true" ]; then ARGS+=(--fix); fi
+          if [ "$INPUT_MIN_CONFIDENCE" != "0" ]; then ARGS+=(--min-confidence "$INPUT_MIN_CONFIDENCE"); fi
           if [ -n "$INPUT_EXCLUDE" ]; then
             IFS=',' read -ra EXCLUDE_PATTERNS <<< "$INPUT_EXCLUDE"
             for pat in "${EXCLUDE_PATTERNS[@]}"; do
@@ -212,12 +200,87 @@ runs:
           echo "::endgroup::"
         fi
 
+        # ── Derive outputs (verdict, score, counts) ──
+        node -e "
+          const fs = require('fs');
+          const outPath = process.env.GITHUB_OUTPUT;
+          const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+          const results = JSON.parse(fs.readFileSync('judges-results.json', 'utf8'));
+          const allFindings = results.findings || (results.files || []).flatMap(f => (f.verdict?.findings || []));
+          const bySeverity = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+          for (const f of allFindings) {
+            const sev = (f.severity || 'info').toLowerCase();
+            if (bySeverity[sev] !== undefined) bySeverity[sev]++;
+          }
+          const verdict = results.overallVerdict || results.verdict || (bySeverity.critical || bySeverity.high ? 'fail' : 'pass');
+          const score = results.overallScore ?? results.worstScore ?? results.score ?? 100;
+          const total = allFindings.length;
+
+          const outLines = [
+            `verdict=${verdict}`,
+            `score=${score}`,
+            `findings=${total}`,
+            `critical=${bySeverity.critical}`,
+            `high=${bySeverity.high}`,
+            `medium=${bySeverity.medium}`,
+            `low=${bySeverity.low}`,
+            `info=${bySeverity.info}`,
+            `sarif_file=${results.sarifFile || ''}`,
+          ];
+          if (outPath) fs.appendFileSync(outPath, outLines.join('\n') + '\n');
+
+          if (summaryPath) {
+            const lines = [];
+            lines.push('## Judges Summary');
+            lines.push('');
+            lines.push(`- Verdict: **${verdict.toUpperCase()}**`);
+            lines.push(`- Score: **${score}**`);
+            lines.push(`- Findings: **${total}** (critical: ${bySeverity.critical}, high: ${bySeverity.high}, medium: ${bySeverity.medium}, low: ${bySeverity.low}, info: ${bySeverity.info})`);
+            if (results._baselineFiltered) {
+              lines.push(`- Baseline-suppressed: ${results._baselineFiltered}`);
+            }
+            lines.push('');
+            lines.push('| Severity | Count |');
+            lines.push('|---|---|');
+            for (const sev of ['critical','high','medium','low','info']) {
+              lines.push(`| ${sev} | ${bySeverity[sev]} |`);
+            }
+            fs.appendFileSync(summaryPath, lines.join('\n') + '\n');
+          }
+
+          const failOnFindings = (process.env.INPUT_FAIL_ON_FINDINGS || '').toLowerCase() === 'true';
+          if (failOnFindings && (bySeverity.critical > 0 || bySeverity.high > 0)) {
+            console.error(`Failing because fail-on-findings=true and critical/high findings present: ${bySeverity.critical + bySeverity.high}`);
+            process.exit(1);
+          }
+        "
+
+        # ── Upload SARIF to GitHub Code Scanning (optional) ──
+        if [ "$INPUT_UPLOAD_SARIF" = "true" ]; then
+          echo "::group::Uploading SARIF report"
+          # If judges produced SARIF, it will be saved as judges.sarif by default
+          if [ -f judges.sarif ]; then
+            gh code-scanning upload --sarif=judges.sarif --commit-sha="${GITHUB_SHA}" --ref="${GITHUB_REF}" || true
+          elif [ -f judges-results.json ]; then
+            # Convert JSON to SARIF on the fly
+            node -e "
+              const fs = require('fs');
+              const { verdictsToSarif } = require('@kevinrabun/judges/formatters/sarif');
+              const results = JSON.parse(fs.readFileSync('judges-results.json','utf8'));
+              const sarif = verdictsToSarif(results.files ? results.files.map(f => f.verdict).filter(Boolean) : [results]);
+              fs.writeFileSync('judges.sarif', JSON.stringify(sarif, null, 2));
+            "
+            gh code-scanning upload --sarif=judges.sarif --commit-sha="${GITHUB_SHA}" --ref="${GITHUB_REF}" || true
+          fi
+          echo "::endgroup::"
+        fi
+
         # ── Extract scores ──
         VERDICT=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log(r.verdict||r.overallVerdict||'UNKNOWN')" 2>/dev/null || echo "UNKNOWN")
-        SCORE=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log(r.score||r.overallScore||r.worstScore||0)" 2>/dev/null || echo "0")
-        TOTAL=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); const f=r.findings||(r.files||[]).flatMap(x=>(x.verdict?.findings||[])); console.log(f.length)" 2>/dev/null || echo "0")
-        CRITICAL=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); const f=r.findings||(r.files||[]).flatMap(x=>(x.verdict?.findings||[])); console.log(f.filter(x=>x.severity==='critical').length)" 2>/dev/null || echo "0")
-        HIGH=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); const f=r.findings||(r.files||[]).flatMap(x=>(x.verdict?.findings||[])); console.log(f.filter(x=>x.severity==='high').length)" 2>/dev/null || echo "0")
+        SCORE=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); console.log(r.score||r.overallScore||r.averageScore||r.worstScore||0)" 2>/dev/null || echo "0")
+        TOTAL=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); if (typeof r.totalFindings === 'number') { console.log(r.totalFindings); process.exit(0); } const f=Array.isArray(r.findings)?r.findings:(r.files||[]).flatMap(x=>(x.verdict?.findings||[])); console.log(f.length)" 2>/dev/null || echo "0")
+        CRITICAL=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); const f=Array.isArray(r.findings)?r.findings:(r.files||[]).flatMap(x=>(x.verdict?.findings||[])); console.log(f.filter(x=>x.severity==='critical').length)" 2>/dev/null || echo "0")
+        HIGH=$(node -e "const r=JSON.parse(require('fs').readFileSync('judges-results.json','utf8')); const f=Array.isArray(r.findings)?r.findings:(r.files||[]).flatMap(x=>(x.verdict?.findings||[])); console.log(f.filter(x=>x.severity==='high').length)" 2>/dev/null || echo "0")
 
         echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
         echo "score=$SCORE" >> "$GITHUB_OUTPUT"

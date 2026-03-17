@@ -3,22 +3,18 @@
  */
 
 import { readFileSync, existsSync } from "fs";
-import { execSync } from "child_process";
 import type { TribunalVerdict } from "../types.js";
+import { runGit, tryRunGit } from "../tools/command-safety.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function getCurrentBranch(): string {
-  try {
-    return execSync("git branch --show-current", { encoding: "utf-8" }).trim();
-  } catch {
-    return "unknown";
-  }
+  return tryRunGit(["branch", "--show-current"]) ?? "unknown";
 }
 
 function getBranchDiff(base: string, head: string): string[] {
   try {
-    const output = execSync(`git diff --name-only ${base}...${head}`, { encoding: "utf-8" });
+    const output = runGit(["diff", "--name-only", `${base}...${head}`], { trim: false });
     return output.trim().split("\n").filter(Boolean);
   } catch {
     return [];

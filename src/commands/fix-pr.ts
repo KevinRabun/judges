@@ -14,7 +14,7 @@
  * Requires: GITHUB_TOKEN or `gh` CLI authenticated.
  */
 
-import { execFileSync, execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { readFileSync, writeFileSync, readdirSync, statSync } from "fs";
 import { resolve, extname, relative, join } from "path";
 import { tmpdir } from "os";
@@ -22,6 +22,7 @@ import { tmpdir } from "os";
 import { evaluateWithTribunal } from "../evaluators/index.js";
 import { applyPatches, type PatchCandidate } from "./fix.js";
 import type { TribunalVerdict } from "../types.js";
+import { parseGitHubRepo, runGit, tryRunGit } from "../tools/command-safety.js";
 
 // ─── Language Detection ─────────────────────────────────────────────────────
 
@@ -92,24 +93,12 @@ function getToken(): string | undefined {
 }
 
 function detectRepo(): string | undefined {
-  try {
-    const remote = execSync("git remote get-url origin", { encoding: "utf-8" }).trim();
-    const sshMatch = remote.match(/github\.com[:/]([^/]+\/[^/.]+)/);
-    if (sshMatch) return sshMatch[1];
-    const httpsMatch = remote.match(/github\.com\/([^/]+\/[^/.]+)/);
-    if (httpsMatch) return httpsMatch[1];
-  } catch {
-    // Not a git repo
-  }
-  return undefined;
+  const remote = tryRunGit(["remote", "get-url", "origin"]);
+  return remote ? parseGitHubRepo(remote) : undefined;
 }
 
 function getCurrentBranch(): string {
-  try {
-    return execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf-8" }).trim();
-  } catch {
-    return "main";
-  }
+  return tryRunGit(["rev-parse", "--abbrev-ref", "HEAD"]) ?? "main";
 }
 
 function ghCliAvailable(): boolean {
@@ -264,7 +253,7 @@ Requires: git, and either GITHUB_TOKEN or gh CLI authenticated.
 
   try {
     // Create and checkout new branch
-    execSync(`git checkout -b ${branch}`, { stdio: "pipe" });
+    runGit(["checkout", "-b", branch]);
 
     // Write fixed files
     for (const fix of fileFixes) {
@@ -272,12 +261,12 @@ Requires: git, and either GITHUB_TOKEN or gh CLI authenticated.
     }
 
     // Stage and commit
-    execSync("git add -A", { stdio: "pipe" });
+    runGit(["add", "-A"]);
     const commitMsg = `fix: auto-fix ${totalPatches} finding(s) across ${fileFixes.length} file(s)\n\nApplied by Judges Panel auto-fix.\n\nFixes applied:\n${fileFixes.map((f) => `- ${f.relPath}: ${f.applied} fix(es)`).join("\n")}`;
-    execSync(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`, { stdio: "pipe" });
+    runGit(["commit", "-m", commitMsg]);
 
     // Push
-    execSync(`git push origin ${branch}`, { stdio: "pipe" });
+    runGit(["push", "origin", branch]);
 
     console.log(`  ✓ Pushed branch: ${branch}`);
 
@@ -353,7 +342,7 @@ Requires: git, and either GITHUB_TOKEN or gh CLI authenticated.
   } finally {
     // Return to original branch
     try {
-      execSync(`git checkout ${baseBranch}`, { stdio: "pipe" });
+      runGit(["checkout", baseBranch]);
     } catch {
       // If checkout fails, we're still on the fix branch
     }

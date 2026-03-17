@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+// NOTE: keep logic in pure helpers to allow coverage
 /**
  * Judges Panel — CLI Evaluator
  *
@@ -21,10 +22,12 @@
  *   judges eval --help                                    # show help
  */
 
-import { readFileSync, existsSync, readdirSync, statSync, writeFileSync } from "fs";
-import { resolve, extname, dirname, relative, join } from "path";
+import { readFileSync, existsSync, writeFileSync, readdirSync, statSync } from "fs";
+import { resolve, extname, dirname, join, relative } from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
+import { globToRegex, matchesGlob, collectFiles as helperCollectFiles, dispatchCommand } from "./cli-helpers.js";
+// Re-export helpers for tests/backward compatibility
+export { globToRegex, matchesGlob } from "./cli-helpers.js";
 
 import {
   evaluateWithTribunal,
@@ -39,30 +42,16 @@ import { verdictToJUnit } from "./formatters/junit.js";
 import { verdictToPdfHtml } from "./formatters/pdf.js";
 import { verdictToCodeClimate } from "./formatters/codeclimate.js";
 import { verdictToGitHubActions } from "./formatters/github-actions.js";
-import { runReport } from "./commands/report.js";
-import { runHook } from "./commands/hook.js";
-import { runDiff } from "./commands/diff.js";
-import { runDeps } from "./commands/deps.js";
-import { runBaseline, loadBaselineData, isBaselined, type LoadedBaseline } from "./commands/baseline.js";
-import { runCompletions } from "./commands/completions.js";
-import { runDocs } from "./commands/docs.js";
-import { generateGitLabCi, generateAzurePipelines, generateBitbucketPipelines } from "./commands/ci-templates.js";
+import { loadBaselineData, isBaselined, type LoadedBaseline } from "./commands/baseline.js";
 import { getPreset, listPresets, composePresets } from "./presets.js";
 import { parseConfig } from "./config.js";
 import type { Finding, JudgesConfig, TribunalVerdict } from "./types.js";
 import { applyPatches, type PatchCandidate } from "./commands/fix.js";
 import { DiskCache } from "./disk-cache.js";
 import { contentHash } from "./cache.js";
-import { runFeedback } from "./commands/feedback.js";
-import { runBenchmark } from "./commands/benchmark.js";
-import { runRule } from "./commands/rule.js";
-import { runPack } from "./commands/language-packs.js";
-import { runConfig } from "./commands/config-share.js";
-import { runDoctor } from "./commands/doctor.js";
-import { runTriage } from "./commands/triage.js";
 import { formatComparisonReport, formatFullComparisonMatrix, TOOL_PROFILES } from "./comparison.js";
-import { runOverride, loadOverrideStore, applyOverrides } from "./commands/override.js";
-import { runNotify } from "./commands/notify.js";
+import { loadOverrideStore, applyOverrides } from "./commands/override.js";
+import { matchGlobPath, runGit } from "./tools/command-safety.js";
 
 // ─── Language Detection from Extension ──────────────────────────────────────
 
@@ -281,762 +270,113 @@ function parseCliArgs(argv: string[]): CliArgs {
 // ─── Help Text ──────────────────────────────────────────────────────────────
 
 function printHelp(): void {
-  console.log(`
-Judges Panel — CLI Code Evaluator
+  const showExperimental = process.env.JUDGES_SHOW_EXPERIMENTAL === "1";
+  /**
+   * Only show GA/implemented commands by default. Experimental/placeholder
+   * commands can be revealed via JUDGES_SHOW_EXPERIMENTAL=1 to avoid
+   * over-promising features that aren't wired yet.
+   */
+  const coreCommands: Array<[string, string]> = [
+    ["judges eval [options] [file]", "Evaluate code with the full tribunal"],
+    ["judges eval --judge <id> [file]", "Evaluate with a single judge"],
+    ["judges init", "Interactive project setup wizard"],
+    ["judges fix <file> [--apply]", "Preview / apply auto-fixes"],
+    ["judges fix-pr <path>", "Create a PR with auto-fix patches"],
+    ["judges watch <path>", "Watch files and re-evaluate on save"],
+    ["judges lsp", "Start LSP server for editor integration"],
+    ["judges report <dir>", "Generate project-level report"],
+    ["judges hook install", "Install pre-commit git hook"],
+    ["judges diff", "Evaluate only changed lines from a diff"],
+    ["judges deps [dir]", "Analyze dependencies for supply-chain risks"],
+    ["judges license-scan", "Dependency license compliance scan"],
+    ["judges doctor", "Run diagnostic healthcheck"],
+    ["judges baseline create <file>", "Create a findings baseline"],
+    ["judges ci-templates <provider>", "Generate CI pipeline template"],
+    ["judges completions <shell>", "Generate shell completions"],
+    ["judges docs", "Generate rule documentation"],
+    ["judges feedback", "Track finding feedback (false positives)"],
+    ["judges override", "Manage per-path rule overrides"],
+    ["judges benchmark", "Run detection accuracy benchmarks"],
+    ["judges config", "Export/import shared team configs"],
+    ["judges review", "Post inline review comments on a GitHub PR"],
+    ["judges app serve", "Start GitHub App webhook server"],
+    ["judges tune", "Auto-tune presets and config"],
+  ];
 
-USAGE:
-  judges eval [options] [file]        Evaluate code with the full tribunal
-  judges eval --judge <id> [file]     Evaluate with a single judge
-  judges init                         Interactive project setup wizard
-  judges fix <file> [--apply]         Preview / apply auto-fixes
-                                     --rule <id>  --severity <level>  --lines <start>-<end>
-  judges fix-pr <path>               Create a PR with auto-fix patches (like Dependabot)
-  judges watch <path>                 Watch files and re-evaluate on save
-  judges lsp                          Start LSP server for editor integration
-  judges trend [file]                 Show findings trend from snapshots
-  judges scaffold-plugin <name>       Generate a starter custom plugin project
-  judges report <dir>                 Generate project-level report
-  judges hook install                 Install pre-commit git hook
-  judges diff                         Evaluate only changed lines from a diff
-  judges deps [dir]                   Analyze dependencies for supply-chain risks
-  judges doctor                       Run diagnostic healthcheck
-  judges baseline create <file>       Create a findings baseline
-  judges ci-templates <provider>      Generate CI pipeline template
-  judges completions <shell>          Generate shell completions
-  judges docs                         Generate rule documentation
-  judges feedback                     Track finding feedback (false positives)
-  judges benchmark                    Run detection accuracy benchmarks
-  judges rule                         Create and manage custom rules
-  judges pack                         Manage language-specific rule packs
-  judges config                       Export/import shared team configs
-  judges compare                      Compare judges vs other tools
-  judges review                       Post inline review comments on a GitHub PR
-  judges app serve                    Start GitHub App webhook server (zero-config PR reviews)
-  judges notify                       Send results to Slack, Teams, or webhook endpoints
-  judges quality-gate                 Evaluate composite quality gate policies
-  judges auto-calibrate               Auto-tune thresholds from feedback history
-  judges dep-audit                    Correlate dependency vulnerabilities with code findings
-  judges monorepo                     Discover and evaluate monorepo packages
-  judges config-migrate               Migrate .judgesrc to current schema
-  judges deprecated                   List deprecated rules with migration guidance
-  judges dedup-report                 Cross-run finding deduplication report
-  judges upload                       Upload SARIF results to GitHub Code Scanning
-  judges smart-select                 Show which judges are relevant for a file
-  judges pr-summary                   Post a PR summary comment with verdict
-  judges profile                      Performance profiling for judge evaluations
-  judges group                        Group findings by category, severity, or file
-  judges diff-only                    Evaluate only changed lines in a PR diff
-  judges auto-triage                  Auto-suppress low-confidence findings
-  judges validate-config              Validate .judgesrc configuration
-  judges coverage-map                 Show which rules apply to which languages
-  judges warm-cache                   Pre-populate eval cache for faster CI
-  judges policy-audit                 Compliance audit trail with policy snapshots
-  judges remediation <rule-id>        Step-by-step fix guide for a finding
-  judges hook-install                 Install git pre-commit/pre-push hooks
-  judges false-negatives              Track and report false-negative feedback
-  judges assign                       Assign findings to team members
-  judges ticket-sync                  Create tickets from findings (Jira/Linear/GitHub)
-  judges sla-track                    SLA tracking and violation detection
-  judges regression-alert             Detect quality regressions between scans
-  judges suppress                     Batch false-positive suppression
-  judges rule-owner                   Map rules to team owners
-  judges noise-advisor                Analyze rule performance and recommend tuning
-  judges review-queue                 Human review queue for low-confidence findings
-  judges report-template              Generate reports from templates
-  judges burndown                     Track finding resolution progress
-  judges kb                           Team knowledge base for rule decisions
-  judges recommend                    Analyze project and recommend judges
-  judges vote                         Consensus voting on findings
-  judges query                        Advanced finding search and filter
-  judges judge-reputation             Per-judge accuracy and FP tracking
-  judges correlate                    Finding correlation and root-cause analysis
-  judges digest                       Periodic finding digest and trend reports
-  judges rule-share                   Export/import custom rule configurations
-  judges explain-finding              Detailed finding explanation with context
-  judges compare-runs                 Compare evaluation runs side by side
-  judges audit-bundle                 Assemble auditor-ready evidence package
-  judges dev-score                    Developer security growth score
-  judges model-risk                   AI model vulnerability risk profiles
-  judges retro                        Security incident retrospective analysis
-  judges config-drift                 Detect config divergence from baseline
-  judges reg-watch                    Regulatory standard coverage monitor
-  judges learn                        Personalized developer learning paths
-  judges generate                     Secure code template generator
-  judges ai-model-trust               AI model confidence scoring
-  judges team-rules-sync              Fast team onboarding with shared rules
-  judges cost-forecast                Security debt cost projections
-  judges team-leaderboard             Gamified security review engagement
-  judges code-owner-suggest           Auto-recommend CODEOWNERS entries
-  judges pr-quality-gate              Automated PR pass/fail quality gate
-  judges ai-prompt-audit              Scan for prompt injection risks
-  judges adoption-report              Team adoption metrics dashboard
-  judges auto-fix                     Automated fix suggestions for findings
-  judges audit-trail                  Chain-of-custody tracking for findings
-  judges pattern-registry             Team security pattern knowledge repo
-  judges security-maturity            Security posture maturity assessment
-  judges perf-hotspot                 Performance anti-pattern detection
-  judges doc-gen                      Generate security documentation
-  judges dep-correlate                Dependency vulnerability correlation
-  judges judge-author                 Custom judge authoring toolkit
-  judges sbom-export                  Generate Software Bill of Materials
-  judges license-scan                 Dependency license compliance
-  judges test-correlate               Test coverage × finding correlation
-  judges predict                      Forecast remediation timelines
-  judges org-policy                   Organization-wide policy management
-  judges incident-response            Incident response playbook generation
-  judges risk-heatmap                 File/directory risk visualization
-  judges learning-path                Personalized security learning
-  judges secret-scan                  Scan for hardcoded secrets and API keys
-  judges iac-lint                     Lint Dockerfiles and Kubernetes manifests
-  judges pii-scan                     Detect PII patterns in source code
-  judges api-audit                    API endpoint security audit
-  judges compliance-map               Multi-framework compliance mapping
-  judges perf-compare                 Before/after performance comparison
-  judges guided-tour                  Interactive onboarding tutorials
-  judges exec-report                  Executive security dashboard
-  judges ai-output-compare            Compare outputs from multiple AI models
-  judges hallucination-score          Hallucination risk score for AI code
-  judges ai-gate                      Pre-merge gate for AI-generated code
-  judges ai-pattern-trend             Track AI code pattern evolution over time
-  judges test-suggest                 Test scenario suggestions for AI code
-  judges vendor-lock-detect           Detect vendor-specific API lock-in
-  judges clarity-score                Code readability and self-documentation score
-  judges arch-audit                   Architecture quality audit
-  judges watch-judge                  Continuously watch and auto-evaluate files
-  judges impact-scan                  Cross-file ripple effect detection
-  judges model-report                 AI model scorecard and comparison
-  judges trust-adaptive               Adaptive trust scoring for actors
-  judges judge-learn                  Generate custom judges from feedback
-  judges chat-notify                  Publish findings to chat platforms
-  judges design-audit                 Detect code breaking project conventions
-  judges remediation-lib              Proven fix templates for common findings
-  judges doc-drift                    Detect documentation-to-code drift
-  judges cross-pr-regression          Track flagged pattern recurrence across PRs
-  judges code-similarity              Compare code across files for duplication
-  judges team-trust                   Team-wide trust profile aggregation
-  judges exception-consistency        Detect inconsistent exception handling
-  judges resource-cleanup             Validate resource cleanup patterns
-  judges refactor-safety              Analyze refactoring safety
-  judges compliance-weight            Re-weight findings by compliance framework
-  judges prompt-replay                Reverse-engineer AI prompts and suggest improvements
-  judges review-replay                Record and replay evaluation runs
-  judges context-inject               Feed project context into evaluation
-  judges habit-tracker                Track recurring finding patterns per author
-  judges finding-contest              Gamified fix challenge mode
-  judges approve-chain                Multi-stage approval workflows
-  judges snippet-eval                 Evaluate code snippets instantly
-  judges coach-mode                   Educational security coaching
-  judges commit-hygiene               Audit commit messages & diff structure
-  judges deploy-readiness             Pre-deployment production readiness checklist
-  judges rollback-safety              Detect changes unsafe to roll back
-  judges test-quality                 Score test suites beyond coverage %
-  judges build-optimize               Detect build-time inefficiencies
-  judges secret-age                   Credential lifecycle & rotation analysis
-  judges observability-gap            Detect missing instrumentation
-  judges migration-safety             Validate migration PRs for risks
-  judges api-versioning-audit         Detect API breaking changes & versioning gaps
-  judges ownership-map                Validate CODEOWNERS coverage & staleness
-  judges retry-pattern-audit          Audit retry, backoff & circuit-breaker patterns
-  judges error-taxonomy               Classify & standardize error codes/messages
-  judges boundary-enforce             Validate architectural module boundaries
-  judges log-quality                  Assess logging hygiene & PII leak risks
-  judges null-safety-audit            Identify null/undefined dereference risks
-  judges test-isolation               Detect test isolation violations & leaks
-  judges comment-drift                Detect stale/misleading inline comments
-  judges timeout-audit                Trace timeout propagation gaps
-  judges cache-audit                  Audit cache invalidation & stampede risk
-  judges idempotency-audit            Verify retry/webhook idempotency safety
-  judges type-boundary                Check type safety at serialization bounds
-  judges event-leak                   Detect orphaned listeners & subscriptions
-  judges privilege-path               Model authorization escalation paths
-  judges error-ux                     Audit user-facing error quality & safety
-  judges dead-code-detect             Find unreachable code & unused exports
-  judges async-safety                 Detect async anti-patterns & fire-and-forget
-  judges input-guard                  Verify input validation on all boundaries
-  judges clone-detect                 Find duplicated code blocks & functions
-  judges contract-verify              Check API spec vs implementation alignment
-  judges encoding-safety              Detect encoding/serialization hazards
-  judges assertion-density            Audit defensive checks & preconditions
-  judges state-integrity              Validate state machines & flag impossible states
-  judges logic-lint                   Detect common logic errors AI generates
-  judges phantom-import               Find hallucinated imports & missing modules
-  judges example-leak                 Detect AI-copied placeholder code in production
-  judges completion-audit             Verify AI code is complete, not truncated
-  judges spec-conform                 Check conformance to project conventions
-  judges cross-file-consistency       Verify naming & pattern consistency across files
-  judges api-misuse                   Detect incorrect API usage patterns
-  judges review-focus                 Prioritize review attention by file risk
-  judges hallucination-detect         Find fabricated APIs and non-existent methods
-  judges context-blind                Flag AI reinventing existing project utilities
-  judges over-abstraction             Detect unnecessary abstractions from AI code
-  judges stale-pattern                Identify outdated idioms with modern alternatives
-  judges security-theater             Detect security code that provides no protection
-  judges review-digest                Generate concise role-appropriate review summaries
-  judges adoption-track               Measure team-level Judges adoption metrics
-  judges finding-budget               Manage finding volume to prevent alert fatigue
-  judges quick-check                  Sub-100ms pattern-only review for real-time feedback
-  judges merge-verdict                Single MERGE/HOLD decision with structured rationale
-  judges review-handoff               Structured escalation to human reviewers
-  judges evidence-chain               Traversable reasoning chain for each finding
-  judges ai-provenance                Detect and annotate AI-generated code regions
-  judges review-receipt               Cryptographically signed review attestation
-  judges review-contract              Define and verify what Judges reviews
-  judges blame-review                 Git-blame integrated finding attribution
-  judges review-gate                  CI/CD quality gate with configurable thresholds
-  judges diff-review                  Review only changed lines in a diff
-  judges batch-review                 Parallel review of multiple files
-  judges custom-rule                  Load and run user-defined custom rules
-  judges review-compare               Compare two review runs for improvement
-  judges severity-tune                Auto-calibrate severity levels for your project
-  judges review-explain               Plain-language finding explanations
-  judges focus-area                   Identify high-risk areas needing review
-  judges review-cache                 Cache review results for unchanged files
-  judges ignore-list                  Manage file/rule ignore patterns
-  judges review-log                   Structured audit log of review actions
-  judges team-config                  Team-level shared configuration management
-  judges finding-group                Group related findings into clusters
-  judges review-summary               Generate PR-ready review summary
-  judges rule-test                    Test custom rules against sample code
-  judges incremental-review           Review only changed files since last run
-  judges review-profile               Per-developer review preferences
-  judges review-template              Reusable review templates
-  judges auto-approve                 Auto-approve findings below threshold
-  judges diff-explain                 Explain why diff changes were flagged
-  judges review-stats                 Personal review statistics and trends
-  judges fix-suggest                  Generate concrete fix suggestions
-  judges review-priority              Smart finding prioritization
-  judges multi-lang-review            Cross-language consistency checking
-  judges review-webhook               Configure webhook notifications for reviews
-  judges finding-suppress             Suppress specific findings
-  judges review-annotate              Generate GitHub-compatible PR annotations
-  judges judge-config                 Per-judge sensitivity configuration
-  judges review-checkpoint            Save and restore review state checkpoints
-  judges review-merge                 Merge multiple review results
-  judges review-filter                Advanced multi-criteria finding filter
-  judges code-health                  Overall codebase health score
-  judges fix-verify                   Verify fixes resolved findings
-  judges review-comment               Generate inline code comments from findings
-  judges finding-timeline             Track finding trends across commits
-  judges rule-catalog                 Browse and search available rules
-  judges review-scope                 Define review scope boundaries
-  judges review-schedule              Configure scheduled review cadences
-  judges review-export                Export results to CSV, markdown, HTML
-  judges setup-wizard                 Guided setup for new users
-  judges finding-age                  Track how long findings are unresolved
-  judges review-dashboard             Terminal dashboard of review health
-  judges config-lint                  Lint and validate .judgesrc configuration
-  judges review-quota                 Track review usage quotas
-  judges review-offline               Offline mode support
-  judges finding-rank                 Rank findings by impact and fix effort
-  judges review-diff-summary          Concise summary of changes + findings
-  judges review-notify                Configure local notifications
-  judges review-streak                Track consecutive clean review streaks
-  judges finding-cluster              Cluster findings to reveal patterns
-  judges review-badge                 Generate status badges for READMEs
-  judges review-audit-log             Comprehensive local audit log
-  judges review-sandbox               Test review configs safely
-  judges finding-hotspot              Identify areas with most findings
-  judges review-ab-test               A/B test review configurations
-  judges review-integration           Verify CI/IDE/hook integrations
-  judges review-standup               Daily standup review summary
-  judges finding-fix-rate             Track finding resolution speed
-  judges review-milestone             Track and celebrate review milestones
-  judges review-risk-score            Calculate aggregate project risk
-  judges review-changelog-gen         Auto-generate changelog from findings
-  judges finding-recurrence           Track recurring findings
-  judges review-benchmark-self        Benchmark against your own history
-  judges review-report-pdf            Generate printable review reports
-  judges review-tag                   Tag reviews for organization and filtering
-  judges finding-impact               Estimate business impact of findings
-  judges review-archive               Archive and retrieve old review results
-  judges review-whitelist             Allow-list safe patterns
-  judges review-custom-prompt         Customize review prompts for project needs
-  judges review-diff-context          Show diff hunks with surrounding context
-  judges review-ci-status             Check CI pipeline review status
-  judges review-team-summary          Aggregate team review metrics
-  judges finding-auto-fix             Auto-generate fix suggestions
-  judges review-history-search        Search past review history
-  judges review-language-stats        Language-specific review statistics
-  judges review-coverage-map          Map which files have been reviewed
-  judges review-rollback              Roll back review config to a previous state
-  judges review-onboard               Guided onboarding for new team members
-  judges review-parallel              Batch review multiple files
-  judges finding-context              Enrich findings with surrounding code context
-  judges review-approval              Approval workflows for review results
-  judges finding-severity-override    Override finding severity per project
-  judges review-config-export         Export / import review configurations
-  judges review-pr-comment            Generate PR comment summaries from reviews
-  judges review-ignore-path           Manage path ignore lists for reviews
-  judges finding-deduplicate          Detect and deduplicate similar findings
-  judges review-score-history         Track review scores over time
-  judges review-feedback              Collect user feedback on review quality
-  judges finding-false-positive       Track and manage false positive findings
-  judges review-session               Group reviews into named sessions
-  judges review-bulk-action           Apply bulk actions across findings
-  judges review-retry                 Retry failed or incomplete reviews
-  judges review-depth                 Control review depth (shallow/normal/deep)
-  judges finding-link                 Link related findings across files
-  judges review-compare-version       Compare review results between versions
-  judges review-summary-email         Generate email-ready review summaries
-  judges finding-confidence-filter    Filter findings by confidence level
-  judges review-skip-rule             Quick skip/disable specific rules
-  judges review-note                  Attach notes to reviews
-  judges finding-export-csv           Export findings as CSV
-  judges review-timeline              Show review activity timeline
-  judges review-snapshot-diff         Diff between review snapshots
-  judges finding-resolution           Track finding resolution status
-  judges review-owner                 Assign review ownership to team members
-  judges review-checklist             Manage pre/post-review checklists
-  judges finding-category             Categorize findings into custom groups
-  judges review-lock                  Lock reviews to prevent re-runs
-  judges finding-priority-queue       Queue findings by priority for triage
-  judges review-diff-annotate         Annotate diff hunks with findings
-  judges finding-remediation-plan     Generate remediation plans from findings
-  judges review-config-validate       Validate review configuration files
-  judges review-rate-limit            Control review execution frequency
-  judges finding-trend                Show finding trends over time
-  judges finding-snippet              Extract code snippets from findings
-  judges review-env-check             Verify review environment prerequisites
-  judges finding-batch-resolve        Resolve multiple findings in bulk
-  judges review-integration-test      Validate CI/CD integration
-  judges review-health-check          Diagnose review system health
-  judges finding-age-report           Report on finding ages and staleness
-  judges review-rule-stats            Per-rule statistics across reviews
-  judges review-parallel-diff         Review multiple diff hunks
-  judges review-auto-merge            Auto-merge reviews that pass checks
-  judges finding-correlate            Correlate related findings across files
-  judges review-dry-run               Simulate review without persisting
-  judges finding-suppress-pattern     Suppress findings by pattern
-  judges review-cache-clear           Clear review caches selectively
-  judges finding-impact-score         Score findings by estimated impact
-  judges review-compliance-check      Check findings against compliance frameworks
-  judges finding-root-cause           Identify root causes of recurring findings
-  judges review-file-filter           Filter files for review inclusion/exclusion
-  judges finding-dependency-check     Check dependency-related findings
-  judges review-incremental           Review only changed files since last review
-  judges finding-severity-histogram   Visualize severity distribution histogram
-  judges review-plugin-manage         Manage review plugins and extensions
-  judges finding-dedup-cross-file     Deduplicate findings across result files
-  judges review-progress-bar          Track and display review progress
-  judges finding-auto-label           Auto-label findings based on content
-  judges finding-group-by             Group findings by category/severity/file
-  judges finding-diff-highlight       Highlight diff regions related to findings
-  judges finding-fix-verify           Verify fixes resolve findings
-  judges review-custom-judge          Register and manage custom judges
-  judges finding-prioritize           Prioritize findings by business impact
-  judges review-annotation            Add annotations to review results
-  judges review-multi-repo            Review across multiple repositories
-  judges finding-trace                Trace findings to origin commits
-  judges review-preset-save           Save and load review preset configurations
-  judges review-blame-map             Map findings to git blame authors
-  judges finding-autofix-preview      Preview auto-fix patches before applying
-  judges review-config-diff           Diff two review configurations
-  judges finding-severity-trend       Track severity distribution trends
-  judges review-batch-files           Batch-review multiple files at once
-  judges finding-context-expand       Expand finding context with surrounding code
-  judges review-output-format         Configure and manage output formats
-  judges finding-merge-results        Merge results from multiple review runs
-  judges review-dependency-graph      Visualize finding dependency relationships
-  judges finding-pattern-match        Match findings against custom patterns
-  judges review-diff-stats            Show git diff statistics for reviews
-  judges finding-cwe-map              Map findings to CWE identifiers
-  judges review-exclude-vendor        Exclude vendor/third-party code from reviews
-  judges finding-risk-matrix           Generate risk matrices from findings
-  judges review-file-stats            Per-file review statistics
-  judges finding-false-neg-check      Check for potential false negatives
-  judges review-rule-filter           Filter review results by rule criteria
-  judges review-scope-lock            Lock review scope to specific files/directories
-  judges finding-duplicate-rule       Detect duplicate or overlapping rules
-  judges review-watch-mode            Watch files and auto-trigger reviews
-  judges review-export-pdf            Export review results as PDF-ready markdown
-  judges finding-line-blame           Map findings to git blame information
-  judges finding-age-tracker          Track the age of findings over time
-  judges review-parallel-files        Batch files for parallel review
-  judges finding-summary-digest       Generate concise finding digests
-  judges review-code-owner            Map findings to CODEOWNERS entries
-  judges review-finding-link          Link related findings together
-  judges review-team-assign           Assign findings to team members
-  judges finding-compare-runs         Compare findings across review runs
-  judges review-skip-list             Manage skip list for reviews
-  judges finding-hotfix-suggest       Suggest quick hotfixes for findings
-  judges review-approval-gate         Configurable review approval gates
-  judges review-changelog-entry       Generate changelog from findings
-  judges review-branch-compare        Compare reviews between branches
-  judges finding-category-stats       Finding category statistics
-  judges finding-trend-report         Generate trend reports from findings
-  judges review-commit-hook           Install/manage git commit hooks
-  judges finding-noise-filter         Filter out noisy/low-value findings
-  judges finding-fix-priority         Prioritize findings for fixing
-  judges review-quota-check           Check review quotas and limits
-  judges finding-cluster-analysis     Cluster findings by similarity
-  judges review-session-save          Save/restore review sessions
-  judges finding-evidence-chain       Build evidence chains across findings
-  judges review-file-complexity       Analyze file complexity metrics
-  judges finding-dependency-risk      Assess dependency risk levels
-  judges review-pr-template           Generate PR templates from findings
-  judges finding-security-hotspot     Identify security-sensitive code
-  judges finding-suppression-log      Log and track suppressed findings
-  judges review-diff-highlight        Highlight review differences
-  judges finding-cve-lookup           Extract CVE references from findings
-  judges review-batch-run             Run batch review on multiple files
-  judges review-output-filter         Filter and transform review output
-  judges finding-timeline-view        Show findings on a timeline
-  judges review-ignore-pattern        Manage review ignore patterns
-  judges finding-quality-gate         Enforce quality gates on findings
-  judges finding-reachability         Analyze finding reachability
-  judges review-merge-check           Pre-merge review validation
-  judges review-workspace-scan        Scan workspace for reviewable files
-  judges finding-context-window       Show findings with code context
-  judges finding-severity-dist        Show severity distribution
-  judges review-report-merge          Merge multiple verdict reports
-  judges review-plugin-config         Manage plugin configuration
-  judges finding-code-smell           Detect code-smell indicators
-  judges finding-related-rules        Find related rules for a finding
-  judges review-token-budget          Estimate token budget usage
-  judges review-plugin-list           List available plugins
-  judges finding-owner-assign         Assign finding owners
-  judges review-lock-file             Analyze lock files for security issues
-  judges finding-pattern-library      Manage finding pattern library
-  judges review-status-badge          Generate status badges
-  judges finding-rule-explain         Explain rules in detail
-  judges finding-dependency-tree      Visualize finding dependencies
-  judges review-ci-integration        Generate CI pipeline configuration
-  judges review-comparative           Compare two verdict reports
-  judges finding-suppression-audit    Audit suppressed findings
-  judges review-custom-rule           Manage custom review rules
-  judges review-notification          Manage review notifications
-  judges finding-age-analysis         Analyze finding age over time
-  judges review-template-export       Export review templates
-  judges finding-correlation          Find correlations between findings
-  judges review-scope-limit           Limit review scope to specific criteria
-  judges finding-regression-check     Check for regressions vs baseline
-  judges finding-fix-validation       Validate finding fixes
-  judges review-dashboard-data        Generate dashboard-ready data
-  judges finding-category-map         Map findings to categories
-  judges finding-dedup-report         Deduplicated findings report
-  judges review-perf-profile          Profile review performance
-  judges finding-false-positive-log   Track false positive findings
-  judges review-guardrail             Define and enforce review guardrails
-  judges review-batch-mode            Batch review processing
-  judges finding-trend-analysis       Analyze finding trends over time
-  judges finding-auto-tag             Auto-tag findings by content
-  judges review-webhook-notify        Configure webhook notifications
-  judges finding-evidence-collect     Collect evidence for findings
-  judges review-compliance-gate       Compliance gate for reviews
-  judges finding-resolution-tracker   Track finding resolutions
-  judges review-threshold-tune        Tune review thresholds
-  judges finding-cluster-group        Group findings into clusters
-  judges review-merge-config          Merge multiple configuration files
-  judges finding-hotspot-map          Map finding hotspots in code
-  judges review-parallel-run          Summarize parallel review runs
-  judges review-annotation-export     Export findings as code annotations
-  judges finding-blast-radius         Estimate finding blast radius
-  judges review-quality-score         Compute multi-dimension quality score
-  judges review-onboard-wizard        Onboarding wizard for new users
-  judges review-cache-warm            Pre-warm review cache
-  judges finding-metadata-enrich      Enrich findings with metadata
-  judges finding-auto-group           Auto-group findings into categories
-  judges finding-suppression-list     Manage finding suppressions
-  judges review-plugin-status         Show plugin loading status
-  judges finding-cross-ref            Cross-reference findings across reviews
-  judges review-ci-gate               CI gate integration checks
-  judges review-team-stats            Team review statistics
-  judges finding-pattern-detect       Detect recurring finding patterns
-  judges review-coverage-gap          Identify review coverage gaps
-  judges review-feedback-loop         Track review feedback over time
-  judges review-slack-format          Format review summaries for Slack
-  judges review-config-template       Generate config templates
-  judges finding-fix-suggest          Suggest fixes for findings
-  judges review-progress-track        Track review progress over time
-  judges finding-ownership-map        Map findings to code owners
-  judges review-report-schedule       Manage report schedules
-  judges finding-link-graph           Build finding relationship graph
-  judges review-audit-trail           Maintain review audit trail
-  judges review-compliance-report     Generate compliance reports
-  judges review-quickstart            Interactive quickstart guide
-  judges review-interactive           Step-by-step finding walkthrough
-  judges finding-explain              Explain findings in detail
-  judges review-ide-sync              Sync results to IDE format
-  judges finding-filter-view          Filter findings by criteria
-  judges review-tenant-config         Manage team config profiles
-  judges finding-code-context         Show code context for findings
-  judges finding-resolution-track     Track finding resolution status
-  judges review-onboard-checklist     Team onboarding checklist
-  judges review-summary-dashboard    Aggregate review dashboard
-  judges review-merge-request        Format findings for MR/PR comments
-  judges finding-groupby-file        Group findings by source file
-  judges finding-dedup-cross         Deduplicate findings across reviews
-  judges review-scope-select         Select review scope by path
-  judges review-api-export           Export review data in API format
-  judges finding-correlation-map     Map finding correlations
-  judges review-template-library     Reusable review templates
-  judges review-notification-config  Configure notification preferences
-  judges review-bulk-apply            Apply fixes in bulk
-  judges finding-severity-heatmap     Severity distribution heatmap
-  judges review-config-migrate        Migrate configs between versions
-  judges review-history-compare       Compare review history
-  judges review-team-dashboard        Team review dashboard
-  judges finding-confidence-calibrate Calibrate confidence thresholds
-  judges review-output-transform      Transform output formats
-  judges review-adoption-metrics      Track adoption metrics
-  judges review-workspace-init        Initialize workspace for Judges
-  judges review-policy-engine         Define and enforce review policies
-  judges review-webhook-dispatch      Configure webhook dispatch
-  judges finding-risk-score           Calculate finding risk scores
-  judges review-compliance-map        Map findings to compliance frameworks
-  judges finding-trend-forecast       Forecast finding trends
-  judges finding-impact-rank          Rank findings by business impact
-  judges review-rollout-plan          Generate phased rollout plan
-  judges finding-annotation-layer     Add annotations to findings
-  judges review-gate-config           Configure quality gates
-  judges review-language-profile      Analyze findings by language
-  judges finding-cwe-lookup           Look up CWE details for findings
-  judges review-cicd-integrate        Generate CI/CD integration configs
-  judges finding-patch-preview        Preview patch modifications
-  judges review-org-dashboard         Organization review dashboard
-  judges finding-duplicate-detect     Detect duplicate findings
-  judges finding-priority-matrix      Urgency x impact priority matrix
-  judges review-sla-config            Configure SLA targets
-  judges review-report-archive        Archive review reports
-  judges finding-auto-suppress        Auto-suppress findings
-  judges review-review-comments       Generate review comments
-  judges review-permission-model      Role-based permissions
-  judges review-repo-onboard          Onboard repository
-  judges finding-dismiss-workflow     Manage finding dismissals
-  judges review-data-retention        Configure data retention
-  judges finding-reachability-check   Check finding reachability
-  judges review-audit-export          Export audit data
-  judges review-pipeline-status       Monitor pipeline status
-  judges finding-auto-triage          Auto-triage findings
-  judges review-stakeholder-report    Stakeholder summaries
-  judges finding-change-impact        Assess change impact
-  judges review-deployment-gate       Deployment gate checks
-  judges review-environment-config    Per-environment config
-  judges finding-false-positive-learn Track false positives
-  judges review-multi-repo-sync       Multi-repo config sync
-  judges review-session-replay        Replay past sessions
-  judges finding-context-enrich       Enrich finding context
-  judges review-custom-judge-config   Custom judge settings
-  judges review-branch-policy         Branch review policies
-  judges finding-recurrence-detect    Detect recurring findings
-  judges review-integration-health    Check integration health
-  judges review-metric-export         Export review metrics
-  judges finding-ownership-assign     Assign finding ownership
-  judges review-notification-digest   Notification digests
-  judges review-access-log            View access logs
-  judges review-tag-manager           Manage review tags
-  judges review-quality-trend         Track quality trends
-  judges finding-batch-suppress       Batch suppress findings
-  judges finding-severity-drift       Detect severity changes
-  judges review-pr-comment-gen        Generate PR comments
-  judges finding-dependency-link      Link findings to deps
-  judges review-role-assignment       Manage reviewer roles
-  judges review-archive-search        Search archived reviews
-  judges review-incident-link         Link findings to incidents
-  judges finding-search-index         Build/search findings index
-  judges review-confidence-explain    Explain confidence levels
-  judges finding-merge-strategy       Merge findings across branches
-  judges review-scope-suggest         Suggest review scope
-  judges review-ai-feedback-loop      AI feedback capture
-  judges finding-trend-alert          Alert on finding trends
-  judges review-workload-balance      Balance reviewer workload
-  judges finding-dedup-smart          Smart finding dedup
-  judges finding-annotation-export    Export annotations
-  judges review-ci-insight            CI pipeline insights
-  judges review-template-suggest      Suggest review templates
-  judges finding-hotspot-detect       Detect code hotspots
-  judges review-code-health-score     Code health score
-  judges review-velocity-track        Track review velocity
-  judges finding-cross-file-link      Cross-file finding links
-  judges review-pr-size-check         PR size analysis
-  judges review-focus-area            Identify focus areas
-  judges review-team-analytics        Team review analytics
-  judges finding-similar-match        Find similar findings
-  judges review-risk-matrix           Risk matrix view
-  judges review-approval-criteria    Check approval criteria
-  judges finding-context-summary     Context summaries
-  judges review-changelog-impact     Changelog impact
-  judges review-commit-quality       Commit quality score
-  judges finding-auto-categorize     Auto-categorize findings
-  judges review-stale-finding-clean  Clean stale findings
-  judges finding-impact-radius       Impact radius analysis
-  judges review-reviewer-match       Match reviewers
-  judges review-quality-gate         Quality gate checks
-  judges finding-reopen-detect       Detect reopened findings
-  judges finding-priority-rank       Priority ranking
-  judges review-dependency-review    Dependency risk review
-  judges review-merge-readiness      Merge readiness check
-  judges review-security-posture     Security posture summary
-  judges review-knowledge-capture    Capture lessons learned
-  judges review-onboarding-check     Onboarding checklist
-  judges finding-regression-detect   Detect regressions
-  judges finding-auto-fix-suggest    Auto-fix suggestions
-  judges finding-scope-filter        Scope-based filtering
-  judges finding-noise-reduce        Reduce finding noise
-  judges review-release-gate         Release gate checks
-  judges review-code-ownership       Code ownership mapping
-  judges finding-batch-triage        Batch triage findings
-  judges review-pr-label-suggest     PR label suggestions
-  judges finding-confidence-boost    Confidence boost analysis
-  judges review-review-cadence       Review cadence analysis
-  judges review-action-item-gen      Generate action items
-  judges review-policy-enforce       Policy enforcement
-  judges finding-time-to-fix         Time-to-fix estimates
-  judges review-sprint-plan          Sprint planning
-  judges finding-ancestry-trace      Finding ancestry trace
-  judges review-escalation-path      Escalation paths
-  judges finding-remediation-cost    Remediation cost estimate
-  judges review-digest-gen           Review digest
-  judges finding-recurrence-check    Recurrence check
-  judges finding-compliance-tag      Compliance tagging
-  judges review-team-coverage        Team coverage analysis
-  judges finding-severity-rebalance  Severity rebalance
-  judges review-stakeholder-notify   Stakeholder notifications
-  judges finding-fix-playbook        Fix playbook generation
-  judges review-adoption-score       Adoption score
-  judges finding-dedup-merge         Dedup merge across runs
-  judges review-team-rotation        Team rotation
-  judges review-goal-track           Goal tracking
-  judges finding-risk-label          Risk labeling
-  judges review-feedback-summary     Feedback summary
-  judges finding-fix-chain           Fix chaining
-  judges review-config-health        Config health check
-  judges finding-owner-notify        Owner notifications
-  judges review-progress-report      Progress report
-  judges finding-patch-chain         Patch chaining
-  judges review-engagement-score     Engagement score
-  judges finding-effort-rank         Effort ranking
-  judges finding-resolution-workflow Resolution workflow
-  judges review-quality-baseline     Quality baseline
-  judges finding-context-link        Context linking
-  judges review-team-velocity        Team velocity
-  judges finding-auto-priority       Auto prioritisation
-  judges review-retrospective        Retrospective
-  judges finding-dependency-impact   Dependency impact
-  judges review-mentor-suggest       Mentor suggestions
-  judges finding-cluster-summary     Cluster summary
-  judges finding-scope-impact        Scope impact
-  judges review-health-trend         Health trend
-  judges finding-fix-estimate        Fix estimates
-  judges review-readiness-check      Readiness check
-  judges finding-noise-score         Noise scoring
-  judges review-workflow-suggest     Workflow suggestions
-  judges finding-top-offender        Top offenders
-  judges review-team-skill-map       Team skill map
-  judges finding-repeat-detect       Repeat detection
-  judges tune                         Analyze project and suggest optimal config
-  judges list                         List all available judges
-  judges version                      Show version information
-  judges --help                       Show this help
+  console.log("\nJudges Panel — CLI Code Evaluator\n");
+  console.log("USAGE:\n  judges <command> [options]\n");
+  console.log("Core commands:");
+  for (const [cmd, desc] of coreCommands) {
+    console.log(`  ${cmd.padEnd(32)} ${desc}`);
+  }
+  console.log("\nTIP: set JUDGES_SHOW_EXPERIMENTAL=1 to print the full experimental command matrix.\n");
 
-EVAL OPTIONS:
-  --file, -f <path>          File to evaluate (or pass as positional arg)
-  --language, -l <lang>      Language override (auto-detected from extension)
-  --format, -o <fmt>         Output: text, json, sarif, markdown, html, pdf, junit, codeclimate, github-actions
-  --judge, -j <id>           Run a single judge instead of the full tribunal
-  --fail-on-findings         Exit with code 1 when verdict is fail
-  --baseline, -b <path>      Suppress findings already in baseline file
-  --summary                  Show one-line summary instead of full output
-  --config, -c <path>        Path to .judgesrc config file
-  --preset, -p <name>        Use a named preset (strict, lenient, security-only, startup, compliance,
-                             performance, react, express, fastapi, django, spring-boot, rails, nextjs,
-                             terraform, kubernetes)
-                             Compose presets with commas: --preset security-only,react
-  --min-score <n>            Fail if score drops below threshold (0-100)
-  --exclude, -x <glob>       Exclude files matching glob pattern (repeatable)
-  --include, -i <glob>       Only include files matching glob pattern (repeatable)
-  --max-files <n>            Maximum number of files to analyze in directory mode
-  --sample                   Randomly sample files instead of taking first N (use with --max-files)
-  --no-color                 Disable colored output
-  --verbose                  Show detailed evaluation information
-  --quiet                    Suppress non-essential output
-  --fix                      Auto-fix findings after evaluation (applies patches in-place)
-  --changed-only             Only evaluate files changed since last commit (uses git diff)
-  --explain                  Enrich findings with OWASP/CWE learning context
-  --trace                    Show detailed decision trace for every finding
-  --help, -h                 Show this help
+  if (!showExperimental) return;
 
-FIX OPTIONS:
-  --apply, -a                Apply patches in-place (default is dry-run)
-  --judge, -j <id>           Only apply fixes from a specific judge
-
-WATCH OPTIONS:
-  --judge, -j <id>           Only evaluate with a specific judge
-  --fail-on-findings         Exit on first failure
-
-DIFF OPTIONS:
-  --file, -f <path>          Read diff from file (or pipe via stdin)
-  --language, -l <lang>      Language override for all files in diff
-
-DEPS OPTIONS:
-  --file, -f <path>          Specific manifest to analyze
-  --format, -o <fmt>         Output: text, json
-
-CI-TEMPLATES:
-  judges ci-templates github  GitHub Actions workflow
-  judges ci-templates gitlab  GitLab CI pipeline
-  judges ci-templates azure   Azure Pipelines
-  judges ci-templates bitbucket  Bitbucket Pipelines
-
-COMPLETIONS:
-  judges completions bash        Bash completions
-  judges completions zsh         Zsh completions
-  judges completions fish        Fish completions
-  judges completions powershell  PowerShell completions
-
-REVIEW OPTIONS:
-  --pr, -p <number>          PR number to review (required)
-  --repo, -r <owner/repo>    Repository (default: current repo from git remote)
-  --approve                  Approve PR if no findings
-  --dry-run, -n              Print comments without posting
-  --min-severity <level>     Minimum severity: info, warning, error (default: warning)
-  --max-comments <n>         Maximum review comments (default: 25)
-  --format, -o <fmt>         Output: text, json, sarif, markdown
-
-TUNE OPTIONS:
-  --dir, -d <path>           Project directory to analyze (default: .)
-  --apply                    Write recommended .judgesrc.json
-  --max-files <n>            Max files to sample (default: 200)
-  --verbose, -v              Show detailed analysis
-
-STDIN:
-  cat file.ts | judges eval --language typescript
-  git diff | judges diff --language typescript
-
-EXAMPLES:
-  judges eval src/app.ts
-  judges eval --file api.py --format sarif
-  judges eval --judge cybersecurity server.ts
-  judges eval --format junit --fail-on-findings src/
-  judges eval --baseline .judges-baseline.json src/app.ts
-  judges eval --preset security-only src/app.ts
-  judges eval --config .judgesrc src/app.ts
-  judges eval --min-score 80 src/app.ts
-  judges eval src/ --exclude "**/*.test.ts" --exclude "**/__mocks__/**"
-  judges eval src/ --include "**/*.py" --include "**/*.ts"
-  judges eval src/ --max-files 50
-  judges init
-  judges fix src/app.ts --apply
-  judges watch src/
-  judges report .
-  judges hook install
-  judges diff --file changes.patch
-  judges deps .
-  judges baseline create --file src/app.ts
-  judges ci-templates github
-  judges docs --output docs/rules/
-  judges completions bash >> ~/.bashrc
-  judges review --pr 42 --dry-run
-  judges review --pr 42 --repo owner/repo --approve
-  judges tune
-  judges tune --dir ./my-project --apply
-  judges list
-
-SUPPORTED LANGUAGES:
-  typescript, javascript, python, rust, go, java, csharp,
-  ruby, php, swift, kotlin, scala, c, cpp, yaml, json,
-  terraform, dockerfile, bash
-`);
+  console.log("Experimental / roadmap commands (may be stubbed):\n");
+  const experimentalCommands = [
+    ["judges quality-gate", "Evaluate composite quality gate policies"],
+    ["judges auto-calibrate", "Auto-tune thresholds from feedback history"],
+    ["judges dep-audit", "Correlate dependency vulnerabilities with code findings"],
+    ["judges monorepo", "Discover and evaluate monorepo packages"],
+    ["judges config-migrate", "Migrate .judgesrc to current schema"],
+    ["judges deprecated", "List deprecated rules with migration guidance"],
+    ["judges dedup-report", "Cross-run finding deduplication report"],
+    ["judges upload", "Upload SARIF results to GitHub Code Scanning"],
+    ["judges smart-select", "Show which judges are relevant for a file"],
+    ["judges pr-summary", "Post a PR summary comment with verdict"],
+    ["judges profile", "Performance profiling for judge evaluations"],
+    ["judges group", "Group findings by category, severity, or file"],
+    ["judges diff-only", "Evaluate only changed lines in a PR diff"],
+    ["judges auto-triage", "Auto-suppress low-confidence findings"],
+    ["judges validate-config", "Validate .judgesrc configuration"],
+    ["judges coverage-map", "Show which rules apply to which languages"],
+    ["judges warm-cache", "Pre-populate eval cache for faster CI"],
+    ["judges policy-audit", "Compliance audit trail with policy snapshots"],
+    ["judges remediation <rule-id>", "Step-by-step fix guide for a finding"],
+    ["judges hook-install", "Install git pre-commit/pre-push hooks"],
+    ["judges false-negatives", "Track and report false-negative feedback"],
+    ["judges assign", "Assign findings to team members"],
+    ["judges ticket-sync", "Create tickets from findings (Jira/Linear/GitHub)"],
+    ["judges sla-track", "SLA tracking and violation detection"],
+    ["judges regression-alert", "Detect quality regressions between scans"],
+    ["judges suppress", "Batch false-positive suppression"],
+    ["judges rule-owner", "Map rules to team owners"],
+    ["judges noise-advisor", "Analyze rule performance and recommend tuning"],
+    ["judges review-queue", "Human review queue for low-confidence findings"],
+    ["judges report-template", "Generate reports from templates"],
+    ["judges burndown", "Track finding resolution progress"],
+    ["judges kb", "Team knowledge base for rule decisions"],
+    ["judges recommend", "Analyze project and recommend judges"],
+    ["judges vote", "Consensus voting on findings"],
+    ["judges query", "Advanced finding search and filter"],
+    ["judges judge-reputation", "Per-judge accuracy and FP tracking"],
+    ["judges correlate", "Finding correlation and root-cause analysis"],
+    ["judges digest", "Periodic finding digest and trend reports"],
+    ["judges rule-share", "Export/import custom rule configurations"],
+    ["judges explain-finding", "Detailed finding explanation with context"],
+    ["judges compare-runs", "Compare evaluation runs side by side"],
+    ["judges audit-bundle", "Assemble auditor-ready evidence package"],
+    ["judges dev-score", "Developer security growth score"],
+    ["judges model-risk", "AI model vulnerability risk profiles"],
+    ["judges retro", "Security incident retrospective analysis"],
+    ["judges config-drift", "Detect config divergence from baseline"],
+    ["judges reg-watch", "Regulatory standard coverage monitor"],
+    ["judges learn", "Personalized developer learning paths"],
+    ["judges generate", "Secure code template generator"],
+    ["judges ai-model-trust", "AI model confidence scoring"],
+    ["judges team-rules-sync", "Fast team onboarding with shared rules"],
+    ["judges cost-forecast", "Security debt cost projections"],
+    ["judges team-leaderboard", "Gamified security review engagement"],
+    ["judges code-owner-suggest", "Auto-recommend CODEOWNERS entries"],
+    ["judges pr-quality-gate", "Automated PR pass/fail quality gate"],
+    ["judges ai-prompt-audit", "Scan for prompt injection risks"],
+    ["judges adoption-report", "Team adoption metrics dashboard"],
+    ["judges auto-fix", "Automated fix suggestions for findings"],
+  ];
+  for (const [cmd, desc] of experimentalCommands) {
+    console.log(`  ${cmd.padEnd(32)} ${desc}`);
+  }
 }
 
 // ─── Read Code Input ────────────────────────────────────────────────────────
@@ -1067,37 +407,7 @@ function readCode(filePath: string | undefined): { code: string; resolvedPath: s
   process.exit(1);
 }
 
-// ─── Glob Matching ──────────────────────────────────────────────────────────
-
-/**
- * Simple glob pattern matching (supports *, **, and ?).
- * Matches against relative file paths using forward slashes.
- */
-export function globToRegex(pattern: string): RegExp {
-  // Normalize to forward slashes
-  let p = pattern.replace(/\\/g, "/");
-  // Escape regex chars except * and ?
-  p = p.replace(/[.+^${}()|[\]\\-]/g, "\\$&");
-  // ** matches any path segment(s)
-  p = p.replace(/\*\*/g, "{{GLOBSTAR}}");
-  // * matches anything except /
-  p = p.replace(/\*/g, "[^/]*");
-  // ? matches any single char except /
-  p = p.replace(/\?/g, "[^/]");
-  // Restore globstar
-  p = p.replace(/\{\{GLOBSTAR\}\}/g, ".*");
-  return new RegExp(`^${p}$`, "i");
-}
-
-export function matchesGlob(filePath: string, patterns: string[]): boolean {
-  if (patterns.length === 0) return false;
-  const normalized = filePath.replace(/\\/g, "/");
-  return patterns.some((pat) => {
-    const re = globToRegex(pat);
-    // Match against full path or just the filename
-    return re.test(normalized) || re.test(normalized.split("/").pop() || "");
-  });
-}
+// Glob helpers moved to cli-helpers.ts for testability
 
 // ─── Glob / Multi-File Resolution ───────────────────────────────────────────
 
@@ -1121,6 +431,7 @@ interface CollectOptions {
   sample?: boolean;
 }
 
+// collectFiles moved to cli-helpers for testability; keep export for backward compat
 export function collectFiles(target: string, options: CollectOptions = {}): string[] {
   const resolved = resolve(target);
   if (!existsSync(resolved)) return [];
@@ -1197,18 +508,10 @@ function getGitChangedFiles(cwd: string): string[] {
   try {
     const resolvedCwd = resolve(cwd);
     // Changed files (staged + unstaged) relative to HEAD
-    const diffOutput = execSync("git diff --name-only HEAD", {
-      cwd: resolvedCwd,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    const diffOutput = runGit(["diff", "--name-only", "HEAD"], { cwd: resolvedCwd });
 
     // Untracked files
-    const untrackedOutput = execSync("git ls-files --others --exclude-standard", {
-      cwd: resolvedCwd,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    const untrackedOutput = runGit(["ls-files", "--others", "--exclude-standard"], { cwd: resolvedCwd });
 
     const files = new Set<string>();
     for (const f of diffOutput.split("\n").filter(Boolean)) {
@@ -1227,11 +530,7 @@ function getGitChangedFiles(cwd: string): string[] {
 function getStagedFiles(cwd: string): string[] {
   try {
     const resolvedCwd = resolve(cwd);
-    const output = execSync("git diff --cached --name-only --diff-filter=ACM", {
-      cwd: resolvedCwd,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    const output = runGit(["diff", "--cached", "--name-only", "--diff-filter=ACM"], { cwd: resolvedCwd });
     return output
       .split("\n")
       .filter(Boolean)
@@ -1505,6 +804,8 @@ export async function runCli(argv: string[]): Promise<void> {
   // ─── Watch Command ────────────────────────────────────────────────────
   if (args.command === "watch") {
     const { runWatch } = await import("./commands/watch.js");
+    // Allow tests to run without hanging
+    if (process.env.JUDGES_TEST_DRY_RUN) return;
     runWatch(argv);
     return; // Watch runs indefinitely
   }
@@ -1512,72 +813,83 @@ export async function runCli(argv: string[]): Promise<void> {
   // ─── LSP Command ─────────────────────────────────────────────────────
   if (args.command === "lsp") {
     const { runLsp } = await import("./commands/lsp.js");
+    if (process.env.JUDGES_TEST_DRY_RUN) return;
     runLsp(argv);
     return; // LSP server runs indefinitely
   }
 
   // ─── Report Command ───────────────────────────────────────────────────
   if (args.command === "report") {
+    const { runReport } = await import("./commands/report.js");
     runReport(argv);
     return;
   }
 
   // ─── Hook Command ────────────────────────────────────────────────────
   if (args.command === "hook") {
+    const { runHook } = await import("./commands/hook.js");
     runHook(argv);
     return;
   }
 
   // ─── Diff Command ────────────────────────────────────────────────────
   if (args.command === "diff") {
+    const { runDiff } = await import("./commands/diff.js");
     runDiff(argv);
     return;
   }
 
   // ─── Deps Command ────────────────────────────────────────────────────
   if (args.command === "deps") {
+    const { runDeps } = await import("./commands/deps.js");
     runDeps(argv);
     return;
   }
 
   // ─── Doctor Command ──────────────────────────────────────────────────
   if (args.command === "doctor") {
+    const { runDoctor } = await import("./commands/doctor.js");
     runDoctor(argv);
     return;
   }
 
   // ─── Baseline Command ────────────────────────────────────────────────
   if (args.command === "baseline") {
+    const { runBaseline } = await import("./commands/baseline.js");
     runBaseline(argv);
     return;
   }
 
   // ─── CI Templates Command ────────────────────────────────────────────
   if (args.command === "ci-templates") {
-    runCiTemplates(argv);
+    await runCiTemplates(argv);
     return;
   }
 
   // ─── Completions Command ─────────────────────────────────────────────
   if (args.command === "completions") {
+    const { runCompletions } = await import("./commands/completions.js");
     runCompletions(argv);
     return;
   }
 
   // ─── Docs Command ────────────────────────────────────────────────────
   if (args.command === "docs") {
+    const { runDocs } = await import("./commands/docs.js");
     runDocs(argv);
     return;
   }
 
   // ─── Feedback Command ─────────────────────────────────────────────────
   if (args.command === "feedback") {
+    const { runFeedback } = await import("./commands/feedback.js");
     runFeedback(argv);
     return;
   }
 
   // ─── Override Command ─────────────────────────────────────────────────
   if (args.command === "override") {
+    const { runOverride } = await import("./commands/override.js");
     runOverride(argv);
     return;
   }
@@ -1626,6 +938,7 @@ export async function runCli(argv: string[]): Promise<void> {
 
   // ─── Triage Command ───────────────────────────────────────────────────
   if (args.command === "triage") {
+    const { runTriage } = await import("./commands/triage.js");
     runTriage(argv);
     return;
   }
@@ -1639,30 +952,35 @@ export async function runCli(argv: string[]): Promise<void> {
 
   // ─── Notify Command ─────────────────────────────────────────────────
   if (args.command === "notify") {
+    const { runNotify } = await import("./commands/notify.js");
     await runNotify(argv);
     return;
   }
 
   // ─── Benchmark Command ────────────────────────────────────────────────
   if (args.command === "benchmark") {
+    const { runBenchmark } = await import("./commands/benchmark.js");
     runBenchmark(argv);
     return;
   }
 
   // ─── Rule Command ─────────────────────────────────────────────────────
   if (args.command === "rule") {
+    const { runRule } = await import("./commands/rule.js");
     runRule(argv);
     return;
   }
 
   // ─── Pack Command ─────────────────────────────────────────────────────
   if (args.command === "pack") {
+    const { runPack } = await import("./commands/language-packs.js");
     runPack(argv);
     return;
   }
 
   // ─── Config Command ───────────────────────────────────────────────────
   if (args.command === "config") {
+    const { runConfig } = await import("./commands/config-share.js");
     runConfig(argv);
     return;
   }
@@ -6810,7 +6128,7 @@ function filterBySeverity<T extends { severity: string }>(findings: T[], minSeve
 
 // ─── CI Templates CLI ──────────────────────────────────────────────────────
 
-function runCiTemplates(argv: string[]): void {
+async function runCiTemplates(argv: string[]): Promise<void> {
   const provider = argv[3];
 
   if (!provider || provider === "--help" || provider === "-h") {
@@ -6818,10 +6136,6 @@ function runCiTemplates(argv: string[]): void {
 Judges Panel — CI Template Generator
 
 USAGE:
-  judges ci-templates github      GitHub Actions workflow
-  judges ci-templates gitlab      GitLab CI pipeline
-  judges ci-templates azure       Azure Pipelines
-  judges ci-templates bitbucket   Bitbucket Pipelines
 `);
     process.exit(0);
   }
@@ -6831,13 +6145,13 @@ USAGE:
       console.log(generateGitHubActions());
       break;
     case "gitlab":
-      console.log(generateGitLabCi());
+      console.log((await import("./commands/ci-templates.js")).generateGitLabCi());
       break;
     case "azure":
-      console.log(generateAzurePipelines());
+      console.log((await import("./commands/ci-templates.js")).generateAzurePipelines());
       break;
     case "bitbucket":
-      console.log(generateBitbucketPipelines());
+      console.log((await import("./commands/ci-templates.js")).generateBitbucketPipelines());
       break;
     default:
       console.error(`Unknown provider: ${provider}`);
@@ -6859,7 +6173,6 @@ on:
     branches: [main]
 
 jobs:
-  judges:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -6869,7 +6182,7 @@ jobs:
           node-version: '22'
 
       - name: Install Judges
-        run: npm install -g @kevinrabun/judges
+        run: npm install -g @kevinrabun/judges-cli
 
       - name: Run Judges Evaluation
         run: |

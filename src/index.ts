@@ -1,113 +1,39 @@
-#!/usr/bin/env node
-
 /**
- * Judges Panel — MCP Server + CLI
- *
- * When invoked with a subcommand (eval, list, --help), runs as a CLI tool.
- * Otherwise, starts as an MCP stdio server.
- *
- * CLI usage:
- *   judges eval --file src/app.ts                   # evaluate a file
- *   judges eval --file src/app.ts --format sarif     # SARIF output
- *   judges eval --judge cybersecurity server.ts      # single judge
- *   cat file.ts | judges eval --language typescript  # stdin pipe
- *   judges list                                      # list all judges
- *   judges --help                                    # show help
- *
- * MCP usage:
- *   Add to your MCP config (VS Code, Claude Desktop, etc.)
+ * Judges Panel — MCP Server
  */
 
-// ─── CLI Detection ──────────────────────────────────────────────────────────
-// If the user passed a subcommand or flag, run as CLI instead of MCP server.
+import("@modelcontextprotocol/sdk/server/mcp.js")
+  .then(async ({ McpServer }) => {
+    const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
+    const { registerTools } = await import("./tools/register.js");
+    const { registerPrompts } = await import("./tools/prompts.js");
+    const { readFileSync } = await import("fs");
+    const { resolve, dirname } = await import("path");
+    const { fileURLToPath } = await import("url");
 
-const cliCommands = new Set([
-  "eval",
-  "list",
-  "evaluate",
-  "init",
-  "fix",
-  "watch",
-  "report",
-  "hook",
-  "diff",
-  "deps",
-  "baseline",
-  "ci-templates",
-  "completions",
-  "docs",
-  "feedback",
-  "triage",
-  "benchmark",
-  "rule",
-  "pack",
-  "config",
-  "compare",
-  "review",
-  "tune",
-  "app",
-  "trend",
-  "doctor",
-  "scaffold-plugin",
-  "calibration-dashboard",
-  "metrics-dashboard",
-  "help",
-  "onboard",
-  "org-metrics",
-  "plugins",
-  "community-patterns",
-  "lsp",
-  "version",
-]);
-const cliFlags = new Set(["--help", "-h", "--file", "-f", "--version", "-v"]);
-const firstArg = process.argv[2];
+    let version = "0.0.0";
+    try {
+      const pkgDir = dirname(fileURLToPath(import.meta.url));
+      const pkgPath = resolve(pkgDir, "..", "package.json");
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+      version = pkg.version ?? version;
+    } catch {
+      // Fallback — should never happen in a published package.
+    }
 
-if (firstArg && (cliCommands.has(firstArg) || cliFlags.has(firstArg))) {
-  // Dynamic import to avoid loading MCP SDK when running as CLI
-  import("./cli.js")
-    .then(({ runCli }) => runCli(process.argv))
-    .catch((err) => {
-      console.error("CLI error:", err);
-      process.exit(1);
+    const server = new McpServer({
+      name: "judges",
+      version,
     });
-} else {
-  // ─── MCP Server Mode ────────────────────────────────────────────────────
 
-  import("@modelcontextprotocol/sdk/server/mcp.js")
-    .then(async ({ McpServer }) => {
-      const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
-      const { registerTools } = await import("./tools/register.js");
-      const { registerPrompts } = await import("./tools/prompts.js");
-      const { readFileSync } = await import("fs");
-      const { resolve, dirname } = await import("path");
-      const { fileURLToPath } = await import("url");
+    registerTools(server);
+    registerPrompts(server);
 
-      // Dynamically read the version from package.json so the MCP server
-      // always advertises the correct version to clients.
-      let version = "0.0.0";
-      try {
-        const pkgDir = dirname(fileURLToPath(import.meta.url));
-        const pkgPath = resolve(pkgDir, "..", "package.json");
-        const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-        version = pkg.version ?? version;
-      } catch {
-        // Fallback — should never happen in a published package
-      }
-
-      const server = new McpServer({
-        name: "judges",
-        version,
-      });
-
-      registerTools(server);
-      registerPrompts(server);
-
-      const transport = new StdioServerTransport();
-      await server.connect(transport);
-      console.error("Judges Panel MCP server running on stdio");
-    })
-    .catch((err) => {
-      console.error("Failed to start Judges Panel:", err);
-      process.exit(1);
-    });
-}
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("Judges Panel MCP server running on stdio");
+  })
+  .catch((err) => {
+    console.error("Failed to start Judges Panel:", err);
+    process.exit(1);
+  });
