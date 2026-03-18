@@ -27,6 +27,13 @@ SEVERITY MAPPING:
 - **medium**: Contradictory boolean assignments, conflicting configuration
 - **low**: Excessive TODO density, minor style inconsistencies
 
+FALSE POSITIVE AVOIDANCE:
+- Only flag coherence issues in code that manages multi-turn conversations, chat sessions, or stateful AI interactions.
+- Do NOT flag stateless API endpoints, single-request handlers, or batch processing code for coherence issues.
+- Standard request-response patterns without conversation state are correctly stateless, not lacking coherence.
+- Missing conversation context management is only relevant for chatbot/assistant implementations.
+- Code that processes a single input and returns a single output has no multi-turn coherence requirements.
+
 ADVERSARIAL MANDATE:
 - Treat every contradiction as a potential logic bug.
 - Do NOT assume dead code is intentionally left for debugging.`,

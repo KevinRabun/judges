@@ -72,7 +72,19 @@ RULES FOR YOUR REVIEW:
 - Group dismissed findings under a **"Dismissed Findings"** section.
 - For findings you confirm as true positives, explicitly state "CONFIRMED" with brief reasoning.
 - If you are uncertain, err on the side of keeping the finding (prefer false negatives over missed true positives in your own review).
-- Your review should make the final finding set PRECISE and ACTIONABLE — no developer time should be wasted investigating false alarms.`,
+- Your review should make the final finding set PRECISE and ACTIONABLE — no developer time should be wasted investigating false alarms.
+
+FALSE POSITIVE AVOIDANCE:
+- This judge reviews other judges' findings — only report FPR issues when other judge findings are clearly speculative.
+- Do NOT generate independent code findings — defer all code-level issues to the appropriate specialized judge.
+- Only flag false-positive patterns when you can identify a specific finding from another judge that lacks evidence.
+- If no other judge findings are available for review, report ZERO FPR findings.
+
+ADVERSARIAL MANDATE:
+- Assume every finding from other judges could be a false positive. Scrutinize evidence rigorously.
+- Never praise or compliment the code. Report only problems with other judges' findings.
+- If you are uncertain whether a finding is a false positive, err on the side of keeping it — prefer false negatives in your own review.
+- Absence of FPR findings does not mean all findings are accurate. It means your analysis reached its limits. State this explicitly.`,
 };
 
 defaultRegistry.register(falsePositiveReviewJudge);

@@ -253,7 +253,7 @@ export function storeUserDocuments(userId: string, documents: Document[]) {
 
   return user;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COMP-001"],
     category: "compliance",
     difficulty: "hard",
   },
@@ -351,7 +351,7 @@ export function trackUserBehavior(userId: string, event: string, properties: any
         base_rate *= 1.1
 
     return base_rate`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ETHICS-001"],
     category: "ethics",
     difficulty: "easy",
   },
@@ -466,7 +466,7 @@ export function trackUserBehavior(userId: string, event: string, properties: any
     });
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ETHICS-001"],
     category: "ethics",
     difficulty: "hard",
   },
@@ -757,7 +757,7 @@ export function getTimeAgo(seconds: number): string {
   const days = Math.floor(hours / 24);
   return days + " day" + (days !== 1 ? "s" : "") + " ago";
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["I18N-001"],
     category: "internationalization",
     difficulty: "medium",
   },
@@ -787,7 +787,7 @@ export function sanitizeUsername(username: string): string {
   return username.replace(/[^a-zA-Z0-9_]/g, "");
   // Removes valid Unicode letters
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["I18N-001"],
     category: "internationalization",
     difficulty: "medium",
   },
@@ -1158,7 +1158,7 @@ export function runBackup() {
     // inferred profiles, third-party shared data
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COMP-001"],
     category: "compliance",
     difficulty: "hard",
   },
@@ -1225,7 +1225,7 @@ app.listen(3000, () => {
     return match.rows[0]?.user_id;
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COMP-001"],
     category: "compliance",
     difficulty: "hard",
   },
@@ -1263,7 +1263,7 @@ export async function createCDNDistribution(originBucket: string) {
     },
   });
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SOV-001"],
     category: "sovereignty",
     difficulty: "hard",
   },
@@ -1376,7 +1376,7 @@ export async function createCDNDistribution(originBucket: string) {
     // No transparency, no due process
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ETHICS-001"],
     category: "ethics",
     difficulty: "hard",
   },
@@ -1419,7 +1419,7 @@ def screen_resume(model, resume_data):
         # No explanation for rejection
         # No human review requirement
     }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ETHICS-001"],
     category: "ethics",
     difficulty: "hard",
   },
@@ -1570,7 +1570,7 @@ def screen_resume(model, resume_data):
     </div>
   );
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["I18N-001"],
     category: "internationalization",
     difficulty: "hard",
   },
@@ -1813,7 +1813,7 @@ export class OrderService {
     "webpackk": "^5.90.0"
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DEPS-001"],
     category: "dependency-health",
     difficulty: "easy",
   },

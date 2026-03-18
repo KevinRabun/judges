@@ -168,7 +168,7 @@ export default defineConfig({
     frameguard: "deny",
   },
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -205,7 +205,7 @@ export const Card = styled.div\`
     outline: 2px solid #007bff;
   }
 \`;`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -235,7 +235,7 @@ def process_config(data: StrictDict[str, int]) -> OrderedDefaultDict:
         result[secure_key].append(expensive_compute(str(value)))
     
     return result`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "easy",
   },
@@ -1140,7 +1140,7 @@ export function shouldRetry(statusCode: number, attempt: number): boolean {
 
   return { results, successful, withTimeout };
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -1173,7 +1173,7 @@ type ImmutableConfig = Frozen<UserConfig>;     // Completely fabricated
 function applyConfig(config: ValidatedConfig): void {
   console.log(config.host, config.port);
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "hard",
   },
@@ -1329,7 +1329,7 @@ fn main() {
     let nested: Result<Result<i32, &str>, &str> = Ok(Ok(42));
     let flat = nested.flatten();
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "hard",
   },
@@ -1363,7 +1363,7 @@ public class DataProcessor {
         return grouped;
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -1507,7 +1507,7 @@ public class DataService {
         var stats = orders.Statistics(o => o.Total); // Statistics doesn't exist
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -2018,7 +2018,7 @@ resource "aws_lambda_auto_scale" "api" {             # Resource doesn't exist
   max_concurrency = 1000
   auto_warm       = true
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "hard",
   },
@@ -2112,7 +2112,7 @@ module.exports = {
     }),
   ],
 };`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -2158,7 +2158,7 @@ export async function getAnalytics() {
 
   return { usersByRole, orders, stats };
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -2217,7 +2217,7 @@ type Mutation {
     rateLimitMode: process.env.NODE_RATE_LIMIT || "sliding-window",
   };
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "easy",
   },
@@ -2246,7 +2246,7 @@ HAVING COUNT(*) > 5
 ORDER BY AVG(salary) DESC
 FILL_GAPS(date, INTERVAL '1 day')           -- Not real SQL
 LIMIT 100;`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -2283,7 +2283,7 @@ export async function initServer() {
 
   return { pool, pipeline, cpuUsage };
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -2719,7 +2719,7 @@ export async function setupInfrastructure() {
     KeepWarm: true,
   }));
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -2763,7 +2763,7 @@ export async function analyzeRepo(owner: string, repo: string) {
 
   return { security, codeReview, deps, metrics };
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "hard",
   },

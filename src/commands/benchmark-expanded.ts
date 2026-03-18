@@ -1686,7 +1686,7 @@ def predict_approval(model, applicant):
     features = [applicant['age'], applicant['income'], applicant['race'],
                 applicant['gender'], applicant['zip_code'], applicant['credit_score']]
     return model.predict([features])[0]`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ETHICS-001"],
     category: "ethics-bias",
     difficulty: "medium",
   },
@@ -2370,7 +2370,7 @@ form = cgi.FieldStorage()
 username = form.getfirst("username")
 
 module = imp.load_source("config", "/etc/app/config.py")`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["FW-001"],
     category: "ai-code-safety",
     difficulty: "medium",
   },

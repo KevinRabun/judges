@@ -263,7 +263,7 @@ const GCP_SERVICE_KEY = '{"type":"service_account","project_id":"my-project","pr
 };
 
 export default config;`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CFG-001"],
     category: "configuration",
     difficulty: "easy",
   },
@@ -759,7 +759,7 @@ resource "aws_s3_bucket_versioning" "sensitive_versioning" {
     status = "Enabled"
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["IAC-001"],
     category: "iac-security",
     difficulty: "medium",
   },
@@ -852,7 +852,7 @@ resource "aws_volume_attachment" "data_attach" {
   volume_id   = aws_ebs_volume.data_volume.id
   instance_id = aws_instance.app_server.id
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["IAC-001"],
     category: "iac-security",
     difficulty: "easy",
   },
@@ -1273,7 +1273,7 @@ jobs:
         env:
           DB_URL: \${{ secrets.DB_URL }}
         run: npm run test:integration`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CICD-001"],
     category: "cicd",
     difficulty: "hard",
   },
@@ -1355,7 +1355,7 @@ resource "google_compute_firewall" "allow_all" {
 
   source_ranges = ["0.0.0.0/0"]
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CLOUD-001"],
     category: "cloud",
     difficulty: "medium",
   },
@@ -1390,7 +1390,7 @@ resource "aws_db_instance" "mysql_prod" {
   deletion_protection     = false
   backup_retention_period = 1
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CLOUD-001"],
     category: "cloud",
     difficulty: "hard",
   },
@@ -1421,7 +1421,7 @@ resource "aws_db_instance" "mysql_prod" {
 }
 
 # No NAT Gateway configured — Lambda cannot reach external APIs`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CLOUD-001"],
     category: "cloud",
     difficulty: "hard",
   },
@@ -1573,7 +1573,7 @@ resource "aws_rds_cluster" "analytics" {
 }
 
 # No tags on any resource — impossible to track costs per team/project`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001"],
     category: "cost-effectiveness",
     difficulty: "easy",
   },
@@ -1608,7 +1608,7 @@ const serverlessConfig = {
     },
   },
 };`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001"],
     category: "cost-effectiveness",
     difficulty: "medium",
   },
@@ -1679,7 +1679,7 @@ app.post("/api/orders", async (req, res) => {
 }
 
 // Each instance has its own rate limiter — no coordination across replicas`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SCALE-001"],
     category: "scalability",
     difficulty: "hard",
   },
@@ -1929,7 +1929,7 @@ const server = new ApolloServer({
 });
 
 startStandaloneServer(server, { listen: { port: 4000 } });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["RATE-001"],
     category: "rate-limiting",
     difficulty: "hard",
   },
@@ -1967,7 +1967,7 @@ wss.on("connection", (ws) => {
 
   ws.on("close", () => clients.delete(clientId));
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["RATE-001"],
     category: "rate-limiting",
     difficulty: "medium",
   },

@@ -105,7 +105,7 @@ func ReadConfig(path string) (*Config, error) {
   }
   return &cfg, nil
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ERR-001"],
     category: "error-handling",
     difficulty: "medium",
   },
@@ -503,7 +503,7 @@ post '/webhook' do
   response = URI.open(payload['callback_url']).read
   { status: 'delivered', response: response }.to_json
 end`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "security",
     difficulty: "medium",
   },
@@ -612,7 +612,7 @@ public class SessionManager
         return stream.ToArray();
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "security",
     difficulty: "medium",
   },
@@ -654,7 +654,7 @@ public class AdminController : ControllerBase
         return Ok(logs);
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AUTH-001"],
     category: "auth",
     difficulty: "medium",
   },
@@ -691,7 +691,7 @@ public class AdminController : ControllerBase
         return conn;
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CONC-001"],
     category: "concurrency",
     difficulty: "medium",
   },
@@ -887,7 +887,7 @@ def process_order(items, discount_code=None):
     assert all(item['qty'] > 0 for item in items), "Quantities must be positive"
     if discount_code:
         assert len(discount_code) == 8, "Invalid discount code"`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ERR-001"],
     category: "error-handling",
     difficulty: "medium",
   },
@@ -920,7 +920,7 @@ void copyData(const char* src) {
     sprintf(dest, "Data: %s (processed at %s)", src, __TIME__);
     processOutput(dest);
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "security",
     difficulty: "easy",
   },
@@ -956,7 +956,7 @@ public:
         }
     }
 };`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "security",
     difficulty: "hard",
   },
@@ -1715,7 +1715,7 @@ class ApiClient {
     let coords = address["coordinates"] as! [Double]
     return UserProfile(name: name, age: age, city: city, lat: coords[0], lon: coords[1])
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ERR-001"],
     category: "error-handling",
     difficulty: "easy",
   },
@@ -1757,7 +1757,7 @@ server <- function(input, output, session) {
     end
   end
 end`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "security",
     difficulty: "hard",
   },
@@ -1780,7 +1780,7 @@ function executeUserCode(code)
     local fn = loadstring(code)
     fn()
 end`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "security",
     difficulty: "medium",
   },

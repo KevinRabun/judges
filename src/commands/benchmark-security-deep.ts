@@ -75,7 +75,7 @@ public class FetchServlet extends HttpServlet {
         }
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "security",
     difficulty: "medium",
   },
@@ -170,7 +170,7 @@ app.delete("/items", async (req, res) => {
   const result = await db.collection("items").deleteMany(filter);
   res.json({ deleted: result.deletedCount });
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "injection",
     difficulty: "medium",
   },
@@ -331,7 +331,7 @@ public class ImportController : ControllerBase
         return Ok(obj.ToString());
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "security",
     difficulty: "medium",
   },
@@ -353,7 +353,7 @@ def parse_xml():
     tree = ET.parse(request.stream)
     root = tree.getroot()
     return root.tag`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "security",
     difficulty: "medium",
   },
@@ -501,7 +501,7 @@ CORS(app, origins="*", supports_credentials=True)
 @app.route('/api/profile')
 def profile():
     return {"email": "user@example.com"}`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "security",
     difficulty: "easy",
   },
@@ -538,7 +538,7 @@ function encrypt(data: string): string {
   encrypted += cipher.final("hex");
   return encrypted;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "security",
     difficulty: "hard",
   },
@@ -938,7 +938,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
     render json: @products
   end
 end`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "injection",
     difficulty: "easy",
   },
@@ -965,7 +965,7 @@ def ping():
         text=True
     )
     return result.stdout`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "injection",
     difficulty: "easy",
   },
@@ -1086,7 +1086,7 @@ func greetHandler(w http.ResponseWriter, r *http.Request) {
   name := r.URL.Query().Get("name")
   fmt.Fprintf(w, "<h1>Hello %s</h1>", name)
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SEC-001"],
     category: "xss",
     difficulty: "easy",
   },

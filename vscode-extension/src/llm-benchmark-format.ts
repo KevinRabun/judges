@@ -7,7 +7,7 @@
  * breakdown, per-category, per-difficulty, and failed case details.
  */
 
-import type { LlmBenchmarkSnapshot } from "@kevinrabun/judges/api";
+import type { LlmBenchmarkSnapshot, OptimizationResult } from "@kevinrabun/judges/api";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -30,6 +30,7 @@ function gradeFromF1(f1: number): { grade: string; emoji: string } {
 export function formatStandaloneBenchmarkReport(
   perJudge?: LlmBenchmarkSnapshot,
   tribunal?: LlmBenchmarkSnapshot,
+  optimization?: OptimizationResult,
 ): string {
   const lines: string[] = [];
   const snapshot = perJudge ?? tribunal;
@@ -111,6 +112,11 @@ export function formatStandaloneBenchmarkReport(
       lines.push(`| ${m.label} | ${pjStr} | ${tStr} | ${deltaStr} |`);
     }
     lines.push("");
+  }
+
+  // ─── Optimization Insights (Self-Teaching) ─────────────────────────────
+  if (optimization) {
+    lines.push(...formatOptimizationSection(optimization));
   }
 
   // ─── Methodology ──────────────────────────────────────────────────────
@@ -225,6 +231,54 @@ function formatModeSection(snapshot: LlmBenchmarkSnapshot, label: string): strin
       const missed = c.missedRuleIds.length > 0 ? c.missedRuleIds.join(", ") : "—";
       const fps = c.falsePositiveRuleIds.length > 0 ? c.falsePositiveRuleIds.join(", ") : "—";
       lines.push(`| ${c.caseId} | ${c.difficulty} | ${c.category} | ${missed} | ${fps} |`);
+    }
+    lines.push("");
+  }
+
+  return lines;
+}
+
+// ─── Optimization Section ───────────────────────────────────────────────────
+
+function formatOptimizationSection(opt: OptimizationResult): string[] {
+  const lines: string[] = [];
+
+  lines.push("## Self-Teaching Optimization");
+  lines.push("");
+  lines.push(
+    `> Projected F1 improvement: **+${(opt.projectedF1Improvement * 100).toFixed(1)}pp** ` +
+      `(${pct(opt.summary.currentF1)} → ${pct(opt.summary.projectedF1)})`,
+  );
+  lines.push("");
+
+  // Summary
+  if (opt.summary.worstJudges.length > 0) {
+    lines.push(`**Worst judges:** ${opt.summary.worstJudges.join(", ")}`);
+  }
+  if (opt.summary.weakCategories.length > 0) {
+    lines.push(`**Weak categories:** ${opt.summary.weakCategories.join(", ")}`);
+  }
+  lines.push("");
+
+  // Insights table
+  if (opt.insights.length > 0) {
+    lines.push("### Insights");
+    lines.push("");
+    lines.push("| Severity | Target | Issue | Metric | Recommendation |");
+    lines.push("|----------|--------|-------|--------|----------------|");
+    for (const i of opt.insights) {
+      const sev = i.severity === "critical" ? "🔴 critical" : i.severity === "high" ? "🟠 high" : "🟡 medium";
+      lines.push(`| ${sev} | ${i.target} | ${i.category} | ${pct(i.metric)} | ${i.recommendation} |`);
+    }
+    lines.push("");
+  }
+
+  // Amendments
+  if (opt.amendments.length > 0) {
+    lines.push("### Prompt Amendments (applied next run)");
+    lines.push("");
+    for (const a of opt.amendments) {
+      lines.push(`- **${a.judgePrefix}** (FP rate: ${pct(a.fpRate)}): ${a.reason}`);
     }
     lines.push("");
   }

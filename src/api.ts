@@ -308,6 +308,20 @@ export {
 export type { LlmBenchmarkSnapshot, LlmCaseResult } from "./commands/llm-benchmark.js";
 export type { LlmFinding, ValidationResult } from "./probabilistic/llm-response-validator.js";
 
+// ─── LLM Benchmark Optimizer (Self-Teaching) ────────────────────────────────
+export {
+  optimizeBenchmark,
+  formatAmendmentSection,
+  createEmptyStore,
+  mergeAmendments,
+} from "./commands/llm-benchmark-optimizer.js";
+export type {
+  PromptAmendment,
+  OptimizerInsight,
+  OptimizationResult,
+  AmendmentStore,
+} from "./commands/llm-benchmark-optimizer.js";
+
 // Review autopilot (GitHub App / scripts)
 export { runReviewAutopilot, dedupeComments, filterAlreadyPostedComments } from "./commands/review.js";
 export { buildContextSnippets } from "./context/context-snippets.js";

@@ -28,6 +28,13 @@ SEVERITY MAPPING:
 - **medium**: Missing rate limiting, absent versioning
 - **low**: Minor Content-Type mismatches, inconsistent error schemas
 
+FALSE POSITIVE AVOIDANCE:
+- Only flag API contract issues in code that defines or implements HTTP/REST/GraphQL APIs.
+- Do NOT flag internal function signatures, database queries, or infrastructure code for API contract issues.
+- Missing OpenAPI/Swagger docs is only an issue for public-facing API endpoints, not internal helpers.
+- Type-safe languages with compile-time checks already enforce many contract guarantees — do not duplicate those findings.
+- Configuration endpoints, health checks, and internal metrics endpoints have different contract requirements than business APIs.
+
 ADVERSARIAL MANDATE:
 - Flag every deviation from RESTful best practices.
 - Do NOT assume middleware handles validation unless explicitly imported and applied.`,

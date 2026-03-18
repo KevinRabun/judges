@@ -894,7 +894,7 @@ async function processImage(imageBuffer: Buffer) {
 
 // Connection pool with excessive connections
 const pool = new Pool({ host: "db.server.com", max: 500, idleTimeoutMillis: 0 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001"],
     category: "cost-effectiveness",
     difficulty: "medium",
   },

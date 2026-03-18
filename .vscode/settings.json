@@ -1,0 +1,8 @@
+{
+  "judges.llmBenchmark.enabled": true,
+  "judges.llmBenchmark.sampleSize": 40,
+  "judges.llmBenchmark.maxOutputTokens": 1024,
+  "judges.llmBenchmark.batchSize": 4,
+  "judges.llmBenchmark.interRequestDelayMs": 500,
+  "judges.llmBenchmark.selfTeaching": true
+}

@@ -2302,7 +2302,7 @@ jobs:
         run: |
           echo \${{ github.event.pull_request.title }}  # Script injection
           ./deploy.sh`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CICD-001"],
     category: "ci-cd",
     difficulty: "medium",
   },
@@ -4280,7 +4280,7 @@ spec:
     await new Promise(resolve => setTimeout(resolve, 10));
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CONC-001"],
     category: "concurrency",
     difficulty: "hard",
   },

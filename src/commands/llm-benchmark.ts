@@ -19,6 +19,14 @@ import type { BenchmarkCase, CategoryResult, JudgeBenchmarkResult, DifficultyRes
 import { JUDGES } from "../judges/index.js";
 import { getCondensedCriteria, SHARED_ADVERSARIAL_MANDATE, PRECISION_MANDATE } from "../tools/prompts.js";
 import { extractAndValidateLlmFindings, mergeFindings } from "../probabilistic/llm-response-validator.js";
+import type { PromptAmendment } from "./llm-benchmark-optimizer.js";
+import { formatAmendmentSection } from "./llm-benchmark-optimizer.js";
+
+// ─── Tribunal Judge Filtering ───────────────────────────────────────────────
+// Meta-judges that assess analysis quality rather than code quality produce
+// near-100% false positives in single-pass tribunal mode and are excluded.
+const TRIBUNAL_EXCLUDED_PREFIXES = new Set(["INTENT", "COH", "MFPR", "FPR", "OVER"]);
+export const TRIBUNAL_JUDGES = JUDGES.filter((j) => !TRIBUNAL_EXCLUDED_PREFIXES.has(j.rulePrefix));
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -133,16 +141,21 @@ export function constructPerJudgePrompt(
   code: string,
   language: string,
   contextSnippets: string[] = [],
+  amendments?: PromptAmendment[],
 ): string {
   const persona = judge.systemPrompt.substring(0, judge.systemPrompt.indexOf("\n\n"));
   const criteria = getCondensedCriteria(judge.systemPrompt);
   const contextSection = contextSnippets.length
     ? `## Repository Context\n\n${contextSnippets.map((s) => `- ${s.replace(/\n/g, " ")}`).join("\n")}\n\n`
     : "";
+  // Filter amendments to only those relevant to this judge
+  const relevantAmendments = (amendments ?? []).filter((a) => a.judgePrefix === judge.rulePrefix);
+  const amendmentSection = formatAmendmentSection(relevantAmendments);
   return (
     `${persona}\n\n` +
     `${SHARED_ADVERSARIAL_MANDATE}\n\n` +
     `${PRECISION_MANDATE}\n\n` +
+    (amendmentSection ? `${amendmentSection}\n` : "") +
     contextSection +
     `${criteria}\n\n` +
     `Please evaluate the following ${language} code:\n\n\`\`\`${language}\n${code}\n\`\`\`` +
@@ -153,8 +166,13 @@ export function constructPerJudgePrompt(
 /**
  * Construct the full-tribunal prompt — identical to the MCP-served `full-tribunal` prompt.
  */
-export function constructTribunalPrompt(code: string, language: string, contextSnippets: string[] = []): string {
-  const judgeInstructions = JUDGES.map(
+export function constructTribunalPrompt(
+  code: string,
+  language: string,
+  contextSnippets: string[] = [],
+  amendments?: PromptAmendment[],
+): string {
+  const judgeInstructions = TRIBUNAL_JUDGES.map(
     (j) =>
       `### ${j.name} — ${j.domain}\n**Rule prefix:** \`${j.rulePrefix}-\`\n\n${getCondensedCriteria(j.systemPrompt)}`,
   ).join("\n\n---\n\n");
@@ -163,14 +181,22 @@ export function constructTribunalPrompt(code: string, language: string, contextS
     ? `## Repository Context\n\n${contextSnippets.map((s) => `- ${s.replace(/\n/g, " ")}`).join("\n")}\n\n`
     : "";
 
+  const amendmentSection = formatAmendmentSection(amendments ?? []);
+
   return (
-    `You are the Judges Panel — a panel of ${JUDGES.length} expert judges who independently evaluate code for quality, security, and operational readiness.\n\n` +
+    `You are the Judges Panel — a panel of ${TRIBUNAL_JUDGES.length} expert judges who independently evaluate code for quality, security, and operational readiness.\n\n` +
     `## Universal Evaluation Directives\n\n` +
     `${SHARED_ADVERSARIAL_MANDATE}\n\n` +
     `${PRECISION_MANDATE}\n\n` +
+    `DOMAIN SCOPE DIRECTIVE (applies to ALL judges):\n` +
+    `- Each judge MUST only report findings within their stated domain expertise.\n` +
+    `- A CI/CD judge should NOT report authentication findings. An ethics judge should NOT report performance findings.\n` +
+    `- If code falls entirely outside your domain (e.g., a YAML CI workflow being evaluated by the Database judge), report ZERO findings for that judge.\n` +
+    `- Cross-domain observations should ONLY be reported by the judge whose domain they fall under.\n\n` +
+    (amendmentSection ? `${amendmentSection}\n` : "") +
     contextSection +
     `## Evaluation Instructions\n\n` +
-    `Evaluate the following ${language} code from the perspective of ALL ${JUDGES.length} judges below. For each judge, provide:\n` +
+    `Evaluate the following ${language} code from the perspective of ALL ${TRIBUNAL_JUDGES.length} judges below. For each judge, provide:\n` +
     `1. Judge name and domain\n` +
     `2. Verdict (PASS / WARNING / FAIL)\n` +
     `3. Score (0-100)\n` +
@@ -267,14 +293,25 @@ export function scoreLlmCase(
     return !detectedPrefixes.has(prefix);
   });
 
-  const falsePositiveIds = tc.unexpectedRuleIds
-    ? detectedRuleIds.filter((found) => {
-        const prefix = found.split("-")[0];
-        return tc.unexpectedRuleIds!.some((u) => u.split("-")[0] === prefix);
-      })
-    : [];
+  // For clean cases (no expected findings), ALL detections are false positives.
+  // For dirty cases with unexpectedRuleIds, FPs are detections matching those prefixes.
+  // For dirty cases WITHOUT unexpectedRuleIds, FPs are detections whose prefix
+  // doesn't match any expected prefix (prevents silent over-reporting).
+  const isCleanCase = tc.expectedRuleIds.length === 0;
+  const expectedPrefixes = new Set(tc.expectedRuleIds.map((r) => r.split("-")[0]));
+  const falsePositiveIds = isCleanCase
+    ? detectedRuleIds
+    : tc.unexpectedRuleIds
+      ? detectedRuleIds.filter((found) => {
+          const prefix = found.split("-")[0];
+          return tc.unexpectedRuleIds!.some((u) => u.split("-")[0] === prefix);
+        })
+      : detectedRuleIds.filter((found) => {
+          const prefix = found.split("-")[0];
+          return !expectedPrefixes.has(prefix);
+        });
 
-  const casePassed = tc.expectedRuleIds.length === 0 ? falsePositiveIds.length === 0 : matchedExpected.length > 0;
+  const casePassed = isCleanCase ? falsePositiveIds.length === 0 : matchedExpected.length > 0;
 
   return {
     caseId: tc.id,

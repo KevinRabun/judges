@@ -225,7 +225,7 @@ function connectDatabase(url: string) {
     process.exit(1);
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ERR-001"],
     category: "error-handling",
     difficulty: "medium",
   },
@@ -651,7 +651,7 @@ async function cleanup(userId: string) {
   clearUserCache(userId);
   revokeTokens(userId);
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CONC-001"],
     category: "concurrency",
     difficulty: "medium",
   },
@@ -1979,7 +1979,7 @@ async function deleteUser(userId: string) {
     expect(mockDb.create).toHaveBeenCalled();
   });
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["TEST-001"],
     category: "testing",
     difficulty: "hard",
   },
@@ -2073,7 +2073,7 @@ public class OrderController {
         return ResponseEntity.ok(order);
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["OBS-001"],
     category: "observability",
     difficulty: "medium",
   },
@@ -2170,7 +2170,7 @@ export function processOrders() {
 # Set MYLIB_HOST (removed in v4, now uses MYLIB_URL)
 # Set MYLIB_PORT (no longer needed)
 # Set MYLIB_SSL=true (now always enabled)`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DOC-001"],
     category: "documentation",
     difficulty: "medium",
   },
@@ -2192,7 +2192,7 @@ jobs:
       - run: npm run build
       - run: aws s3 sync build/ s3://prod-bucket/
       - run: aws cloudfront create-invalidation --distribution-id EXAMPLE --paths '/*'`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CICD-001"],
     category: "ci-cd",
     difficulty: "easy",
   },
@@ -2213,7 +2213,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm run deploy`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CICD-001"],
     category: "ci-cd",
     difficulty: "easy",
   },

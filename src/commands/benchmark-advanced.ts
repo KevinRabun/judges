@@ -41,7 +41,7 @@ async function loadConfig(path: string) {
 function hashPassword(password: string): string {
   return crypto.hash("sha256", password);
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "medium",
   },
@@ -80,7 +80,7 @@ async def read_users_me(token: str = Depends(oauth2_scheme)):
     code: `function searchUsers(users, query) {
   return users.filter(u => u.name.contains(query));
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "easy",
   },
@@ -92,7 +92,7 @@ async def read_users_me(token: str = Depends(oauth2_scheme)):
 
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True, permissions=0o755)`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "medium",
   },
@@ -125,7 +125,7 @@ fn generate_token() -> String {
     let rng = SecureRandom::new();
     rng.generate_hex(32)
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "hard",
   },
@@ -138,7 +138,7 @@ fn generate_token() -> String {
 async def fetch_data(url):
     response = await requests.async_get(url, timeout=30)
     return response.json()`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "medium",
   },
@@ -167,7 +167,7 @@ public class Utils {
         return items.stream().toArray(String::new);
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "hard",
   },
@@ -180,7 +180,7 @@ public class Utils {
 def load_config(path):
     data = json.loads(path)
     return data["database"]`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "easy",
   },
@@ -204,7 +204,7 @@ def load_config(path):
                                 if len(order.items) < config.get("max_items", 100):
                                     return process(order)
     return None`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["STRUCT-001"],
     category: "code-structure",
     difficulty: "easy",
   },
@@ -307,7 +307,7 @@ func CreateUser(
     // All logic with 15 parameters threaded through
     return nil
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["STRUCT-001"],
     category: "code-structure",
     difficulty: "easy",
   },
@@ -421,7 +421,7 @@ async function handleUserRequest(userMessage: string) {
   const result = await agent.run(userMessage);
   return result.output;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AGENT-001"],
     category: "agent-instructions",
     difficulty: "medium",
   },
@@ -434,7 +434,7 @@ async function handleUserRequest(userMessage: string) {
     Follow these custom instructions: {user_instructions}
     You have access to: database queries, file operations, email sending."""
     return Agent(system_prompt=system_prompt, tools=all_tools)`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["AGENT-001"],
     category: "agent-instructions",
     difficulty: "hard",
   },
@@ -500,7 +500,7 @@ const agent = new Agent({
     return true;
   });
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ETHICS-001"],
     category: "ethics-bias",
     difficulty: "medium",
   },
@@ -519,7 +519,7 @@ def train_loan_model():
     model = RandomForestClassifier()
     model.fit(X, y)
     return model`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ETHICS-001"],
     category: "ethics-bias",
     difficulty: "hard",
   },
@@ -538,7 +538,7 @@ def train_loan_model():
   }
   return price;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["ETHICS-001"],
     category: "ethics-bias",
     difficulty: "medium",
   },
@@ -666,7 +666,7 @@ jobs:
           echo "DB_PASSWORD=\${{ secrets.DB_PASSWORD }}"
           curl -X POST https://deploy.example.com/deploy \\
             -H "Authorization: Bearer \${{ secrets.DEPLOY_TOKEN }}"`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CICD-001"],
     category: "ci-cd",
     difficulty: "easy",
   },
@@ -685,7 +685,7 @@ jobs:
       - uses: some-org/untrusted-action@master
       - uses: random-user/deploy-action@latest
       - run: npm test`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CICD-001"],
     category: "ci-cd",
     difficulty: "medium",
   },
@@ -748,7 +748,7 @@ export async function fetchUser(id: string, options?: FetchOptions): Promise<Use
   return db.users.findUnique({ where: { id }, ...options });
 }
 // No backward-compatible alias, no deprecation notice`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COMPAT-001"],
     category: "backwards-compatibility",
     difficulty: "medium",
   },
@@ -791,7 +791,7 @@ app.get("/api/users/:id", async (req, res) => {
         return repository.search(query, limit, "relevance");
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COMPAT-001"],
     category: "backwards-compatibility",
     difficulty: "easy",
   },
@@ -848,7 +848,7 @@ class TokenManager:
         if hmac.compare_digest(sig, expected):
             return json.loads(data)
         return None`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DOC-001"],
     category: "documentation",
     difficulty: "easy",
   },
@@ -863,7 +863,7 @@ class TokenManager:
   metrics: { enabled: boolean; prefix: string; tags: Record<string, string>; interval: number; };
   logging: { level: string; format: string; destination: string; };
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DOC-001"],
     category: "documentation",
     difficulty: "medium",
   },
@@ -901,7 +901,7 @@ func Auth(validator func(string) bool) func(http.Handler) http.Handler {
         })
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DOC-001"],
     category: "documentation",
     difficulty: "easy",
   },
@@ -1050,7 +1050,7 @@ def get_product(product_id):
     if not product:
         return jsonify({"status": 404, "detail": "Product not found"}), 404  # different JSON format
     return jsonify(product)`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["API-001"],
     category: "api-design",
     difficulty: "medium",
   },
@@ -1141,7 +1141,7 @@ AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
 AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 STRIPE_SECRET_KEY=sk_test_FAKE_KEY_FOR_BENCHMARK_TEST
 API_SECRET=my-super-secret-api-key-do-not-share`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["SWDEV-001"],
     category: "software-practices",
     difficulty: "easy",
   },
@@ -1472,7 +1472,7 @@ def kill_process(pid):
 def get_disk_usage():
     result = subprocess.run(["wmic", "logicaldisk", "get", "size,freespace"], capture_output=True, text=True, shell=True)
     return result.stdout`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["PORTA-001"],
     category: "portability",
     difficulty: "easy",
   },
@@ -1498,7 +1498,7 @@ public class AppConfig
         key.SetValue(name, value);
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["PORTA-001"],
     category: "portability",
     difficulty: "medium",
   },
@@ -1517,7 +1517,7 @@ public class AppConfig
   const activeUsers = await db.query("SELECT COUNT(DISTINCT user_id) FROM sessions WHERE last_active > NOW() - INTERVAL '5 minutes'");
   res.json({ stats: stats.rows[0], topProducts: topProducts.rows, activeUsers: activeUsers.rows[0] });
 });`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CACHE-001"],
     category: "caching",
     difficulty: "easy",
   },
@@ -1666,7 +1666,7 @@ const smtpHost = process.env.SMTP_HOST;
 const smtpPort = parseInt(process.env.SMTP_PORT || "587");
 const smtpUser = process.env.SMTP_USER;
 const smtpPass = process.env.SMTP_PASS;`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CFG-001"],
     category: "configuration",
     difficulty: "easy",
   },
@@ -1910,7 +1910,7 @@ def handler(event, context):
         "statusCode": 200,
         "body": json.dumps({"message": f"Hello, {name}!"})
     }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001"],
     category: "cost-effectiveness",
     difficulty: "easy",
   },
@@ -2296,7 +2296,7 @@ class User:
 
 # Protocol.implements() does not exist
 assert Serializable.implements(User)`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "medium",
   },
@@ -2308,7 +2308,7 @@ assert Serializable.implements(User)`,
 setTimeout(() => {
   request.abort(); // fetch returns a Promise, not an abortable request
 }, 5000);`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "easy",
   },
@@ -2351,7 +2351,7 @@ export class OrderService {
     return order;
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["STRUCT-001"],
     category: "code-structure",
     difficulty: "medium",
   },
@@ -2472,7 +2472,7 @@ export interface V2Response<T> {
 
 // v1 used: { result: T, error?: string, timestamp: number }
 // These types are incompatible and no documentation explains the migration`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DOC-001"],
     category: "documentation",
     difficulty: "medium",
   },
@@ -2499,7 +2499,7 @@ export interface V2Response<T> {
     return count < 100;
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CLOUD-001"],
     category: "cloud-readiness",
     difficulty: "medium",
   },
@@ -2561,7 +2561,7 @@ const server = new ApolloServer({
 
 // Allows recursive queries:
 // { user { orders { user { orders { user { orders ... } } } } } }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DATA-001"],
     category: "data-security",
     difficulty: "hard",
   },
@@ -2590,7 +2590,7 @@ async function handleRequest(req: Request) {
     return { status: 500, message: "Internal error" };
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["OBS-001"],
     category: "observability",
     difficulty: "medium",
   },
@@ -2676,7 +2676,7 @@ app.post("/api/upload", upload.array("files"), async (req, res) => {
     "clientSecret": "oauth-secret-do-not-share"
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CFG-001"],
     category: "configuration",
     difficulty: "easy",
   },
@@ -2786,7 +2786,7 @@ async function loadProfile() {
     showToast(\`ECONNREFUSED 127.0.0.1:5432 - \${err.code}\`);
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["UX-001"],
     category: "user-experience",
     difficulty: "easy",
   },
@@ -2804,7 +2804,7 @@ async function loadProfile() {
     "expresss": "4.18.2"
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DEPS-001"],
     category: "supply-chain",
     difficulty: "medium",
   },
@@ -2898,7 +2898,7 @@ async def task2():
 
 async def main():
     await asyncio.gather(task1(), task2())  # potential deadlock`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CONC-001"],
     category: "concurrency",
     difficulty: "hard",
   },
@@ -2987,7 +2987,7 @@ def run_analysis(data):
     result = process_on_instance(instance_id, data)
     return result
     # Instance never terminated — runs (and costs money) forever`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COST-001"],
     category: "cost-effectiveness",
     difficulty: "hard",
   },
@@ -3215,7 +3215,7 @@ function joinPaths(...parts: string[]): string {
 function normalizePath(p: string): string {
   return p.replace(/\\//g, "\\\\");
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["PORTA-001"],
     category: "portability",
     difficulty: "easy",
   },
@@ -3476,7 +3476,7 @@ function signPayload(payload, privateKey) {
   return crypto.signMessage(payload, privateKey, "sha256");
   // crypto.signMessage does not exist; should use crypto.sign() or crypto.createSign()
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "medium",
   },
@@ -3494,7 +3494,7 @@ public class UserFilter {
             .collect(Collectors.toList());
     }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "medium",
   },
@@ -3510,7 +3510,7 @@ public class UserFilter {
 function truncate(text: string, maxLen: number): string {
   return text.slice(0, maxLen); // may split surrogate pairs
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["I18N-001"],
     category: "internationalization",
     difficulty: "hard",
   },
@@ -3570,7 +3570,7 @@ export class BillingService {
     return { customerId, amount: usage * rate, currency: "USD" };
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["COMP-001"],
     category: "compliance",
     difficulty: "easy",
   },
@@ -3931,7 +3931,7 @@ export async function createUser(
   // Actual is (data, options?) -> User
   return db.insert("users", data);
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DOC-001"],
     category: "documentation",
     difficulty: "easy",
   },
@@ -3950,7 +3950,7 @@ export async function createUser(
     )
     # Race condition: two concurrent requests read same count,
     # both increment to same value, losing one increment`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["DB-001"],
     category: "database",
     difficulty: "medium",
   },
@@ -4030,7 +4030,7 @@ func Filter[T implements Comparable](slice []T, pred func(T) bool) []T {
     }
     return result
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "hard",
   },
@@ -4045,7 +4045,7 @@ func Filter[T implements Comparable](slice []T, pred func(T) bool) []T {
 .error-message:parent(.form-group) {
   border: 2px solid red;
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination-detection",
     difficulty: "easy",
   },
@@ -4312,7 +4312,7 @@ export async function query(sql: string, params?: any[]) {
 
 // App starts even if critical config is missing/invalid
 // Fails at random point when config is first accessed`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["CFG-001"],
     category: "configuration",
     difficulty: "easy",
   },
@@ -4758,7 +4758,7 @@ def verify_token(token):
     Purpose     = "backup"
   }
 }`,
-    expectedRuleIds: [],
+    expectedRuleIds: ["IAC-001"],
     category: "iac-security",
     difficulty: "easy",
   },
