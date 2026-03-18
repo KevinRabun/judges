@@ -155,6 +155,97 @@ export type { SarifValidationError } from "./formatters/sarif.js";
 export { verdictToCsvRows, verdictsToCsv, findingsToCsv } from "./formatters/csv.js";
 export { verdictToGitHubActions } from "./formatters/github-actions.js";
 
+// ─── Escalation Protocol ────────────────────────────────────────────────────
+export {
+  evaluateEscalations,
+  resolveEscalation,
+  computeEscalationSummary,
+  shouldBlockOnEscalations,
+  enhanceReviewWithEscalations,
+  loadEscalationStore,
+  saveEscalationStore,
+} from "./escalation.js";
+export type {
+  EscalatedFinding,
+  EscalationStore,
+  EscalationSummary,
+  EscalationPolicy,
+  EscalationReason,
+  EscalationStatus,
+  EscalationRouting,
+} from "./escalation.js";
+
+// ─── Audit Trail ─────────────────────────────────────────────────────────────
+export {
+  appendAuditEvent,
+  readAuditTrail,
+  verifyAuditIntegrity,
+  recordEvaluationStart,
+  recordEvaluationComplete,
+  recordFindings,
+  recordSuppression,
+  recordOverride,
+  recordEscalation,
+  recordReviewDecision,
+  recordTriageAction,
+  computeAuditSummary,
+  queryAuditTrail,
+} from "./audit-trail.js";
+export type { AuditEvent, AuditEventType, AuditPayload, AuditSummary } from "./audit-trail.js";
+
+// ─── SAST Integration ────────────────────────────────────────────────────────
+export {
+  registerSastProvider,
+  getSastProvider,
+  listSastProviders,
+  ingestSarifFile,
+  ingestSarifContent,
+  mergeSastFindings,
+} from "./sast-integration.js";
+export type { SastProvider } from "./sast-integration.js";
+
+// ─── Multi-Turn Review Conversation ──────────────────────────────────────────
+export {
+  startReviewConversation,
+  processMessage,
+  getOutstandingFindings,
+  isConversationResolved,
+  exportConversationAsMarkdown,
+} from "./review-conversation.js";
+export type {
+  ReviewConversation,
+  ConversationMessage,
+  ConversationRole,
+  MessageIntent,
+  ConversationState,
+  DeveloperContext,
+} from "./review-conversation.js";
+
+// ─── A2A Protocol ────────────────────────────────────────────────────────────
+export {
+  getAgentCard,
+  createTask,
+  getTask,
+  completeTask,
+  failTask,
+  listTasks,
+  pruneTasks,
+  handleA2ARequest,
+} from "./a2a-protocol.js";
+export type {
+  AgentCard,
+  AgentCapability,
+  A2ATask,
+  A2ATaskResult,
+  TaskStatus,
+  A2ARequest,
+  A2AResponse,
+} from "./a2a-protocol.js";
+
+// ─── Fix-Outcome Feedback Loop ───────────────────────────────────────────────
+export { runFeedbackLoop, formatFeedbackLoopReport } from "./feedback-loop.js";
+export type { FeedbackLoopResult, ConfidenceAdjustment, FeedbackLoopStats } from "./feedback-loop.js";
+
 // ─── Plugin API ──────────────────────────────────────────────────────────────
 export {
   registerPlugin,

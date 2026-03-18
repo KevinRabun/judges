@@ -125,4 +125,111 @@ jobs:
             coverage/index.html
           if-no-files-found: warn
 
+      - name: Upload SARIF artifact
+        if: matrix.node-version == '22'
+        uses: actions/upload-artifact@v4
+        with:
+          name: judges-sarif
+          path: artifacts/judges.sarif
+          if-no-files-found: warn
 
+  # ── Tier 2: LLM-enhanced deep review (PR merges to main only) ───────────
+  # Runs the full tribunal with LLM augmentation on changed files only.
+  # This catches semantic/logic issues that deterministic eval misses.
+  llm-pr-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          CI: true
+
+      - name: Build
+        run: npm run build
+        env:
+          CI: true
+
+      - name: Compute PR diff
+        run: |
+          git fetch origin "$GITHUB_BASE_REF" --depth=1 2>/dev/null || true
+          git diff "origin/$GITHUB_BASE_REF"...HEAD --name-only -- '*.ts' '*.js' '*.py' '*.go' '*.java' '*.cs' '*.rs' > /tmp/changed-files.txt
+          echo "Changed source files:"
+          cat /tmp/changed-files.txt
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+
+      - name: LLM-enhanced tribunal review (changed files)
+        run: |
+          set -euo pipefail
+          MAX_LLM_FILES=10
+          FILE_COUNT=$(wc -l < /tmp/changed-files.txt)
+          echo "Evaluating up to $MAX_LLM_FILES of $FILE_COUNT changed files with deep review"
+
+          # Evaluate changed files with escalation threshold for human routing
+          head -n "$MAX_LLM_FILES" /tmp/changed-files.txt | while IFS= read -r file; do
+            if [ -f "$file" ]; then
+              echo "::group::Deep review: $file"
+              node packages/judges-cli/bin/judges.js eval --file "$file" \
+                --format sarif \
+                --preset strict \
+                --min-confidence 0.5 2>&1 || true
+              echo "::endgroup::"
+            fi
+          done
+
+          # Full diff-based analysis for merge gating
+          git diff "origin/$GITHUB_BASE_REF"...HEAD > /tmp/pr.diff 2>/dev/null || true
+          if [ -s /tmp/pr.diff ]; then
+            node packages/judges-cli/bin/judges.js diff --file /tmp/pr.diff \
+              --format json \
+              --output artifacts/pr-deep-review.json 2>&1 || true
+          fi
+        env:
+          CI: true
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+
+      - name: PR review gate
+        run: |
+          node -e "
+            const fs = require('fs');
+            const path = 'artifacts/pr-deep-review.json';
+            if (!fs.existsSync(path)) { console.log('No deep review results — skipping gate'); process.exit(0); }
+            const results = JSON.parse(fs.readFileSync(path, 'utf-8'));
+            const findings = results.findings || [];
+            const critical = findings.filter(f => f.severity === 'critical').length;
+            const high = findings.filter(f => f.severity === 'high').length;
+            const escalated = findings.filter(f => f.needsHumanReview).length;
+            console.log('Deep review: ' + findings.length + ' finding(s), ' + critical + ' critical, ' + high + ' high, ' + escalated + ' escalated to human');
+            if (critical > 0) {
+              console.error('::error::PR blocked: ' + critical + ' critical finding(s) in deep review');
+              process.exit(1);
+            }
+            if (escalated > 0) {
+              console.log('::warning::' + escalated + ' finding(s) flagged for human review — require manual approval');
+            }
+          "
+        env:
+          CI: true
+
+      - name: Upload PR review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-deep-review
+          path: artifacts/pr-deep-review.json
+          if-no-files-found: warn

@@ -64,6 +64,8 @@ import { applyTriageFeedback, loadFindingStore } from "../finding-lifecycle.js";
 import { enrichWithSecurityIds } from "../security-ids.js";
 import { selectJudges } from "./judge-selector.js";
 import { getGlobalSession } from "../evaluation-session.js";
+import { evaluateEscalations, enhanceReviewWithEscalations } from "../escalation.js";
+import { applyRecallBoost } from "./recall-boost.js";
 
 // ─── Individual Analyzers ────────────────────────────────────────────────────
 // NOTE: Analyzer functions are now registered directly on each JudgeDefinition
@@ -631,6 +633,17 @@ export function evaluateWithJudge(
     findings.push(...judge.analyze(code, language, analyzeCtx));
   }
 
+  // ── Recall boost: supplementary patterns for weak-recall categories ──
+  const boostResult = applyRecallBoost(code, language);
+  if (boostResult.findings.length > 0) {
+    // Deduplicate: only add boost findings whose ruleId isn't already present
+    for (const bf of boostResult.findings) {
+      if (!findings.some((f) => f.ruleId === bf.ruleId)) {
+        findings.push(bf);
+      }
+    }
+  }
+
   // ── Absence gating ──
   // Absence-based findings ("no rate limiting", "no monitoring", etc.) are
   // project-level concerns that cannot be accurately assessed from a single
@@ -1117,6 +1130,23 @@ export function evaluateWithTribunal(
         ? "AI-generated code detected with high confidence — consider requiring human review sign-off"
         : "AI-generated code patterns detected — review for model-specific biases",
     };
+  }
+
+  // ── Human escalation protocol ──
+  // Evaluate which findings need human review based on escalation policy.
+  // Enhances the review decision with escalation routing information.
+  if (options?.config?.escalationThreshold || options?.filePath) {
+    try {
+      const escalationPolicy = options?.config?.escalationThreshold
+        ? { confidenceThreshold: options.config.escalationThreshold }
+        : undefined;
+      const escalations = evaluateEscalations(result, options?.filePath ?? "<unknown>", escalationPolicy);
+      if (escalations.length > 0 && result.reviewDecision) {
+        result.reviewDecision = enhanceReviewWithEscalations(result.reviewDecision, escalations);
+      }
+    } catch {
+      // Escalation evaluation failure is non-fatal
+    }
   }
 
   // ── Disk cache: persist for future runs ──
