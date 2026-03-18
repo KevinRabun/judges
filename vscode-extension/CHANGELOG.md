@@ -4,6 +4,16 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.115.3] — 2026-03-18
+
+### Fixed
+- **Extension activation crash** — `import.meta.url` at top level in `judges/index.ts` threw when bundled as CJS, preventing the extension from activating. Added ESM/CJS guard with `process.cwd()` fallback.
+- Same fix in `agent-loader.ts` and `skill-loader.ts` for runtime safety.
+- Resolves "No activated agent with id judges-panel.judges" error.
+
+### Changed
+- Core engine bumped to `@kevinrabun/judges@^3.115.3`
+
 ## [3.115.2] — 2026-03-17
 
 ### Fixed

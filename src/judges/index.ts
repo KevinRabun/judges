@@ -18,8 +18,10 @@ import { loadAndRegisterAgents } from "../agent-loader.js";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Support both ESM (import.meta.url) and CJS (esbuild bundle) environments.
+const _importMetaUrl: string | undefined = typeof import.meta?.url === "string" ? import.meta.url : undefined;
+const __filename = _importMetaUrl ? fileURLToPath(_importMetaUrl) : "";
+const __dirname = __filename ? dirname(__filename) : process.cwd();
 let agentsLoaded = false;
 
 function loadDefaultAgents() {

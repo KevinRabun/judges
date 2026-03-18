@@ -170,7 +170,14 @@ export async function runSkill(
   language: string,
   opts?: { skillsDir?: string; context?: unknown },
 ): Promise<TribunalVerdict> {
-  const skillsDir = opts?.skillsDir ?? resolve(dirname(fileURLToPath(import.meta.url)), "..", "skills");
+  const _skillUrl = typeof import.meta?.url === "string" ? import.meta.url : undefined;
+  const skillsDir =
+    opts?.skillsDir ??
+    resolve(
+      dirname(_skillUrl ? fileURLToPath(_skillUrl) : __filename || process.argv[1] || process.cwd()),
+      "..",
+      "skills",
+    );
   const skills = loadSkillDirectory(skillsDir);
   const skill = skills.find((s) => s.frontmatter.id === skillId);
   if (!skill) throw new Error(`Skill not found: ${skillId}`);

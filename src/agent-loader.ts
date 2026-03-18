@@ -221,7 +221,13 @@ export function resolveEvaluator(agent: ParsedAgent): AnalyzeFn | undefined {
     resolve(process.cwd(), "dist", "evaluators", `${agent.frontmatter.id}.js`),
   ];
 
-  const req = createRequire(import.meta.url);
+  // Support both ESM and CJS (esbuild bundle) environments
+  const _url = typeof import.meta?.url === "string" ? import.meta.url : undefined;
+  const req = _url
+    ? createRequire(_url)
+    : typeof globalThis.require === "function"
+      ? globalThis.require
+      : createRequire("file:///" + process.cwd());
   for (const candidate of candidatePaths) {
     try {
       const mod = req(candidate) as Record<string, unknown>;

@@ -2,6 +2,13 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.115.3] — 2026-03-18
+
+### Fixed
+- Extension activation crash: `fileURLToPath(import.meta.url)` in `judges/index.ts` threw at top level in CJS bundles (esbuild `--format=cjs`). Added ESM/CJS guard (`typeof import.meta?.url === "string"`) with `process.cwd()` fallback.
+- Same guard applied to `agent-loader.ts` (`createRequire`) and `skill-loader.ts` (`fileURLToPath`) to prevent runtime errors when called from the extension.
+- Resolves "No activated agent with id judges-panel.judges" error in VS Code.
+
 ## [3.115.2] — 2026-03-17
 
 ### Fixed
