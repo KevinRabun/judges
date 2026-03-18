@@ -2,6 +2,11 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.117.1] — 2026-03-18
+
+### Fixed
+- **VS Code extension activation crash** — `Cannot find module 'typescript'` on extension load. The taint tracker (`src/ast/taint-tracker.ts`) had a static `import ts from "typescript"` which esbuild marked as `--external`, causing a runtime `require("typescript")` at module load time. Replaced with a lazy loader (`createRequire` in ESM, CJS `require` fallback) so the TypeScript compiler API is only loaded when taint analysis is actually invoked on JS/TS files. If `typescript` is unavailable (e.g. extension context), taint analysis gracefully falls back to regex-based detection.
+
 ## [3.117.0] — 2026-03-18
 
 ### Added

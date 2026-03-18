@@ -12,8 +12,27 @@
 // - Guard clause sensitivity (validation guards reduce taint confidence)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import ts from "typescript";
+import type ts from "typescript";
+import { createRequire } from "node:module";
 import { normalizeLanguage } from "../language-patterns.js";
+
+// Lazy-load the TypeScript compiler API so that modules which transitively
+// import this file (e.g. the VS Code extension bundle) do not crash at load
+// time when the `typescript` package is not available at runtime.
+//
+// In CJS bundles (esbuild for VS Code extension), `import.meta.url` is empty
+// but the bundler emits a CJS `require` for externals — so `require` just
+// works.  In native ESM (tests, CLI), we use `createRequire` from the real
+// `import.meta.url`.
+let _ts: typeof ts | undefined;
+function getTS(): typeof ts {
+  if (!_ts) {
+    const metaUrl = typeof import.meta?.url === "string" ? import.meta.url : undefined;
+    const req = metaUrl ? createRequire(metaUrl) : require;
+    _ts = req("typescript") as typeof ts;
+  }
+  return _ts;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -220,6 +239,7 @@ function buildFunctionTaintMap(
   sourceFile: ts.SourceFile,
   _taintMap: Map<string, TaintEntry>,
 ): Map<string, FunctionTaintInfo> {
+  const ts = getTS();
   const result = new Map<string, FunctionTaintInfo>();
 
   ts.forEachChild(sourceFile, function walk(node) {
@@ -277,6 +297,7 @@ function buildFunctionTaintMap(
 }
 
 function getFnName(node: ts.Node): string | undefined {
+  const ts = getTS();
   if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) {
     return node.name?.getText();
   }
@@ -808,7 +829,13 @@ export function analyzeTaintFlows(code: string, language: string): TaintFlow[] {
   switch (lang) {
     case "javascript":
     case "typescript":
-      return analyzeTypeScriptTaint(code, lang);
+      try {
+        return analyzeTypeScriptTaint(code, lang);
+      } catch {
+        // typescript package unavailable (e.g. VS Code extension bundle) —
+        // fall through to regex-based analysis
+        return analyzeRegexTaint(code, LANGUAGE_PATTERN_MAP[lang]);
+      }
     default: {
       const langPatterns = LANGUAGE_PATTERN_MAP[lang];
       return analyzeRegexTaint(code, langPatterns);
@@ -819,6 +846,7 @@ export function analyzeTaintFlows(code: string, language: string): TaintFlow[] {
 // ─── TypeScript / JavaScript Taint Analysis ──────────────────────────────────
 
 function analyzeTypeScriptTaint(code: string, language: "javascript" | "typescript"): TaintFlow[] {
+  const ts = getTS();
   const scriptKind = language === "typescript" ? ts.ScriptKind.TS : ts.ScriptKind.JS;
   const sourceFile = ts.createSourceFile(
     "input." + (language === "typescript" ? "ts" : "js"),

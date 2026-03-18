@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.117.1] — 2026-03-18
+
+### Fixed
+- **Extension activation crash** — `Cannot find module 'typescript'` prevented the extension from activating. The taint tracker now lazy-loads the TypeScript compiler API and gracefully falls back to regex-based analysis when unavailable.
+
 ## [3.117.0] — 2026-03-18
 
 ### Added
