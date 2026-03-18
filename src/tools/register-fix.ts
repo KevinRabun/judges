@@ -11,6 +11,7 @@ import { evaluateWithTribunal, evaluateWithJudge } from "../evaluators/index.js"
 import { getJudge, JUDGES } from "../judges/index.js";
 import { applyPatches, type PatchCandidate } from "../commands/fix.js";
 import { configSchema, toJudgesConfig } from "./schemas.js";
+import { validateCodeSize } from "./validation.js";
 
 /**
  * Register the fix_code tool for one-shot code evaluation + auto-fix.
@@ -52,6 +53,10 @@ function registerFixCode(server: McpServer): void {
     },
     async ({ code, language, judgeId, context, minConfidence, config }) => {
       try {
+        const sizeError = validateCodeSize(code);
+        if (sizeError) {
+          return { content: [{ type: "text" as const, text: `Error: ${sizeError}` }], isError: true };
+        }
         const effectiveMinConfidence = minConfidence ?? 0.5;
 
         // ── Evaluate ────────────────────────────────────────────────
@@ -161,8 +166,27 @@ function registerFixCode(server: McpServer): void {
 
         text += `### Fixed Code\n\n\`\`\`${language}\n${fixedCode}\n\`\`\`\n`;
 
+        const structured = {
+          totalFindings: allFindings.length,
+          autoFixable: fixable.length,
+          applied,
+          skipped,
+          remaining: remaining.length,
+          patches: fixable.map((p) => ({
+            ruleId: p.ruleId,
+            severity: p.severity,
+            title: p.title,
+            line: p.patch.startLine,
+            oldText: p.patch.oldText,
+            newText: p.patch.newText,
+          })),
+        };
+
         return {
-          content: [{ type: "text" as const, text }],
+          content: [
+            { type: "text" as const, text },
+            { type: "text" as const, text: "```json\n" + JSON.stringify(structured, null, 2) + "\n```" },
+          ],
         };
       } catch (error) {
         return {

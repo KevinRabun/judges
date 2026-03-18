@@ -7,6 +7,7 @@ import("@modelcontextprotocol/sdk/server/mcp.js")
     const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
     const { registerTools } = await import("./tools/register.js");
     const { registerPrompts } = await import("./tools/prompts.js");
+    const { registerResources } = await import("./tools/register-resources.js");
     const { readFileSync } = await import("fs");
     const { resolve, dirname } = await import("path");
     const { fileURLToPath } = await import("url");
@@ -28,6 +29,7 @@ import("@modelcontextprotocol/sdk/server/mcp.js")
 
     registerTools(server);
     registerPrompts(server);
+    registerResources(server);
 
     const transport = new StdioServerTransport();
     await server.connect(transport);

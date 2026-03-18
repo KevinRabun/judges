@@ -821,3 +821,128 @@ export interface JudgeDefinition {
    */
   analyze?: (code: string, language: string, context?: AnalyzeContext) => Finding[];
 }
+
+// ─── Execution Traces & Observability ────────────────────────────────────────
+
+/**
+ * Detailed trace of a single rule application within a judge evaluation.
+ * Enables "why did judge X flag line Y?" debugging and FP investigation.
+ */
+export interface RuleTrace {
+  /** Rule ID (e.g. "SEC-001") */
+  ruleId: string;
+  /** Whether the rule produced any findings */
+  matched: boolean;
+  /** Number of findings produced */
+  findingCount: number;
+  /** Confidence of the highest-confidence finding from this rule, if any */
+  peakConfidence?: number;
+  /** Human-readable reason for match/skip */
+  reason?: string;
+}
+
+/**
+ * Full execution trace for a single judge evaluation — captures timing,
+ * rules matched, AST resolution details, and skip reasons.
+ */
+export interface ExecutionTrace {
+  /** Judge that was evaluated */
+  judgeId: string;
+  judgeName: string;
+  /** Wall-clock duration in milliseconds */
+  durationMs: number;
+  /** Whether the judge was skipped (and why) */
+  skipped?: boolean;
+  skipReason?: string;
+  /** Per-rule traces */
+  rules: RuleTrace[];
+  /** AST resolution metadata (when AST analysis was used) */
+  astResolution?: {
+    functionsAnalyzed: number;
+    maxComplexity: number;
+    taintFlowsDetected: number;
+  };
+  /** Number of findings before and after post-processing */
+  rawFindingCount: number;
+  finalFindingCount: number;
+}
+
+// ─── Streaming Evaluation ────────────────────────────────────────────────────
+
+/**
+ * A single batch yielded during streaming evaluation — one per judge.
+ * Enables progressive result display and early termination.
+ */
+export interface StreamingBatch {
+  /** The judge that produced this batch */
+  judgeId: string;
+  judgeName: string;
+  /** The evaluation result for this judge */
+  evaluation: JudgeEvaluation;
+  /** Execution trace for this judge */
+  trace: ExecutionTrace;
+  /** Running aggregate across all completed judges so far */
+  aggregate: {
+    completedJudges: number;
+    totalJudges: number;
+    findingsSoFar: number;
+    criticalSoFar: number;
+    highSoFar: number;
+    currentScore: number;
+    currentVerdict: Verdict;
+  };
+  /** Whether this is the final batch (all judges complete) */
+  done: boolean;
+}
+
+// ─── Judge Selection ─────────────────────────────────────────────────────────
+
+/**
+ * Signal-based context used to select which judges are relevant for a file.
+ */
+export interface JudgeSelectionContext {
+  /** Programming language */
+  language: string;
+  /** Detected frameworks (e.g. "express", "react", "django") */
+  frameworks?: string[];
+  /** File classification from shared.ts (e.g. "test", "config", "server") */
+  fileCategory?: string;
+  /** File path (for glob-based overrides) */
+  filePath?: string;
+  /** Whether this is a project-level evaluation */
+  projectMode?: boolean;
+}
+
+/**
+ * Result of judge selection — which judges to run and why others were skipped.
+ */
+export interface JudgeSelectionResult {
+  /** Judges selected to run */
+  selected: JudgeDefinition[];
+  /** Judges skipped with reasons */
+  skipped: Array<{ judgeId: string; reason: string }>;
+}
+
+// ─── Evaluation Session ──────────────────────────────────────────────────────
+
+/**
+ * Persistent project context that survives across evaluation calls within
+ * the same session. Avoids redundant framework detection, capability scanning,
+ * and feedback loading for repeated evaluations of the same project.
+ */
+export interface SessionContext {
+  /** Detected frameworks across the project */
+  frameworks: string[];
+  /** Detected project-wide security capabilities */
+  capabilities: Set<string>;
+  /** Per-file verdict history — tracks how findings evolve */
+  verdictHistory: Map<string, { score: number; findingCount: number; timestamp: string }[]>;
+  /** Files that have been evaluated (content hash → file path) */
+  evaluatedFiles: Map<string, string>;
+  /** Session start time */
+  startedAt: string;
+  /** Number of evaluations performed in this session */
+  evaluationCount: number;
+  /** User feedback on findings — ruleId → { tp, fp, wontfix counts } */
+  feedbackTally: Map<string, { tp: number; fp: number; wontfix: number }>;
+}

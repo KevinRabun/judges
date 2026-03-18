@@ -145,8 +145,22 @@ function registerExplainFinding(server: McpServer): void {
         `\n## Next steps\n- Use \`triage_finding\` to accept, defer, or dismiss this finding\n- Use \`fix_code\` to auto-fix if a patch is available\n- Use \`evaluate_code\` to re-evaluate after fixing`,
       );
 
+      const structured = {
+        ruleId,
+        prefix,
+        title: title ?? null,
+        severity: severity ?? null,
+        owasp: ctx?.owasp ?? null,
+        cwe: ctx?.cwe ?? null,
+        learn: ctx?.learn ?? null,
+        remediation: getRemediationGuidance(prefix) ?? null,
+      };
+
       return {
-        content: [{ type: "text" as const, text: sections.join("\n") }],
+        content: [
+          { type: "text" as const, text: sections.join("\n") },
+          { type: "text" as const, text: "```json\n" + JSON.stringify(structured, null, 2) + "\n```" },
+        ],
       };
     },
   );
@@ -221,6 +235,23 @@ function registerTriageFinding(server: McpServer): void {
             {
               type: "text" as const,
               text: `✓ Triaged finding \`${result.ruleId}\` in ${result.filePath} as **${status}**${reason ? `\n\nReason: ${reason}` : ""}${triagedBy ? `\nTriaged by: ${triagedBy}` : ""}`,
+            },
+            {
+              type: "text" as const,
+              text:
+                "```json\n" +
+                JSON.stringify(
+                  {
+                    ruleId: result.ruleId,
+                    filePath: result.filePath,
+                    status,
+                    reason: reason ?? null,
+                    triagedBy: triagedBy ?? null,
+                  },
+                  null,
+                  2,
+                ) +
+                "\n```",
             },
           ],
         };

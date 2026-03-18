@@ -7,6 +7,7 @@ import { registerChatParticipant } from "./chat-participant";
 import { registerLmTools } from "./lm-tool";
 import { runLlmBenchmark, saveResultsToWorkspace } from "./llm-benchmark-runner";
 import type { Finding } from "@kevinrabun/judges/api";
+import { getGlobalSession } from "@kevinrabun/judges/api";
 
 let diagnosticProvider: JudgesDiagnosticProvider;
 let findingsPanel: JudgesFindingsPanel;
@@ -97,6 +98,67 @@ export function activate(context: vscode.ExtensionContext): void {
       } else {
         vscode.window.showWarningMessage("Judges: No file is open. Open a file to fix.");
       }
+    }),
+
+    // ─── Agentic Fix-and-Verify Loop ──────────────────────────────────────
+    // Apply auto-fixes and immediately re-evaluate with only the
+    // judges that found issues — the core agentic feedback loop.
+    vscode.commands.registerCommand("judges.fixAndReEvaluate", async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        vscode.window.showWarningMessage("Judges: No file is open.");
+        return;
+      }
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Judges: Fix & Re-evaluate…",
+          cancellable: false,
+        },
+        async (progress) => {
+          // Get current findings to identify which judges found issues
+          const beforeFindings = diagnosticProvider.getFindings(editor.document.uri.toString());
+          if (beforeFindings.length === 0) {
+            vscode.window.showInformationMessage("Judges: No findings to fix.");
+            return;
+          }
+
+          // Step 1: Apply fixes
+          progress.report({ message: "Applying auto-fixes…" });
+          const fixResult = await diagnosticProvider.fix(editor.document);
+
+          if (fixResult.applied === 0) {
+            // No fixes applied — just re-evaluate fully
+            progress.report({ message: "No auto-fixes available. Re-evaluating…" });
+            diagnosticProvider.forceEvaluate(editor.document);
+            return;
+          }
+
+          // Small delay to let the document update
+          await new Promise<void>((r) => setTimeout(r, 200));
+
+          // Step 2: Re-evaluate (narrowed to judges that found issues)
+          progress.report({ message: `Applied ${fixResult.applied} fix(es). Re-evaluating…` });
+          diagnosticProvider.forceEvaluate(editor.document);
+
+          // Step 3: Compare
+          const afterFindings = diagnosticProvider.getFindings(editor.document.uri.toString());
+          const resolved = beforeFindings.length - afterFindings.length;
+
+          if (afterFindings.length === 0) {
+            vscode.window.showInformationMessage(`Judges: All ${resolved} finding(s) resolved! Code is clean. ✅`);
+          } else {
+            const action = await vscode.window.showInformationMessage(
+              `Judges: ${fixResult.applied} fix(es) applied, ${resolved} finding(s) resolved, ${afterFindings.length} remaining.`,
+              "Run Again",
+            );
+            if (action === "Run Again") {
+              vscode.commands.executeCommand("judges.fixAndReEvaluate");
+            }
+          }
+        },
+      );
     }),
 
     vscode.commands.registerCommand("judges.fixAll", async () => {
@@ -397,6 +459,7 @@ export function activate(context: vscode.ExtensionContext): void {
       "judges.feedbackTp",
       async (ruleId: string, uri: vscode.Uri, line: number, finding?: Finding) => {
         await recordFeedbackEntry(uri, ruleId, "tp", line, finding);
+        getGlobalSession().recordFeedback(ruleId, "tp");
         vscode.window.showInformationMessage(`Judges: Marked ${ruleId} as true positive ✓`);
       },
     ),
@@ -409,6 +472,7 @@ export function activate(context: vscode.ExtensionContext): void {
           placeHolder: "Brief explanation…",
         });
         await recordFeedbackEntry(uri, ruleId, "fp", line, finding, comment);
+        getGlobalSession().recordFeedback(ruleId, "fp");
         vscode.window.showInformationMessage(`Judges: Marked ${ruleId} as false positive ✓`);
       },
     ),
@@ -417,6 +481,7 @@ export function activate(context: vscode.ExtensionContext): void {
       "judges.feedbackWontfix",
       async (ruleId: string, uri: vscode.Uri, line: number, finding?: Finding) => {
         await recordFeedbackEntry(uri, ruleId, "wontfix", line, finding);
+        getGlobalSession().recordFeedback(ruleId, "wontfix");
         vscode.window.showInformationMessage(`Judges: Marked ${ruleId} as won't fix ✓`);
       },
     ),

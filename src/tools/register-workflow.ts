@@ -7,11 +7,21 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { JUDGES } from "../judges/index.js";
-import { evaluateProject, evaluateDiff, analyzeDependencies, runAppBuilderWorkflow } from "../evaluators/index.js";
-import { evaluateWithTribunal } from "../evaluators/index.js";
+import {
+  evaluateProject,
+  evaluateDiff,
+  analyzeDependencies,
+  runAppBuilderWorkflow,
+  evaluateWithTribunal,
+  enrichWithPatches,
+  formatVerdictAsMarkdown,
+} from "../evaluators/index.js";
 import { evaluateFilesBatch } from "../api.js";
+import { getGlobalSession } from "../evaluation-session.js";
 import { generatePublicRepoReport } from "../reports/public-repo-report.js";
 import { configSchema, toJudgesConfig } from "./schemas.js";
+import { validateCodeSize } from "./validation.js";
+import type { Finding, JudgesConfig } from "../types.js";
 import {
   benchmarkGate,
   formatBenchmarkReport,
@@ -32,6 +42,10 @@ export function registerWorkflowTools(server: McpServer): void {
   registerBenchmarkGate(server);
   registerBenchmarkDashboard(server);
   registerEvaluateBatch(server);
+  registerEvaluateThenFix(server);
+  registerEvaluateFocused(server);
+  registerSessionStatus(server);
+  registerRecordFeedback(server);
 }
 
 // ─── evaluate_public_repo_report ─────────────────────────────────────────────
@@ -105,6 +119,10 @@ function registerPublicRepoReport(server: McpServer): void {
       keepClone,
     }) => {
       try {
+        await server.sendLoggingMessage({
+          level: "info",
+          data: `Cloning repository: ${repoUrl}${branch ? ` (branch: ${branch})` : ""}...`,
+        });
         const report = generatePublicRepoReport({
           repoUrl,
           branch,
@@ -144,12 +162,19 @@ function registerPublicRepoReport(server: McpServer): void {
           summary += `- Clone path: ${report.clonePath}\n`;
         }
 
+        const structured = {
+          repoUrl,
+          overallVerdict: report.overallVerdict,
+          averageScore: report.averageScore,
+          analyzedFileCount: report.analyzedFileCount,
+          totalFindings: report.totalFindings,
+          outputPath: report.outputPath ?? null,
+        };
+
         return {
           content: [
-            {
-              type: "text" as const,
-              text: `${summary}\n---\n\n${report.markdown}`,
-            },
+            { type: "text" as const, text: `${summary}\n---\n\n${report.markdown}` },
+            { type: "text" as const, text: "```json\n" + JSON.stringify(structured, null, 2) + "\n```" },
           ],
         };
       } catch (error) {
@@ -272,7 +297,38 @@ function registerAppBuilderFlow(server: McpServer): void {
           }
         }
 
-        return { content: [{ type: "text" as const, text: md }] };
+        const structured = {
+          mode: result.mode,
+          releaseDecision: result.releaseDecision,
+          score: result.score,
+          verdict: result.verdict,
+          criticalCount: result.criticalCount,
+          highCount: result.highCount,
+          mediumCount: result.mediumCount,
+          taskCount: result.tasks.length,
+          aiFixableCount: result.aiFixableNow.length,
+          findings: result.plainLanguageFindings.map((f) => ({
+            ruleId: f.ruleId,
+            severity: f.severity,
+            title: f.title,
+            whatIsWrong: f.whatIsWrong,
+            nextAction: f.nextAction,
+          })),
+          tasks: result.tasks.map((t) => ({
+            priority: t.priority,
+            owner: t.owner,
+            effort: t.effort,
+            ruleId: t.ruleId,
+            task: t.task,
+          })),
+        };
+
+        return {
+          content: [
+            { type: "text" as const, text: md },
+            { type: "text" as const, text: "```json\n" + JSON.stringify(structured, null, 2) + "\n```" },
+          ],
+        };
       } catch (error) {
         return {
           content: [
@@ -316,6 +372,10 @@ function registerEvaluateProject(server: McpServer): void {
     },
     async ({ files, context, includeAstFindings, minConfidence, config }) => {
       try {
+        await server.sendLoggingMessage({
+          level: "info",
+          data: `Evaluating ${files.length} files with ${JUDGES.length} judges...`,
+        });
         const result = evaluateProject(files, context, {
           includeAstFindings,
           minConfidence,
@@ -348,7 +408,38 @@ function registerEvaluateProject(server: McpServer): void {
           }
         }
 
-        return { content: [{ type: "text" as const, text: md }] };
+        const structured = {
+          overallScore: result.overallScore,
+          overallVerdict: result.overallVerdict,
+          fileCount: result.fileResults.length,
+          criticalCount: result.criticalCount,
+          highCount: result.highCount,
+          fileResults: result.fileResults.map((fr) => ({
+            path: fr.path,
+            language: fr.language,
+            score: fr.score,
+            findingCount: fr.findings.length,
+            findings: fr.findings.map((f) => ({
+              ruleId: f.ruleId,
+              severity: f.severity,
+              title: f.title,
+              line: f.lineNumbers?.[0],
+            })),
+          })),
+          architecturalFindings: result.architecturalFindings.map((f) => ({
+            ruleId: f.ruleId,
+            severity: f.severity,
+            title: f.title,
+            description: f.description,
+          })),
+        };
+
+        return {
+          content: [
+            { type: "text" as const, text: md },
+            { type: "text" as const, text: "```json\n" + JSON.stringify(structured, null, 2) + "\n```" },
+          ],
+        };
       } catch (error) {
         return {
           content: [
@@ -386,6 +477,10 @@ function registerEvaluateDiff(server: McpServer): void {
     },
     async ({ code, language, changedLines, context, includeAstFindings, minConfidence, config }) => {
       try {
+        const sizeError = validateCodeSize(code);
+        if (sizeError) {
+          return { content: [{ type: "text" as const, text: `Error: ${sizeError}` }], isError: true };
+        }
         const result = evaluateDiff(code, language, changedLines, context, {
           includeAstFindings,
           minConfidence,
@@ -408,7 +503,25 @@ function registerEvaluateDiff(server: McpServer): void {
           }
         }
 
-        return { content: [{ type: "text" as const, text: md }] };
+        const structured = {
+          score: result.score,
+          verdict: result.verdict,
+          linesAnalyzed: result.linesAnalyzed,
+          findingCount: result.findings.length,
+          findings: result.findings.map((f) => ({
+            ruleId: f.ruleId,
+            severity: f.severity,
+            title: f.title,
+            lineNumbers: f.lineNumbers,
+          })),
+        };
+
+        return {
+          content: [
+            { type: "text" as const, text: md },
+            { type: "text" as const, text: "```json\n" + JSON.stringify(structured, null, 2) + "\n```" },
+          ],
+        };
       } catch (error) {
         return {
           content: [
@@ -466,7 +579,25 @@ function registerAnalyzeDependencies(server: McpServer): void {
           }
         }
 
-        return { content: [{ type: "text" as const, text: md }] };
+        const structured = {
+          manifestType,
+          score: result.score,
+          verdict: result.verdict,
+          totalDependencies: result.totalDependencies,
+          findingCount: result.findings.length,
+          findings: result.findings.map((f) => ({
+            ruleId: f.ruleId,
+            severity: f.severity,
+            title: f.title,
+          })),
+        };
+
+        return {
+          content: [
+            { type: "text" as const, text: md },
+            { type: "text" as const, text: "```json\n" + JSON.stringify(structured, null, 2) + "\n```" },
+          ],
+        };
       } catch (error) {
         return {
           content: [
@@ -628,8 +759,14 @@ function registerEvaluateBatch(server: McpServer): void {
       const config = params.config ? toJudgesConfig(params.config) : undefined;
       const options = config ? { config } : undefined;
 
+      await server.sendLoggingMessage({ level: "info", data: `Batch evaluation: ${params.files.length} files...` });
+
       // Use bounded-concurrency parallel evaluation instead of sequential loop
-      const batchResults = await evaluateFilesBatch(params.files, 4, options);
+      const batchResults = await evaluateFilesBatch(params.files, 4, options, (completed, total) => {
+        server
+          .sendLoggingMessage({ level: "info", data: `Progress: ${completed}/${total} files evaluated` })
+          .catch(() => {});
+      });
 
       const results = batchResults.map((r) => {
         const criticals = r.verdict.findings.filter((f) => f.severity === "critical").length;
@@ -668,8 +805,312 @@ function registerEvaluateBatch(server: McpServer): void {
         "\n\n" +
         allFindings.join("\n\n");
 
+      const structured = {
+        fileCount: results.length,
+        averageScore: avgScore,
+        totalFindings,
+        totalCriticals,
+        files: results,
+      };
+
       return {
-        content: [{ type: "text" as const, text: summary }],
+        content: [
+          { type: "text" as const, text: summary },
+          { type: "text" as const, text: "```json\n" + JSON.stringify(structured, null, 2) + "\n```" },
+        ],
+      };
+    },
+  );
+}
+
+// ─── evaluate_then_fix ───────────────────────────────────────────────────────
+
+function registerEvaluateThenFix(server: McpServer): void {
+  server.tool(
+    "evaluate_then_fix",
+    "Evaluate code and automatically generate fix patches for all findings that have auto-fix support. Returns the evaluation verdict alongside ready-to-apply patches. Use this for a single-step 'review + fix' workflow.",
+    {
+      code: z.string().describe("The source code to evaluate and fix."),
+      language: z.string().describe("The programming language (e.g., 'typescript', 'python')."),
+      context: z.string().optional().describe("Optional context about the code."),
+      includeAstFindings: z.boolean().optional().describe("Include AST/code-structure findings (default: true)"),
+      minConfidence: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe("Minimum finding confidence to include (0-1, default: 0)"),
+      config: configSchema,
+    },
+    async ({ code, language, context, includeAstFindings, minConfidence, config }) => {
+      try {
+        const sizeError = validateCodeSize(code);
+        if (sizeError) {
+          return { content: [{ type: "text" as const, text: `Error: ${sizeError}` }], isError: true };
+        }
+        const session = getGlobalSession();
+
+        // Step 1: Evaluate
+        const verdict = evaluateWithTribunal(code, language, context, {
+          includeAstFindings,
+          minConfidence,
+          config: toJudgesConfig(config),
+          adaptiveSelection: true,
+        });
+
+        // Step 2: Generate fix patches for all findings
+        const patchedFindings = enrichWithPatches(verdict.findings, code);
+
+        session.recordEvaluation(context ?? `<inline:${language}>`, code, verdict);
+
+        const patchableFindings = patchedFindings.filter((f) => f.patch);
+        const patchCount = patchableFindings.length;
+
+        let md = `# Evaluate & Fix Results\n\n`;
+        md += `**Score:** ${verdict.overallScore}/100 | **Verdict:** ${verdict.overallVerdict.toUpperCase()}\n`;
+        md += `**Total Findings:** ${verdict.findings.length} | **Auto-fixable:** ${patchCount}\n\n`;
+
+        if (patchCount > 0) {
+          md += `## Auto-Fix Patches\n\n`;
+          md += `The following findings have auto-fix patches ready to apply:\n\n`;
+          for (const f of patchableFindings.slice(0, 20)) {
+            md += `### ${f.ruleId}: ${f.title}\n`;
+            md += `- **Severity:** ${f.severity} | **Lines:** ${f.lineNumbers?.join(", ") ?? "N/A"}\n`;
+            md += `- **Fix:**\n\`\`\`diff\n`;
+            if (f.patch?.oldText) md += `- ${f.patch.oldText}\n`;
+            if (f.patch?.newText) md += `+ ${f.patch.newText}\n`;
+            md += `\`\`\`\n\n`;
+          }
+          if (patchableFindings.length > 20) {
+            md += `> ... and ${patchableFindings.length - 20} more auto-fixable findings\n\n`;
+          }
+        }
+
+        md += formatVerdictAsMarkdown(verdict);
+
+        const structuredData = {
+          score: verdict.overallScore,
+          verdict: verdict.overallVerdict,
+          totalFindings: verdict.findings.length,
+          autoFixable: patchCount,
+          patches: patchableFindings.slice(0, 50).map((f: Finding) => ({
+            ruleId: f.ruleId,
+            severity: f.severity,
+            title: f.title,
+            lineNumbers: f.lineNumbers,
+            oldText: f.patch?.oldText,
+            newText: f.patch?.newText,
+          })),
+        };
+
+        return {
+          content: [
+            { type: "text" as const, text: md },
+            { type: "text" as const, text: "```json\n" + JSON.stringify(structuredData, null, 2) + "\n```" },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: error instanceof Error ? `Error: ${error.message}` : "Error: evaluate_then_fix failed",
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+}
+
+// ─── evaluate_focused ────────────────────────────────────────────────────────
+
+function registerEvaluateFocused(server: McpServer): void {
+  server.tool(
+    "evaluate_focused",
+    "Run a focused evaluation using only the specified judges. Use this after an initial full evaluation to re-check specific areas — for example, re-run only 'cybersecurity' and 'authentication' judges after applying security fixes. Much faster than a full tribunal evaluation.",
+    {
+      code: z.string().describe("The source code to evaluate."),
+      language: z.string().describe("The programming language (e.g., 'typescript', 'python')."),
+      judgeIds: z
+        .array(z.string())
+        .min(1)
+        .describe("Array of judge IDs to run (e.g., ['cybersecurity', 'authentication', 'data-sovereignty'])"),
+      context: z.string().optional().describe("Optional context about the code."),
+      includeAstFindings: z.boolean().optional().describe("Include AST/code-structure findings (default: true)"),
+      minConfidence: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe("Minimum finding confidence to include (0-1, default: 0)"),
+      config: configSchema,
+    },
+    async ({ code, language, judgeIds, context, includeAstFindings, minConfidence, config }) => {
+      try {
+        const sizeError = validateCodeSize(code);
+        if (sizeError) {
+          return { content: [{ type: "text" as const, text: `Error: ${sizeError}` }], isError: true };
+        }
+        const cfgObj = toJudgesConfig(config);
+        // Build a config that disables all judges EXCEPT the focused ones
+        const allJudgeIds = JUDGES.map((j) => j.id);
+        const focusedSet = new Set(judgeIds);
+        const disabledJudges = allJudgeIds.filter((id) => !focusedSet.has(id));
+
+        const mergedConfig = cfgObj
+          ? { ...cfgObj, disabledJudges: [...(cfgObj.disabledJudges ?? []), ...disabledJudges] }
+          : ({ disabledJudges } as JudgesConfig);
+
+        const verdict = evaluateWithTribunal(code, language, context, {
+          includeAstFindings,
+          minConfidence,
+          config: mergedConfig,
+        });
+
+        let md = `# Focused Evaluation (${judgeIds.length} judges)\n\n`;
+        md += `**Judges:** ${judgeIds.join(", ")}\n`;
+        md += `**Score:** ${verdict.overallScore}/100 | **Verdict:** ${verdict.overallVerdict.toUpperCase()}\n`;
+        md += `**Findings:** ${verdict.findings.length}\n\n`;
+        md += formatVerdictAsMarkdown(verdict);
+
+        const structuredData = {
+          focusedJudges: judgeIds,
+          score: verdict.overallScore,
+          verdict: verdict.overallVerdict,
+          findingCount: verdict.findings.length,
+          findings: verdict.findings.map((f) => ({
+            ruleId: f.ruleId,
+            severity: f.severity,
+            title: f.title,
+            lineNumbers: f.lineNumbers,
+            confidence: f.confidence,
+          })),
+        };
+
+        return {
+          content: [
+            { type: "text" as const, text: md },
+            { type: "text" as const, text: "```json\n" + JSON.stringify(structuredData, null, 2) + "\n```" },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: error instanceof Error ? `Error: ${error.message}` : "Error: Focused evaluation failed",
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+}
+
+// ─── session_status ──────────────────────────────────────────────────────────
+
+function registerSessionStatus(server: McpServer): void {
+  server.tool(
+    "session_status",
+    "Get the current evaluation session status — how many evaluations have been run, detected frameworks, verdict history per file, and stability indicators. Useful for understanding what the tribunal has already reviewed.",
+    {},
+    async () => {
+      const session = getGlobalSession();
+      const ctx = session.getContext();
+
+      const filesEvaluated = [...ctx.verdictHistory.entries()].map(([file, history]) => ({
+        file,
+        evaluations: history.length,
+        latestScore: history[history.length - 1]?.score ?? 0,
+        stable: session.isVerdictStable(file),
+      }));
+
+      let md = `# Evaluation Session Status\n\n`;
+      md += `**Evaluations:** ${ctx.evaluationCount}\n`;
+      md += `**Started:** ${ctx.startedAt}\n`;
+      md += `**Detected Frameworks:** ${ctx.frameworks.length > 0 ? ctx.frameworks.join(", ") : "None yet"}\n`;
+      md += `**Capabilities:** ${ctx.capabilities.size > 0 ? [...ctx.capabilities].join(", ") : "None yet"}\n\n`;
+
+      if (filesEvaluated.length > 0) {
+        md += `## Files Evaluated\n\n`;
+        md += `| File | Evals | Latest Score | Stable |\n`;
+        md += `|------|-------|--------------|--------|\n`;
+        for (const f of filesEvaluated) {
+          md += `| ${f.file} | ${f.evaluations} | ${f.latestScore}/100 | ${f.stable ? "Yes" : "No"} |\n`;
+        }
+      }
+
+      const feedbackTally = [...session.getFeedbackTally().entries()];
+      if (feedbackTally.length > 0) {
+        md += `\n## Feedback Tally\n\n`;
+        md += `| Rule | TP | FP | Won't Fix |\n`;
+        md += `|------|----|----|----------|\n`;
+        for (const [rule, counts] of feedbackTally) {
+          md += `| ${rule} | ${counts.tp} | ${counts.fp} | ${counts.wontfix} |\n`;
+        }
+      }
+
+      return {
+        content: [
+          { type: "text" as const, text: md },
+          {
+            type: "text" as const,
+            text:
+              "```json\n" +
+              JSON.stringify(
+                {
+                  evaluationCount: ctx.evaluationCount,
+                  startedAt: ctx.startedAt,
+                  frameworks: ctx.frameworks,
+                  capabilities: [...ctx.capabilities],
+                  filesEvaluated,
+                  feedbackTally: Object.fromEntries(feedbackTally),
+                },
+                null,
+                2,
+              ) +
+              "\n```",
+          },
+        ],
+      };
+    },
+  );
+}
+
+// ─── record_feedback ─────────────────────────────────────────────────────────
+
+function registerRecordFeedback(server: McpServer): void {
+  server.tool(
+    "record_feedback",
+    "Record user feedback on a finding — mark it as a true positive (tp), false positive (fp), or won't fix (wontfix). This feedback calibrates confidence scores in subsequent evaluations during the current session, reducing noise from rules the user considers inaccurate.",
+    {
+      ruleId: z.string().describe("The rule ID of the finding (e.g., 'SEC-001', 'AUTH-003')."),
+      verdict: z
+        .enum(["tp", "fp", "wontfix"])
+        .describe(
+          "The feedback verdict: tp (true positive), fp (false positive), wontfix (acknowledged but won't fix).",
+        ),
+    },
+    async ({ ruleId, verdict }) => {
+      const session = getGlobalSession();
+      session.recordFeedback(ruleId, verdict);
+
+      const penalty = session.getConfidencePenalty(ruleId);
+      const penaltyPct = Math.round(penalty * 100);
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Feedback recorded: **${ruleId}** → **${verdict}**\n\n` +
+              `Current confidence multiplier for ${ruleId}: **${penaltyPct}%**\n` +
+              (verdict === "fp" ? `Future findings for this rule will have reduced confidence in this session.` : ``),
+          },
+        ],
       };
     },
   );

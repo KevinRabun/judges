@@ -7,6 +7,7 @@ import {
   isContentPolicyRefusal,
   DEEP_REVIEW_PROMPT_INTRO,
   DEEP_REVIEW_IDENTITY,
+  getPreset,
 } from "@kevinrabun/judges/api";
 import type { Finding } from "@kevinrabun/judges/api";
 import type { JudgesDiagnosticProvider } from "./diagnostics";
@@ -194,6 +195,8 @@ const handleChatRequest: vscode.ChatRequestHandler = async (
       return await handleShallowReview(request, stream, token);
     case "security":
       return await handleShallowReview(request, stream, token, "security-only");
+    case "aireview":
+      return await handleShallowReview(request, stream, token, "ai-review");
     case "fix":
       return await handleFix(stream, token);
     case "benchmark":
@@ -217,6 +220,8 @@ function inferCommand(prompt: string): string {
   if (/\bbenchmark\b/.test(lower)) return "benchmark";
   if (/\bshallow\s*review\b/.test(lower)) return "shallowreview";
   if (/\bpattern\s*(only|analysis)\b/.test(lower)) return "shallowreview";
+  if (/\bai[\s-]*(generated|review|code)\b/.test(lower)) return "aireview";
+  if (/\b(copilot|chatgpt|cursor|llm)\s*(generated|code|output)\b/.test(lower)) return "aireview";
   if (/\bsecur/.test(lower)) return "security";
   if (/\bhelp\b/.test(lower)) return "help";
   // Recognize explicit "run judges" / "judges review" / "evaluate" / "check"
@@ -319,7 +324,13 @@ async function handleShallowReview(
   }
 
   try {
-    const verdict = evaluateWithTribunal(code, language);
+    const presetConfig = preset ? getPreset(preset)?.config : undefined;
+    const verdict = evaluateWithTribunal(
+      code,
+      language,
+      undefined,
+      presetConfig ? { config: presetConfig } : undefined,
+    );
     const allFindings = verdict.evaluations.flatMap((e) => e.findings);
 
     // Filter by preset if provided
@@ -579,6 +590,35 @@ async function handleWorkspaceReview(
     stream.markdown(`| Category | Count |\n|---|---|\n`);
     for (const [prefix, count] of sortedPrefixes) {
       stream.markdown(`| \`${prefix}\` | ${count} |\n`);
+    }
+    stream.markdown("\n");
+  }
+
+  // ── Cross-file pattern hotspots ──
+  // Identify rules that fire across multiple files — these indicate
+  // systemic patterns rather than one-off issues.
+  const ruleToFiles = new Map<string, Set<string>>();
+  for (const f of allFindings) {
+    const existing = ruleToFiles.get(f.ruleId) ?? new Set<string>();
+    existing.add(f.file);
+    ruleToFiles.set(f.ruleId, existing);
+  }
+  const hotspots = [...ruleToFiles.entries()]
+    .filter(([, files]) => files.size >= 2)
+    .sort((a, b) => b[1].size - a[1].size)
+    .slice(0, 10);
+
+  if (hotspots.length > 0) {
+    stream.markdown(`#### 🔥 Cross-File Pattern Hotspots\n\n`);
+    stream.markdown(`These rules fire across multiple files — consider a systemic fix:\n\n`);
+    stream.markdown(`| Rule | Files Affected | Files |\n|---|---|---|\n`);
+    for (const [ruleId, files] of hotspots) {
+      const fileList = [...files]
+        .slice(0, 5)
+        .map((p) => `\`${p}\``)
+        .join(", ");
+      const more = files.size > 5 ? ` +${files.size - 5} more` : "";
+      stream.markdown(`| \`${ruleId}\` | ${files.size} | ${fileList}${more} |\n`);
     }
     stream.markdown("\n");
   }
@@ -1022,6 +1062,7 @@ function handleHelp(stream: vscode.ChatResponseStream): vscode.ChatResult | void
       `| \`@judges /deepreview\` | Same as \`/review\` (Layer 1 + Layer 2 deep review) |\n` +
       `| \`@judges /shallowreview\` | Pattern analysis only (Layer 1 — no AI deep review) |\n` +
       `| \`@judges /security\` | Security-focused pattern review only |\n` +
+      `| \`@judges /aireview\` | AI-generated code review — optimized for Copilot/ChatGPT/Cursor output |\n` +
       `| \`@judges /fix\` | Auto-fix findings that have patches (not all findings are auto-fixable) |\n` +
       `| \`@judges /benchmark\` | Run LLM benchmark — evaluates all judges against test cases |\n` +
       `| \`@judges /help\` | Show this help |\n\n` +
@@ -1040,6 +1081,7 @@ function handleHelp(stream: vscode.ChatResponseStream): vscode.ChatResult | void
       `- **\`judges.preset\`** — try \`"security-only"\` or \`"lenient"\` for lighter reviews.\n\n` +
       `### Examples\n\n` +
       `- *"@judges review this file for performance issues"*\n` +
+      `- *"@judges review this AI-generated code"*\n` +
       `- *"@judges review the entire codebase"*\n` +
       `- *"@judges check security across the project"*\n` +
       `- *"@judges shallow review this file"*\n` +

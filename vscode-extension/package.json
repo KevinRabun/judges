@@ -2,7 +2,7 @@
   "name": "judges-panel",
   "displayName": "Judges Panel",
   "description": "45 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.115.4",
+  "version": "3.116.0",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -100,6 +100,11 @@
         "command": "judges.fixFile",
         "title": "Judges: Auto-Fix Current File",
         "icon": "$(wrench)"
+      },
+      {
+        "command": "judges.fixAndReEvaluate",
+        "title": "Judges: Fix & Re-Evaluate (Agentic Loop)",
+        "icon": "$(sync)"
       },
       {
         "command": "judges.skills.quickPick",
@@ -468,6 +473,10 @@
             "description": "Security-focused pattern review of the current file"
           },
           {
+            "name": "aireview",
+            "description": "Review AI-generated code (Copilot, ChatGPT, Cursor) — focuses on hallucination detection, security, and correctness"
+          },
+          {
             "name": "fix",
             "description": "Auto-fix all fixable findings in the current file"
           },
@@ -554,7 +563,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run esbuild -- --minify",
-    "esbuild": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+    "esbuild": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --external:typescript --format=cjs --platform=node",
     "compile": "npm run esbuild",
     "watch": "npm run esbuild -- --watch --sourcemap",
     "package": "npx @vscode/vsce package",
@@ -565,10 +574,10 @@
     "@types/vscode": "^1.109.0",
     "@vscode/vsce": "^3.3.2",
     "esbuild": "^0.25.0",
-    "typescript": "^5.9.3"
+    "typescript": "~5.6.3"
   },
   "dependencies": {
-    "@kevinrabun/judges": "^3.115.3"
+    "@kevinrabun/judges": "file:.."
   },
   "overrides": {
     "yauzl": "^3.2.1"

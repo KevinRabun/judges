@@ -2,6 +2,36 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.116.0] — 2026-03-18
+
+### Added
+- **Structured JSON output** on 18+ MCP tools — every evaluation/analysis tool now returns a dual-block response (human-readable markdown + machine-parseable JSON) for seamless agentic consumption.
+- **MCP Resource Templates** — parameterized `judges://judge/{id}` and `judges://preset/{key}` resources with `list` and `complete` autocomplete callbacks, alongside 3 existing static resources.
+- **Input validation helper** (`src/tools/validation.ts`) — `validateCodeSize()` rejects oversized inputs (>1 MB) at system boundaries; wired into `evaluate_code`, `evaluate_code_single_judge`, `fix_code`, `evaluate_diff`, `evaluate_then_fix`, `evaluate_focused`.
+- **MCP progress logging** — `server.sendLoggingMessage()` on long-running tools: `evaluate_project`, `evaluate_batch` (with per-file progress callback), `evaluate_public_repo_report`.
+- **Adaptive judge selection** (`src/evaluators/judge-selector.ts`) — automatically picks relevant judges based on language, file role, and detected frameworks.
+- **Evaluation session** (`src/evaluation-session.ts`) — persistent context across MCP calls tracks verdicts, frameworks, capabilities, and feedback calibration.
+- **Streaming evaluation** — `evaluate_code_streaming` async-generator tool yields per-judge results.
+- **Evaluate-then-fix** — `evaluate_then_fix` tool for single-step review + auto-patch workflow.
+- **Focused evaluation** — `evaluate_focused` tool runs a specific subset of judges.
+- **Session status** — `session_status` tool exposes evaluation history and stability indicators.
+- **Feedback calibration** — `record_feedback` tool records TP/FP/wontfix verdicts to adjust confidence scoring within a session.
+- **VS Code `/aireview` chat command** — quick inline code review via the chat participant.
+- **Cross-file pattern hotspots** — architectural analysis detects duplication and inconsistent patterns across project files.
+
+### Changed
+- **Package exports reordered** — `types` condition now precedes `import`/`default` per TypeScript best practice; added `default` condition for broader bundler compatibility.
+- Top-level `"types": "dist/api.d.ts"` added to `package.json` for tooling that doesn't support `exports`.
+- VS Code extension dependency changed to `file:..` for local development; `--external:typescript` added to esbuild command.
+- TypeScript pinned to `~5.6.3` in the extension for stability.
+
+### Fixed
+- `onDidChangeSelectedChatModel` → `onDidChangeChatModels` — updated to current VS Code API in `llm-benchmark-runner.ts`.
+- MCP `ResourceTemplate` `list` callback now returns `{ resources: [...] }` (was returning bare array).
+
+### Tests
+- 2311 tests pass, 0 fail (43 tool-routing, 19 integration).
+
 ## [3.115.4] — 2026-03-18
 
 ### Fixed

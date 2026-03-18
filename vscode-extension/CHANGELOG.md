@@ -4,6 +4,23 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.116.0] — 2026-03-18
+
+### Added
+- **Structured JSON output** — all evaluation tools now return dual-block responses (markdown + JSON) for programmatic consumption by agentic clients.
+- **`/aireview` chat command** — quick inline code review via the chat participant.
+- **Input validation** — oversized code inputs (>1 MB) are rejected at the tool boundary with a clear error message.
+
+### Changed
+- Core engine bumped to `@kevinrabun/judges@file:..` (local development).
+- TypeScript pinned to `~5.6.3` for stability.
+- esbuild command updated with `--external:typescript` for clean bundling.
+
+### Fixed
+- `onDidChangeSelectedChatModel` → `onDidChangeChatModels` — updated to current VS Code API in LLM benchmark runner.
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.115.4] — 2026-03-18
 
 ### Fixed

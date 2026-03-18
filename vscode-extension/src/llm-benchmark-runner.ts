@@ -142,7 +142,7 @@ async function resolveModel(token: vscode.CancellationToken): Promise<vscode.Lan
   const models = await vscode.lm.selectChatModels();
   // Defensive: dispose any lingering handles to avoid listener accumulation
   try {
-    vscode.lm.onDidChangeSelectedChatModel(() => undefined).dispose?.();
+    vscode.lm.onDidChangeChatModels(() => undefined).dispose?.();
   } catch {
     /* ignore */
   }

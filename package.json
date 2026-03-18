@@ -1,57 +1,69 @@
 {
   "name": "@kevinrabun/judges",
-  "version": "3.115.4",
+  "version": "3.116.0",
   "description": "45 specialized judges that evaluate AI-generated code for security, cost, and quality.",
   "mcpName": "io.github.KevinRabun/judges",
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/api.d.ts",
   "bin": {
     "judges": "packages/judges-cli/bin/judges.js"
   },
   "exports": {
     ".": {
+      "types": "./dist/api.d.ts",
       "import": "./dist/api.js",
-      "types": "./dist/api.d.ts"
+      "default": "./dist/api.js"
     },
     "./api": {
+      "types": "./dist/api.d.ts",
       "import": "./dist/api.js",
-      "types": "./dist/api.d.ts"
+      "default": "./dist/api.js"
     },
     "./server": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "default": "./dist/index.js"
     },
     "./sarif": {
+      "types": "./dist/api.d.ts",
       "import": "./dist/api.js",
-      "types": "./dist/api.d.ts"
+      "default": "./dist/api.js"
     },
     "./junit": {
+      "types": "./dist/api.d.ts",
       "import": "./dist/api.js",
-      "types": "./dist/api.d.ts"
+      "default": "./dist/api.js"
     },
     "./codeclimate": {
+      "types": "./dist/api.d.ts",
       "import": "./dist/api.js",
-      "types": "./dist/api.d.ts"
+      "default": "./dist/api.js"
     },
     "./badge": {
+      "types": "./dist/api.d.ts",
       "import": "./dist/api.js",
-      "types": "./dist/api.d.ts"
+      "default": "./dist/api.js"
     },
     "./diagnostics": {
+      "types": "./dist/api.d.ts",
       "import": "./dist/api.js",
-      "types": "./dist/api.d.ts"
+      "default": "./dist/api.js"
     },
     "./plugins": {
+      "types": "./dist/api.d.ts",
       "import": "./dist/api.js",
-      "types": "./dist/api.d.ts"
+      "default": "./dist/api.js"
     },
     "./fingerprint": {
+      "types": "./dist/api.d.ts",
       "import": "./dist/api.js",
-      "types": "./dist/api.d.ts"
+      "default": "./dist/api.js"
     },
     "./comparison": {
+      "types": "./dist/api.d.ts",
       "import": "./dist/api.js",
-      "types": "./dist/api.d.ts"
+      "default": "./dist/api.js"
     }
   },
   "files": [

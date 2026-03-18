@@ -38,6 +38,12 @@ export type {
   PolicyProfile,
   SuppressionRecord,
   SuppressionResult,
+  ExecutionTrace,
+  RuleTrace,
+  StreamingBatch,
+  JudgeSelectionContext,
+  JudgeSelectionResult,
+  SessionContext,
 } from "./types.js";
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
@@ -66,6 +72,7 @@ export { JUDGES, getJudge, getJudgeSummaries } from "./judges/index.js";
 export {
   evaluateWithJudge,
   evaluateWithTribunal,
+  evaluateWithTribunalStreaming,
   evaluateProject,
   evaluateDiff,
   analyzeDependencies,
@@ -82,7 +89,17 @@ export {
   clearEvaluationCaches,
   scanProjectWideSecurityPatterns,
 } from "./evaluators/index.js";
-export type { FindingDiff, NetChangeGateOptions, NetChangeGateResult } from "./evaluators/index.js";
+export type { FindingDiff, NetChangeGateOptions, NetChangeGateResult, EvaluationOptions } from "./evaluators/index.js";
+
+// ─── Adaptive Judge Selection ────────────────────────────────────────────────
+export { selectJudges } from "./evaluators/judge-selector.js";
+
+// ─── Evaluation Session ─────────────────────────────────────────────────────
+export { EvaluationSession, getGlobalSession, resetGlobalSession } from "./evaluation-session.js";
+
+// ─── Presets ─────────────────────────────────────────────────────────────────
+export { getPreset, composePresets, PRESETS } from "./presets.js";
+export type { Preset } from "./presets.js";
 
 // ─── V2 Policy-Aware API ────────────────────────────────────────────────────
 export { evaluateCodeV2, evaluateProjectV2, getSupportedPolicyProfiles } from "./evaluators/v2.js";
