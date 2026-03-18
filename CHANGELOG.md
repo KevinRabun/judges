@@ -2,6 +2,12 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.117.2] — 2026-03-18
+
+### Fixed
+- **Full taint analysis in VS Code extension** — removed `--external:typescript` from the esbuild config so the TypeScript compiler API is bundled into the extension. This restores precise AST-based taint tracking for JS/TS files (v3.117.1 fell back to regex). Published bundle is 2.2 MB minified.
+- Reverted the lazy-loader from v3.117.1 back to a clean static `import ts from "typescript"` — no longer needed since TypeScript is bundled.
+
 ## [3.117.1] — 2026-03-18
 
 ### Fixed

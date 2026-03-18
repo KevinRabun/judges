@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.117.2] — 2026-03-18
+
+### Fixed
+- **Full taint analysis restored** — TypeScript compiler API is now bundled into the extension (removed `--external:typescript` from esbuild). JS/TS files get precise AST-based taint tracking instead of the regex fallback from v3.117.1. Minified bundle is 2.2 MB.
+
 ## [3.117.1] — 2026-03-18
 
 ### Fixed

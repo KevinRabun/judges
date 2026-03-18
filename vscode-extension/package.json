@@ -2,7 +2,7 @@
   "name": "judges-panel",
   "displayName": "Judges Panel",
   "description": "45 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.117.1",
+  "version": "3.117.2",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -563,7 +563,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run esbuild -- --minify",
-    "esbuild": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --external:typescript --format=cjs --platform=node",
+    "esbuild": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
     "compile": "npm run esbuild",
     "watch": "npm run esbuild -- --watch --sourcemap",
     "package": "npx @vscode/vsce package",
