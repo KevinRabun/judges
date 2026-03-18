@@ -2,6 +2,36 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.117.0] — 2026-03-18
+
+### Added
+- **Human escalation protocol** (`src/escalation.ts`) — confidence-based routing of security-critical findings to human reviewers; 7 escalation reasons, 5 routing targets, configurable threshold (default 0.5).
+- **Immutable audit trail** (`src/audit-trail.ts`) — append-only JSONL ledger with FNV-1a integrity chain for every review decision; supports tamper detection and compliance queries.
+- **Recall-boost evaluator** (`src/evaluators/recall-boost.ts`) — targeted pattern matching for 7 historically weak categories (timing attacks, TOCTOU, prototype pollution, ReDoS, deserialization, SSRF via DNS rebinding, mass assignment).
+- **SAST integration layer** (`src/sast-integration.ts`) — unified SARIF ingestion with provider adapters for CodeQL and Semgrep; correlates static-analysis findings with judge verdicts.
+- **Multi-turn review conversation** (`src/review-conversation.ts`) — stateful review sessions with explain/dispute/accept intents, enabling developers to interact with findings conversationally.
+- **Agent-to-Agent (A2A) protocol** (`src/a2a-protocol.ts`) — JSON-RPC 2.0 agent card and task lifecycle for inter-agent orchestration per Google A2A spec.
+- **Fix-outcome feedback loop** (`src/feedback-loop.ts`) — tracks whether applied fixes resolve findings on re-review; builds per-rule effectiveness metrics.
+- **LLM benchmark system** — `scripts/run-benchmark.ts` (deterministic) and `scripts/copilot-llm-benchmark.ts` (LLM tribunal) for continuous accuracy measurement.
+- **Recall gap analyzer** (`scripts/analyze-recall-gaps.ts`) — identifies weak judge categories from benchmark results.
+
+### Changed
+- **Tiered CI strategy** — deterministic benchmark runs on every push; LLM tribunal reserved for pull requests to balance cost and coverage.
+- **123 benchmark cases corrected** — all cases with deliberate security issues now carry proper `expectedRuleIds` instead of empty arrays.
+- **5 meta-judges excluded** from benchmark tribunal — `meta-review`, `comparison`, `scoring`, `calibration`, `governance` no longer self-evaluate.
+- **FALSE POSITIVE AVOIDANCE directive** added to 31 `.judge.md` agent files — explicit instruction to avoid flagging idiomatic patterns.
+- **DOMAIN SCOPE DIRECTIVE** added to all agent judge files — constrains each judge to its declared domain.
+- **Scoring asymmetry fix** — penalty for false positives now proportional to confidence, preventing score inflation.
+- **`security.ts` hardened** — tightened regex timeout, added entropy-based secret detection threshold.
+
+### Fixed
+- Regenerated all 33 `.judge.md` agent files to include P3 production-readiness directives.
+- VS Code extension LLM benchmark runner test rewritten for v2 API (`onDidChangeChatModels`).
+
+### Tests
+- Deterministic benchmark: **F1 = 89.6 %** (precision 100 %, recall 81.1 %, 0 false positives).
+- LLM tribunal benchmark: **F1 = 100 %** (Copilot run, 0 FP, 0 FN).
+
 ## [3.116.0] — 2026-03-18
 
 ### Added

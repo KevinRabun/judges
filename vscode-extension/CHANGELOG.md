@@ -4,6 +4,25 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.117.0] — 2026-03-18
+
+### Added
+- **Human escalation protocol** — security-critical findings below 0.5 confidence automatically route to human reviewers with full context.
+- **Immutable audit trail** — every review decision logged to append-only JSONL with integrity chain for compliance.
+- **Recall-boost evaluator** — improved detection of timing attacks, TOCTOU, prototype pollution, ReDoS, deserialization, SSRF, and mass assignment.
+- **Multi-turn review conversations** — developers can dispute, request explanation, or accept findings interactively.
+- **Agent-to-Agent (A2A) protocol** — JSON-RPC 2.0 inter-agent orchestration support.
+
+### Changed
+- Core engine bumped to `@kevinrabun/judges@3.117.0`.
+- 31 judge agent files updated with FALSE POSITIVE AVOIDANCE and DOMAIN SCOPE directives.
+- Tiered CI: deterministic checks on push, LLM tribunal on PRs.
+
+### Fixed
+- LLM benchmark runner test updated for `onDidChangeChatModels` VS Code API.
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.116.0] — 2026-03-18
 
 ### Added

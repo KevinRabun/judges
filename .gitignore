@@ -82,3 +82,9 @@ vscode-extension/out/
 vscode-extension/node_modules/
 vscode-extension/*.vsix
 test-output-redos.txt
+
+# Hill-climb & LLM benchmark working files
+benchmarks/hill-climb-*
+benchmarks/copilot-llm/
+benchmarks/local-llm-benchmark.json
+benchmarks/improvement-proposals.md
