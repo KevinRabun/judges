@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.115.4] — 2026-03-18
+
+### Fixed
+- **Layer 1 deterministic analysis broken** — all 45 judges now loaded correctly via static side-effect imports that esbuild inlines into the CJS bundle. Previously, the agent-native `.judge.md` loader could not find files in the packaged `.vsix`.
+- `loadAgentJudges()` no longer errors in the extension context.
+
+### Changed
+- Core engine bumped to `@kevinrabun/judges@^3.115.4`
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.115.3] — 2026-03-18
 
 ### Fixed

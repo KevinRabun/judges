@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.115.4] — 2026-03-18
+
+### Fixed
+- Layer 1 deterministic analysis returned 0 judges / NaN score in the VS Code extension.
+  Root cause: the v3.115.3 CJS guard set `__dirname` to `process.cwd()` when `import.meta.url` is unavailable, causing the `agents/` directory path to resolve incorrectly. Additionally, `.judge.md` files aren't present in the published `.vsix` (`node_modules/**` is excluded by `.vscodeignore`).
+- Restored static side-effect imports for all 45 judge modules in `judges/index.ts`. Each module calls `defaultRegistry.register()` at load time and is inlined by esbuild into the CJS bundle — no disk I/O required.
+- In ESM mode (CLI, tests), both static imports and agent-native `.judge.md` loading operate together; the registry deduplicates by ID.
+- Fixed `loadAgentJudges()` default path to gracefully return 0 in CJS bundles instead of resolving a wrong directory.
+
+### Tests
+- Updated registry test to verify ≥45 static side-effect imports exist (previously asserted none).
+- 2194 tests pass, 0 fail.
+
 ## [3.115.3] — 2026-03-18
 
 ### Fixed

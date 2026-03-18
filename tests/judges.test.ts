@@ -121,9 +121,12 @@ describe("Judge Registry", () => {
     assert.equal(JUDGES.length, 45);
   });
 
-  it("registry should be populated via agent loader (no side-effect judge imports)", () => {
+  it("registry should be populated via static side-effect imports", () => {
     const src = readFileSync("src/judges/index.ts", "utf-8");
-    assert.ok(!/import\s+"\.\/.+\.js"/g.test(src), "Expected no side-effect judge imports in index.ts");
+    // Judges are dual-registered: static side-effect imports (for CJS bundle)
+    // + agent-native .judge.md files (for ESM). Verify the static imports exist.
+    const sideEffects = src.match(/import\s+"\.\/.+\.js"/g) ?? [];
+    assert.ok(sideEffects.length >= 45, `Expected ≥45 side-effect imports, found ${sideEffects.length}`);
   });
 
   it("should allow lookup of every judge by ID", () => {
