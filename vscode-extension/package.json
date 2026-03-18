@@ -577,7 +577,7 @@
     "typescript": "~5.6.3"
   },
   "dependencies": {
-    "@kevinrabun/judges": "file:.."
+    "@kevinrabun/judges": "*"
   },
   "overrides": {
     "yauzl": "^3.2.1"
