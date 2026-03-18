@@ -2510,6 +2510,23 @@ describe("Deduplication — crossEvaluatorDedup", () => {
     const result = crossEvaluatorDedup(findings);
     assert.equal(result.length, 1, "CORS findings should dedup to 1");
   });
+
+  it("should dedup identical recall-boost findings from multiple judges (COST-900 bug)", () => {
+    // Simulate 45 identical COST-900 findings (one per judge) from applyRecallBoost
+    const duplicates = Array.from({ length: 45 }, () =>
+      makeFinding({
+        ruleId: "COST-900",
+        severity: "medium",
+        title: "Nested array iterations",
+        description: "Nested array iterations reduce performance.",
+        lineNumbers: [10],
+        confidence: 0.75,
+      }),
+    );
+    const result = crossEvaluatorDedup(duplicates);
+    assert.equal(result.length, 1, "45 identical COST-900 findings should dedup to 1");
+    assert.equal(result[0].ruleId, "COST-900");
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

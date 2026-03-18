@@ -633,16 +633,8 @@ export function evaluateWithJudge(
     findings.push(...judge.analyze(code, language, analyzeCtx));
   }
 
-  // ── Recall boost: supplementary patterns for weak-recall categories ──
-  const boostResult = applyRecallBoost(code, language);
-  if (boostResult.findings.length > 0) {
-    // Deduplicate: only add boost findings whose ruleId isn't already present
-    for (const bf of boostResult.findings) {
-      if (!findings.some((f) => f.ruleId === bf.ruleId)) {
-        findings.push(bf);
-      }
-    }
-  }
+  // NOTE: Recall boost (applyRecallBoost) is applied once in evaluateWithTribunal()
+  // rather than per-judge, to avoid generating N duplicate boost findings.
 
   // ── Absence gating ──
   // Absence-based findings ("no rate limiting", "no monitoring", etc.) are
@@ -921,6 +913,20 @@ export function evaluateWithTribunal(
       : "pass";
 
   const rawFindings = evaluations.flatMap((e) => e.findings);
+
+  // ── Recall boost (once, not per-judge) ──
+  // Apply supplementary recall-boost patterns a single time and merge into
+  // the raw findings before cross-evaluator dedup. Previously this ran
+  // inside evaluateWithJudge(), producing N identical copies per judge.
+  const boostResult = applyRecallBoost(code, language);
+  if (boostResult.findings.length > 0) {
+    for (const bf of boostResult.findings) {
+      if (!rawFindings.some((f) => f.ruleId === bf.ruleId)) {
+        rawFindings.push(bf);
+      }
+    }
+  }
+
   const dedupedFindings = crossEvaluatorDedup(rawFindings);
   const { filtered: fpFiltered } = filterFalsePositiveHeuristics(
     dedupedFindings,

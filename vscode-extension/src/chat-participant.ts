@@ -497,7 +497,7 @@ async function handleWorkspaceReview(
       if (!code.trim()) continue;
 
       const verdict = evaluateWithTribunal(code, language);
-      let allFindings = verdict.evaluations.flatMap((e) => e.findings);
+      let allFindings = [...verdict.findings];
 
       // Apply preset / focus filters
       if (preset === "security-only") {
@@ -674,7 +674,7 @@ async function handleDeepReview(
 
   try {
     const verdict = evaluateWithTribunal(code, language);
-    findings = verdict.evaluations.flatMap((e) => e.findings);
+    findings = verdict.findings;
 
     if (token.isCancellationRequested) return;
 

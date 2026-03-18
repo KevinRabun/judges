@@ -96,7 +96,7 @@ async function handleEvaluateInvoke(
 
   try {
     const verdict = evaluateWithTribunal(code, language);
-    const findings = verdict.evaluations.flatMap((e) => e.findings);
+    const findings = verdict.findings;
 
     if (findings.length === 0) {
       return new vscode.LanguageModelToolResult([

@@ -361,3 +361,30 @@ describe("Integration: Verdict Structure", () => {
     }
   });
 });
+
+// ─── Recall Boost Dedup (COST-900 regression test) ─────────────────────────
+
+describe("Integration: Recall boost findings are not duplicated across judges", () => {
+  it("COST-900 appears at most once in tribunal findings for nested array code", () => {
+    const code = `
+const users = getUsers();
+const results = users.map(u => u.orders.filter(o => o.total > 100));
+export default results;
+`;
+    const verdict = evaluateWithTribunal(code, "typescript");
+    const cost900 = verdict.findings.filter((f) => f.ruleId === "COST-900");
+    assert.ok(cost900.length <= 1, `COST-900 should appear at most once but found ${cost900.length} times`);
+  });
+
+  it("recall boost findings in per-judge evaluations do not leak un-deduped into verdict.findings", () => {
+    const code = `
+const items = getData();
+const mapped = items.map(i => i.children.forEach(c => console.log(c)));
+`;
+    const verdict = evaluateWithTribunal(code, "typescript");
+    // Count any recall-boost findings (ruleId ending in -900+)
+    const boostFindings = verdict.findings.filter((f) => /-9\d{2}$/.test(f.ruleId));
+    const uniqueBoostIds = new Set(boostFindings.map((f) => f.ruleId));
+    assert.equal(boostFindings.length, uniqueBoostIds.size, "Each recall-boost ruleId should appear at most once");
+  });
+});

@@ -448,7 +448,7 @@ export class JudgesDiagnosticProvider {
     // ── Layer 1: Deterministic Evaluation ──
     onProgress?.("Layer 1 — Running deterministic analysis…");
     const verdict = evaluateWithTribunal(code, language);
-    const findings = verdict.evaluations.flatMap((e) => e.findings);
+    const findings = verdict.findings;
     this.publishFindings(document, findings, code);
 
     if (token.isCancellationRequested) {

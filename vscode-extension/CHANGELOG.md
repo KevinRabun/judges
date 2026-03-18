@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.117.3] — 2026-03-18
+
+### Fixed
+- **Duplicate findings eliminated** — recall-boost findings (COST-900, HALLU-900, etc.) no longer appear 40+ times. Four code paths in the extension were bypassing cross-evaluator deduplication by reading raw per-judge findings instead of the deduped `verdict.findings`. All fixed.
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.117.2] — 2026-03-18
 
 ### Fixed

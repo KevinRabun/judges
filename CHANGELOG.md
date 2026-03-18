@@ -2,6 +2,15 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.117.3] — 2026-03-18
+
+### Fixed
+- **COST-900 (and other recall-boost findings) duplicated 40+ times** — `applyRecallBoost()` ran inside `evaluateWithJudge()` which executes once per judge (~45 times), producing identical copies of every recall-boost finding. Moved recall boost to `evaluateWithTribunal()` so it runs exactly once as a post-aggregation step.
+- **VS Code extension bypassed cross-evaluator dedup** — four code paths in the extension (`diagnostics.ts`, `chat-participant.ts` ×2, `lm-tool.ts`) used `verdict.evaluations.flatMap(e => e.findings)` (raw per-judge findings) instead of `verdict.findings` (deduped findings). All four now use `verdict.findings`.
+
+### Tests
+- 3 new tests: crossEvaluatorDedup handles 45 identical recall-boost findings (subsystems), COST-900 appears at most once in tribunal output, and all boost ruleIds are unique in findings (integration). Total: 2314 pass, 0 fail, 2 skipped.
+
 ## [3.117.2] — 2026-03-18
 
 ### Fixed
