@@ -55,20 +55,29 @@ require.cache[judgesApiModuleId] = { exports: { JUDGES: [], BENCHMARK_CASES: [] 
 
 // Import the module under test
 const modulePath = pathToFileURL(path.resolve("vscode-extension/src/llm-benchmark-runner.ts")).href;
+type TestHooks = {
+  truncateResponse?: (s: string, max: number) => string;
+  truncate?: (s: string, max: number) => string;
+  getBenchmarkConfig?: () => Record<string, unknown>;
+  readConfig?: () => Record<string, unknown>;
+  enforceHeapGuard: (maxHeapMb: number) => void;
+};
 type RunnerModule = {
-  __test: {
-    truncateResponse: (s: string, max: number) => string;
-    getBenchmarkConfig: () => { sampleSize: number; maxOutputTokens: number; concurrency: number; enabled: boolean };
-    enforceHeapGuard: (maxHeapMb: number) => void;
-  };
+  __test?: TestHooks;
+  default?: { __test?: TestHooks };
 };
 const importedModule: unknown = await import(modulePath);
 const runner = importedModule as RunnerModule;
-const { __test } = runner;
+const __test = runner.__test ?? runner.default?.__test;
+if (!__test) throw new Error("Could not resolve __test from runner module");
+const truncateResponse = __test.truncateResponse ?? __test.truncate;
+const getBenchmarkConfig = __test.getBenchmarkConfig ?? __test.readConfig;
+if (!truncateResponse) throw new Error("Could not resolve truncateResponse/truncate");
+if (!getBenchmarkConfig) throw new Error("Could not resolve getBenchmarkConfig/readConfig");
 
 void test("truncateResponse truncates long strings", () => {
   const long = "abcdefghij"; // 10 chars
-  const truncated = __test.truncateResponse(long, 5);
+  const truncated = truncateResponse(long, 5);
   assert.ok(truncated.startsWith("abcde"));
   assert.ok(truncated.includes("truncated 5 chars"));
 });
@@ -79,11 +88,12 @@ void test("getBenchmarkConfig honors env overrides and default disabled", () => 
     process.env.JUDGES_LLM_BENCHMARK_ENABLED = "true";
     process.env.JUDGES_LLM_BENCHMARK_SAMPLE_SIZE = "10";
     process.env.JUDGES_LLM_BENCHMARK_MAX_OUTPUT_TOKENS = "999";
-    const cfg = __test.getBenchmarkConfig();
+    const cfg = getBenchmarkConfig();
     assert.strictEqual(cfg.enabled, true);
     assert.strictEqual(cfg.sampleSize, 10);
     assert.strictEqual(cfg.maxOutputTokens, 999);
-    assert.ok(cfg.concurrency >= 1);
+    // v2 renamed concurrency -> batchSize
+    assert.ok((cfg.batchSize ?? cfg.concurrency) >= 1);
   } finally {
     process.env = prev;
   }
@@ -91,7 +101,7 @@ void test("getBenchmarkConfig honors env overrides and default disabled", () => 
 
 void test("enforceHeapGuard throws when heap exceeds threshold", () => {
   // sanity for default config values
-  const cfg = __test.getBenchmarkConfig();
+  const cfg = getBenchmarkConfig();
   assert.strictEqual(cfg.enabled, false);
 
   const original = process.memoryUsage;
