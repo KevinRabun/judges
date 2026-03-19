@@ -157,8 +157,5 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
     "tsx": "^4.19.4"
-  },
-  "overrides": {
-    "hono": ">=4.12.7"
   }
 }
