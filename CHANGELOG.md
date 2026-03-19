@@ -2,6 +2,15 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.117.6] — 2026-03-19
+
+### Fixed
+- **VS Code extension type resolution** — deleted `vscode-extension/src/types/augment-judges-api.d.ts`, a stale ambient module declaration (`declare module "@kevinrabun/judges/api"`) that overrode all real package exports with a hardcoded minimal subset. This caused 82 persistent type errors including missing exports (`Finding`, `Patch`, `evaluateWithTribunal`, `getPreset`, `PromptAmendment`, `optimizeBenchmark`, etc.) and wrong function signatures (`constructTribunalPrompt` declared with 2–3 params instead of 4, `constructPerJudgePrompt` with 3 instead of 5). The real `dist/api.d.ts` declarations are complete and correct.
+- **`weakCategories` → `worstCategories`** in `vscode-extension/src/llm-benchmark-format.ts` — property name didn't match the `OptimizationResult.summary` interface.
+
+### Tests
+- 2368 pass, 0 fail, 2 skipped.
+
 ## [3.117.5] — 2026-03-19
 
 ### Fixed

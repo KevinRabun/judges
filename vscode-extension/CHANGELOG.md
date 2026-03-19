@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.117.6] — 2026-03-19
+
+### Fixed
+- **Type resolution permanently fixed** — removed stale `augment-judges-api.d.ts` ambient module declaration that was overriding all real `@kevinrabun/judges/api` exports with a hardcoded subset, causing 82 persistent type errors (missing exports, wrong function signatures). The real `dist/api.d.ts` declarations are now used directly.
+- **`weakCategories` → `worstCategories`** in benchmark formatting code.
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.117.5] — 2026-03-19
 
 ### Fixed
