@@ -201,7 +201,7 @@ describe("Documentation: Patch rules", () => {
 // ─── MCP Tool Count ─────────────────────────────────────────────────────────
 
 describe("Documentation: MCP tool count", () => {
-  it("has 29 MCP tools registered", () => {
+  it("has 31 MCP tools registered", () => {
     const toolsDir = resolve(ROOT, "src", "tools");
     const registerFiles = readdirSync(toolsDir).filter((f) => f.startsWith("register-") && f.endsWith(".ts"));
     let totalTools = 0;
@@ -214,8 +214,8 @@ describe("Documentation: MCP tool count", () => {
 
     assert.equal(
       totalTools,
-      29,
-      `Documentation claims 29 MCP tools but found ${totalTools}. Update docs/jetbrains-setup.md if this changes.`,
+      31,
+      `Documentation claims 31 MCP tools but found ${totalTools}. Update docs/jetbrains-setup.md if this changes.`,
     );
   });
 });

@@ -19,6 +19,7 @@ import {
 import { evaluateFilesBatch } from "../api.js";
 import { getGlobalSession } from "../evaluation-session.js";
 import { generatePublicRepoReport } from "../reports/public-repo-report.js";
+import { evaluateGitDiff, evaluateUnifiedDiff } from "../git-diff.js";
 import { configSchema, toJudgesConfig } from "./schemas.js";
 import { validateCodeSize } from "./validation.js";
 import type { Finding, JudgesConfig } from "../types.js";
@@ -38,6 +39,7 @@ export function registerWorkflowTools(server: McpServer): void {
   registerAppBuilderFlow(server);
   registerEvaluateProject(server);
   registerEvaluateDiff(server);
+  registerEvaluateGitDiff(server);
   registerAnalyzeDependencies(server);
   registerBenchmarkGate(server);
   registerBenchmarkDashboard(server);
@@ -1112,6 +1114,150 @@ function registerRecordFeedback(server: McpServer): void {
           },
         ],
       };
+    },
+  );
+}
+
+// ─── evaluate_git_diff ───────────────────────────────────────────────────────
+
+function registerEvaluateGitDiff(server: McpServer): void {
+  server.tool(
+    "evaluate_git_diff",
+    "Evaluate code changes from a git diff. Parses the unified diff from a git repository, identifies changed files and lines, and runs the full tribunal on each changed file — filtering findings to only those on changed lines. Supports both live git repos (provide repoPath + base ref) and pre-computed diffs (provide diffText).",
+    {
+      repoPath: z
+        .string()
+        .optional()
+        .describe("Absolute path to the git repository. Required when not providing diffText."),
+      base: z
+        .string()
+        .optional()
+        .describe("Git ref to diff against (e.g., 'main', 'HEAD~1', 'origin/main'). Default: 'HEAD~1'"),
+      diffText: z
+        .string()
+        .optional()
+        .describe("Pre-computed unified diff text. When provided, repoPath is used only for reading file contents."),
+      confidenceFilter: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe("Minimum confidence threshold for findings (default: no filter)"),
+      autoTune: z
+        .boolean()
+        .optional()
+        .describe("Apply feedback-driven auto-tuning to reduce false positives (default: false)"),
+      config: configSchema,
+    },
+    async ({ repoPath, base, diffText, confidenceFilter, autoTune, config }) => {
+      try {
+        const evalOptions = {
+          confidenceFilter,
+          autoTune,
+          config: toJudgesConfig(config),
+        };
+
+        let result;
+        if (diffText) {
+          result = evaluateUnifiedDiff(diffText, repoPath ?? ".", evalOptions);
+        } else if (repoPath) {
+          result = evaluateGitDiff(repoPath, base ?? "HEAD~1", evalOptions);
+        } else {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: "Error: Provide either `repoPath` (for live git diff) or `diffText` (for pre-computed diff).",
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        let md = `# Git Diff Analysis\n\n`;
+        md += `**Files changed:** ${result.files.length}\n`;
+        md += `**Total findings:** ${result.totalFindings}\n\n`;
+
+        for (const file of result.files) {
+          md += `## ${file.filePath}\n`;
+          md += `**Verdict:** ${file.verdict.verdict} · **Score:** ${file.verdict.score}/100 · `;
+          md += `**Changed lines:** ${file.verdict.linesAnalyzed} · **Findings:** ${file.verdict.findings.length}\n\n`;
+
+          if (file.verdict.findings.length > 0) {
+            for (const f of file.verdict.findings) {
+              const conf =
+                f.confidence !== undefined && f.confidence !== null ? ` (${Math.round(f.confidence * 100)}%)` : "";
+              md += `- **${f.ruleId}** ${f.severity}${conf}: ${f.title}`;
+              if (f.lineNumbers && f.lineNumbers.length > 0) {
+                md += ` (L${f.lineNumbers.join(", L")})`;
+              }
+              md += `\n`;
+            }
+            md += `\n`;
+          }
+        }
+
+        const structured = {
+          filesAnalyzed: result.files.length,
+          totalFindings: result.totalFindings,
+          fileVerdicts: result.files.map(
+            (fv: {
+              filePath: string;
+              language: string;
+              verdict: {
+                verdict: string;
+                score: number;
+                linesAnalyzed: number;
+                findings: Array<{
+                  ruleId: string;
+                  severity: string;
+                  confidence?: number;
+                  title: string;
+                  lineNumbers?: number[];
+                }>;
+              };
+            }) => ({
+              filePath: fv.filePath,
+              verdict: fv.verdict.verdict,
+              score: fv.verdict.score,
+              changedLineCount: fv.verdict.linesAnalyzed,
+              findingCount: fv.verdict.findings.length,
+              findings: fv.verdict.findings.map(
+                (f: {
+                  ruleId: string;
+                  severity: string;
+                  confidence?: number;
+                  title: string;
+                  lineNumbers?: number[];
+                }) => ({
+                  ruleId: f.ruleId,
+                  severity: f.severity,
+                  confidence: f.confidence,
+                  title: f.title,
+                  lineNumbers: f.lineNumbers,
+                }),
+              ),
+            }),
+          ),
+        };
+
+        return {
+          content: [
+            { type: "text" as const, text: md },
+            { type: "text" as const, text: "```json\n" + JSON.stringify(structured, null, 2) + "\n```" },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: error instanceof Error ? `Error: ${error.message}` : "Error: Failed to evaluate git diff",
+            },
+          ],
+          isError: true,
+        };
+      }
     },
   );
 }

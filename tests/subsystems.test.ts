@@ -14226,16 +14226,10 @@ describe("LSP Server module", () => {
 });
 
 describe("Watch Command", () => {
-  const usingTsx = process.execArgv.some((arg) => arg.includes("tsx"));
-  const itWatch = usingTsx ? it.skip : it;
-
-  itWatch("watches a single file and evaluates it immediately and on change", async () => {
+  it("watches a single file and evaluates it immediately and on change", async () => {
     const fs = await import("fs");
     const os = await import("os");
     const path = await import("path");
-    const { createRequire, syncBuiltinESMExports } = await import("module");
-    const require = createRequire(import.meta.url);
-    const fsBuiltin = require("fs");
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-watch-"));
     const filePath = path.join(tmpDir, "sample.ts");
     const logs: string[] = [];
@@ -14247,15 +14241,13 @@ describe("Watch Command", () => {
       },
     };
 
-    const origWatch = fsBuiltin.watch;
+    const mockFsWatch = (() => watcher) as unknown as typeof fs.watch;
     const origSetTimeout = globalThis.setTimeout;
     const origClearTimeout = globalThis.clearTimeout;
     const origLog = console.log;
 
     try {
       fs.writeFileSync(filePath, 'const secret = "prodSecret123";\nconsole.log(secret);\n');
-      fsBuiltin.watch = (() => watcher) as typeof fsBuiltin.watch;
-      syncBuiltinESMExports();
       globalThis.setTimeout = ((fn: (...args: any[]) => void) => {
         fn();
         return 1 as unknown as ReturnType<typeof setTimeout>;
@@ -14266,7 +14258,7 @@ describe("Watch Command", () => {
       }) as typeof console.log;
 
       const { runWatch } = await import("../src/commands/watch.js");
-      runWatch(["node", "judges", "watch", filePath]);
+      runWatch(["node", "judges", "watch", filePath], { fsWatch: mockFsWatch });
       handlers.get("change")?.("change", path.basename(filePath));
 
       assert.ok(logs.some((line) => line.includes("Watch Mode")));
@@ -14276,8 +14268,6 @@ describe("Watch Command", () => {
       );
       assert.ok(handlers.has("change"), "should register a change handler");
     } finally {
-      fsBuiltin.watch = origWatch;
-      syncBuiltinESMExports();
       globalThis.setTimeout = origSetTimeout;
       globalThis.clearTimeout = origClearTimeout;
       console.log = origLog;
@@ -14285,13 +14275,10 @@ describe("Watch Command", () => {
     }
   });
 
-  itWatch("reports an unknown judge without crashing", async () => {
+  it("reports an unknown judge without crashing", async () => {
     const fs = await import("fs");
     const os = await import("os");
     const path = await import("path");
-    const { createRequire, syncBuiltinESMExports } = await import("module");
-    const require = createRequire(import.meta.url);
-    const fsBuiltin = require("fs");
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "judges-watch-judge-"));
     const filePath = path.join(tmpDir, "sample.ts");
     const errors: string[] = [];
@@ -14300,24 +14287,20 @@ describe("Watch Command", () => {
         return watcher;
       },
     };
-    const origWatch = fsBuiltin.watch;
+    const mockFsWatch = (() => watcher) as unknown as typeof fs.watch;
     const origError = console.error;
 
     try {
       fs.writeFileSync(filePath, "export const value = 1;\n");
-      fsBuiltin.watch = (() => watcher) as typeof fsBuiltin.watch;
-      syncBuiltinESMExports();
       console.error = ((...parts: unknown[]) => {
         errors.push(parts.map((part) => String(part ?? "")).join(" "));
       }) as typeof console.error;
 
       const { runWatch } = await import("../src/commands/watch.js");
-      runWatch(["node", "judges", "watch", filePath, "--judge", "missing-judge"]);
+      runWatch(["node", "judges", "watch", filePath, "--judge", "missing-judge"], { fsWatch: mockFsWatch });
 
       assert.ok(errors.some((line) => line.includes("Unknown judge: missing-judge")));
     } finally {
-      fsBuiltin.watch = origWatch;
-      syncBuiltinESMExports();
       console.error = origError;
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

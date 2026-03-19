@@ -645,3 +645,15 @@ export async function evaluateFilesBatch(
 // ─── GitHub App ──────────────────────────────────────────────────────────────
 export { handleWebhook, verifyWebhookSignature, loadAppConfig, startAppServer, runAppCommand } from "./github-app.js";
 export type { GitHubAppConfig } from "./github-app.js";
+
+// ─── Git Diff Evaluation ─────────────────────────────────────────────────────
+export { evaluateGitDiff, evaluateUnifiedDiff, parseUnifiedDiffToChangedLines } from "./git-diff.js";
+export type { FileChangedLines, GitDiffVerdict } from "./git-diff.js";
+
+// ─── Cross-File Import Resolution ────────────────────────────────────────────
+export { resolveImports, buildRelatedFilesContext } from "./import-resolver.js";
+export type { ResolvedImport, ImportResolutionResult } from "./import-resolver.js";
+
+// ─── Auto-Tune (Feedback-Driven Calibration) ────────────────────────────────
+export { applyAutoTune, generateAutoTuneReport, formatAutoTuneReport, formatAutoTuneReportJson } from "./auto-tune.js";
+export type { AutoTuneReport, AutoTuneOptions, AutoTuneAction } from "./auto-tune.js";

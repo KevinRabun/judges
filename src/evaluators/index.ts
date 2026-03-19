@@ -66,6 +66,8 @@ import { selectJudges } from "./judge-selector.js";
 import { getGlobalSession } from "../evaluation-session.js";
 import { evaluateEscalations, enhanceReviewWithEscalations } from "../escalation.js";
 import { applyRecallBoost } from "./recall-boost.js";
+import { buildTribunalDeepReviewSection } from "../tools/deep-review.js";
+import { detectProjectContext } from "./shared.js";
 
 // ─── Individual Analyzers ────────────────────────────────────────────────────
 // NOTE: Analyzer functions are now registered directly on each JudgeDefinition
@@ -131,6 +133,36 @@ export interface EvaluationOptions {
    * and improves performance. Defaults to false (run all judges).
    */
   adaptiveSelection?: boolean;
+  /**
+   * Enable automatic feedback-driven auto-tuning.
+   * When true, loads the feedback store and applies time-decay weighted
+   * auto-suppression (FP rate >= 80%), severity downgrading (50-80%),
+   * and confidence boosting (< 15%) without requiring `calibrate` to be set.
+   * Defaults to false. When both `autoTune` and `calibrate` are set,
+   * auto-tune runs first, then calibration refines further.
+   */
+  autoTune?: boolean;
+  /**
+   * Include deep-review prompt section in the verdict for LLM-augmented analysis.
+   * When true, appends the tribunal deep-review criteria to the verdict metadata
+   * so that downstream LLM consumers can perform contextual reasoning beyond
+   * pattern matching. This is the bridge between Layer 1 (deterministic) and
+   * Layer 2 (LLM) review.
+   */
+  deepReview?: boolean;
+  /**
+   * Related file snippets for cross-file deep-review context.
+   * When deepReview is enabled, these are included in the deep-review prompt
+   * to give the LLM visibility into imports, shared types, and call sites.
+   */
+  relatedFiles?: Array<{ path: string; snippet: string; relationship?: string }>;
+  /**
+   * Minimum confidence threshold for findings to appear in the output.
+   * Findings below this threshold are filtered out of the verdict.
+   * The verdict includes a `filteredCount` field showing how many were removed.
+   * Value range: 0-1 (e.g., 0.6 means only findings with >= 60% confidence appear).
+   */
+  confidenceFilter?: number;
   /** @internal — pre-computed AST structure for the file (set by evaluateWithTribunal) */
   _astCache?: CodeStructure;
   /** @internal — pre-computed taint flows for the file (set by evaluateWithTribunal) */
@@ -843,6 +875,10 @@ export function evaluateWithTribunal(
         ms: options.config?.minSeverity,
         jw: options.config?.judgeWeights,
         mfg: options.mustFixGate,
+        at: options.autoTune,
+        drev: options.deepReview,
+        cf: options.confidenceFilter,
+        rf: options.relatedFiles?.length,
       })
     : "";
   const hash = contentHash(code, language + optionsSuffix);
@@ -971,6 +1007,7 @@ export function evaluateWithTribunal(
   // 2. Severity downgrade for rules with FP rate 50-80%
   // 3. Confidence calibration based on historical FP rates
   let calibrated = configFiltered;
+  let autoTuneMetadata: { suppressed: number; downgraded: number } | undefined;
   if (enrichedOptions.calibrate) {
     try {
       const calOpts: CalibrationOptions | undefined =
@@ -979,6 +1016,7 @@ export function evaluateWithTribunal(
       if (feedbackStore.entries.length > 0) {
         const tuned = applyAutoTune(calibrated, feedbackStore);
         calibrated = tuned.findings;
+        autoTuneMetadata = { suppressed: tuned.suppressed, downgraded: tuned.downgraded };
       } else {
         // No feedback data — try plain calibration profile
         const profile = loadCalibrationProfile(calOpts);
@@ -988,6 +1026,21 @@ export function evaluateWithTribunal(
       }
     } catch {
       // Calibration failure is non-fatal — continue with uncalibrated findings
+    }
+  } else if (enrichedOptions.autoTune) {
+    // ── Standalone auto-tune (without full calibrate) ──
+    // Lightweight feedback-only tuning path: applies auto-suppression and
+    // severity downgrades from the feedback store without requiring a
+    // full calibration profile.
+    try {
+      const feedbackStore = loadFeedbackStore();
+      if (feedbackStore.entries.length > 0) {
+        const tuned = applyAutoTune(calibrated, feedbackStore);
+        calibrated = tuned.findings;
+        autoTuneMetadata = { suppressed: tuned.suppressed, downgraded: tuned.downgraded };
+      }
+    } catch {
+      // Auto-tune failure is non-fatal
     }
   }
 
@@ -1052,7 +1105,23 @@ export function evaluateWithTribunal(
     // Session feedback calibration failure is non-fatal
   }
 
-  const cappedFindings = applyPerFileFindingCap(sessionAdjusted, maxFindings);
+  // ── Confidence-based output filtering ──
+  // When confidenceFilter is set, drop findings below the threshold entirely.
+  // This gives callers a first-class knob to control signal-to-noise ratio.
+  let confidenceFiltered = sessionAdjusted;
+  let confidenceFilteredOutCount = 0;
+  if (
+    enrichedOptions.confidenceFilter !== undefined &&
+    enrichedOptions.confidenceFilter !== null &&
+    enrichedOptions.confidenceFilter > 0
+  ) {
+    const threshold = enrichedOptions.confidenceFilter;
+    const before = confidenceFiltered.length;
+    confidenceFiltered = confidenceFiltered.filter((f) => (f.confidence ?? 0.5) >= threshold);
+    confidenceFilteredOutCount = before - confidenceFiltered.length;
+  }
+
+  const cappedFindings = applyPerFileFindingCap(confidenceFiltered, maxFindings);
 
   // ── Confidence-based tiering for progressive disclosure ──
   // Tag each finding with a disclosure tier so downstream consumers (CLI,
@@ -1113,6 +1182,43 @@ export function evaluateWithTribunal(
     },
     reviewDecision: synthesizeReviewDecision(enrichedFindings),
   };
+
+  // ── Deep review prompt attachment (P0.1) ──
+  // When deepReview is enabled, build and attach a structured LLM prompt
+  // section so downstream consumers can trigger a second-pass analysis.
+  if (enrichedOptions.deepReview) {
+    try {
+      const projectCtx = detectProjectContext(code, language, enrichedOptions.filePath);
+      const relatedSnippets: Array<{ path: string; snippet: string; relationship?: string }> =
+        enrichedOptions.relatedFiles ?? [];
+      result.deepReviewPrompt = buildTribunalDeepReviewSection(
+        judges,
+        language,
+        context,
+        relatedSnippets.map((r) => ({ path: r.path, snippet: r.snippet, relationship: r.relationship })),
+        projectCtx,
+      );
+    } catch {
+      // Deep review prompt generation failure is non-fatal
+    }
+  }
+
+  // ── Attach auto-tune metadata ──
+  if (autoTuneMetadata) {
+    result.autoTuneApplied = autoTuneMetadata;
+  }
+
+  // ── Attach confidence filter metadata ──
+  if (
+    enrichedOptions.confidenceFilter !== undefined &&
+    enrichedOptions.confidenceFilter !== null &&
+    confidenceFilteredOutCount > 0
+  ) {
+    result.confidenceFilterApplied = {
+      threshold: enrichedOptions.confidenceFilter,
+      filteredOut: confidenceFilteredOutCount,
+    };
+  }
 
   // ── AI model detection escalation ──
   // When the model-fingerprint judge (MFPR-* rules) fires, attach escalation

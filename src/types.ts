@@ -732,6 +732,28 @@ export interface TribunalVerdict {
     /** Recommended action */
     recommendation: string;
   };
+  /**
+   * LLM deep-review prompt section. Present when `deepReview: true` is set
+   * in evaluation options. Contains a structured prompt that downstream LLM
+   * consumers can use for a second-pass analysis of the findings.
+   */
+  deepReviewPrompt?: string;
+  /**
+   * Auto-tune metadata. Present when `autoTune: true` is set and feedback
+   * data was applied. Records how many findings were suppressed or downgraded.
+   */
+  autoTuneApplied?: {
+    suppressed: number;
+    downgraded: number;
+  };
+  /**
+   * Confidence filter metadata. Present when `confidenceFilter` is set.
+   * Records how many findings were filtered out due to low confidence.
+   */
+  confidenceFilterApplied?: {
+    threshold: number;
+    filteredOut: number;
+  };
 }
 
 /**

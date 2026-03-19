@@ -16,6 +16,8 @@ import {
   formatSuppressionAnalytics,
 } from "../finding-lifecycle.js";
 import type { TriageStatus } from "../finding-lifecycle.js";
+import { evaluateWithTribunal } from "../evaluators/index.js";
+import type { EvaluationOptions } from "../evaluators/index.js";
 
 // ─── Rule-prefix learning context (shared with CLI --explain) ────────────────
 
@@ -97,6 +99,7 @@ export function registerReviewTools(server: McpServer): void {
   registerGetFindingStats(server);
   registerGetSuppressionAnalytics(server);
   registerListTriagedFindings(server);
+  registerReEvaluateWithContext(server);
 }
 
 // ─── explain_finding ─────────────────────────────────────────────────────────
@@ -475,6 +478,197 @@ function registerListTriagedFindings(server: McpServer): void {
             {
               type: "text" as const,
               text: error instanceof Error ? `Error: ${error.message}` : "Error: Failed to list triaged findings",
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+}
+
+// ─── re_evaluate_with_context ────────────────────────────────────────────────
+
+function registerReEvaluateWithContext(server: McpServer): void {
+  server.tool(
+    "re_evaluate_with_context",
+    "Re-evaluate code with developer-provided context from a multi-turn conversation. Accepts disputed findings, accepted findings, and additional context to adjust the evaluation. This is the agentic feedback loop — the developer explains their intent and the tribunal re-evaluates with that context, applying auto-tune and confidence filtering.",
+    {
+      code: z.string().describe("The source code to re-evaluate"),
+      language: z.string().describe("Programming language (e.g., typescript, python, go)"),
+      disputedRuleIds: z
+        .array(z.string())
+        .optional()
+        .describe("Rule IDs the developer disputes as false positives (e.g., ['SEC-001', 'PERF-003'])"),
+      acceptedRuleIds: z
+        .array(z.string())
+        .optional()
+        .describe("Rule IDs the developer accepts (these will not be filtered)"),
+      developerContext: z
+        .string()
+        .optional()
+        .describe(
+          "Free-form explanation from the developer about their intent, design decisions, or why certain findings are incorrect",
+        ),
+      focusAreas: z
+        .array(z.string())
+        .optional()
+        .describe("Specific areas to focus the re-evaluation on (e.g., ['security', 'performance'])"),
+      confidenceFilter: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe("Minimum confidence threshold — findings below this are dropped (default: 0.5)"),
+      filePath: z.string().optional().describe("File path for context-aware evaluation"),
+      deepReview: z
+        .boolean()
+        .optional()
+        .describe("Whether to include the LLM deep-review prompt section in the result"),
+      relatedFiles: z
+        .array(
+          z.object({
+            path: z.string().describe("Path of the related file"),
+            snippet: z.string().describe("Relevant code snippet from the related file"),
+            relationship: z.string().optional().describe("Relationship to the main file (e.g., 'imports', 'tests')"),
+          }),
+        )
+        .optional()
+        .describe("Cross-file context for more accurate evaluation"),
+    },
+    async ({
+      code,
+      language,
+      disputedRuleIds,
+      acceptedRuleIds,
+      developerContext,
+      focusAreas,
+      confidenceFilter,
+      filePath,
+      deepReview,
+      relatedFiles,
+    }) => {
+      try {
+        // Build context string from developer inputs
+        const contextParts: string[] = [];
+        if (developerContext) {
+          contextParts.push(`Developer context: ${developerContext}`);
+        }
+        if (disputedRuleIds && disputedRuleIds.length > 0) {
+          contextParts.push(`Disputed findings: ${disputedRuleIds.join(", ")}`);
+        }
+        if (acceptedRuleIds && acceptedRuleIds.length > 0) {
+          contextParts.push(`Accepted findings: ${acceptedRuleIds.join(", ")}`);
+        }
+        if (focusAreas && focusAreas.length > 0) {
+          contextParts.push(`Focus areas: ${focusAreas.join(", ")}`);
+        }
+        const fullContext = contextParts.join("\n");
+
+        const evalOptions: EvaluationOptions = {
+          autoTune: true,
+          deepReview: deepReview ?? false,
+          confidenceFilter: confidenceFilter ?? 0.5,
+          filePath,
+          relatedFiles,
+          calibrate: true,
+        };
+
+        const verdict = evaluateWithTribunal(code, language, fullContext || undefined, evalOptions);
+
+        // Post-process: mark disputed findings
+        let findings = verdict.findings;
+        if (disputedRuleIds && disputedRuleIds.length > 0) {
+          const disputedSet = new Set(disputedRuleIds);
+          findings = findings.map((f) => {
+            if (disputedSet.has(f.ruleId)) {
+              return {
+                ...f,
+                confidence: Math.max(0.1, (f.confidence ?? 0.5) * 0.5),
+                confidenceTier: "supplementary" as const,
+              };
+            }
+            return f;
+          });
+          // Re-filter after confidence adjustment
+          if (confidenceFilter) {
+            findings = findings.filter((f) => (f.confidence ?? 0.5) >= confidenceFilter);
+          }
+        }
+
+        const sections: string[] = [];
+        sections.push(`# Re-Evaluation Results\n`);
+        sections.push(`**Verdict:** ${verdict.overallVerdict} · **Score:** ${verdict.overallScore}/100`);
+        sections.push(`**Findings:** ${findings.length} (after context adjustment)`);
+
+        if (verdict.autoTuneApplied) {
+          sections.push(
+            `**Auto-tune:** ${verdict.autoTuneApplied.suppressed} suppressed, ${verdict.autoTuneApplied.downgraded} downgraded`,
+          );
+        }
+        if (verdict.confidenceFilterApplied) {
+          sections.push(
+            `**Confidence filter:** ${verdict.confidenceFilterApplied.filteredOut} findings below ${Math.round(verdict.confidenceFilterApplied.threshold * 100)}% filtered out`,
+          );
+        }
+
+        if (findings.length > 0) {
+          sections.push(`\n## Findings\n`);
+          for (const f of findings) {
+            const conf =
+              f.confidence !== undefined && f.confidence !== null ? ` (${Math.round(f.confidence * 100)}%)` : "";
+            const tier = f.confidenceTier ? ` [${f.confidenceTier}]` : "";
+            sections.push(`- **${f.ruleId}** ${f.severity}${conf}${tier}: ${f.title}`);
+          }
+        }
+
+        if (disputedRuleIds && disputedRuleIds.length > 0) {
+          const stillPresent = findings.filter((f) => disputedRuleIds.includes(f.ruleId));
+          const resolved = disputedRuleIds.filter((id) => !findings.some((f) => f.ruleId === id));
+          if (resolved.length > 0) {
+            sections.push(`\n## Disputed findings resolved\n`);
+            sections.push(`The following disputed findings were dropped: ${resolved.join(", ")}`);
+          }
+          if (stillPresent.length > 0) {
+            sections.push(`\n## Disputed findings retained\n`);
+            sections.push(
+              `The following remain with reduced confidence: ${stillPresent.map((f) => `${f.ruleId} (${Math.round((f.confidence ?? 0) * 100)}%)`).join(", ")}`,
+            );
+          }
+        }
+
+        const structured = {
+          overallVerdict: verdict.overallVerdict,
+          overallScore: verdict.overallScore,
+          findingCount: findings.length,
+          autoTuneApplied: verdict.autoTuneApplied ?? null,
+          confidenceFilterApplied: verdict.confidenceFilterApplied ?? null,
+          disputedResolved: disputedRuleIds?.filter((id) => !findings.some((f) => f.ruleId === id)) ?? [],
+          findings: findings.map((f) => ({
+            ruleId: f.ruleId,
+            severity: f.severity,
+            confidence: f.confidence,
+            confidenceTier: f.confidenceTier,
+            title: f.title,
+          })),
+        };
+
+        const contentBlocks = [
+          { type: "text" as const, text: sections.join("\n") },
+          { type: "text" as const, text: "```json\n" + JSON.stringify(structured, null, 2) + "\n```" },
+        ];
+
+        if (verdict.deepReviewPrompt) {
+          contentBlocks.push({ type: "text" as const, text: verdict.deepReviewPrompt });
+        }
+
+        return { content: contentBlocks };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: error instanceof Error ? `Error: ${error.message}` : "Error: Re-evaluation failed",
             },
           ],
           isError: true,

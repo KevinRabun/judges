@@ -154,7 +154,13 @@ function debounce(fn: () => void, ms: number): () => void {
 
 // ─── Main Watch Command ────────────────────────────────────────────────────
 
-export function runWatch(argv: string[]): void {
+export interface WatchOptions {
+  /** Override the fs.watch function (useful for testing). */
+  fsWatch?: typeof fsWatch;
+}
+
+export function runWatch(argv: string[], options?: WatchOptions): void {
+  const watchFn = options?.fsWatch ?? fsWatch;
   const args = parseWatchArgs(argv);
   const target = resolve(args.path);
 
@@ -176,7 +182,7 @@ export function runWatch(argv: string[]): void {
 
   if (isDir) {
     // Watch directory recursively
-    const watcher = fsWatch(target, { recursive: true });
+    const watcher = watchFn(target, { recursive: true });
 
     watcher.on("change", (_event, filename) => {
       if (!filename) return;
@@ -206,7 +212,7 @@ export function runWatch(argv: string[]): void {
       }
     }, 300);
 
-    const watcher = fsWatch(target);
+    const watcher = watchFn(target);
     watcher.on("change", () => debouncedEval());
 
     // Run initial evaluation
