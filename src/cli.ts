@@ -6159,7 +6159,8 @@ function loadEvalConfig(args: CliArgs): JudgesConfig | undefined {
       args.format = config.format;
     }
     if (config.failOnScoreBelow !== undefined && args.minScore === undefined) {
-      args.minScore = config.failOnScoreBelow;
+      // Config uses 0-10 scale; CLI --min-score uses 0-100 (matches overallScore)
+      args.minScore = config.failOnScoreBelow * 10;
     }
   }
 

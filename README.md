@@ -73,9 +73,26 @@ console.log(verdict.overallVerdict, verdict.overallScore);
 ```
 
 ### MCP server
+
+The MCP server runs on stdio and is started by your MCP client (VS Code, Claude Desktop, etc.).
+Configure it in your MCP settings (e.g. `mcp.json`):
+
+```json
+{
+  "servers": {
+    "judges": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@kevinrabun/judges"]
+    }
+  }
+}
+```
+
+Or run the server directly:
 ```bash
-npx @kevinrabun/judges mcp
-# Or programmatically: import { startMcpServer } from "@kevinrabun/judges/mcp";
+npx @kevinrabun/judges
+# Starts the MCP server on stdio
 ```
 
 > Config file: `.judgesrc.json` (supports `${ENV_VAR}` substitution via `expandEnvPlaceholders`). See [Configuration](#configuration).

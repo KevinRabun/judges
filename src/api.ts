@@ -4,7 +4,7 @@
  * Public entry-point for consuming judges as a library (not via MCP).
  *
  * ```ts
- * import { evaluateCode, evaluateProject, getJudges } from "@kevinrabun/judges/api";
+ * import { evaluateCode, evaluateProject, JUDGES } from "@kevinrabun/judges/api";
  * const result = evaluateCode("const x = eval(input);", "typescript");
  * ```
  */

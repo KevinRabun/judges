@@ -49,7 +49,7 @@ judges eval src/
 
 | SonarQube Concept | Judges Equivalent |
 |---|---|
-| Quality Gate | `"failOnScoreBelow": 7` + `"failOnFindings": true` |
+| Quality Gate | `"failOnScoreBelow": 7` + `"failOnFindings": true` (config uses 0-10 scale; equivalent to `--min-score 70` on the CLI's 0-100 scale) |
 | Quality Profile | `"preset": "security-only"` or `"preset": "strict"` |
 | `sonar-project.properties` | `.judgesrc` |
 | Issue severity (Blocker/Critical/Major) | Severity (critical/high/medium/low/info) |
@@ -67,7 +67,7 @@ judges eval src/ --format sarif --output judges.sarif
 judges eval src/ --format github-actions
 
 # Quality gate equivalent:
-judges eval src/ --fail-on-findings --min-score 7
+judges eval src/ --fail-on-findings --min-score 70
 ```
 
 ### Key Differences
@@ -150,7 +150,7 @@ judges eval src/ --format github-actions --changed-only
       --format github-actions \
       --changed-only \
       --fail-on-findings \
-      --min-score 7
+      --min-score 70
 ```
 
 ### GitLab CI

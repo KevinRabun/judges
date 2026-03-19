@@ -14,7 +14,7 @@ npm install @kevinrabun/judges
 ## Quick Start
 
 ```typescript
-import { evaluateCode, evaluateCodeSingleJudge, getJudges } from "@kevinrabun/judges/api";
+import { evaluateCode, evaluateCodeSingleJudge, JUDGES } from "@kevinrabun/judges/api";
 
 // Full tribunal evaluation
 const verdict = evaluateCode("const x = eval(input);", "typescript");
@@ -23,6 +23,9 @@ console.log(verdict.overallScore);   // 0-100
 
 // Single judge
 const result = evaluateCodeSingleJudge("cybersecurity", code, "typescript");
+
+// List all judges
+console.log(JUDGES.length); // 45
 ```
 
 ---

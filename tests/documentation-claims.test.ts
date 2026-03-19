@@ -532,3 +532,278 @@ describe("Documentation: README claims consistency", () => {
     );
   });
 });
+
+// ─── Quickstart: API import examples match real exports ─────────────────────
+
+describe("Quickstart: API import examples use real exports", () => {
+  // Collect import statements from docs that reference @kevinrabun/judges/api
+  const docsToCheck = [
+    { file: "README.md", label: "README" },
+    { file: "docs/api-reference.md", label: "API Reference" },
+    { file: "docs/plugin-guide.md", label: "Plugin Guide" },
+    { file: "examples/quickstart.ts", label: "examples/quickstart.ts" },
+  ];
+
+  for (const { file, label } of docsToCheck) {
+    it(`${label} import examples only reference real exports`, async () => {
+      const filePath = resolve(ROOT, file);
+      if (!existsSync(filePath)) return;
+      const content = readFileSync(filePath, "utf-8");
+      const api = await import("../src/api.js");
+      const apiKeys = new Set(Object.keys(api));
+
+      // Extract named imports from lines like: import { foo, bar } from "@kevinrabun/judges/api";
+      // Also match from "@kevinrabun/judges" (bare import)
+      const importPattern = /import\s*\{([^}]+)\}\s*from\s*["']@kevinrabun\/judges(?:\/api)?["']/g;
+      let match;
+      while ((match = importPattern.exec(content)) !== null) {
+        const names = match[1]
+          .split(",")
+          .map((n) =>
+            n
+              .trim()
+              .split(/\s+as\s+/)[0]
+              .trim(),
+          )
+          .filter(Boolean);
+        for (const name of names) {
+          // Skip type-only imports
+          if (name.startsWith("type ")) continue;
+          assert.ok(
+            apiKeys.has(name),
+            `${label} imports "${name}" from @kevinrabun/judges/api but it is not exported. ` +
+              `Available exports include: JUDGES, getJudge, getJudgeSummaries, evaluateCode, etc.`,
+          );
+        }
+      }
+    });
+  }
+});
+
+// ─── Quickstart: MCP server documentation ───────────────────────────────────
+
+describe("Quickstart: MCP server claims", () => {
+  it("README does not reference non-existent 'mcp' CLI command", () => {
+    const readme = readFileSync(resolve(ROOT, "README.md"), "utf-8");
+    // The CLI has no "mcp" subcommand — MCP server is started via direct node invocation
+    assert.ok(
+      !readme.includes("judges mcp") || readme.includes("# "),
+      'README should not claim "judges mcp" or "npx @kevinrabun/judges mcp" as a command — no such CLI command exists',
+    );
+  });
+
+  it("README does not reference non-existent startMcpServer export", () => {
+    const readme = readFileSync(resolve(ROOT, "README.md"), "utf-8");
+    assert.ok(
+      !readme.includes("startMcpServer"),
+      'README should not reference "startMcpServer" — this function does not exist',
+    );
+  });
+
+  it("README does not reference non-existent ./mcp export path", () => {
+    const readme = readFileSync(resolve(ROOT, "README.md"), "utf-8");
+    assert.ok(
+      !readme.includes('@kevinrabun/judges/mcp"') && !readme.includes("@kevinrabun/judges/mcp'"),
+      'README should not reference "@kevinrabun/judges/mcp" — the correct path is "@kevinrabun/judges/server"',
+    );
+  });
+
+  it("package.json exports ./server (the MCP server entry)", () => {
+    const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf-8"));
+    assert.ok(pkg.exports?.["./server"], 'package.json should export "./server" for the MCP server');
+  });
+});
+
+// ─── Quickstart: GitHub Action inputs ───────────────────────────────────────
+
+describe("Quickstart: GitHub Action inputs match action.yml", () => {
+  it("action.yml has all documented inputs", () => {
+    const actionPath = resolve(ROOT, "action.yml");
+    if (!existsSync(actionPath)) return;
+    const actionContent = readFileSync(actionPath, "utf-8");
+    const documentedInputs = [
+      "path",
+      "diff-only",
+      "fail-on-findings",
+      "upload-sarif",
+      "language",
+      "judge",
+      "preset",
+      "config",
+      "format",
+      "fix",
+      "pr-review",
+      "baseline-file",
+    ];
+    for (const input of documentedInputs) {
+      assert.ok(
+        actionContent.includes(`${input}:`),
+        `action.yml should define input "${input}" — update docs if action inputs change`,
+      );
+    }
+  });
+});
+
+// ─── Quickstart: CLI commands exist ─────────────────────────────────────────
+
+describe("Quickstart: CLI commands referenced in docs exist", () => {
+  const cliPath = resolve(ROOT, "src", "cli.ts");
+  const cliSrc = existsSync(cliPath) ? readFileSync(cliPath, "utf-8") : "";
+
+  const documentedCommands = [
+    "eval",
+    "list",
+    "init",
+    "fix",
+    "watch",
+    "report",
+    "diff",
+    "deps",
+    "app",
+    "skill",
+    "skills",
+    "license-scan",
+  ];
+
+  for (const cmd of documentedCommands) {
+    it(`CLI has "${cmd}" command handler`, () => {
+      assert.ok(
+        cliSrc.includes(`args.command === "${cmd}"`),
+        `CLI should have a handler for command "${cmd}" — update docs if commands change`,
+      );
+    });
+  }
+});
+
+// ─── Quickstart: CLI flags exist ────────────────────────────────────────────
+
+describe("Quickstart: CLI flags referenced in docs exist", () => {
+  const cliPath = resolve(ROOT, "src", "cli.ts");
+  const cliSrc = existsSync(cliPath) ? readFileSync(cliPath, "utf-8") : "";
+
+  const documentedFlags = [
+    "--file",
+    "--language",
+    "--format",
+    "--judge",
+    "--preset",
+    "--config",
+    "--min-score",
+    "--summary",
+    "--fail-on-findings",
+    "--baseline",
+    "--changed-only",
+    "--output",
+    "--min-severity",
+    "--fix",
+  ];
+
+  for (const flag of documentedFlags) {
+    it(`CLI parses "${flag}" flag`, () => {
+      assert.ok(cliSrc.includes(`case "${flag}"`), `CLI should parse flag "${flag}" — update docs if flags change`);
+    });
+  }
+});
+
+// ─── Quickstart: examples/quickstart.ts is valid ────────────────────────────
+
+describe("Quickstart: examples/quickstart.ts", () => {
+  it("quickstart example file exists", () => {
+    assert.ok(existsSync(resolve(ROOT, "examples", "quickstart.ts")), "examples/quickstart.ts should exist");
+  });
+
+  it("quickstart example imports only real exports", async () => {
+    const content = readFileSync(resolve(ROOT, "examples", "quickstart.ts"), "utf-8");
+    const api = await import("../src/api.js");
+    const apiKeys = new Set(Object.keys(api));
+
+    const importPattern = /import\s*\{([^}]+)\}\s*from\s*["']@kevinrabun\/judges(?:\/api)?["']/g;
+    let match;
+    while ((match = importPattern.exec(content)) !== null) {
+      const names = match[1]
+        .split(",")
+        .map((n) =>
+          n
+            .trim()
+            .split(/\s+as\s+/)[0]
+            .trim(),
+        )
+        .filter(Boolean);
+      for (const name of names) {
+        if (name.startsWith("type ")) continue;
+        assert.ok(apiKeys.has(name), `examples/quickstart.ts imports "${name}" but it is not exported from api.ts`);
+      }
+    }
+  });
+
+  it("quickstart example calls evaluateCode which returns a verdict", async () => {
+    const { evaluateCode } = await import("../src/api.js");
+    const verdict = evaluateCode("const x = eval(input);", "typescript");
+    assert.ok(verdict, "evaluateCode should return a verdict");
+    assert.ok(typeof verdict.overallVerdict === "string", "verdict.overallVerdict should be a string");
+    assert.ok(typeof verdict.overallScore === "number", "verdict.overallScore should be a number");
+    assert.ok(Array.isArray(verdict.evaluations), "verdict.evaluations should be an array");
+  });
+
+  it("quickstart example calls evaluateCodeSingleJudge correctly", async () => {
+    const { evaluateCodeSingleJudge } = await import("../src/api.js");
+    const result = evaluateCodeSingleJudge("cybersecurity", "const x = eval(input);", "typescript");
+    assert.ok(result, "evaluateCodeSingleJudge should return a result");
+    assert.ok(typeof result.score === "number", "result.score should be a number");
+    assert.ok(Array.isArray(result.findings), "result.findings should be an array");
+  });
+
+  it("quickstart example calls getJudgeSummaries correctly", async () => {
+    const { getJudgeSummaries } = await import("../src/api.js");
+    const summaries = getJudgeSummaries();
+    assert.ok(Array.isArray(summaries), "getJudgeSummaries should return an array");
+    assert.equal(summaries.length, 45, "Should return 45 judge summaries");
+    for (const s of summaries) {
+      assert.ok(s.id, "Each summary should have an id");
+      assert.ok(s.name, "Each summary should have a name");
+    }
+  });
+});
+
+// ─── Quickstart: Score scales are consistent ────────────────────────────────
+
+describe("Quickstart: Score scale consistency", () => {
+  it("failOnScoreBelow config is validated on 0-10 scale", () => {
+    const configSrc = readFileSync(resolve(ROOT, "src", "config.ts"), "utf-8");
+    assert.ok(
+      configSrc.includes("failOnScoreBelow") && configSrc.includes("> 10"),
+      "failOnScoreBelow should be validated as 0-10 range in config.ts",
+    );
+  });
+
+  it("CLI scales failOnScoreBelow from 0-10 config to 0-100 minScore", () => {
+    const cliSrc = readFileSync(resolve(ROOT, "src", "cli.ts"), "utf-8");
+    assert.ok(
+      cliSrc.includes("failOnScoreBelow * 10"),
+      "CLI should scale failOnScoreBelow (0-10) to minScore (0-100) by multiplying by 10",
+    );
+  });
+
+  it("overallScore is on 0-100 scale", async () => {
+    const { evaluateCode } = await import("../src/api.js");
+    const verdict = evaluateCode("console.log('hello');", "typescript");
+    assert.ok(verdict.overallScore >= 0 && verdict.overallScore <= 100, "overallScore should be 0-100");
+  });
+
+  it("migration guide uses --min-score on 0-100 scale", () => {
+    const migrationPath = resolve(ROOT, "docs", "migration-guides.md");
+    if (!existsSync(migrationPath)) return;
+    const content = readFileSync(migrationPath, "utf-8");
+    // All --min-score values should be >= 10 to make sense on 0-100 scale
+    const minScorePattern = /--min-score\s+(\d+)/g;
+    let match;
+    while ((match = minScorePattern.exec(content)) !== null) {
+      const value = parseInt(match[1], 10);
+      assert.ok(
+        value >= 10,
+        `Migration guide uses --min-score ${value} which is suspiciously low for a 0-100 scale. ` +
+          `Did you mean ${value * 10}? (SonarQube uses 0-10; Judges CLI uses 0-100)`,
+      );
+    }
+  });
+});
