@@ -80,7 +80,6 @@
         "contents": "Save a file to run 45 judges automatically, or click below.\n[Evaluate Current File](command:judges.evaluateFile)\n[Evaluate Workspace](command:judges.evaluateWorkspace)\n[Open @judges Chat](command:workbench.action.chat.open)"
       }
     ],
-
     "commands": [
       {
         "command": "judges.evaluateFile",
@@ -306,7 +305,15 @@
         "judges.preset": {
           "type": "string",
           "default": "",
-          "enum": ["", "strict", "lenient", "security-only", "startup", "compliance", "performance"],
+          "enum": [
+            "",
+            "strict",
+            "lenient",
+            "security-only",
+            "startup",
+            "compliance",
+            "performance"
+          ],
           "enumDescriptions": [
             "All judges, default severity threshold",
             "All judges, show all severities",
@@ -353,15 +360,20 @@
         "judges.exclude": {
           "type": "array",
           "default": [],
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Glob patterns to exclude files from workspace evaluation (e.g., '**/test/**', '*.spec.ts')."
         },
         "judges.include": {
           "type": "array",
           "default": [],
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Glob patterns to include only matching files in workspace evaluation."
-        },        "judges.llmBenchmark.enabled": {
+        },
+        "judges.llmBenchmark.enabled": {
           "type": "boolean",
           "default": false,
           "description": "Enable LLM benchmark runner (disabled by default to protect extension host memory). Env override: JUDGES_LLM_BENCHMARK_ENABLED=true"
@@ -426,7 +438,8 @@
           "default": 20,
           "minimum": 1,
           "description": "Log memory stats every N LLM calls. Env override: JUDGES_LLM_BENCHMARK_LOG_MEMORY_EVERY."
-        },        "judges.maxFiles": {
+        },
+        "judges.maxFiles": {
           "type": "number",
           "default": 50,
           "description": "Maximum number of files to evaluate in workspace mode."
@@ -574,7 +587,7 @@
     "@types/vscode": "^1.109.0",
     "@vscode/vsce": "^3.3.2",
     "esbuild": "^0.25.0",
-    "typescript": "~5.6.3"
+    "typescript": "^5.6.3"
   },
   "dependencies": {
     "@kevinrabun/judges": "*"

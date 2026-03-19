@@ -255,8 +255,8 @@ function formatOptimizationSection(opt: OptimizationResult): string[] {
   if (opt.summary.worstJudges.length > 0) {
     lines.push(`**Worst judges:** ${opt.summary.worstJudges.join(", ")}`);
   }
-  if (opt.summary.weakCategories.length > 0) {
-    lines.push(`**Weak categories:** ${opt.summary.weakCategories.join(", ")}`);
+  if (opt.summary.worstCategories.length > 0) {
+    lines.push(`**Weak categories:** ${opt.summary.worstCategories.join(", ")}`);
   }
   lines.push("");
 
