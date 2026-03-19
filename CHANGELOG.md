@@ -2,6 +2,15 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.117.8] — 2026-03-19
+
+### Changed
+- **Removed stale `hono` override** — the `overrides.hono` pin (`>=4.12.7`) in `package.json` was a transitive-dependency guard that is no longer needed; `@modelcontextprotocol/sdk` already resolves hono ≥4.12.8.
+- **CLI package version sync** — `packages/judges-cli/package.json` now stays in sync with the root version automatically. The build script (`scripts/prepare-cli-package.mjs`) copies the root version on every build. Previously drifted from 3.114.0.
+
+### Tests
+- 2412 pass, 0 fail, 2 skipped.
+
 ## [3.117.7] — 2026-03-19
 
 ### Fixed

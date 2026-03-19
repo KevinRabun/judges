@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.117.8] — 2026-03-19
+
+### Changed
+- **Removed stale `hono` override** and synced CLI package version to root. Build script now auto-syncs versions.
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.117.7] — 2026-03-19
 
 ### Fixed
