@@ -56,9 +56,12 @@ export {
   mergeConfigs,
   discoverCascadingConfigs,
   loadCascadingConfig,
+  loadConfigFile,
+  expandEnvPlaceholders,
   loadPluginJudges,
   validatePluginSpecifiers,
   isValidJudgeDefinition,
+  validateJudgeDefinition,
   applyOverridesForFile,
   applyLanguageProfile,
   resolveExtendsConfig,
@@ -78,6 +81,7 @@ export {
   analyzeDependencies,
   enrichWithPatches,
   crossEvaluatorDedup,
+  crossFileDedup,
   diffFindings,
   formatFindingDiff,
   evaluateNetChangeGate,
@@ -98,7 +102,7 @@ export { selectJudges } from "./evaluators/judge-selector.js";
 export { EvaluationSession, getGlobalSession, resetGlobalSession } from "./evaluation-session.js";
 
 // ─── Presets ─────────────────────────────────────────────────────────────────
-export { getPreset, composePresets, PRESETS } from "./presets.js";
+export { getPreset, composePresets, listPresets, PRESETS } from "./presets.js";
 export type { Preset } from "./presets.js";
 
 // ─── V2 Policy-Aware API ────────────────────────────────────────────────────

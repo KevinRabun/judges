@@ -2,6 +2,22 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.117.4] — 2026-03-19
+
+### Fixed
+- **Documentation accuracy audit** — cross-referenced all documentation claims against source code and fixed 15 discrepancies:
+  - `docs/migration-guides.md`: corrected 4 wrong package name references (`@anthropic/judges` → `@kevinrabun/judges-cli`), fixed dimension count (44 → 45).
+  - `README.md`: updated test badge (1666 → 2370), added missing format options (`pdf`, `github-actions`), corrected `security-only` preset description, expanded preset table from 6 to all 22 presets, fixed dimension count (44 → 45).
+  - `docs/api-reference.md`: fixed import path (`@kevinrabun/judges/presets` → `@kevinrabun/judges/api`), expanded presets list to all 22, added `isValidJudgeDefinition` alias note.
+  - `docs/jetbrains-setup.md`: corrected MCP tool count (21 → 29), expanded tool table from 5 to 27 rows, fixed config example format.
+- **Missing API exports** — `loadConfigFile`, `expandEnvPlaceholders`, `validateJudgeDefinition`, `listPresets`, and `crossFileDedup` were documented in `api-reference.md` but not re-exported from `src/api.ts`. All five are now exported.
+
+### Added
+- **Documentation claims regression tests** (`tests/documentation-claims.test.ts`) — 54 tests across 9 suites that validate documentation claims match actual functionality: judge count (45), preset count (22), patch rule count (200+), MCP tool count (29), formatter files (9), API export existence (36 functions), package.json exports map, CLI format types, and README claim consistency. These tests will fail if functionality changes without corresponding documentation updates.
+
+### Tests
+- 54 new documentation-claims tests. Total: 2370 pass, 0 fail, 2 skipped.
+
 ## [3.117.3] — 2026-03-18
 
 ### Fixed

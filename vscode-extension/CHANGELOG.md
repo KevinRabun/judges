@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.117.4] — 2026-03-19
+
+### Fixed
+- **Documentation accuracy audit** — 15 discrepancies fixed across README, api-reference, migration-guides, and jetbrains-setup docs. All documented claims now match actual functionality.
+- **Missing API exports** — 5 functions (`loadConfigFile`, `expandEnvPlaceholders`, `validateJudgeDefinition`, `listPresets`, `crossFileDedup`) now properly exported from the public API.
+
+### Added
+- **Documentation claims regression tests** — 54 new tests ensure docs stay in sync with code.
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.117.3] — 2026-03-18
 
 ### Fixed

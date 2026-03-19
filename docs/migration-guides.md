@@ -22,7 +22,7 @@ concepts, configs, and workflows to their Judges equivalents.
 
 ```bash
 # 1. Install
-npm install -g @anthropic/judges
+npm install -g @kevinrabun/judges-cli
 
 # 2. Initialize (creates .judgesrc)
 judges init
@@ -37,7 +37,7 @@ judges eval src/
 
 ### Key Differences
 
-- **Judges evaluates 44 dimensions** — not just style/lint. Security, performance,
+- **Judges evaluates 45 dimensions** — not just style/lint. Security, performance,
   accessibility, database, API design, error handling, and more.
 - **No per-rule config needed** — Judges auto-selects relevant rules per language.
 - **Confidence scores** — every finding has a 0-1 confidence score with evidence basis.
@@ -146,7 +146,7 @@ judges eval src/ --format github-actions --changed-only
 # Replace your existing analysis step with:
 - name: Judges Analysis
   run: |
-    npx @anthropic/judges eval src/ \
+    npx @kevinrabun/judges-cli eval src/ \
       --format github-actions \
       --changed-only \
       --fail-on-findings \
@@ -159,7 +159,7 @@ judges eval src/ --format github-actions --changed-only
 judges:
   stage: test
   script:
-    - npx @anthropic/judges eval src/ --format codeclimate --output gl-code-quality-report.json
+    - npx @kevinrabun/judges-cli eval src/ --format codeclimate --output gl-code-quality-report.json
   artifacts:
     reports:
       codequality: gl-code-quality-report.json
@@ -168,7 +168,7 @@ judges:
 ### Azure Pipelines
 
 ```yaml
-- script: npx @anthropic/judges eval src/ --format sarif --output $(Build.ArtifactStagingDirectory)/judges.sarif
+- script: npx @kevinrabun/judges-cli eval src/ --format sarif --output $(Build.ArtifactStagingDirectory)/judges.sarif
   displayName: 'Judges Analysis'
 - task: PublishBuildArtifacts@1
   inputs:

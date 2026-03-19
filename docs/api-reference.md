@@ -193,6 +193,8 @@ Resolves the `extends` chain (supports arrays), detects cycles, and merges confi
 ### `validateJudgeDefinition(def)`
 Returns an array of validation error strings. Empty array means success.
 
+> **Note:** Also available as `isValidJudgeDefinition(def)` — returns `boolean`.
+
 ### `JudgesConfig`
 
 ```typescript
@@ -213,7 +215,7 @@ interface JudgesConfig {
 ## Presets
 
 ```typescript
-import { getPreset, listPresets, composePresets } from "@kevinrabun/judges/presets";
+import { getPreset, listPresets, composePresets } from "@kevinrabun/judges/api";
 
 // Single preset
 const preset = getPreset("security-only");
@@ -222,7 +224,7 @@ const preset = getPreset("security-only");
 const composed = composePresets(["security-only", "performance"]);
 ```
 
-Available presets: `strict`, `lenient`, `security-only`, `startup`, `compliance`, `performance`.
+Available presets: `strict`, `lenient`, `security-only`, `startup`, `compliance`, `performance`, `react`, `express`, `fastapi`, `django`, `spring-boot`, `rails`, `nextjs`, `terraform`, `kubernetes`, `onboarding`, `fintech`, `healthtech`, `saas`, `government`.
 
 ---
 

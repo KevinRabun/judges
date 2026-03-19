@@ -1,6 +1,6 @@
 # JetBrains IDE Integration
 
-Judges exposes 21 MCP tools via stdio transport, making it compatible with any JetBrains IDE that supports the Model Context Protocol (IntelliJ IDEA, WebStorm, PyCharm, GoLand, Rider, etc.).
+Judges exposes 29 MCP tools via stdio transport, making it compatible with any JetBrains IDE that supports the Model Context Protocol (IntelliJ IDEA, WebStorm, PyCharm, GoLand, Rider, etc.).
 
 ## Prerequisites
 
@@ -54,27 +54,46 @@ Once connected, the following tools are available to the AI Assistant:
 
 | Tool | Description |
 |------|-------------|
-| `judges_evaluate` | Evaluate code with the full 45-judge tribunal |
-| `judges_evaluate_project` | Evaluate an entire project directory |
-| `judges_evaluate_diff` | Evaluate only changed lines in a diff |
-| `judges_list` | List all available judges |
-| `judges_benchmark` | Run the benchmark suite |
+| `get_judges` | List all available judges with their domains and descriptions |
+| `evaluate_code` | Evaluate code with the full 45-judge tribunal |
+| `evaluate_code_single_judge` | Evaluate code with a specific judge |
+| `evaluate_policy_aware` | V2 context-aware evaluation with policy profiles |
+| `evaluate_file` | Evaluate a file from disk with session-aware caching |
+| `evaluate_code_streaming` | Streaming evaluation with per-judge breakdown |
+| `evaluate_project` | Evaluate an entire project directory |
+| `evaluate_diff` | Evaluate only changed lines in a diff |
+| `evaluate_public_repo_report` | Clone and analyze a public repository |
+| `evaluate_app_builder_flow` | 3-step app builder workflow for release decisions |
+| `evaluate_then_fix` | Evaluate and auto-fix in one call |
+| `evaluate_focused` | Run a specific subset of judges |
+| `evaluate_with_progress` | Evaluate with progress logging |
+| `fix_code` | Apply auto-fix patches to findings |
+| `analyze_dependencies` | Analyze dependency manifests for supply-chain risks |
+| `explain_finding` | Get detailed explanation of a finding |
+| `triage_finding` | Triage a finding (accept/dismiss/defer) |
+| `get_finding_stats` | Get statistics about findings |
+| `get_suppression_analytics` | View suppression analytics |
+| `list_triaged_findings` | List all triaged findings |
+| `scaffold_judge` | Scaffold a new custom judge |
+| `scaffold_plugin` | Scaffold a new plugin |
+| `benchmark_gate` | Run benchmark regression gate |
+| `run_benchmark` | Run the full benchmark suite |
+| `session_status` | View evaluation session state |
+| `list_files` | List files in a directory |
+| `read_file` | Read a file from disk |
 
-See the [API Reference](api-reference.md) for the complete tool list and parameters.
+See the [API Reference](api-reference.md) for complete tool parameters.
 
 ## Configuration
 
-Place a `.judgesrc` file in your project root to customize behavior:
+Place a `.judgesrc.json` file in your project root to customize behavior:
 
 ```json
 {
   "preset": "strict",
-  "judges": {
-    "enabled": ["*"],
-    "disabled": []
-  },
-  "minConfidence": 0.7,
-  "maxFindingsPerFile": 20
+  "disabledJudges": [],
+  "minSeverity": "medium",
+  "maxFiles": 600
 }
 ```
 

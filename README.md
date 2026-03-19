@@ -15,7 +15,7 @@ An MCP (Model Context Protocol) server that provides a panel of **45 specialized
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![npm downloads](https://img.shields.io/npm/dw/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-1666-brightgreen)](https://github.com/KevinRabun/judges/actions)
+[![Tests](https://img.shields.io/badge/tests-2370-brightgreen)](https://github.com/KevinRabun/judges/actions)
 
 > 🔰 **Packages**
 > - **CLI**: `@kevinrabun/judges-cli` → binary `judges` (use `npx @kevinrabun/judges-cli eval --file app.ts`).
@@ -84,7 +84,7 @@ npx @kevinrabun/judges mcp
 
 ## Why Judges?
 
-AI code generators (Copilot, Cursor, Claude, ChatGPT, etc.) write code fast — but they routinely produce **insecure defaults, missing auth, hardcoded secrets, and poor error handling**. Human reviewers catch some of this, but nobody reviews 44 dimensions consistently.
+AI code generators (Copilot, Cursor, Claude, ChatGPT, etc.) write code fast — but they routinely produce **insecure defaults, missing auth, hardcoded secrets, and poor error handling**. Human reviewers catch some of this, but nobody reviews 45 dimensions consistently.
 
 | | ESLint / Biome | SonarQube | Semgrep / CodeQL | **Judges** |
 |---|---|---|---|---|
@@ -550,13 +550,13 @@ Evaluate a file with all 45 judges or a single judge.
 | `--file <path>` / positional | File to evaluate |
 | `--judge <id>` / `-j <id>` | Single judge mode |
 | `--language <lang>` / `-l <lang>` | Language hint (auto-detected from extension) |
-| `--format <fmt>` / `-f <fmt>` | Output format: `text`, `json`, `sarif`, `markdown`, `html`, `junit`, `codeclimate` |
+| `--format <fmt>` / `-f <fmt>` | Output format: `text`, `json`, `sarif`, `markdown`, `html`, `pdf`, `junit`, `codeclimate`, `github-actions` |
 | `--output <path>` / `-o <path>` | Write output to file |
 | `--fail-on-findings` | Exit with code 1 if verdict is FAIL |
 | `--baseline <path>` / `-b <path>` | JSON baseline file — suppress known findings |
 | `--summary` | Print a single summary line (ideal for scripts) |
 | `--config <path>` | Load a `.judgesrc` / `.judgesrc.json` config file |
-| `--preset <name>` | Use a named preset: `strict`, `lenient`, `security-only`, `startup`, `compliance`, `performance` |
+| `--preset <name>` | Use a named preset (see [Named Presets](#named-presets) for all 18 options) |
 | `--min-score <n>` | Exit with code 1 if overall score is below this threshold |
 | `--verbose` | Print timing and debug information |
 | `--quiet` | Suppress non-essential output |
@@ -696,10 +696,24 @@ Use `--preset` to apply pre-configured evaluation settings:
 |--------|-------------|
 | `strict` | All severities, all judges — maximum thoroughness |
 | `lenient` | Only high and critical findings — fast and focused |
-| `security-only` | Security judges only — cybersecurity, data-security, authentication, logging-privacy |
+| `security-only` | Security-focused — disables non-security judges (cost, scalability, docs, a11y, i18n, UX, etc.) |
 | `startup` | Skip compliance, sovereignty, i18n judges — move fast |
 | `compliance` | Only compliance, data-sovereignty, authentication — regulatory focus |
 | `performance` | Only performance, scalability, caching, cost-effectiveness |
+| `react` | Tuned for React/Next.js apps — enables accessibility, XSS protection |
+| `express` | Tuned for Express.js APIs — middleware security, auth, CORS, rate limiting |
+| `fastapi` | Tuned for Python FastAPI — input validation, async patterns, API security |
+| `django` | Tuned for Django apps — template security, ORM misuse, CSRF |
+| `spring-boot` | Tuned for Java Spring Boot — injection, configuration, actuator security |
+| `rails` | Tuned for Ruby on Rails — mass assignment, CSRF, SQL injection |
+| `nextjs` | Tuned for Next.js — server/client security, API routes, SSR/ISR |
+| `terraform` | Tuned for Terraform/OpenTofu IaC — infrastructure security, compliance |
+| `kubernetes` | Tuned for K8s manifests — security contexts, RBAC, resource limits |
+| `onboarding` | Smart defaults for first-time adoption — suppresses noisy rules |
+| `fintech` | Financial services — PCI DSS, cryptography, authentication, audit |
+| `healthtech` | Healthcare — HIPAA compliance, data sovereignty, encryption, audit trails |
+| `saas` | Multi-tenant SaaS — tenant isolation, rate limiting, scalability |
+| `government` | Government/public sector — compliance, sovereignty, authentication |
 
 ```bash
 judges eval --preset security-only src/api.ts
@@ -1155,13 +1169,13 @@ Create a `.judgesrc.json` (or `.judgesrc`) file in your project root to customiz
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `$schema` | `string` | — | JSON Schema URL for IDE validation |
-| `preset` | `string` | — | Named preset: `strict`, `lenient`, `security-only`, `startup`, `compliance`, `performance` |
+| `preset` | `string` | — | Named preset (see [Named Presets](#named-presets) for all 18 options) |
 | `minSeverity` | `string` | `"info"` | Minimum severity to report: `critical` · `high` · `medium` · `low` · `info` |
 | `disabledRules` | `string[]` | `[]` | Rule IDs or prefix wildcards to suppress (e.g. `"COST-*"`, `"SEC-003"`) |
 | `disabledJudges` | `string[]` | `[]` | Judge IDs to skip entirely (e.g. `"cost-effectiveness"`) |
 | `ruleOverrides` | `object` | `{}` | Per-rule overrides keyed by rule ID or wildcard — `{ disabled?: boolean, severity?: string }` |
 | `languages` | `string[]` | `[]` | Restrict analysis to specific languages (empty = all) |
-| `format` | `string` | `"text"` | Default output format: `text` · `json` · `sarif` · `markdown` · `html` · `junit` · `codeclimate` |
+| `format` | `string` | `"text"` | Default output format: `text` · `json` · `sarif` · `markdown` · `html` · `pdf` · `junit` · `codeclimate` · `github-actions` |
 | `failOnFindings` | `boolean` | `false` | Exit code 1 when verdict is `fail` — useful for CI gates |
 | `baseline` | `string` | `""` | Path to a baseline JSON file — matching findings are suppressed |
 
