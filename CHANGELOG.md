@@ -2,6 +2,23 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.118.0] — 2026-03-19
+
+### Added
+- **LLM deep-review prompt generation** — new `deepReview` and `relatedFiles` options on `EvaluationOptions` attach structured prompts for LLM-assisted deep review of tribunal findings, with cross-file context and project-aware formatting.
+- **Multi-turn re-evaluate MCP tool** — `re_evaluate_with_context` allows agentic callers to re-run the tribunal with prior findings as context, enabling iterative refinement workflows.
+- **Auto-tune standalone path** — new `autoTune` option on `EvaluationOptions` applies time-decay weighted false-positive suppression directly in the evaluation pipeline without requiring a separate call.
+- **Native git diff evaluation** — `evaluateGitDiff()` and `evaluateUnifiedDiff()` in new `src/git-diff.ts` parse unified diffs and evaluate only changed lines. New `evaluate_git_diff` MCP tool exposes this to agentic callers.
+- **Cross-file import resolution** — `resolveImports()` and `buildRelatedFilesContext()` in new `src/import-resolver.ts` resolve imports across 5 languages (TypeScript, JavaScript, Python, Go, Rust) using AST + regex fallback, providing cross-file snippets for deep review.
+- **Confidence filter** — new `confidenceFilter` option on `EvaluationOptions` filters findings below a confidence threshold, with metadata tracking (`confidenceFilterApplied`) on the verdict.
+- **2 new MCP tools** — `evaluate_git_diff` (workflow) and `re_evaluate_with_context` (review). Total MCP tools: 31.
+
+### Fixed
+- **Watch command tests no longer skipped** — rewrote the 2 "Watch Command" tests to use dependency injection (`WatchOptions.fsWatch`) instead of CJS `createRequire`/`syncBuiltinESMExports` monkeypatching that was incompatible with tsx. All tests now run under tsx.
+
+### Tests
+- 28 new tests (26 P0/P1 feature tests + 2 watch tests now running). Total: 2440 pass, 0 fail, 0 skipped.
+
 ## [3.117.8] — 2026-03-19
 
 ### Changed

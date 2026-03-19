@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.118.0] — 2026-03-19
+
+### Added
+- **6 agentic evaluation features** — deep-review prompts, multi-turn re-evaluate tool, auto-tune pipeline, native git diff evaluation, cross-file import resolution, and confidence filtering.
+- **2 new MCP tools** — `evaluate_git_diff` and `re_evaluate_with_context`. Total MCP tools: 31.
+
+### Fixed
+- **Watch command tests fully enabled** — no more skipped tests (was 2 skipped).
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.117.8] — 2026-03-19
 
 ### Changed
