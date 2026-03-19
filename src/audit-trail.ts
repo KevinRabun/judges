@@ -18,8 +18,7 @@
 
 import { appendFileSync, readFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import type { Finding, Severity, ReviewDecision, SuppressionRecord } from "./types.js";
-import { getDataAdapter, type DataAdapter } from "./data-adapter.js";
+import type { Finding, Severity, ReviewDecision } from "./types.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

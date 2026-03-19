@@ -10,9 +10,9 @@
  *   npx tsx scripts/analyze-recall-gaps.ts --verbose  # With code snippets
  */
 
-import { evaluateWithTribunal } from "../src/evaluators/index.js";
-import { runBenchmarkSuite, type BenchmarkCase } from "../src/commands/benchmark.js";
+import { runBenchmarkSuite } from "../src/commands/benchmark.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface RecallGap {
   /** Rule prefix that was missed (e.g. "HALLU") */
   prefix: string;
@@ -33,7 +33,7 @@ interface RecallGap {
 }
 
 async function analyzeRecallGaps(): Promise<void> {
-  const verbose = process.argv.includes("--verbose");
+  const _verbose = process.argv.includes("--verbose");
 
   console.log("Running full benchmark suite...\n");
   const result = runBenchmarkSuite();
@@ -62,7 +62,7 @@ async function analyzeRecallGaps(): Promise<void> {
   // Analyze per-judge recall
   console.log("\n=== Per-Judge Recall (lowest first) ===\n");
   const sortedJudges = Object.entries(result.perJudge)
-    .filter(([, j]) => (j.totalExpected ?? 0) > 0)
+    .filter(([, j]) => (j.total ?? 0) > 0)
     .sort(([, a], [, b]) => (a.recall ?? 1) - (b.recall ?? 1));
 
   for (const [judgeId, judgeResult] of sortedJudges) {
@@ -70,7 +70,7 @@ async function analyzeRecallGaps(): Promise<void> {
     const marker = recall < 0.7 ? "❌" : recall < 0.85 ? "⚠️" : "✅";
     console.log(
       `${marker} ${judgeId}: recall=${(recall * 100).toFixed(1)}% ` +
-        `(${judgeResult.truePositives ?? 0}/${judgeResult.totalExpected ?? 0} detected)`,
+        `(${judgeResult.truePositives ?? 0}/${judgeResult.total ?? 0} detected)`,
     );
   }
 
@@ -78,8 +78,8 @@ async function analyzeRecallGaps(): Promise<void> {
   console.log("\n=== Per-Difficulty Recall ===\n");
   for (const [difficulty, diffResult] of Object.entries(result.perDifficulty)) {
     console.log(
-      `${difficulty}: recall=${((diffResult.recall ?? 1) * 100).toFixed(1)}% ` +
-        `(${diffResult.truePositives ?? 0} TP, ${diffResult.falseNegatives ?? 0} FN)`,
+      `${difficulty}: recall=${((diffResult.detectionRate ?? 1) * 100).toFixed(1)}% ` +
+        `(${diffResult.detected ?? 0} TP, ${(diffResult.total ?? 0) - (diffResult.detected ?? 0)} FN)`,
     );
   }
 
@@ -100,7 +100,7 @@ async function analyzeRecallGaps(): Promise<void> {
     console.log(`\n${weakJudges.length} judges with recall < 85%:`);
     for (const [judgeId, judgeResult] of weakJudges) {
       const fn = judgeResult.falseNegatives ?? 0;
-      const total = judgeResult.totalExpected ?? 0;
+      const total = judgeResult.total ?? 0;
       console.log(`  - ${judgeId}: missing ${fn}/${total} expected findings`);
     }
   }

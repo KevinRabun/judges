@@ -92,13 +92,13 @@ for (let i = 0; i < cases.length; i += BATCH_SIZE) {
   let runTP = 0,
     runFN = 0,
     runFP = 0,
-    runDetected = 0;
+    _runDetected = 0;
   for (const r of results) {
     const tp = r.expectedRuleIds.length - r.missedRuleIds.length;
     runTP += tp;
     runFN += r.missedRuleIds.length;
     runFP += r.falsePositiveRuleIds.length;
-    if (r.passed) runDetected++;
+    if (r.passed) _runDetected++;
   }
   const runP = runTP + runFP > 0 ? runTP / (runTP + runFP) : 1;
   const runR = runTP + runFN > 0 ? runTP / (runTP + runFN) : 1;

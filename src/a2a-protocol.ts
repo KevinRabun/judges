@@ -14,7 +14,7 @@
  * Wire format: JSON-RPC 2.0 over HTTP or stdio (MCP-compatible)
  */
 
-import type { Finding, TribunalVerdict, ReviewDecision, Severity } from "./types.js";
+import type { Finding, ReviewDecision } from "./types.js";
 
 // ─── Agent Card (Discovery) ──────────────────────────────────────────────────
 

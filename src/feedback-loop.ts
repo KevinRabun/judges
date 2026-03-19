@@ -17,8 +17,8 @@
  * 5. Generate a summary report of the feedback loop's impact
  */
 
-import { loadFixHistory, computeFixStats, type FixHistory, type FixStats } from "./fix-history.js";
-import { loadFeedbackStore, saveFeedbackStore, type FeedbackStore, type FeedbackEntry } from "./commands/feedback.js";
+import { loadFixHistory, computeFixStats, type FixStats } from "./fix-history.js";
+import { loadFeedbackStore, saveFeedbackStore, type FeedbackEntry } from "./commands/feedback.js";
 import { loadCalibrationProfile, type CalibrationProfile, type CalibrationOptions } from "./calibration.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────

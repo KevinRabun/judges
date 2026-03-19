@@ -13,7 +13,7 @@
  * Designed for MCP tool sessions and VS Code extension interactions.
  */
 
-import type { Finding, TribunalVerdict, Severity } from "./types.js";
+import type { Finding, TribunalVerdict } from "./types.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -392,7 +392,7 @@ function handleAcceptance(conversation: ReviewConversation, ref?: string): strin
   return `Finding **${ref}** accepted. ${unaddressed.length} finding(s) remaining.`;
 }
 
-function handleReEvaluateRequest(conversation: ReviewConversation, content: string): string {
+function handleReEvaluateRequest(conversation: ReviewConversation, _content: string): string {
   return `Re-evaluation requested. The following developer context will be applied:\n\n${conversation.developerContext.additionalContext.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n\nRe-run the evaluation with this conversation's context for updated results.`;
 }
 

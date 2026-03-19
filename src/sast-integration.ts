@@ -17,7 +17,6 @@
  */
 
 import { readFileSync, existsSync } from "fs";
-import { resolve, basename } from "path";
 import type { Finding, Severity, TribunalVerdict } from "./types.js";
 
 // ─── SARIF Types (subset of SARIF 2.1.0 schema) ─────────────────────────────
