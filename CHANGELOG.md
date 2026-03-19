@@ -2,6 +2,21 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.117.5] — 2026-03-19
+
+### Fixed
+- **Lint and type errors resolved** — cleaned up unused imports and variables across 7 files:
+  - `src/feedback-loop.ts`: removed unused `FixHistory`, `FeedbackStore` type imports.
+  - `src/audit-trail.ts`: removed unused `SuppressionRecord`, `getDataAdapter`, `DataAdapter` imports.
+  - `src/sast-integration.ts`: removed unused `resolve`, `basename` path imports.
+  - `src/review-conversation.ts`: removed unused `Severity` type, prefixed unused parameter.
+  - `src/a2a-protocol.ts`: removed unused `TribunalVerdict`, `Severity` type imports.
+  - `scripts/analyze-recall-gaps.ts`: fixed type property mismatches (`totalExpected` → `total`, `DifficultyResult` field mappings), removed unused imports.
+  - `scripts/run-local-llm-benchmark.ts`: prefixed unused variable.
+
+### Tests
+- 2368 pass, 0 fail, 2 skipped.
+
 ## [3.117.4] — 2026-03-19
 
 ### Fixed
