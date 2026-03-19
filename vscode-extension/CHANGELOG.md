@@ -4,6 +4,16 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.117.7] — 2026-03-19
+
+### Fixed
+- **Quickstart documentation accuracy** — corrected MCP server instructions, API import examples, migration guide score thresholds, and `failOnScoreBelow` config scaling bug.
+
+### Added
+- **44 quickstart verification tests** — automated checks for API imports, MCP claims, CLI commands/flags, GitHub Action inputs, and score scale consistency.
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.117.6] — 2026-03-19
 
 ### Fixed

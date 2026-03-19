@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.117.7] — 2026-03-19
+
+### Fixed
+- **Quickstart documentation accuracy** — corrected MCP server setup instructions in README (removed non-existent `judges mcp` command and `startMcpServer` import; replaced with correct `mcp.json` stdio config), fixed `getJudges` → `JUDGES` in API reference and JSDoc imports, corrected `--min-score 7` → `--min-score 70` in migration guides (CLI uses 0-100 scale).
+- **`failOnScoreBelow` config scaling bug** — config value (0-10 scale) was compared directly against `overallScore` (0-100 scale) without conversion. Now correctly multiplied by 10.
+
+### Added
+- **44 quickstart verification tests** — new automated tests in `documentation-claims.test.ts` covering: API import accuracy (4), MCP server claims (4), GitHub Action inputs (1), CLI commands (12), CLI flags (14), examples/quickstart.ts (5), score scale consistency (4).
+
+### Tests
+- 2412 pass, 0 fail, 2 skipped.
+
 ## [3.117.6] — 2026-03-19
 
 ### Fixed
