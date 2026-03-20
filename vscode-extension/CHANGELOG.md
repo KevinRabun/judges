@@ -9,7 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - **Token budget safeguards** — `maxPromptChars` option on evaluation and MCP tools defaults to 100K chars. Set to `0` for unlimited.
 - **New API exports** — `DEFAULT_MAX_PROMPT_CHARS`, `formatRelatedFilesSection`.
-- **27 documentation-verification tests** and **13 token budget tests**. Total: 2480 pass.
+- **27 documentation-verification tests**, **13 token budget tests**, and **1 badge-sync test**. Total: 2481 pass.
 
 See [core CHANGELOG](../../CHANGELOG.md) for full details.
 

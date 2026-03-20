@@ -531,6 +531,26 @@ describe("Documentation: README claims consistency", () => {
       'README should reference "200+" auto-fix patch rules',
     );
   });
+
+  it("README test badge count matches CHANGELOG latest reported count", () => {
+    // Extract test count from the README badge: tests-NNNN-brightgreen
+    const badgeMatch = readme.match(/tests-(\d+)-brightgreen/);
+    assert.ok(badgeMatch, "README should have a test badge like tests-NNNN-brightgreen");
+    const badgeCount = parseInt(badgeMatch[1], 10);
+
+    // Extract the latest test count from the CHANGELOG (first "Total: NNNN pass" entry)
+    const changelog = readFileSync(resolve(ROOT, "CHANGELOG.md"), "utf-8");
+    const clMatch = changelog.match(/Total:\s*(\d+)\s*pass/);
+    assert.ok(clMatch, "CHANGELOG should report a total test count like 'Total: NNNN pass'");
+    const changelogCount = parseInt(clMatch[1], 10);
+
+    assert.equal(
+      badgeCount,
+      changelogCount,
+      `README badge says ${badgeCount} tests but CHANGELOG reports ${changelogCount}. ` +
+        `Update the README badge: [![Tests](https://img.shields.io/badge/tests-${changelogCount}-brightgreen)]`,
+    );
+  });
 });
 
 // ─── Quickstart: API import examples match real exports ─────────────────────

@@ -10,7 +10,7 @@ All notable changes to **@kevinrabun/judges** are documented here.
 - **27 documentation-verification tests** — automated checks for `maxPromptChars` docs in API reference, README, CHANGELOG, public API exports, and MCP tool schemas.
 
 ### Tests
-- 40 new tests (13 token budget + 27 doc-verification). Total: 2480 pass, 0 fail, 0 skipped.
+- 41 new tests (13 token budget + 27 doc-verification + 1 badge-sync). Total: 2481 pass, 0 fail, 0 skipped.
 
 ## [3.118.0] — 2026-03-19
 
