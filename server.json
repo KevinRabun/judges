@@ -3,10 +3,19 @@
   "name": "io.github.KevinRabun/judges",
   "title": "Judges Panel",
   "description": "45 judges that evaluate AI-generated code for security, cost, and quality with built-in AST.",
+  "websiteUrl": "https://kevinrabun.github.io/judges/",
   "repository": {
-    "url": "https://github.com/kevinrabun/judges",
-    "source": "github"
+    "url": "https://github.com/KevinRabun/judges",
+    "source": "github",
+    "id": "1161966307"
   },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/KevinRabun/judges/main/vscode-extension/icon.png",
+      "sizes": "128x128",
+      "mimeType": "image/png"
+    }
+  ],
   "version": "3.122.0",
   "packages": [
     {
