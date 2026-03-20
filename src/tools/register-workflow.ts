@@ -1147,13 +1147,21 @@ function registerEvaluateGitDiff(server: McpServer): void {
         .boolean()
         .optional()
         .describe("Apply feedback-driven auto-tuning to reduce false positives (default: false)"),
+      maxPromptChars: z
+        .number()
+        .min(0)
+        .optional()
+        .describe(
+          "Maximum character budget for LLM prompts. Controls truncation of deep-review prompts. Set to 0 to disable all truncation. Default: 100000.",
+        ),
       config: configSchema,
     },
-    async ({ repoPath, base, diffText, confidenceFilter, autoTune, config }) => {
+    async ({ repoPath, base, diffText, confidenceFilter, autoTune, maxPromptChars, config }) => {
       try {
         const evalOptions = {
           confidenceFilter,
           autoTune,
+          maxPromptChars,
           config: toJudgesConfig(config),
         };
 

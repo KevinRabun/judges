@@ -96,6 +96,94 @@ Analyze a dependency manifest (package.json, requirements.txt, etc.) for supply-
 
 **Returns:** `DependencyVerdict`
 
+### `evaluateGitDiff(repoPath, base?, options?)`
+
+Evaluate only the changed lines from a live git diff. Parses the diff, reads file contents, and runs the tribunal on each changed file.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `repoPath` | `string` | Absolute path to the git repository |
+| `base` | `string` | Git ref to diff against (default: `"HEAD~1"`) |
+| `options?` | `EvaluationOptions` | Evaluation options |
+
+**Returns:** `GitDiffVerdict` — `{ files, totalFindings }`
+
+### `evaluateUnifiedDiff(diffText, repoPath?, options?)`
+
+Evaluate a pre-computed unified diff text. Parses the diff and evaluates changed lines.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `diffText` | `string` | Unified diff text |
+| `repoPath` | `string` | Repository root for reading file contents (default: `"."`) |
+| `options?` | `EvaluationOptions` | Evaluation options |
+
+**Returns:** `GitDiffVerdict`
+
+### `resolveImports(code, language, filePath?)`
+
+Resolve imports/requires across 5 languages (TypeScript, JavaScript, Python, Go, Rust) using AST + regex fallback.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `code` | `string` | Source code |
+| `language` | `string` | Language identifier |
+| `filePath?` | `string` | File path for relative import resolution |
+
+**Returns:** `ImportResolutionResult` — `{ resolved, external }`
+
+### `buildRelatedFilesContext(code, language, filePath, rootDir?)`
+
+Build cross-file context snippets for deep review by resolving imports and reading related files.
+
+**Returns:** `RelatedFileSnippet[]`
+
+---
+
+## EvaluationOptions
+
+All evaluation functions accept an optional `EvaluationOptions` object:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `deepReview` | `boolean` | `false` | Attach LLM deep-review prompt section to the verdict |
+| `relatedFiles` | `Array<{path, snippet, relationship?}>` | — | Cross-file context for deep-review prompts |
+| `autoTune` | `boolean` | `false` | Apply feedback-driven auto-tuning to reduce false positives |
+| `confidenceFilter` | `number` | — | Filter findings below this confidence threshold (0–1) |
+| `maxPromptChars` | `number` | `100000` | Max character budget for LLM prompts. Set to `0` for unlimited |
+| `config` | `JudgesConfig` | — | Rule/judge/severity filtering |
+| `filePath` | `string` | — | File path for file-type gating |
+| `includeAstFindings` | `boolean` | `true` | Include AST/code-structure findings |
+| `minConfidence` | `number` | `0` | Minimum finding confidence to include (0–1) |
+| `maxFindingsPerFile` | `number` | `20` | Cap on findings per file (0 = unlimited) |
+| `projectMode` | `boolean` | `false` | Keep absence-based findings for project-level analysis |
+| `calibrate` | `boolean` | `false` | Enable feedback-driven confidence calibration |
+| `adaptiveSelection` | `boolean` | `false` | Auto-skip irrelevant judges |
+
+### Token Budget (`maxPromptChars`)
+
+Controls the size of LLM-facing deep-review prompts. When the budget is exceeded:
+
+- **Related files** are capped to 10 files (default), each snippet to 3,000 chars
+- **Context strings** are truncated to 10% of the budget (minimum 2,000 chars)
+- **Judge criteria** switch from per-judge listing (~15 KB for 45 judges) to compact category-based mode (~2 KB) when there isn't enough room
+
+Set `maxPromptChars: 0` to disable all truncation and send unlimited prompts.
+
+```typescript
+// Default: 100K budget (~25K tokens)
+const verdict = evaluateCode(code, "typescript", {
+  deepReview: true,
+  maxPromptChars: 100_000, // default
+});
+
+// Unlimited: no truncation
+const unlimited = evaluateCode(code, "typescript", {
+  deepReview: true,
+  maxPromptChars: 0,
+});
+```
+
 ---
 
 ## V2 Policy-Aware API
@@ -361,6 +449,10 @@ All types are exported from `@kevinrabun/judges/api`:
 | `PolicyProfile` | V2 policy profile name |
 | `CustomRule` | Plugin-defined rule |
 | `JudgesPlugin` | Plugin definition |
+| `EvaluationOptions` | Options for `evaluateCode`, `evaluateCodeSingleJudge`, etc. |
+| `GitDiffVerdict` | Result from `evaluateGitDiff` / `evaluateUnifiedDiff` |
+| `RelatedFileSnippet` | `{ path, snippet, relationship? }` for deep-review context |
+| `ImportResolutionResult` | Result from `resolveImports` |
 
 ---
 

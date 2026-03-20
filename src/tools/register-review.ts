@@ -535,6 +535,13 @@ function registerReEvaluateWithContext(server: McpServer): void {
         )
         .optional()
         .describe("Cross-file context for more accurate evaluation"),
+      maxPromptChars: z
+        .number()
+        .min(0)
+        .optional()
+        .describe(
+          "Maximum character budget for LLM prompts. Controls truncation of source code, related files, and context strings in deep-review prompts. Set to 0 to disable all truncation. Default: 100000.",
+        ),
     },
     async ({
       code,
@@ -547,6 +554,7 @@ function registerReEvaluateWithContext(server: McpServer): void {
       filePath,
       deepReview,
       relatedFiles,
+      maxPromptChars,
     }) => {
       try {
         // Build context string from developer inputs
@@ -565,16 +573,28 @@ function registerReEvaluateWithContext(server: McpServer): void {
         }
         const fullContext = contextParts.join("\n");
 
+        // Apply token budget caps to inputs
+        const budget = maxPromptChars ?? 100_000;
+        const unlimited = budget === 0;
+        const codeCap = unlimited ? Infinity : budget;
+        const contextCap = unlimited ? Infinity : Math.max(2000, Math.floor(budget * 0.1));
+        const cappedCode = code.length > codeCap ? code.slice(0, codeCap) : code;
+        const cappedContext =
+          fullContext.length > contextCap ? fullContext.slice(0, contextCap) + "\n… (context truncated)" : fullContext;
+        const cappedRelatedFiles =
+          !unlimited && relatedFiles && relatedFiles.length > 10 ? relatedFiles.slice(0, 10) : relatedFiles;
+
         const evalOptions: EvaluationOptions = {
           autoTune: true,
           deepReview: deepReview ?? false,
           confidenceFilter: confidenceFilter ?? 0.5,
           filePath,
-          relatedFiles,
+          relatedFiles: cappedRelatedFiles,
           calibrate: true,
+          maxPromptChars: maxPromptChars,
         };
 
-        const verdict = evaluateWithTribunal(code, language, fullContext || undefined, evalOptions);
+        const verdict = evaluateWithTribunal(cappedCode, language, cappedContext || undefined, evalOptions);
 
         // Post-process: mark disputed findings
         let findings = verdict.findings;

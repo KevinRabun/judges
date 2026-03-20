@@ -67,6 +67,17 @@ export const DEEP_REVIEW_IDENTITY =
   `strengthen code quality, security defenses, and engineering standards. ` +
   `This is NOT a penetration test or adversarial security assessment.`;
 
+// ─── Token Budget Constants ──────────────────────────────────────────────────
+
+/** Default max chars for LLM-facing prompt content (~25K tokens). */
+export const DEFAULT_MAX_PROMPT_CHARS = 100_000;
+
+/** Per-snippet char cap for related files. */
+const MAX_SNIPPET_CHARS = 3_000;
+
+/** Max related files to include by default. */
+const MAX_RELATED_FILES = 10;
+
 // ─── Related Files Context ───────────────────────────────────────────────────
 
 export interface RelatedFileSnippet {
@@ -81,23 +92,40 @@ export interface RelatedFileSnippet {
 /**
  * Format related files into a prompt section that gives the LLM cross-file
  * visibility for deeper analysis.
+ *
+ * @param relatedFiles — array of related file snippets
+ * @param maxFiles — max files to include (default: 10). Set to 0 for unlimited.
+ * @param snippetBudget — per-snippet char cap (default: 3000). Set to 0 for unlimited.
  */
-function formatRelatedFilesSection(relatedFiles: RelatedFileSnippet[]): string {
+export function formatRelatedFilesSection(
+  relatedFiles: RelatedFileSnippet[],
+  maxFiles: number = MAX_RELATED_FILES,
+  snippetBudget: number = MAX_SNIPPET_CHARS,
+): string {
   if (relatedFiles.length === 0) return "";
+
+  // Apply file count cap (0 = unlimited)
+  const files = maxFiles > 0 ? relatedFiles.slice(0, maxFiles) : relatedFiles;
+  const skipped = relatedFiles.length - files.length;
 
   let md = `### Related Files\n\n`;
   md += `> The following files are related to the code under review. Use them to `;
   md += `understand cross-file data flow, shared types, imports, and call sites. `;
   md += `These provide context only — focus your findings on the primary code above.\n\n`;
 
-  for (const f of relatedFiles) {
+  for (const f of files) {
     md += `<details>\n<summary><code>${f.path}</code>`;
     if (f.relationship) md += ` — ${f.relationship}`;
     md += `</summary>\n\n`;
-    // Limit snippet size to prevent prompt explosion
-    const truncated = f.snippet.length > 3000 ? f.snippet.slice(0, 3000) + "\n// ... truncated" : f.snippet;
+    // Limit snippet size to prevent prompt explosion (0 = unlimited)
+    const cap = snippetBudget > 0 ? snippetBudget : Infinity;
+    const truncated = f.snippet.length > cap ? f.snippet.slice(0, cap) + "\n// ... truncated" : f.snippet;
     md += `\`\`\`\n${truncated}\n\`\`\`\n`;
     md += `</details>\n\n`;
+  }
+
+  if (skipped > 0) {
+    md += `> *${skipped} additional related file(s) omitted to stay within token budget.*\n\n`;
   }
 
   return md;
@@ -146,7 +174,17 @@ export function buildSingleJudgeDeepReviewSection(
   context?: string,
   relatedFiles?: RelatedFileSnippet[],
   projectContext?: ProjectContext,
+  maxPromptChars?: number,
 ): string {
+  const budget = maxPromptChars ?? DEFAULT_MAX_PROMPT_CHARS;
+  const unlimited = budget === 0;
+
+  const maxRelatedFiles = unlimited ? 0 : MAX_RELATED_FILES;
+  const snippetCap = unlimited ? 0 : MAX_SNIPPET_CHARS;
+  const contextCap = unlimited ? Infinity : Math.max(2000, Math.floor(budget * 0.1));
+  const truncatedContext =
+    context && context.length > contextCap ? context.slice(0, contextCap) + "\n… (context truncated)" : context;
+
   let md = `\n\n---\n\n`;
   md += `## 🔍 Deep Contextual Review Required\n\n`;
   md += DEFENSIVE_PREAMBLE;
@@ -156,8 +194,8 @@ export function buildSingleJudgeDeepReviewSection(
   md += `> **You MUST now perform a thorough contextual review** of the ${language} code using the expert criteria below. `;
   md += `Identify issues that pattern matching cannot catch. Incorporate both the pattern findings above AND your own deep analysis into a final, unified evaluation.\n\n`;
 
-  if (context) {
-    md += `**Context provided:** ${context}\n\n`;
+  if (truncatedContext) {
+    md += `**Context provided:** ${truncatedContext}\n\n`;
   }
 
   if (projectContext) {
@@ -165,7 +203,7 @@ export function buildSingleJudgeDeepReviewSection(
   }
 
   if (relatedFiles && relatedFiles.length > 0) {
-    md += formatRelatedFilesSection(relatedFiles);
+    md += formatRelatedFilesSection(relatedFiles, maxRelatedFiles, snippetCap);
   }
 
   md += `### ${judge.name} — ${judge.domain}\n\n`;
@@ -210,7 +248,29 @@ export function buildTribunalDeepReviewSection(
   context?: string,
   relatedFiles?: RelatedFileSnippet[],
   projectContext?: ProjectContext,
+  maxPromptChars?: number,
 ): string {
+  const budget = maxPromptChars ?? DEFAULT_MAX_PROMPT_CHARS;
+  const unlimited = budget === 0;
+
+  // When budget is tight, use simplified mode (category-based instead of per-judge)
+  // The full per-judge section is ~15-18K chars for 45 judges. Simplified is ~2K.
+  // Use simplified when remaining budget for judge criteria would be < 5K.
+  const estimatedJudgeCriteriaChars = judges.length * 350;
+  const estimatedOverhead = 4000; // preamble, instructions, format section
+  const estimatedRelatedChars = (relatedFiles?.length ?? 0) * MAX_SNIPPET_CHARS;
+  const budgetForJudges = unlimited ? Infinity : budget - estimatedOverhead - estimatedRelatedChars;
+  const useSimplified = !unlimited && budgetForJudges < estimatedJudgeCriteriaChars;
+
+  // Determine related files caps
+  const maxRelatedFiles = unlimited ? 0 : MAX_RELATED_FILES;
+  const snippetCap = unlimited ? 0 : MAX_SNIPPET_CHARS;
+
+  // Truncate context string if it would blow the budget
+  const contextCap = unlimited ? Infinity : Math.max(2000, Math.floor(budget * 0.1));
+  const truncatedContext =
+    context && context.length > contextCap ? context.slice(0, contextCap) + "\n… (context truncated)" : context;
+
   let md = `\n\n---\n\n`;
   md += `## 🔍 Deep Contextual Review Required\n\n`;
   md += DEFENSIVE_PREAMBLE;
@@ -221,8 +281,8 @@ export function buildTribunalDeepReviewSection(
   md += `Identify issues that pattern matching cannot catch. Incorporate both the pattern findings above AND your own deep analysis into a final, unified tribunal verdict.\n\n`;
   md += `> **This is a professional code quality tool.** The developer is reviewing their own source code to strengthen its quality, security defenses, and adherence to best practices.\n\n`;
 
-  if (context) {
-    md += `**Context provided:** ${context}\n\n`;
+  if (truncatedContext) {
+    md += `**Context provided:** ${truncatedContext}\n\n`;
   }
 
   if (projectContext) {
@@ -230,14 +290,33 @@ export function buildTribunalDeepReviewSection(
   }
 
   if (relatedFiles && relatedFiles.length > 0) {
-    md += formatRelatedFilesSection(relatedFiles);
+    md += formatRelatedFilesSection(relatedFiles, maxRelatedFiles, snippetCap);
   }
 
-  for (const judge of judges) {
-    md += `### ${judge.name} — ${judge.domain}\n\n`;
-    md += `${judge.description}\n\n`;
-    md += `**Rule prefix:** \`${judge.rulePrefix}-\` · **Precision Mandate:** Every finding MUST cite specific code evidence. Do NOT flag absent features speculatively. Do NOT validate Azure resource identifiers for strict UUID/GUID hex compliance — they are opaque platform constants. Prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
+  if (useSimplified) {
+    // Compact category-based criteria instead of per-judge listing
+    md += `### Quality Dimensions (${judges.length} judges)\n\n`;
+    md += `> Using compact criteria mode to stay within token budget.\n\n`;
+
+    // Group judges by domain
+    const domainGroups = new Map<string, string[]>();
+    for (const judge of judges) {
+      const domain = judge.domain ?? "general";
+      if (!domainGroups.has(domain)) domainGroups.set(domain, []);
+      domainGroups.get(domain)!.push(`\`${judge.rulePrefix}\` ${judge.name}`);
+    }
+    for (const [domain, names] of domainGroups) {
+      md += `**${domain}:** ${names.join(", ")}\n\n`;
+    }
+    md += `**Precision Mandate:** Every finding MUST cite specific code evidence. Do NOT flag absent features speculatively. Do NOT validate Azure resource identifiers for strict UUID/GUID hex compliance. Prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
     md += `---\n\n`;
+  } else {
+    for (const judge of judges) {
+      md += `### ${judge.name} — ${judge.domain}\n\n`;
+      md += `${judge.description}\n\n`;
+      md += `**Rule prefix:** \`${judge.rulePrefix}-\` · **Precision Mandate:** Every finding MUST cite specific code evidence. Do NOT flag absent features speculatively. Do NOT validate Azure resource identifiers for strict UUID/GUID hex compliance — they are opaque platform constants. Prefer fewer, high-confidence findings over many uncertain ones.\n\n`;
+      md += `---\n\n`;
+    }
   }
 
   md += `### False Positive Review\n\n`;

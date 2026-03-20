@@ -807,3 +807,186 @@ describe("Quickstart: Score scale consistency", () => {
     }
   });
 });
+
+// ─── Token Budget Documentation Claims ──────────────────────────────────────
+
+describe("Documentation: Token budget safeguards", () => {
+  const apiRef = readFileSync(resolve(ROOT, "docs", "api-reference.md"), "utf-8");
+  const readme = readFileSync(resolve(ROOT, "README.md"), "utf-8");
+  const changelog = readFileSync(resolve(ROOT, "CHANGELOG.md"), "utf-8");
+
+  it("DEFAULT_MAX_PROMPT_CHARS matches documented default of 100000", async () => {
+    const { DEFAULT_MAX_PROMPT_CHARS } = await import("../src/tools/deep-review.js");
+    assert.equal(
+      DEFAULT_MAX_PROMPT_CHARS,
+      100_000,
+      "DEFAULT_MAX_PROMPT_CHARS must be 100_000 to match documentation claims",
+    );
+  });
+
+  it("api-reference.md documents maxPromptChars option", () => {
+    assert.ok(apiRef.includes("maxPromptChars"), 'docs/api-reference.md should document the "maxPromptChars" option');
+  });
+
+  it("api-reference.md documents default value of 100000", () => {
+    assert.ok(
+      apiRef.includes("100000") || apiRef.includes("100_000") || apiRef.includes("100,000"),
+      "docs/api-reference.md should document the default value of 100000 for maxPromptChars",
+    );
+  });
+
+  it("api-reference.md documents 0 = unlimited", () => {
+    assert.ok(
+      apiRef.includes("maxPromptChars: 0") || apiRef.includes("Set to `0`") || apiRef.includes("0 = unlimited"),
+      "docs/api-reference.md should document that maxPromptChars=0 disables truncation",
+    );
+  });
+
+  it("api-reference.md documents EvaluationOptions section", () => {
+    assert.ok(
+      apiRef.includes("## EvaluationOptions"),
+      "docs/api-reference.md should have an EvaluationOptions section",
+    );
+  });
+
+  it("api-reference.md documents evaluateGitDiff", () => {
+    assert.ok(apiRef.includes("evaluateGitDiff"), "docs/api-reference.md should document evaluateGitDiff");
+  });
+
+  it("api-reference.md documents evaluateUnifiedDiff", () => {
+    assert.ok(apiRef.includes("evaluateUnifiedDiff"), "docs/api-reference.md should document evaluateUnifiedDiff");
+  });
+
+  it("api-reference.md documents resolveImports", () => {
+    assert.ok(apiRef.includes("resolveImports"), "docs/api-reference.md should document resolveImports");
+  });
+
+  it("api-reference.md documents buildRelatedFilesContext", () => {
+    assert.ok(
+      apiRef.includes("buildRelatedFilesContext"),
+      "docs/api-reference.md should document buildRelatedFilesContext",
+    );
+  });
+
+  it("api-reference.md documents RelatedFileSnippet type", () => {
+    assert.ok(
+      apiRef.includes("RelatedFileSnippet"),
+      "docs/api-reference.md Types Reference should include RelatedFileSnippet",
+    );
+  });
+
+  it("api-reference.md documents GitDiffVerdict type", () => {
+    assert.ok(apiRef.includes("GitDiffVerdict"), "docs/api-reference.md Types Reference should include GitDiffVerdict");
+  });
+
+  it("api-reference.md documents token budget truncation behavior", () => {
+    assert.ok(
+      apiRef.includes("Token Budget"),
+      'docs/api-reference.md should have a "Token Budget" section explaining truncation behavior',
+    );
+  });
+
+  it("README documents evaluate_git_diff MCP tool", () => {
+    assert.ok(readme.includes("### `evaluate_git_diff`"), "README.md should document the evaluate_git_diff MCP tool");
+  });
+
+  it("README documents re_evaluate_with_context MCP tool", () => {
+    assert.ok(
+      readme.includes("### `re_evaluate_with_context`"),
+      "README.md should document the re_evaluate_with_context MCP tool",
+    );
+  });
+
+  it("README documents maxPromptChars on evaluate_git_diff", () => {
+    // Find the evaluate_git_diff section and check maxPromptChars is in its parameter table
+    const gitDiffIdx = readme.indexOf("### `evaluate_git_diff`");
+    assert.ok(gitDiffIdx >= 0, "evaluate_git_diff section must exist");
+    const section = readme.slice(gitDiffIdx, gitDiffIdx + 1500);
+    assert.ok(section.includes("maxPromptChars"), "evaluate_git_diff section should document maxPromptChars parameter");
+  });
+
+  it("README documents maxPromptChars on re_evaluate_with_context", () => {
+    const reEvalIdx = readme.indexOf("### `re_evaluate_with_context`");
+    assert.ok(reEvalIdx >= 0, "re_evaluate_with_context section must exist");
+    const section = readme.slice(reEvalIdx, reEvalIdx + 2000);
+    assert.ok(
+      section.includes("maxPromptChars"),
+      "re_evaluate_with_context section should document maxPromptChars parameter",
+    );
+  });
+
+  it("CHANGELOG mentions token budget safeguards", () => {
+    assert.ok(
+      changelog.includes("Token budget safeguards") || changelog.includes("maxPromptChars"),
+      "CHANGELOG.md should mention token budget safeguards",
+    );
+  });
+});
+
+// ─── Token Budget API Exports ───────────────────────────────────────────────
+
+describe("Documentation: Token budget API exports from src/api.ts", () => {
+  it("exports DEFAULT_MAX_PROMPT_CHARS", async () => {
+    const api = await import("../src/api.js");
+    assert.equal(typeof api.DEFAULT_MAX_PROMPT_CHARS, "number");
+    assert.equal(api.DEFAULT_MAX_PROMPT_CHARS, 100_000);
+  });
+
+  it("exports formatRelatedFilesSection", async () => {
+    const api = await import("../src/api.js");
+    assert.equal(typeof api.formatRelatedFilesSection, "function");
+  });
+
+  it("exports buildTribunalDeepReviewSection", async () => {
+    const api = await import("../src/api.js");
+    assert.equal(typeof api.buildTribunalDeepReviewSection, "function");
+  });
+
+  it("exports buildSingleJudgeDeepReviewSection", async () => {
+    const api = await import("../src/api.js");
+    assert.equal(typeof api.buildSingleJudgeDeepReviewSection, "function");
+  });
+
+  it("exports evaluateGitDiff", async () => {
+    const api = await import("../src/api.js");
+    assert.equal(typeof api.evaluateGitDiff, "function");
+  });
+
+  it("exports evaluateUnifiedDiff", async () => {
+    const api = await import("../src/api.js");
+    assert.equal(typeof api.evaluateUnifiedDiff, "function");
+  });
+
+  it("exports resolveImports", async () => {
+    const api = await import("../src/api.js");
+    assert.equal(typeof api.resolveImports, "function");
+  });
+
+  it("exports buildRelatedFilesContext", async () => {
+    const api = await import("../src/api.js");
+    assert.equal(typeof api.buildRelatedFilesContext, "function");
+  });
+});
+
+// ─── MCP Tool Schema Verification ──────────────────────────────────────────
+
+describe("Documentation: MCP tools have maxPromptChars parameter", () => {
+  it("re_evaluate_with_context tool schema includes maxPromptChars", () => {
+    const src = readFileSync(resolve(ROOT, "src", "tools", "register-review.ts"), "utf-8");
+    const toolStart = src.indexOf('"re_evaluate_with_context"');
+    assert.ok(toolStart >= 0, "re_evaluate_with_context tool must exist in register-review.ts");
+    const toolSection = src.slice(toolStart, toolStart + 3000);
+    assert.ok(
+      toolSection.includes("maxPromptChars"),
+      "re_evaluate_with_context tool schema should include maxPromptChars",
+    );
+  });
+
+  it("evaluate_git_diff tool schema includes maxPromptChars", () => {
+    const src = readFileSync(resolve(ROOT, "src", "tools", "register-workflow.ts"), "utf-8");
+    const toolStart = src.indexOf('"evaluate_git_diff"');
+    assert.ok(toolStart >= 0, "evaluate_git_diff tool must exist in register-workflow.ts");
+    const toolSection = src.slice(toolStart, toolStart + 3000);
+    assert.ok(toolSection.includes("maxPromptChars"), "evaluate_git_diff tool schema should include maxPromptChars");
+  });
+});

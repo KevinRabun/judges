@@ -5,6 +5,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import type { JudgeDefinition } from "../src/types.js";
 
 // ─── P1.1: Git Diff Parsing ────────────────────────────────────────────────
 
@@ -308,5 +309,148 @@ describe("TribunalVerdict new fields", () => {
     assert.equal(verdict.deepReviewPrompt, undefined);
     assert.equal(verdict.autoTuneApplied, undefined);
     assert.equal(verdict.confidenceFilterApplied, undefined);
+  });
+});
+
+// ─── Token Budget Safeguards ────────────────────────────────────────────────
+
+import {
+  DEFAULT_MAX_PROMPT_CHARS,
+  buildTribunalDeepReviewSection,
+  buildSingleJudgeDeepReviewSection,
+} from "../src/tools/deep-review.js";
+import { formatRelatedFilesSection } from "../src/tools/deep-review.js";
+import type { RelatedFileSnippet } from "../src/tools/deep-review.js";
+
+describe("Token budget constants", () => {
+  it("DEFAULT_MAX_PROMPT_CHARS is 100_000", () => {
+    assert.equal(DEFAULT_MAX_PROMPT_CHARS, 100_000);
+  });
+});
+
+describe("formatRelatedFilesSection", () => {
+  const makeFiles = (n: number): RelatedFileSnippet[] =>
+    Array.from({ length: n }, (_, i) => ({
+      path: `file-${i}.ts`,
+      snippet: `const x${i} = ${i};`,
+      relationship: "imports",
+    }));
+
+  it("caps files at maxFiles and shows omitted message", () => {
+    const files = makeFiles(15);
+    const result = formatRelatedFilesSection(files, 5, 3000);
+    // Only 5 files should appear
+    const fileHeaders = result.match(/<code>file-\d+\.ts<\/code>/g) ?? [];
+    assert.equal(fileHeaders.length, 5);
+    assert.ok(result.includes("10 additional related file(s) omitted"));
+  });
+
+  it("does not cap when maxFiles is 0 (unlimited)", () => {
+    const files = makeFiles(15);
+    const result = formatRelatedFilesSection(files, 0, 3000);
+    const fileHeaders = result.match(/<code>file-\d+\.ts<\/code>/g) ?? [];
+    assert.equal(fileHeaders.length, 15);
+    assert.ok(!result.includes("omitted"));
+  });
+
+  it("truncates long snippets at snippetBudget", () => {
+    const longSnippet = "x".repeat(5000);
+    const files: RelatedFileSnippet[] = [{ path: "big.ts", snippet: longSnippet }];
+    const result = formatRelatedFilesSection(files, 10, 200);
+    // Snippet should be truncated
+    assert.ok(!result.includes("x".repeat(5000)));
+    assert.ok(result.includes("// ... truncated"));
+  });
+
+  it("does not truncate snippets when snippetBudget is 0 (unlimited)", () => {
+    const longSnippet = "x".repeat(5000);
+    const files: RelatedFileSnippet[] = [{ path: "big.ts", snippet: longSnippet }];
+    const result = formatRelatedFilesSection(files, 0, 0);
+    assert.ok(result.includes("x".repeat(5000)));
+  });
+});
+
+describe("buildTribunalDeepReviewSection — token budgets", () => {
+  const stubJudges: JudgeDefinition[] = [
+    { name: "Security", domain: "security", rulePrefix: "SEC", description: "Security review" } as JudgeDefinition,
+    { name: "Performance", domain: "performance", rulePrefix: "PERF", description: "Perf review" } as JudgeDefinition,
+  ];
+
+  it("default budget truncates oversized context", () => {
+    const hugeContext = "a".repeat(200_000);
+    const result = buildTribunalDeepReviewSection(stubJudges, "javascript", hugeContext);
+    assert.ok(result.includes("… (context truncated)"));
+    // Should NOT contain the full 200K string
+    assert.ok(!result.includes("a".repeat(200_000)));
+  });
+
+  it("maxPromptChars=0 does not truncate context (unlimited)", () => {
+    const hugeContext = "b".repeat(200_000);
+    const result = buildTribunalDeepReviewSection(stubJudges, "javascript", hugeContext, undefined, undefined, 0);
+    assert.ok(!result.includes("… (context truncated)"));
+    assert.ok(result.includes("b".repeat(200_000)));
+  });
+
+  it("default budget caps related files to 10", () => {
+    const manyFiles: RelatedFileSnippet[] = Array.from({ length: 20 }, (_, i) => ({
+      path: `rel-${i}.ts`,
+      snippet: `// file ${i}`,
+    }));
+    const result = buildTribunalDeepReviewSection(stubJudges, "typescript", undefined, manyFiles);
+    assert.ok(result.includes("10 additional related file(s) omitted"));
+  });
+
+  it("maxPromptChars=0 includes all related files", () => {
+    const manyFiles: RelatedFileSnippet[] = Array.from({ length: 20 }, (_, i) => ({
+      path: `rel-${i}.ts`,
+      snippet: `// file ${i}`,
+    }));
+    const result = buildTribunalDeepReviewSection(stubJudges, "typescript", undefined, manyFiles, undefined, 0);
+    assert.ok(!result.includes("omitted"));
+    const fileHeaders = result.match(/<code>rel-\d+\.ts<\/code>/g) ?? [];
+    assert.equal(fileHeaders.length, 20);
+  });
+});
+
+describe("buildSingleJudgeDeepReviewSection — token budgets", () => {
+  const stubJudge = {
+    name: "Security",
+    domain: "security",
+    rulePrefix: "SEC",
+    description: "Security review",
+  } as JudgeDefinition;
+
+  it("truncates oversized context by default", () => {
+    const hugeContext = "c".repeat(200_000);
+    const result = buildSingleJudgeDeepReviewSection(stubJudge, "javascript", hugeContext);
+    assert.ok(result.includes("… (context truncated)"));
+  });
+
+  it("maxPromptChars=0 means no truncation", () => {
+    const hugeContext = "d".repeat(200_000);
+    const result = buildSingleJudgeDeepReviewSection(stubJudge, "javascript", hugeContext, undefined, undefined, 0);
+    assert.ok(!result.includes("… (context truncated)"));
+    assert.ok(result.includes("d".repeat(200_000)));
+  });
+});
+
+describe("EvaluationOptions maxPromptChars", () => {
+  it("passes maxPromptChars through to deep review", () => {
+    const result = evaluateWithTribunal("const x = 1;", "javascript", undefined, {
+      deepReview: true,
+      maxPromptChars: 50_000,
+    });
+    // Deep review prompt should be generated
+    assert.ok(typeof result.deepReviewPrompt === "string");
+    assert.ok(result.deepReviewPrompt!.length > 0);
+  });
+
+  it("maxPromptChars=0 produces unlimited deep review", () => {
+    const result = evaluateWithTribunal("const x = 1;", "javascript", undefined, {
+      deepReview: true,
+      maxPromptChars: 0,
+    });
+    assert.ok(typeof result.deepReviewPrompt === "string");
+    assert.ok(result.deepReviewPrompt!.length > 0);
   });
 });

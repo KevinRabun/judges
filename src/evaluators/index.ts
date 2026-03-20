@@ -163,6 +163,18 @@ export interface EvaluationOptions {
    * Value range: 0-1 (e.g., 0.6 means only findings with >= 60% confidence appear).
    */
   confidenceFilter?: number;
+  /**
+   * Maximum character budget for LLM-facing prompt content.
+   * Controls truncation of:
+   * - Source code in deep-review prompts (truncated with summary when exceeded)
+   * - Related file snippets (array trimmed to fit budget)
+   * - Developer context strings (truncated)
+   *
+   * Defaults to 100_000 (~25K tokens). Set to 0 to disable all truncation
+   * (use with caution — large files can produce prompts that exceed model
+   * context windows and waste tokens).
+   */
+  maxPromptChars?: number;
   /** @internal — pre-computed AST structure for the file (set by evaluateWithTribunal) */
   _astCache?: CodeStructure;
   /** @internal — pre-computed taint flows for the file (set by evaluateWithTribunal) */
@@ -1197,6 +1209,7 @@ export function evaluateWithTribunal(
         context,
         relatedSnippets.map((r) => ({ path: r.path, snippet: r.snippet, relationship: r.relationship })),
         projectCtx,
+        enrichedOptions.maxPromptChars,
       );
     } catch {
       // Deep review prompt generation failure is non-fatal

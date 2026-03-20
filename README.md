@@ -1098,6 +1098,36 @@ Analyze a dependency manifest file for supply-chain risks, version pinning issue
 | `manifestType` | string | yes | File type: `package.json`, `requirements.txt`, etc. |
 | `context` | string | no | Optional context |
 
+### `evaluate_git_diff`
+Evaluate only **changed lines** from a git diff. Provide either `repoPath` for a live git diff or `diffText` for a pre-computed unified diff.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `repoPath` | string | conditional | Absolute path to the git repository |
+| `base` | string | no | Git ref to diff against (default: `HEAD~1`) |
+| `diffText` | string | conditional | Pre-computed unified diff text |
+| `confidenceFilter` | number | no | Minimum confidence threshold for findings (0–1) |
+| `autoTune` | boolean | no | Apply feedback-driven auto-tuning (default: false) |
+| `maxPromptChars` | number | no | Max character budget for LLM prompts (default: 100000, 0 = unlimited) |
+| `config` | object | no | Inline configuration |
+
+### `re_evaluate_with_context`
+Re-run the tribunal with **prior findings as context** for iterative refinement. Supports dispute resolution, developer context injection, and focus-area filtering.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `code` | string | yes | Source code to re-evaluate |
+| `language` | string | yes | Programming language |
+| `disputedRuleIds` | string[] | no | Rule IDs the developer disputes as false positives |
+| `acceptedRuleIds` | string[] | no | Rule IDs the developer accepts |
+| `developerContext` | string | no | Free-form explanation of developer intent |
+| `focusAreas` | string[] | no | Specific areas to focus on (e.g., `["security"]`) |
+| `confidenceFilter` | number | no | Minimum confidence threshold (default: 0.5) |
+| `filePath` | string | no | File path for context-aware evaluation |
+| `deepReview` | boolean | no | Include LLM deep-review prompt section |
+| `relatedFiles` | array | no | Cross-file context `{ path, snippet, relationship? }[]` |
+| `maxPromptChars` | number | no | Max character budget for LLM prompts (default: 100000, 0 = unlimited) |
+
 #### Judge IDs
 
 `data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure` · `agent-instructions` · `ai-code-safety` · `framework-safety` · `iac-security` · `false-positive-review`

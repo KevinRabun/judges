@@ -116,9 +116,11 @@ export {
   buildSingleJudgeDeepReviewSection,
   buildTribunalDeepReviewSection,
   buildSimplifiedDeepReviewSection,
+  formatRelatedFilesSection,
   isContentPolicyRefusal,
   DEEP_REVIEW_PROMPT_INTRO,
   DEEP_REVIEW_IDENTITY,
+  DEFAULT_MAX_PROMPT_CHARS,
 } from "./tools/deep-review.js";
 export type { RelatedFileSnippet } from "./tools/deep-review.js";
 
