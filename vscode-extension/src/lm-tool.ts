@@ -1,27 +1,8 @@
 import * as vscode from "vscode";
 import { evaluateWithTribunal } from "@kevinrabun/judges/api";
+import { LANG_MAP } from "./lang-map";
 
 // ─── LM Tool Registration ───────────────────────────────────────────────────
-
-const LANG_MAP: Record<string, string> = {
-  typescript: "typescript",
-  typescriptreact: "typescript",
-  javascript: "javascript",
-  javascriptreact: "javascript",
-  python: "python",
-  go: "go",
-  rust: "rust",
-  java: "java",
-  csharp: "csharp",
-  cpp: "cpp",
-  terraform: "terraform",
-  bicep: "bicep",
-  powershell: "powershell",
-  php: "php",
-  ruby: "ruby",
-  kotlin: "kotlin",
-  swift: "swift",
-};
 
 /** Input schema for the judges_evaluate tool. */
 interface JudgesEvaluateInput {

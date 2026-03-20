@@ -67,6 +67,9 @@ export {
   resolveExtendsConfig,
 } from "./config.js";
 
+// ─── Language Detection ──────────────────────────────────────────────────────
+export { EXT_TO_LANG, SUPPORTED_EXTENSIONS, detectLanguageFromPath } from "./ext-to-lang.js";
+
 // ─── Judge Registry ──────────────────────────────────────────────────────────
 export { JUDGES, getJudge, getJudgeSummaries } from "./judges/index.js";
 

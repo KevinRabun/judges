@@ -669,6 +669,9 @@ describe("Quickstart: GitHub Action inputs match action.yml", () => {
 describe("Quickstart: CLI commands referenced in docs exist", () => {
   const cliPath = resolve(ROOT, "src", "cli.ts");
   const cliSrc = existsSync(cliPath) ? readFileSync(cliPath, "utf-8") : "";
+  const dispatchPath = resolve(ROOT, "src", "cli-dispatch.ts");
+  const dispatchSrc = existsSync(dispatchPath) ? readFileSync(dispatchPath, "utf-8") : "";
+  const combinedSrc = cliSrc + dispatchSrc;
 
   const documentedCommands = [
     "eval",
@@ -688,7 +691,7 @@ describe("Quickstart: CLI commands referenced in docs exist", () => {
   for (const cmd of documentedCommands) {
     it(`CLI has "${cmd}" command handler`, () => {
       assert.ok(
-        cliSrc.includes(`args.command === "${cmd}"`),
+        combinedSrc.includes(`args.command === "${cmd}"`) || combinedSrc.includes(`"${cmd}": [`),
         `CLI should have a handler for command "${cmd}" — update docs if commands change`,
       );
     });

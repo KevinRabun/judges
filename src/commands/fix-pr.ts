@@ -23,33 +23,10 @@ import { evaluateWithTribunal } from "../evaluators/index.js";
 import { applyPatches, type PatchCandidate } from "./fix.js";
 import type { TribunalVerdict } from "../types.js";
 import { parseGitHubRepo, runGit, tryRunGit } from "../tools/command-safety.js";
-
-// ─── Language Detection ─────────────────────────────────────────────────────
-
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  ".py": "python",
-  ".rs": "rust",
-  ".go": "go",
-  ".java": "java",
-  ".cs": "csharp",
-  ".cpp": "cpp",
-  ".cc": "cpp",
-  ".h": "c",
-  ".hpp": "cpp",
-};
-
-const SUPPORTED_EXTENSIONS = new Set(Object.keys(EXT_TO_LANG));
+import { detectLanguageFromPath, SUPPORTED_EXTENSIONS } from "../ext-to-lang.js";
 
 function detectLanguage(filePath: string): string {
-  const base = filePath.toLowerCase();
-  if (base.endsWith("dockerfile") || base.includes("dockerfile.")) return "dockerfile";
-  return EXT_TO_LANG[extname(base)] || "typescript";
+  return detectLanguageFromPath(filePath) ?? "typescript";
 }
 
 // ─── File Collection ────────────────────────────────────────────────────────

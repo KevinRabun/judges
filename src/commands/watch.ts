@@ -14,54 +14,14 @@ import { resolve, extname, join, relative } from "path";
 import { evaluateWithTribunal, evaluateWithJudge } from "../evaluators/index.js";
 import { getJudge } from "../judges/index.js";
 import type { Finding } from "../types.js";
+import { detectLanguageFromPath, SUPPORTED_EXTENSIONS } from "../ext-to-lang.js";
 
 // ─── Language Detection ─────────────────────────────────────────────────────
 
-const WATCH_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".py",
-  ".rs",
-  ".go",
-  ".java",
-  ".cs",
-  ".cpp",
-  ".cc",
-  ".cxx",
-  ".h",
-  ".hpp",
-  ".ps1",
-  ".psm1",
-]);
-
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  ".py": "python",
-  ".rs": "rust",
-  ".go": "go",
-  ".java": "java",
-  ".cs": "csharp",
-  ".cpp": "cpp",
-  ".cc": "cpp",
-  ".cxx": "cpp",
-  ".h": "c",
-  ".hpp": "cpp",
-  ".ps1": "powershell",
-  ".psm1": "powershell",
-};
+const WATCH_EXTENSIONS = SUPPORTED_EXTENSIONS;
 
 function detectLanguage(filePath: string): string {
-  const ext = extname(filePath.toLowerCase());
-  return EXT_TO_LANG[ext] || "typescript";
+  return detectLanguageFromPath(filePath) ?? "typescript";
 }
 
 // ─── Watch Arguments ────────────────────────────────────────────────────────

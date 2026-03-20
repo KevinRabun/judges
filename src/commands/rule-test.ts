@@ -57,21 +57,7 @@ function collectFiles(dirPath: string): string[] {
 
 // ─── Language matching ──────────────────────────────────────────────────────
 
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".py": "python",
-  ".go": "go",
-  ".rs": "rust",
-  ".java": "java",
-  ".cs": "csharp",
-  ".cpp": "cpp",
-  ".c": "c",
-  ".rb": "ruby",
-  ".php": "php",
-};
+import { EXT_TO_LANG } from "../ext-to-lang.js";
 
 function matchesLanguage(filePath: string, languages?: string[]): boolean {
   if (!languages || languages.length === 0) return true;

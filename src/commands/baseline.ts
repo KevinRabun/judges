@@ -14,49 +14,7 @@ import { resolve, extname, relative } from "path";
 import { evaluateWithTribunal } from "../evaluators/index.js";
 import { collectFiles } from "../cli.js";
 import type { Finding } from "../types.js";
-
-// ─── Language Detection ─────────────────────────────────────────────────────
-
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  ".py": "python",
-  ".rs": "rust",
-  ".go": "go",
-  ".java": "java",
-  ".cs": "csharp",
-  ".rb": "ruby",
-  ".php": "php",
-  ".swift": "swift",
-  ".kt": "kotlin",
-  ".scala": "scala",
-  ".c": "c",
-  ".cpp": "cpp",
-  ".h": "c",
-  ".hpp": "cpp",
-  ".yaml": "yaml",
-  ".yml": "yaml",
-  ".json": "json",
-  ".tf": "terraform",
-  ".hcl": "terraform",
-  ".sh": "bash",
-  ".bash": "bash",
-  ".ps1": "powershell",
-  ".psm1": "powershell",
-  ".dart": "dart",
-  ".sql": "sql",
-  ".bicep": "bicep",
-};
-
-function detectLanguage(filePath: string): string | undefined {
-  if (filePath.toLowerCase().includes("dockerfile")) return "dockerfile";
-  const ext = extname(filePath.toLowerCase());
-  return EXT_TO_LANG[ext];
-}
+import { detectLanguageFromPath as detectLanguage } from "../ext-to-lang.js";
 
 // ─── Fingerprinting ────────────────────────────────────────────────────────
 // Hash ruleId + title + normalized surrounding source context so that findings

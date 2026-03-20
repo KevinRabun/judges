@@ -8,32 +8,12 @@ import {
   DEEP_REVIEW_PROMPT_INTRO,
   DEEP_REVIEW_IDENTITY,
   getPreset,
+  EXT_TO_LANG,
 } from "@kevinrabun/judges/api";
 import type { Finding } from "@kevinrabun/judges/api";
 import type { JudgesDiagnosticProvider } from "./diagnostics";
 import { runLlmBenchmark, saveResultsToWorkspace } from "./llm-benchmark-runner";
-
-// ─── Language Map ────────────────────────────────────────────────────────────
-
-const LANG_MAP: Record<string, string> = {
-  typescript: "typescript",
-  typescriptreact: "typescript",
-  javascript: "javascript",
-  javascriptreact: "javascript",
-  python: "python",
-  go: "go",
-  rust: "rust",
-  java: "java",
-  csharp: "csharp",
-  cpp: "cpp",
-  terraform: "terraform",
-  bicep: "bicep",
-  powershell: "powershell",
-  php: "php",
-  ruby: "ruby",
-  kotlin: "kotlin",
-  swift: "swift",
-};
+import { LANG_MAP } from "./lang-map";
 
 // ─── Severity Icons ──────────────────────────────────────────────────────────
 
@@ -233,22 +213,6 @@ function inferCommand(prompt: string): string {
 
 /** File extensions supported by judges, mapped to language names. */
 const SUPPORTED_GLOB = "**/*.{ts,tsx,js,jsx,py,go,rs,java,cs,cpp,tf,bicep,ps1,psm1}";
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".py": "python",
-  ".go": "go",
-  ".rs": "rust",
-  ".java": "java",
-  ".cs": "csharp",
-  ".cpp": "cpp",
-  ".tf": "terraform",
-  ".bicep": "bicep",
-  ".ps1": "powershell",
-  ".psm1": "powershell",
-};
 
 /** Default max files to evaluate in a single workspace review to avoid timeouts. */
 const DEFAULT_MAX_WORKSPACE_FILES = 50;

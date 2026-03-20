@@ -496,35 +496,10 @@ function registerEvaluateV2(server: McpServer): void {
 
 // ─── evaluate_file ───────────────────────────────────────────────────────────
 
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  ".py": "python",
-  ".rs": "rust",
-  ".go": "go",
-  ".java": "java",
-  ".cs": "csharp",
-  ".cpp": "cpp",
-  ".cc": "cpp",
-  ".h": "c",
-  ".hpp": "cpp",
-  ".ps1": "powershell",
-  ".psm1": "powershell",
-  ".bicep": "bicep",
-  ".tf": "terraform",
-  ".yaml": "yaml",
-  ".yml": "yaml",
-};
+import { detectLanguageFromPath as _detectLangShared } from "../ext-to-lang.js";
 
 function detectLanguageFromPath(filePath: string): string {
-  const lower = filePath.toLowerCase();
-  if (lower.endsWith("dockerfile") || lower.includes("dockerfile.")) return "dockerfile";
-  const ext = extname(lower);
-  return EXT_TO_LANG[ext] || "typescript";
+  return _detectLangShared(filePath) ?? "typescript";
 }
 
 function registerEvaluateFile(server: McpServer): void {

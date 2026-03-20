@@ -41,21 +41,10 @@ export interface ParallelEvalSummary {
 
 // ─── Language Detection ─────────────────────────────────────────────────────
 
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".py": "python",
-  ".rs": "rust",
-  ".go": "go",
-  ".java": "java",
-  ".cs": "csharp",
-  ".cpp": "cpp",
-};
+import { detectLanguageFromPath } from "./ext-to-lang.js";
 
 export function detectLanguage(filePath: string): string {
-  return EXT_TO_LANG[extname(filePath).toLowerCase()] || "typescript";
+  return detectLanguageFromPath(filePath) ?? "typescript";
 }
 
 // ─── Sequential (fallback) ──────────────────────────────────────────────────

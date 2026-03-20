@@ -2,6 +2,16 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.120.0] — 2026-03-19
+
+### Refactored
+- **P0 — DRY: Single `EXT_TO_LANG` source of truth** — Consolidated 16 duplicated file-extension-to-language maps into `src/ext-to-lang.ts`. New exports: `EXT_TO_LANG`, `SUPPORTED_EXTENSIONS`, `detectLanguageFromPath()`. 13 command files + `github-app.ts` + `parallel.ts` now import from the shared module. VS Code extension gets its own `lang-map.ts` for VS Code languageId mapping (3 files updated).
+- **P1 — Complexity: Split `cli.ts` god file** — Reduced `cli.ts` from 6,350 → 1,494 lines (77% reduction). Extracted `cli-formatters.ts` (output formatting, ~195 lines) and `cli-dispatch.ts` (646-entry command dispatch table, ~650 lines). 12 special commands (version, help, skills, init, watch, lsp, etc.) remain inline.
+- **P3 — Cohesion: Extract suppressions module** — Moved inline-suppression parsing, matching, and audit-trail logic (~230 lines) from `evaluators/index.ts` into `evaluators/suppressions.ts`. Public API unchanged — `applyInlineSuppressions` and `applyInlineSuppressionsWithAudit` re-exported from original path.
+
+### Tests
+- All 2,481 tests pass after refactoring. Updated `documentation-claims.test.ts` to verify commands in both `cli.ts` and `cli-dispatch.ts`.
+
 ## [3.119.0] — 2026-03-19
 
 ### Added

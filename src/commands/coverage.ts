@@ -40,40 +40,9 @@ export interface LanguageCoverageReport {
   };
 }
 
-// ─── Extension → Language mapping (mirrors CLI) ─────────────────────────────
+// ─── Extension → Language mapping ────────────────────────────────────────────
 
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  ".py": "python",
-  ".rs": "rust",
-  ".go": "go",
-  ".java": "java",
-  ".cs": "csharp",
-  ".rb": "ruby",
-  ".php": "php",
-  ".swift": "swift",
-  ".kt": "kotlin",
-  ".scala": "scala",
-  ".c": "c",
-  ".cpp": "cpp",
-  ".h": "c",
-  ".hpp": "cpp",
-  ".yaml": "yaml",
-  ".yml": "yaml",
-  ".json": "json",
-  ".tf": "terraform",
-  ".hcl": "terraform",
-  ".sh": "bash",
-  ".bash": "bash",
-  ".ps1": "powershell",
-  ".psm1": "powershell",
-  ".bicep": "bicep",
-};
+import { EXT_TO_LANG, detectLanguageFromPath } from "../ext-to-lang.js";
 
 /**
  * Languages for which the Judges Panel has first-class evaluator coverage.
@@ -105,10 +74,7 @@ const COVERED_LANGUAGES = new Set([
  * Detect language from file path extension.
  */
 export function detectFileLanguage(filePath: string): string {
-  const lower = filePath.toLowerCase();
-  if (lower.endsWith("dockerfile") || lower.includes("dockerfile.")) return "dockerfile";
-  const ext = extname(lower);
-  return EXT_TO_LANG[ext] ?? "unknown";
+  return detectLanguageFromPath(filePath) ?? "unknown";
 }
 
 /**

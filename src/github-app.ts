@@ -124,40 +124,8 @@ interface WebhookResult {
 
 // ─── Language Detection ─────────────────────────────────────────────────────
 
-export const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  ".py": "python",
-  ".rs": "rust",
-  ".go": "go",
-  ".java": "java",
-  ".cs": "csharp",
-  ".rb": "ruby",
-  ".php": "php",
-  ".swift": "swift",
-  ".kt": "kotlin",
-  ".tf": "terraform",
-  ".hcl": "terraform",
-  ".bicep": "bicep",
-  ".sh": "bash",
-  ".ps1": "powershell",
-  ".c": "c",
-  ".cpp": "cpp",
-  ".h": "c",
-  ".hpp": "cpp",
-  ".dart": "dart",
-  ".sql": "sql",
-};
-
-export function detectLanguage(filePath: string): string | undefined {
-  const ext = filePath.toLowerCase().match(/\.[^.]+$/)?.[0] ?? "";
-  if (filePath.toLowerCase().includes("dockerfile")) return "dockerfile";
-  return EXT_TO_LANG[ext];
-}
+export { EXT_TO_LANG, detectLanguageFromPath as detectLanguage } from "./ext-to-lang.js";
+import { detectLanguageFromPath as detectLanguage } from "./ext-to-lang.js";
 
 // ─── JWT Generation (RS256, no dependencies) ───────────────────────────────
 

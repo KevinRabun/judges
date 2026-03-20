@@ -16,35 +16,10 @@ import { resolve, extname } from "path";
 import { evaluateWithTribunal, evaluateWithJudge } from "../evaluators/index.js";
 import { getJudge } from "../judges/index.js";
 import type { Finding, Patch } from "../types.js";
-
-// ─── Language Detection (shared with cli.ts) ────────────────────────────────
-
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  ".py": "python",
-  ".rs": "rust",
-  ".go": "go",
-  ".java": "java",
-  ".cs": "csharp",
-  ".cpp": "cpp",
-  ".cc": "cpp",
-  ".cxx": "cpp",
-  ".h": "c",
-  ".hpp": "cpp",
-  ".ps1": "powershell",
-  ".psm1": "powershell",
-};
+import { detectLanguageFromPath } from "../ext-to-lang.js";
 
 function detectLanguage(filePath: string): string {
-  const base = filePath.toLowerCase();
-  if (base.endsWith("dockerfile") || base.includes("dockerfile.")) return "dockerfile";
-  const ext = extname(base);
-  return EXT_TO_LANG[ext] || "typescript";
+  return detectLanguageFromPath(filePath) ?? "typescript";
 }
 
 // ─── Patch Application Engine ───────────────────────────────────────────────

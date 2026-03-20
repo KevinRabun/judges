@@ -222,18 +222,7 @@ export function parseQualityGateConfig(
 
 // ─── CLI Runner ─────────────────────────────────────────────────────────────
 
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".py": "python",
-  ".rs": "rust",
-  ".go": "go",
-  ".java": "java",
-  ".cs": "csharp",
-  ".cpp": "cpp",
-};
+import { EXT_TO_LANG } from "../ext-to-lang.js";
 
 export function runQualityGate(argv: string[]): void {
   if (argv.includes("--help") || argv.includes("-h")) {

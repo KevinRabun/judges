@@ -24,26 +24,7 @@ interface ParallelReport {
 
 // ─── Language Detection ─────────────────────────────────────────────────────
 
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".py": "python",
-  ".java": "java",
-  ".cs": "csharp",
-  ".go": "go",
-  ".rs": "rust",
-  ".rb": "ruby",
-  ".php": "php",
-  ".cpp": "cpp",
-  ".c": "c",
-  ".swift": "swift",
-  ".kt": "kotlin",
-  ".scala": "scala",
-};
-
-const SOURCE_EXTS = new Set(Object.keys(EXT_TO_LANG));
+import { SUPPORTED_EXTENSIONS as SOURCE_EXTS, EXT_TO_LANG } from "../ext-to-lang.js";
 
 // ─── File Discovery ─────────────────────────────────────────────────────────
 

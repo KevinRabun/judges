@@ -136,38 +136,7 @@ interface DiffHunk {
 
 // ─── Language Detection ─────────────────────────────────────────────────────
 
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  ".py": "python",
-  ".rs": "rust",
-  ".go": "go",
-  ".java": "java",
-  ".cs": "csharp",
-  ".rb": "ruby",
-  ".php": "php",
-  ".swift": "swift",
-  ".kt": "kotlin",
-  ".tf": "terraform",
-  ".hcl": "terraform",
-  ".bicep": "bicep",
-  ".sh": "bash",
-  ".ps1": "powershell",
-  ".c": "c",
-  ".cpp": "cpp",
-  ".h": "c",
-  ".hpp": "cpp",
-};
-
-function detectLanguage(filePath: string): string | undefined {
-  const ext = extname(filePath.toLowerCase());
-  if (filePath.toLowerCase().includes("dockerfile")) return "dockerfile";
-  return EXT_TO_LANG[ext];
-}
+import { detectLanguageFromPath as detectLanguage } from "../ext-to-lang.js";
 
 // ─── Severity Helpers ───────────────────────────────────────────────────────
 

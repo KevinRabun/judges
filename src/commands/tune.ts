@@ -19,6 +19,7 @@ import { resolve, extname, join } from "path";
 import { evaluateWithTribunal } from "../evaluators/index.js";
 import { PRESETS } from "../presets.js";
 import type { Finding, JudgesConfig, RuleOverride, Severity } from "../types.js";
+import { detectLanguageFromPath as detectLanguage } from "../ext-to-lang.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -43,36 +44,6 @@ interface TuneRecommendation {
   disabledJudges: string[];
   statsMessage: string;
   config: JudgesConfig;
-}
-
-// ─── Language Detection ─────────────────────────────────────────────────────
-
-const EXT_TO_LANG: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  ".py": "python",
-  ".rs": "rust",
-  ".go": "go",
-  ".java": "java",
-  ".cs": "csharp",
-  ".rb": "ruby",
-  ".php": "php",
-  ".swift": "swift",
-  ".kt": "kotlin",
-  ".tf": "terraform",
-  ".hcl": "terraform",
-  ".bicep": "bicep",
-  ".sh": "bash",
-};
-
-function detectLanguage(filePath: string): string | undefined {
-  const ext = extname(filePath.toLowerCase());
-  if (filePath.toLowerCase().includes("dockerfile")) return "dockerfile";
-  return EXT_TO_LANG[ext];
 }
 
 // ─── Framework Detection ────────────────────────────────────────────────────
