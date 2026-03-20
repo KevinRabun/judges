@@ -2,6 +2,27 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.121.0] — 2026-03-19
+
+### Improved
+- **Reduced false negatives across security & hallucination evaluators** — Systematic analysis of 269 false negatives identified targeted pattern gaps in two evaluators. 25 new detection patterns added with zero new false positives.
+
+#### Security evaluator (`security.ts`)
+- **SEC-007 fixed**: SSRF detection now covers Java `new URL().openConnection()` with request parameter input and Ruby `URI.open`/`Kernel.open` with user input.
+- **SEC-016 fixed**: Command injection detection now covers Python `subprocess.run/call/Popen/check_output/check_call` with `shell=True` and f-string/format/user input.
+- **SEC-020 fixed**: Weak crypto detection broadened — static IV/nonce patterns (variable naming heuristics), explicit ECB mode selection, and broken ciphers (DES/3DES/RC4).
+- **SEC-023 new**: C/C++ unsafe memory functions — `strcpy`, `strcat`, `sprintf`, `gets`, `sscanf`, `memcpy` with user input, use-after-free patterns.
+- **SEC-024 new**: NoSQL injection — MongoDB operations (`find`, `deleteMany`, `updateMany`, etc.) with raw `req.body`/`req.query`/`req.params`, indirect variable tracking, and `$where` with string literals.
+- **SEC-025 new**: CORS wildcard with credentials — Flask `origins="*"` + `supports_credentials=True`, Express `origin: "*"` + `credentials: true`, and raw header combinations.
+- **SEC-026 new**: Elixir atom exhaustion — `String.to_atom()` with user input from params/conn.
+- **SEC-027 new**: Lua/dynamic code execution — `loadstring`/`load` with variable arguments.
+
+#### Hallucination-detection evaluator (`hallucination-detection.ts`)
+- 22 new hallucinated API patterns: JS `String.contains()` (Java confusion), `crypto.signMessage()`, `fetch().abort()`, Python `Protocol.implements()`, `json.loads(file_path)`, Prisma fakes (`.groupByAndCount()`, `.bulkUpsert()`, `.findManyOrThrow()`, `.softDelete()`), Rust std fakes (`get_or_default()`, `Vec::from_iter_parallel`, `Arc::try_make_mut`, `truncate_safe()`, `use secure_random`), Java `stream().toArray(Constructor::new)`, fabricated webpack plugins, fabricated AWS SDK commands, fabricated Octokit methods, fabricated SQL functions.
+
+### Benchmark
+- **F1: 90.0% → 90.8%** (+0.8%). TP: 1225→1245 (+20). FN: 269→249 (−20). FP: 2→2 (unchanged). Precision: 99.8% (unchanged). Grade: **A** (maintained). 2481 tests pass.
+
 ## [3.120.0] — 2026-03-19
 
 ### Fixed

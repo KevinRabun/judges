@@ -781,6 +781,172 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
     fix: "Use Go type constraints: [T comparable], [T constraints.Ordered], or define a constraint interface.",
     languages: ["go"],
   },
+
+  // ── Additional Patterns (Benchmark Gaps) ──────────────────────────────
+
+  // String.contains() doesn't exist in JS — Java confusion
+  {
+    pattern: /\.\bcontains\s*\(\s*(?:['"`]|[a-zA-Z_])/,
+    hallucinated: "String.contains()",
+    reason: "JavaScript strings have no .contains() method. This is a Java API hallucinated onto JS.",
+    fix: "Use .includes() instead of .contains().",
+    languages: ["javascript"],
+    scopeCheckMethod: "contains",
+  },
+
+  // crypto.signMessage() doesn't exist in Node.js
+  {
+    pattern: /\bcrypto\.signMessage\s*\(/,
+    hallucinated: "crypto.signMessage()",
+    reason: "Node.js crypto module has no signMessage() method.",
+    fix: "Use crypto.sign() or crypto.createSign() to sign data.",
+    languages: ["javascript", "typescript"],
+  },
+
+  // fetch().abort() — fetch returns a Promise, not an abortable request
+  {
+    pattern: /\.abort\s*\(\s*\)/,
+    hallucinated: "fetch().abort()",
+    reason: "fetch() returns a Promise, not an abortable request. There is no .abort() method on the returned value.",
+    fix: "Use AbortController: const controller = new AbortController(); fetch(url, { signal: controller.signal }); controller.abort();",
+    languages: ["javascript", "typescript"],
+    scopeCheckMethod: "abort",
+    requiresImport: "fetch",
+  },
+
+  // Python typing.Protocol.implements() doesn't exist
+  {
+    pattern: /\bProtocol\.implements\s*\(/,
+    hallucinated: "Protocol.implements()",
+    reason: "Python's typing.Protocol has no implements() class method. Protocol checking is structural.",
+    fix: "Use isinstance() with @runtime_checkable decorator, or rely on mypy/pyright for static checks.",
+    languages: ["python"],
+  },
+
+  // json.loads() on a file path — should be json.load(file_handle)
+  {
+    pattern: /\bjson\.loads\s*\(\s*(?:path|file_?path|config_?path|filename)\b/,
+    hallucinated: "json.loads(file_path)",
+    reason: "json.loads() parses a string, not a file path. LLMs confuse json.loads() with json.load().",
+    fix: "Use json.load(open(path)) or: with open(path) as f: data = json.load(f)",
+    languages: ["python"],
+  },
+
+  // Prisma fabricated methods
+  {
+    pattern: /\.groupByAndCount\s*\(/,
+    hallucinated: "prisma.model.groupByAndCount()",
+    reason: "Prisma has no groupByAndCount(). Use groupBy() with _count aggregation.",
+    fix: "Use prisma.model.groupBy({ by: ['field'], _count: true })",
+    languages: ["javascript", "typescript"],
+  },
+  {
+    pattern: /\.bulkUpsert\s*\(/,
+    hallucinated: "prisma.model.bulkUpsert()",
+    reason: "Prisma has no bulkUpsert(). Use createMany() or loop with upsert().",
+    fix: "Use prisma.model.createMany({ data: items }) or loop with prisma.model.upsert()",
+    languages: ["javascript", "typescript"],
+  },
+  {
+    pattern: /\.findManyOrThrow\s*\(/,
+    hallucinated: "prisma.model.findManyOrThrow()",
+    reason: "Prisma has findFirstOrThrow() and findUniqueOrThrow() but not findManyOrThrow().",
+    fix: "Use findMany() and check result length, or findFirstOrThrow() for single records.",
+    languages: ["javascript", "typescript"],
+  },
+  {
+    pattern: /\.softDelete\s*\(/,
+    hallucinated: "prisma.model.softDelete()",
+    reason: "Prisma has no built-in softDelete() method.",
+    fix: "Implement soft delete: prisma.model.update({ where: { id }, data: { deletedAt: new Date() } })",
+    languages: ["javascript", "typescript"],
+  },
+
+  // Rust std hallucinations
+  {
+    pattern: /\bget_or_default\s*\(/,
+    hallucinated: "HashMap.get_or_default()",
+    reason: "Rust HashMap has no get_or_default(). Java HashMap API hallucinated onto Rust.",
+    fix: "Use .entry(key).or_default() or .get(key).unwrap_or(&default).",
+    languages: ["rust"],
+  },
+  {
+    pattern: /\bVec::from_iter_parallel\b/,
+    hallucinated: "Vec::from_iter_parallel()",
+    reason: "Rust Vec has no from_iter_parallel() method.",
+    fix: "Use rayon: (0..1000).into_par_iter().map(|x| x * 2).collect()",
+    languages: ["rust"],
+  },
+  {
+    pattern: /\bArc::try_make_mut\b/,
+    hallucinated: "Arc::try_make_mut()",
+    reason: "Rust Arc has no try_make_mut(). Arc::make_mut() exists but requires Clone.",
+    fix: "Use Arc::make_mut() (clones if needed) or Arc::try_unwrap().",
+    languages: ["rust"],
+  },
+  {
+    pattern: /\btruncate_safe\s*\(/,
+    hallucinated: "String::truncate_safe()",
+    reason: "Rust String has no truncate_safe() method.",
+    fix: "Use .truncate(n) with char boundary check: if s.is_char_boundary(n) { s.truncate(n); }",
+    languages: ["rust"],
+  },
+
+  // secure_random crate doesn't exist in Rust
+  {
+    pattern: /\buse\s+secure_random\b/,
+    hallucinated: "secure_random crate",
+    reason: "There is no 'secure_random' crate. This is a fabricated crate name.",
+    fix: "Use the 'rand' crate with OsRng or ThreadRng for cryptographic randomness.",
+    languages: ["rust"],
+  },
+
+  // Java stream().toArray(Constructor::new) — wrong signature
+  {
+    pattern: /\.stream\(\)\.toArray\s*\(\s*\w+::new\s*\)/,
+    hallucinated: "stream().toArray(Constructor::new)",
+    reason: "Stream.toArray() takes an IntFunction<A[]> (e.g., String[]::new), not a constructor reference.",
+    fix: "Use .toArray(String[]::new) for typed arrays, or .toArray() for Object[].",
+    languages: ["java"],
+  },
+
+  // Fabricated npm packages (common webpack/build tool hallucinations)
+  {
+    pattern: /\brequire\s*\(\s*["']webpack-(?:auto-optimize|security-scan|smart-split)["']\s*\)/,
+    hallucinated: "webpack-auto-optimize / webpack-security-scan / webpack-smart-split",
+    reason: "These webpack plugins do not exist. LLMs fabricate plausible-sounding plugin names.",
+    fix: "Use real webpack plugins: TerserPlugin, BundleAnalyzerPlugin, SplitChunksPlugin (built-in).",
+    languages: ["javascript", "typescript"],
+  },
+
+  // Fabricated AWS SDK commands
+  {
+    pattern: /\b(?:SecurityScanCommand|AutoScaleCommand|WarmUpCommand)\b/,
+    hallucinated: "Fabricated AWS SDK commands",
+    reason: "SecurityScanCommand, AutoScaleCommand, WarmUpCommand do not exist in the AWS SDK.",
+    fix: "Use real AWS SDK commands: ListObjectsV2Command, PutItemCommand, InvokeCommand, etc.",
+    languages: ["javascript", "typescript"],
+  },
+
+  // Fabricated Octokit/GitHub API methods
+  {
+    pattern: /\.repos\.(?:getSecurityScore|getAICodeReview|getPerformanceMetrics)\s*\(/,
+    hallucinated: "Fabricated Octokit methods",
+    reason: "Octokit has no getSecurityScore(), getAICodeReview(), or getPerformanceMetrics() methods.",
+    fix: "Use real GitHub API endpoints: repos.get(), repos.listCommits(), repos.getContent(), etc.",
+    languages: ["javascript", "typescript"],
+  },
+
+  // Fabricated SQL functions
+  {
+    pattern:
+      /\b(?:TOP_N|STRING_AGG_DISTINCT|FIRST_VALUE_IF|WEIGHTED_AVG|RUNNING_TOTAL|AUTO_BUCKET|FUZZY_MATCH|FILL_GAPS)\s*\(/i,
+    hallucinated: "Fabricated SQL functions",
+    reason:
+      "TOP_N, STRING_AGG_DISTINCT, WEIGHTED_AVG, RUNNING_TOTAL, AUTO_BUCKET, FUZZY_MATCH, FILL_GAPS are not standard SQL functions.",
+    fix: "Use standard SQL: NTILE()/ROW_NUMBER(), STRING_AGG(), FIRST_VALUE() with FILTER, SUM() OVER(), WIDTH_BUCKET(), SIMILARITY() (PostgreSQL).",
+    languages: ["sql"],
+  },
 ];
 
 // ─── Suspicious Import Patterns ─────────────────────────────────────────────

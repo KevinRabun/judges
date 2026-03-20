@@ -270,6 +270,20 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
       ) {
         ssrfLines.push(i + 1);
       }
+      // Java: new URL(userInput).openConnection() or URL constructed from request parameter
+      if (
+        /\bnew\s+URL\s*\(/i.test(line) &&
+        /(?:req\.|request\.|getParameter|params|query|body|args|input)/i.test(line)
+      ) {
+        ssrfLines.push(i + 1);
+      }
+      // Ruby: URI.open / Kernel.open with user input
+      if (
+        /\b(?:URI\.open|Kernel\.open|open\()\s*/i.test(line) &&
+        /(?:params\[|request\.|args|input|user|url)/i.test(line)
+      ) {
+        ssrfLines.push(i + 1);
+      }
       // Indirect: variable assigned from req, then used in fetch
       if (/\b(?:fetch|axios|http\.get|https\.get|requests\.get|requests\.request)\s*\(\s*(\w+)/i.test(line)) {
         const match = line.match(/\b(?:fetch|axios|http\.get|requests\.get)\s*\(\s*(\w+)/i);
@@ -676,6 +690,16 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
           cmdInjLines.push(i + 1);
         }
       }
+      // Python subprocess with shell=True and user input
+      if (/\bsubprocess\.(?:run|call|Popen|check_output|check_call)\s*\(/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 5)).join("\n");
+        if (/shell\s*=\s*True/i.test(ctx)) {
+          // Check for user input in the command string (f-string, format, concatenation)
+          if (/(?:f["']|\$\{|\.format\s*\(|\+\s*\w|request\.|args\.get|params|query|body|input)/i.test(ctx)) {
+            cmdInjLines.push(i + 1);
+          }
+        }
+      }
       // PHP system/exec/passthru/shell_exec with user input variables
       if (
         /\b(?:system|exec|passthru|shell_exec|popen)\s*\(/i.test(line) &&
@@ -835,9 +859,16 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
     const cryptoMiscLines: number[] = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      // Static/hardcoded IV
-      if (/(?:static\s*IV|\b(?:iv|IV)\b\s*[:=]\s*(?:\[\]byte\s*\(|["'[])|var\s+\w*[Ii][Vv]\s*=)/i.test(line)) {
+      // Static/hardcoded IV — matches variable names containing iv/IV with hardcoded values
+      if (/(?:static\s*IV|\b(?:iv|IV)\b\s*[:=]\s*(?:\[\]byte\s*\(|["'[])| var\s+\w*[Ii][Vv]\s*=)/i.test(line)) {
         cryptoMiscLines.push(i + 1);
+      }
+      // Broader IV detection: const/let/var STATIC_IV =, nonce = "...", etc.
+      if (/\b(?:const|let|var|val)\s+\w*(?:_iv|_IV|IV|Iv|_nonce|NONCE)\w*\s*=/.test(line)) {
+        // Must be assigned a hardcoded value (string, buffer, byte array)
+        if (/(?:Buffer\.from|new\s+Uint8Array|\[\]byte|"[^"]+"|'[^']+'|\[\s*\d)/.test(line)) {
+          cryptoMiscLines.push(i + 1);
+        }
       }
       // ECB-like mode: manual block-by-block encryption without chain/GCM
       if (/block\.Encrypt\s*\(/i.test(line)) {
@@ -845,6 +876,17 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
         if (/for\s|range\s|BlockSize/i.test(ctx) && !/GCM|CBC|CTR|cipher\.NewGCM/i.test(ctx)) {
           cryptoMiscLines.push(i + 1);
         }
+      }
+      // ECB mode explicitly selected
+      if (/['"](?:aes-\d+-ecb|ECB|DES-ECB|des-ecb)['"]|cipher\.NewCipher\b/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 3)).join("\n");
+        if (!/GCM|NewGCM|AEAD/i.test(ctx)) {
+          cryptoMiscLines.push(i + 1);
+        }
+      }
+      // DES/3DES/RC4 usage (known broken ciphers)
+      if (/['"](?:des(?:-ede3)?(?:-cbc|-ecb)?|rc4|RC4)['"]|DES\.(?:encrypt|decrypt|new)/i.test(line)) {
+        cryptoMiscLines.push(i + 1);
       }
     }
     const uniqueCrypto = [...new Set(cryptoMiscLines)].sort((a, b) => a - b);
@@ -937,6 +979,226 @@ export function analyzeSecurity(code: string, language: string): Finding[] {
         reference: "CWE-134",
         suggestedFix:
           "Use safe rendering: output = f'Hello, {name}' with pre-validated name, or use a template engine with auto-escaping.",
+        confidence: 0.85,
+      });
+    }
+  }
+
+  ruleNum++; // advance past SEC-022
+
+  // ── SEC-023: C/C++ unsafe memory functions ─────────────────────────────
+  if (lang === "cpp") {
+    const unsafeMemLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // strcpy, strcat, sprintf, gets, sscanf — no bounds checking
+      if (/\b(?:strcpy|strcat|sprintf|gets|sscanf|wcscpy|wcscat|swprintf)\s*\(/i.test(line)) {
+        unsafeMemLines.push(i + 1);
+      }
+      // memcpy with potentially unbounded size from user input
+      if (/\bmemcpy\s*\(/.test(line) && /sizeof\s*\(\s*\w+\s*\)/.test(line) === false) {
+        const ctx = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 2)).join("\n");
+        if (/strlen|input|user|request|param|argv|read/i.test(ctx)) {
+          unsafeMemLines.push(i + 1);
+        }
+      }
+      // Use-after-free: free() followed by use of same pointer
+      if (/\bfree\s*\(\s*(\w+)\s*\)/.test(line)) {
+        const match = line.match(/\bfree\s*\(\s*(\w+)\s*\)/);
+        if (match) {
+          const varName = match[1];
+          const after = lines.slice(i + 1, Math.min(lines.length, i + 6)).join("\n");
+          const useRe = new RegExp(`\\b${varName}\\b(?!\\s*=\\s*NULL|\\s*=\\s*nullptr|\\s*=\\s*0)`, "i");
+          if (useRe.test(after)) {
+            unsafeMemLines.push(i + 1);
+          }
+        }
+      }
+    }
+    if (unsafeMemLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Unsafe memory functions without bounds checking",
+        description:
+          "Functions like strcpy, gets, sprintf, and strcat perform no bounds checking and are primary sources of buffer overflow vulnerabilities. Use-after-free patterns also detected.",
+        lineNumbers: [...new Set(unsafeMemLines)].sort((a, b) => a - b),
+        recommendation:
+          "Replace with bounds-checked alternatives: strncpy/strlcpy, snprintf, fgets, strncat. Set freed pointers to NULL. Consider using std::string in C++.",
+        reference: "CWE-120 / CWE-416",
+        suggestedFix:
+          "strcpy(dest, src) → strncpy(dest, src, sizeof(dest)-1); gets(buf) → fgets(buf, sizeof(buf), stdin);",
+        confidence: 0.95,
+      });
+    }
+  }
+
+  ruleNum++; // advance past SEC-023
+
+  // ── SEC-024: NoSQL injection via unsanitized query objects ─────────────
+  {
+    const nosqlLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // MongoDB-style: collection.find/deleteMany/updateMany with raw user input
+      if (
+        /\.(?:find|findOne|findOneAndUpdate|findOneAndDelete|updateOne|updateMany|deleteOne|deleteMany|aggregate|countDocuments)\s*\(/i.test(
+          line,
+        )
+      ) {
+        // Direct user input in the function call
+        if (/(?:req\.body|req\.query|req\.params|request\.body|request\.args)/i.test(line)) {
+          nosqlLines.push(i + 1);
+        }
+        // Indirect: check if the argument variable was assigned from user input
+        const match = line.match(
+          /\.(?:find|findOne|findOneAndUpdate|findOneAndDelete|deleteMany|updateMany)\s*\(\s*(\w+)/i,
+        );
+        if (match && match[1]) {
+          const varName = match[1];
+          if (!/^['"`{[]/.test(varName) && !/^(?:null|undefined|true|false|\d)/.test(varName)) {
+            const ctx = lines.slice(Math.max(0, i - 8), i).join("\n");
+            const assignRe = new RegExp(
+              `(?:const|let|var)\\s+${varName}\\s*=\\s*.*(?:req\\.body|req\\.query|req\\.params|request\\.body|request\\.args)`,
+              "i",
+            );
+            if (assignRe.test(ctx)) {
+              nosqlLines.push(i + 1);
+            }
+          }
+        }
+      }
+      // MongoDB $where with string (code injection)
+      if (/\$where\s*:\s*['"`]/.test(line)) {
+        nosqlLines.push(i + 1);
+      }
+    }
+    if (nosqlLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        severity: "critical",
+        title: "NoSQL injection via unsanitized query object",
+        description:
+          "User input is passed directly as a query filter to NoSQL database operations. Attackers can inject operators like $gt, $ne, or $where to bypass authentication or extract data.",
+        lineNumbers: [...new Set(nosqlLines)].sort((a, b) => a - b),
+        recommendation:
+          "Validate and sanitize query objects. Use explicit field selection instead of passing raw request body. Strip MongoDB operators ($gt, $ne, $regex, $where) from user input.",
+        reference: "CWE-943",
+        suggestedFix:
+          "const filter = { status: req.body.status }; // whitelist fields instead of: collection.find(req.body)",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  ruleNum++; // advance past SEC-024
+
+  // ── SEC-025: CORS wildcard origin with credentials ─────────────────────
+  {
+    const corsLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Python Flask-CORS: origins="*" + supports_credentials=True
+      if (/origins?\s*[:=]\s*["']\*["']/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 5)).join("\n");
+        if (/(?:supports_credentials|credentials)\s*[:=]\s*(?:True|true)/i.test(ctx)) {
+          corsLines.push(i + 1);
+        }
+      }
+      // Express cors: origin: "*" + credentials: true
+      if (/origin\s*:\s*["']\*["']|origin\s*:\s*true/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 5)).join("\n");
+        if (/credentials\s*:\s*true/i.test(ctx)) {
+          corsLines.push(i + 1);
+        }
+      }
+      // Raw header: Access-Control-Allow-Origin: *
+      if (/Access-Control-Allow-Origin['":\s]*\*/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 3)).join("\n");
+        if (/Access-Control-Allow-Credentials['":\s]*true/i.test(ctx)) {
+          corsLines.push(i + 1);
+        }
+      }
+    }
+    if (corsLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        severity: "high",
+        title: "CORS wildcard origin with credentials enabled",
+        description:
+          "Setting Access-Control-Allow-Origin to '*' while enabling credentials is a dangerous misconfiguration. Browsers block this combination, but misconfigurations in server handling can still leak session cookies to arbitrary origins.",
+        lineNumbers: corsLines,
+        recommendation:
+          "Use an explicit allowlist of origins instead of '*' when credentials are required. Validate the Origin header against trusted domains.",
+        reference: "CWE-346 / CWE-942",
+        suggestedFix:
+          "Replace origin='*' with specific allowed origins: CORS(app, origins=['https://myapp.com'], supports_credentials=True)",
+        confidence: 0.9,
+      });
+    }
+  }
+
+  ruleNum++; // advance past SEC-025
+
+  // ── SEC-026: Elixir atom exhaustion from user input ────────────────────
+  {
+    const atomLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // String.to_atom or String.to_existing_atom from user input
+      if (/String\.to_atom\s*\(/i.test(line)) {
+        const ctx = lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 2)).join("\n");
+        if (/(?:params|conn\.params|request|body|query|input|assigns)/i.test(ctx)) {
+          atomLines.push(i + 1);
+        }
+      }
+    }
+    if (atomLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        severity: "high",
+        title: "Atom exhaustion from uncontrolled user input",
+        description:
+          "Converting user input to atoms via String.to_atom/1 can exhaust the atom table (atoms are never garbage collected), leading to a denial-of-service crash of the BEAM VM.",
+        lineNumbers: atomLines,
+        recommendation:
+          "Use String.to_existing_atom/1 instead, which only converts to atoms that already exist. Alternatively, use a whitelist of allowed values.",
+        reference: "CWE-400",
+        suggestedFix:
+          "String.to_atom(input) → String.to_existing_atom(input) or validate: if input in ~w(index show), do: ...",
+        confidence: 0.95,
+      });
+    }
+  }
+
+  ruleNum++; // advance past SEC-026
+
+  // ── SEC-027: Dynamic code execution (loadstring, eval equivalents) ─────
+  {
+    const dynCodeLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Lua: loadstring / load with user input (code execution)
+      if (/\b(?:loadstring|load)\s*\(\s*(\w+)/i.test(line)) {
+        const match = line.match(/\b(?:loadstring|load)\s*\(\s*(\w+)/i);
+        if (match && !/^['"`]/.test(match[1])) {
+          dynCodeLines.push(i + 1);
+        }
+      }
+    }
+    if (dynCodeLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum).padStart(3, "0")}`,
+        severity: "critical",
+        title: "Dynamic code execution with potentially untrusted input",
+        description:
+          "Functions like loadstring (Lua) compile and execute strings as code. When called with untrusted input, attackers can execute arbitrary code on the server.",
+        lineNumbers: dynCodeLines,
+        recommendation:
+          "Avoid loadstring/load with external input. Use a sandboxed environment or whitelist of allowed operations. Consider using a data-driven approach instead of code generation.",
+        reference: "CWE-94",
+        suggestedFix:
+          "Replace loadstring(code) with a safe dispatch table: actions[command](args) using pre-defined functions.",
         confidence: 0.85,
       });
     }
