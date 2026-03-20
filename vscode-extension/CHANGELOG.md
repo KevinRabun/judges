@@ -4,6 +4,19 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.121.0] — 2026-03-20
+
+### Improved
+- **Reduced false negatives** — 25 new detection patterns across security and hallucination evaluators. F1: 90.0% → 90.8%, +20 true positives, zero new false positives.
+- **Security evaluator** — 8 new/fixed rules: SSRF (Java/Ruby), command injection (Python subprocess), weak crypto broadened, C/C++ memory safety, NoSQL injection, CORS misconfiguration, Elixir atom DoS, Lua code execution.
+- **Hallucination-detection evaluator** — 22 new hallucinated API patterns covering JS, Python, Rust, Java, Prisma, webpack, AWS SDK, and SQL fabrications.
+
+### Fixed (3.120.0)
+- **Benchmark grades B→A** — Layer 1 deterministic (22 hallucination patterns) and LLM tribunal (symmetric FP scoring, meta-judge prefix filtering).
+- **P0-P3 refactoring** — DRY `EXT_TO_LANG`, split `cli.ts` god file (77% reduction), extracted suppressions module.
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.119.0] — 2026-03-19
 
 ### Added

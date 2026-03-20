@@ -2,7 +2,7 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
-## [3.121.0] — 2026-03-19
+## [3.121.0] — 2026-03-20
 
 ### Improved
 - **Reduced false negatives across security & hallucination evaluators** — Systematic analysis of 269 false negatives identified targeted pattern gaps in two evaluators. 25 new detection patterns added with zero new false positives.
