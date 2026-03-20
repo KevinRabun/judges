@@ -571,6 +571,216 @@ const HALLUCINATED_PATTERNS: HallucinatedPattern[] = [
     fix: "Verify the package exists on Maven Central/Gradle Plugin Portal. Use established alternatives from Spring Security, Apache Commons, or Bouncy Castle.",
     languages: ["java", "kotlin"],
   },
+
+  // ── Additional Node.js / JavaScript / TypeScript ──────────────────────
+
+  // crypto.hash() doesn't exist — it's crypto.createHash()
+  {
+    pattern: /\bcrypto\.hash\s*\(/,
+    hallucinated: "crypto.hash()",
+    reason: "Node.js crypto module has no hash() method. LLMs hallucinate a simplified API.",
+    fix: "Use crypto.createHash('sha256').update(data).digest('hex').",
+    languages: ["javascript", "typescript"],
+  },
+  // Promise.map/filter/timeout/retry/sequential — don't exist on native Promise
+  {
+    pattern: /\bPromise\.(?:map|filter|timeout|retry|sequential)\s*\(/,
+    hallucinated: "Promise.map/filter/timeout/retry/sequential()",
+    reason:
+      "Native Promise has no map(), filter(), timeout(), retry(), or sequential() methods. LLMs hallucinate these from Bluebird or other promise libraries.",
+    fix: "Use Promise.all() with Array.map() for parallel, or implement custom retry/timeout logic.",
+    languages: ["javascript", "typescript"],
+  },
+  // Fake Node.js built-in submodules (node:url/validator, node:path/sanitize, etc.)
+  {
+    pattern: /\bfrom\s+['"]node:(?:url|path|net|tls|timers|util|worker_threads)\/\w+['"]/,
+    hallucinated: "Non-existent Node.js built-in submodule",
+    reason:
+      "Node.js built-in modules do not have these submodule paths. LLMs fabricate submodule paths by combining real module names with plausible feature names.",
+    fix: "Import directly from the parent module (e.g., import { URL } from 'node:url').",
+    languages: ["javascript", "typescript"],
+  },
+  // os.getCpuUsagePercent / os.getMemoryUsagePercent / os.getDiskUsagePercent
+  {
+    pattern: /\bos\.(?:getCpuUsagePercent|getMemoryUsagePercent|getDiskUsagePercent)\s*\(/,
+    hallucinated: "os.getCpuUsagePercent/getMemoryUsagePercent/getDiskUsagePercent()",
+    reason:
+      "Node.js os module has no percentage-based resource usage methods. LLMs fabricate convenient but non-existent APIs.",
+    fix: "Use os.cpus() for CPU info, os.freemem()/os.totalmem() for memory.",
+    languages: ["javascript", "typescript"],
+  },
+  // process.onUncaughtRejection / process.setMaxMemory / process.enableGracefulShutdown
+  {
+    pattern: /\bprocess\.(?:onUncaughtRejection|setMaxMemory|enableGracefulShutdown)\s*\(/,
+    hallucinated: "process.onUncaughtRejection/setMaxMemory/enableGracefulShutdown()",
+    reason: "Node.js process object does not have these methods. LLMs fabricate convenience APIs.",
+    fix: "Use process.on('unhandledRejection', handler). Use --max-old-space-size for memory. Implement graceful shutdown with process.on('SIGTERM').",
+    languages: ["javascript", "typescript"],
+  },
+  // Fake TypeScript utility types presented as built-in
+  {
+    pattern: /\b(?:StrictOmit|Validated|Frozen)\s*</,
+    hallucinated: "Non-existent TypeScript built-in utility type",
+    reason:
+      "TypeScript does not have built-in StrictOmit, Validated, or Frozen utility types. LLMs hallucinate these as part of the standard type system.",
+    fix: "Use built-in types: Omit<T, K> for StrictOmit, Readonly<T> for Frozen. Define custom types for other needs.",
+    languages: ["typescript"],
+  },
+
+  // ── Additional Python ─────────────────────────────────────────────────
+
+  // requests.async_get/post/etc. — requests has no async methods
+  {
+    pattern: /\brequests\.async_(?:get|post|put|delete|patch)\s*\(/,
+    hallucinated: "requests.async_get()",
+    reason: "The requests library has no async methods. LLMs hallucinate async variants of the synchronous API.",
+    fix: "Use aiohttp or httpx for async HTTP: async with aiohttp.ClientSession() as s: await s.get(url).",
+    languages: ["python"],
+  },
+  // os.makedirs with permissions= parameter (should be mode=)
+  {
+    pattern: /\bos\.makedirs\s*\([^)]*\bpermissions\s*=/,
+    hallucinated: "os.makedirs(permissions=...)",
+    reason:
+      "os.makedirs() uses 'mode=' for permissions, not 'permissions='. LLMs hallucinate a more readable parameter name.",
+    fix: "Use os.makedirs(path, mode=0o755, exist_ok=True).",
+    languages: ["python"],
+  },
+  // collections.OrderedDefaultDict doesn't exist
+  {
+    pattern: /\bfrom\s+collections\s+import\b.*\bOrderedDefaultDict\b/,
+    hallucinated: "collections.OrderedDefaultDict",
+    reason:
+      "Python's collections module has no OrderedDefaultDict. LLMs fabricate this by combining OrderedDict and defaultdict.",
+    fix: "Use collections.OrderedDict or collections.defaultdict separately.",
+    languages: ["python"],
+  },
+  // typing.StrictDict doesn't exist
+  {
+    pattern: /\bfrom\s+typing\s+import\b.*\bStrictDict\b/,
+    hallucinated: "typing.StrictDict",
+    reason: "Python's typing module has no StrictDict. LLMs fabricate convenience types.",
+    fix: "Use typing.TypedDict for typed dicts or typing.Dict for generic dict hints.",
+    languages: ["python"],
+  },
+  // pathlib.SecurePath doesn't exist
+  {
+    pattern: /\bfrom\s+pathlib\s+import\b.*\bSecurePath\b/,
+    hallucinated: "pathlib.SecurePath",
+    reason: "Python's pathlib has no SecurePath class. LLMs fabricate security-focused variants.",
+    fix: "Use pathlib.Path and validate/sanitize paths manually.",
+    languages: ["python"],
+  },
+  // asyncio.ParallelMap doesn't exist
+  {
+    pattern: /\bfrom\s+asyncio\s+import\b.*\bParallelMap\b/,
+    hallucinated: "asyncio.ParallelMap",
+    reason: "Python's asyncio has no ParallelMap. LLMs fabricate parallel execution utilities.",
+    fix: "Use asyncio.gather(*[coro(x) for x in items]).",
+    languages: ["python"],
+  },
+  // json.schema doesn't exist in Python stdlib
+  {
+    pattern: /\bjson\.schema\b/,
+    hallucinated: "json.schema",
+    reason: "Python's json module has no schema submodule. LLMs conflate json with the jsonschema package.",
+    fix: "Install jsonschema: from jsonschema import validate.",
+    languages: ["python"],
+  },
+  // functools.memoize doesn't exist (it's lru_cache or cache)
+  {
+    pattern: /\bfrom\s+functools\s+import\b.*\bmemoize\b/,
+    hallucinated: "functools.memoize",
+    reason: "Python's functools has no memoize. LLMs hallucinate this from other languages.",
+    fix: "Use @functools.lru_cache(maxsize=128) or @functools.cache (Python 3.9+).",
+    languages: ["python"],
+  },
+
+  // ── Additional Java ───────────────────────────────────────────────────
+
+  // stream().filterMap() doesn't exist in Java (Rust concept)
+  {
+    pattern: /\.filterMap\s*\(/,
+    hallucinated: ".filterMap()",
+    reason: "Java Streams have no filterMap(). LLMs hallucinate this from Rust's filter_map().",
+    fix: "Use .filter(predicate).map(mapper) as two separate operations.",
+    languages: ["java"],
+    scopeCheckMethod: "filterMap",
+  },
+  // Stream.ofParallel() doesn't exist
+  {
+    pattern: /\bStream\.ofParallel\s*\(/,
+    hallucinated: "Stream.ofParallel()",
+    reason: "Java has no Stream.ofParallel(). LLMs fabricate this combining Stream.of() and parallelStream().",
+    fix: "Use collection.parallelStream() or Stream.of(...).parallel().",
+    languages: ["java"],
+  },
+  // Stream.zip() doesn't exist in Java stdlib
+  {
+    pattern: /\bStream\.zip\s*\(/,
+    hallucinated: "Stream.zip()",
+    reason: "Java Streams have no zip(). LLMs hallucinate this from Scala, Kotlin, or Python.",
+    fix: "Use IntStream.range() for manual zipping, or Guava's Streams.zip().",
+    languages: ["java"],
+  },
+  // .filterAsync() doesn't exist in Java Streams or C# LINQ
+  {
+    pattern: /\.filterAsync\s*\(/,
+    hallucinated: ".filterAsync()",
+    reason: "Neither Java Streams nor C# LINQ have filterAsync(). LLMs fabricate async variants.",
+    fix: "Use CompletableFuture with .filter() in Java, or async/await with Where() in C#.",
+    languages: ["java", "csharp"],
+    scopeCheckMethod: "filterAsync",
+  },
+  // Collectors.toUnmodifiableGroupingBy doesn't exist
+  {
+    pattern: /\bCollectors\.toUnmodifiableGroupingBy\s*\(/,
+    hallucinated: "Collectors.toUnmodifiableGroupingBy()",
+    reason: "Java has no Collectors.toUnmodifiableGroupingBy(). LLMs combine groupingBy() with unmodifiable concepts.",
+    fix: "Use Collectors.groupingBy() and wrap with Collections.unmodifiableMap().",
+    languages: ["java"],
+  },
+  // .groupByKey() on Java streams (Spark/Kotlin concept)
+  {
+    pattern: /\.groupByKey\s*\(/,
+    hallucinated: ".groupByKey()",
+    reason: "Java Streams have no groupByKey(). LLMs hallucinate this from Spark or Kotlin.",
+    fix: "Use .collect(Collectors.groupingBy(keyFunction)).",
+    languages: ["java"],
+    scopeCheckMethod: "groupByKey",
+  },
+  // .toConcurrentMap() terminal operation doesn't exist
+  {
+    pattern: /\.toConcurrentMap\s*\(\s*\)/,
+    hallucinated: ".toConcurrentMap()",
+    reason: "Java Streams have no .toConcurrentMap() terminal operation.",
+    fix: "Use .collect(Collectors.toConcurrentMap(keyMapper, valueMapper)).",
+    languages: ["java"],
+    scopeCheckMethod: "toConcurrentMap",
+  },
+
+  // ── Additional C# ────────────────────────────────────────────────────
+
+  // Fake LINQ extension methods
+  {
+    pattern: /\.(?:WhereAsync|BatchBy|ParallelSelect|FlattenAll|SortByMultiple|TakeWhileIncluding|SlidingWindow)\s*\(/,
+    hallucinated: "Non-existent LINQ extension method",
+    reason:
+      "C# LINQ does not have WhereAsync, BatchBy, ParallelSelect, FlattenAll, SortByMultiple, TakeWhileIncluding, or SlidingWindow. LLMs hallucinate these extensions.",
+    fix: "Use standard LINQ: Where, Chunk (.NET 6+), AsParallel().Select, SelectMany, OrderBy.ThenBy, TakeWhile.",
+    languages: ["csharp"],
+  },
+
+  // ── Additional Go ─────────────────────────────────────────────────────
+
+  // 'implements' keyword in Go type constraints (Java/C# concept)
+  {
+    pattern: /\bimplements\s+\w+/,
+    hallucinated: "'implements' keyword in Go generics",
+    reason: "Go does not have an 'implements' keyword. LLMs hallucinate this from Java/C#.",
+    fix: "Use Go type constraints: [T comparable], [T constraints.Ordered], or define a constraint interface.",
+    languages: ["go"],
+  },
 ];
 
 // ─── Suspicious Import Patterns ─────────────────────────────────────────────
