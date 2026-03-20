@@ -101,8 +101,8 @@ function generateHtmlJudgesArray(): string {
   const lines = ["    const judges = ["];
   for (const j of JUDGES) {
     const displayName = j.name.replace(/^Judge\s+/, "");
-    // Escape any double quotes in descriptions for JS string safety
-    const desc = j.tableDescription.replace(/"/g, '\\"');
+    // Escape backslashes first, then double quotes for JS string safety
+    const desc = j.tableDescription.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     lines.push(`      { name: "${displayName}", desc: "${desc}" },`);
   }
   lines.push("    ];");

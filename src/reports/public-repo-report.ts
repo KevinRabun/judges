@@ -313,7 +313,14 @@ function countBySeverity(findings: Finding[]): Record<Severity, number> {
 
 function compileExcludeRegexes(patterns?: string[]): RegExp[] {
   if (!patterns || patterns.length === 0) return [];
-  return patterns.map((pattern) => new RegExp(pattern, "i"));
+  return patterns.map((pattern) => {
+    try {
+      return new RegExp(pattern, "i");
+    } catch {
+      // Invalid regex from user input — treat as literal string match
+      return new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    }
+  });
 }
 
 function isLikelyNonProductionPath(path: string): boolean {

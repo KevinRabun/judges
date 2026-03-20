@@ -44,7 +44,7 @@ export function parseSkillFrontmatter(raw: string): { meta: SkillMeta; body: str
       i++;
       continue;
     }
-    const kv = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*(.*)$/);
+    const kv = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*)[ \t]*:[ \t]*(.*)$/);
     if (!kv) {
       i++;
       continue;
@@ -85,9 +85,10 @@ export function parseSkillFrontmatter(raw: string): { meta: SkillMeta; body: str
     if (typeof value === "string" && ((value.startsWith("[") && value.endsWith("]")) || value.includes(","))) {
       // simple array parsing: split on comma
       const normalized = (value as string)
-        .replace(/^\s*\[/, "")
-        .replace(/\]\s*$/, "")
-        .split(/\s*,\s*/)
+        .replace(/^[ \t]*\[/, "")
+        .replace(/\][ \t]*$/, "")
+        .split(",")
+        .map((s) => s.trim())
         .filter(Boolean);
       value = normalized;
     } else if (
@@ -117,13 +118,15 @@ export function validateSkillFrontmatter(meta: SkillMeta, sourcePath: string): S
     agents: Array.isArray(meta.agents)
       ? (meta.agents as string[])
       : String(meta.agents ?? "")
-          .split(/\s*,\s*/)
+          .split(",")
+          .map((s) => s.trim())
           .filter(Boolean),
     tags: Array.isArray(meta.tags)
       ? (meta.tags as string[])
       : meta.tags
         ? String(meta.tags)
-            .split(/\s*,\s*/)
+            .split(",")
+            .map((s) => s.trim())
             .filter(Boolean)
         : undefined,
     priority: meta.priority ? Number(meta.priority) : 10,

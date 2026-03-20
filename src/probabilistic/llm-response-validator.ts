@@ -23,7 +23,8 @@ const SEVERITY_SET: Set<string> = new Set(["critical", "high", "medium", "low", 
  * Attempt to parse a JSON payload embedded in LLM output. Supports fenced code blocks and raw JSON.
  */
 function parseJsonBlock(text: string): unknown | undefined {
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const fenceMatch =
+    text.match(/```(?:json)?[ \t]*\n([\s\S]*?)\n[ \t]*```/i) ?? text.match(/```(?:json)?[ \t]*([\s\S]*?)```/i);
   if (fenceMatch) {
     try {
       return JSON.parse(fenceMatch[1]);

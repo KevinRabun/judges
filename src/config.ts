@@ -15,7 +15,7 @@ import { matchGlobPath } from "./tools/command-safety.js";
 // Expand ${ENV_VAR} placeholders in config strings
 export function expandEnvPlaceholders(content: string): string {
   if (!content) return content;
-  return content.replace(/\$\{([^}]+)\}/g, (_match, varName) => {
+  return content.replace(/\$\{([^}]{1,100})\}/g, (_match, varName) => {
     const envVal = process.env[varName];
     return envVal !== undefined ? envVal : "";
   });

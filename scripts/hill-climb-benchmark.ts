@@ -422,8 +422,8 @@ async function main() {
     process.exit(1);
   }
 
-  const redactedKey = apiKey.slice(0, 10) + "..." + apiKey.slice(-4);
-  console.log(`  API Key:        ${redactedKey}\n`);
+  // Log key presence only — CodeQL flags any env-derived data in logs (js/clear-text-logging)
+  console.log(`  API Key:        [set, ${apiKey.length} chars]\n`);
 
   // Initialize
   _client = new Anthropic({ apiKey });
