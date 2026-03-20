@@ -4,6 +4,14 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.122.0] — 2026-03-20
+
+### Security
+- **9 CodeQL alerts resolved** — Polynomial ReDoS fixes in skill-loader/config/llm-response-validator, regex injection protection, incomplete sanitization fix, clear-text logging fix.
+- **Dependency fix** — `flatted` 3.4.1 → 3.4.2 (prototype pollution).
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.121.0] — 2026-03-20
 
 ### Improved

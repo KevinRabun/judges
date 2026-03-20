@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.122.0] — 2026-03-20
+
+### Security
+- **9 CodeQL code scanning alerts resolved** — Fixed all open alerts across 6 source files:
+  - `js/polynomial-redos` (6 alerts): Replaced unbounded `\s*` quantifiers with `[ \t]*` in `skill-loader.ts`, bounded capture group in `config.ts`, split fenced-block regex in `llm-response-validator.ts`.
+  - `js/regex-injection`: Wrapped user-provided regex in try/catch with `escapeRegExp` fallback in `public-repo-report.ts`.
+  - `js/incomplete-sanitization`: Escape backslashes before double-quotes in `sync-docs.ts`.
+  - `js/clear-text-logging`: Removed environment-derived API key from log output in `hill-climb-benchmark.ts`.
+- **Dependency vulnerability fixed** — Upgraded `flatted` 3.4.1 → 3.4.2 (GHSA-rf6f-7fwh-wjgh, prototype pollution via `parse()`). Dev-dependency only (eslint → file-entry-cache → flat-cache → flatted).
+
+### Tests
+- 2,481 tests pass, 0 fail.
+
 ## [3.121.0] — 2026-03-20
 
 ### Improved
