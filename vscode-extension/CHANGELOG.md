@@ -4,12 +4,20 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.119.0] — 2026-03-19
+
+### Added
+- **Token budget safeguards** — `maxPromptChars` option on evaluation and MCP tools defaults to 100K chars. Set to `0` for unlimited.
+- **New API exports** — `DEFAULT_MAX_PROMPT_CHARS`, `formatRelatedFilesSection`.
+- **27 documentation-verification tests** and **13 token budget tests**. Total: 2480 pass.
+
+See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.118.0] — 2026-03-19
 
 ### Added
 - **6 agentic evaluation features** — deep-review prompts, multi-turn re-evaluate tool, auto-tune pipeline, native git diff evaluation, cross-file import resolution, and confidence filtering.
 - **2 new MCP tools** — `evaluate_git_diff` and `re_evaluate_with_context`. Total MCP tools: 31.
-- **Token budget safeguards** — `maxPromptChars` option on evaluation and MCP tools defaults to 100K chars. Set to `0` for unlimited.
 
 ### Fixed
 - **Watch command tests fully enabled** — no more skipped tests (was 2 skipped).

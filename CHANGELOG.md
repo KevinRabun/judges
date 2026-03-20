@@ -2,6 +2,16 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.119.0] — 2026-03-19
+
+### Added
+- **Token budget safeguards** — new `maxPromptChars` option on `EvaluationOptions` (default: 100,000 chars) controls truncation of LLM-facing deep-review prompts. Related files capped to 10 with 3K/snippet, context strings to 10% of budget, and judge criteria auto-switch to compact mode when budget is tight. Set to `0` to disable all truncation. Also available as a parameter on `re_evaluate_with_context` and `evaluate_git_diff` MCP tools.
+- **New API exports** — `DEFAULT_MAX_PROMPT_CHARS`, `formatRelatedFilesSection` now exported from `@kevinrabun/judges/api`.
+- **27 documentation-verification tests** — automated checks for `maxPromptChars` docs in API reference, README, CHANGELOG, public API exports, and MCP tool schemas.
+
+### Tests
+- 40 new tests (13 token budget + 27 doc-verification). Total: 2480 pass, 0 fail, 0 skipped.
+
 ## [3.118.0] — 2026-03-19
 
 ### Added
@@ -12,14 +22,12 @@ All notable changes to **@kevinrabun/judges** are documented here.
 - **Cross-file import resolution** — `resolveImports()` and `buildRelatedFilesContext()` in new `src/import-resolver.ts` resolve imports across 5 languages (TypeScript, JavaScript, Python, Go, Rust) using AST + regex fallback, providing cross-file snippets for deep review.
 - **Confidence filter** — new `confidenceFilter` option on `EvaluationOptions` filters findings below a confidence threshold, with metadata tracking (`confidenceFilterApplied`) on the verdict.
 - **2 new MCP tools** — `evaluate_git_diff` (workflow) and `re_evaluate_with_context` (review). Total MCP tools: 31.
-- **Token budget safeguards** — new `maxPromptChars` option on `EvaluationOptions` (default: 100,000 chars) controls truncation of LLM-facing deep-review prompts. Related files capped to 10 with 3K/snippet, context strings to 10% of budget, and judge criteria auto-switch to compact mode when budget is tight. Set to `0` to disable all truncation. Also available as a parameter on `re_evaluate_with_context` and `evaluate_git_diff` MCP tools.
-- **New API exports** — `DEFAULT_MAX_PROMPT_CHARS`, `formatRelatedFilesSection` now exported from `@kevinrabun/judges/api`.
 
 ### Fixed
 - **Watch command tests no longer skipped** — rewrote the 2 "Watch Command" tests to use dependency injection (`WatchOptions.fsWatch`) instead of CJS `createRequire`/`syncBuiltinESMExports` monkeypatching that was incompatible with tsx. All tests now run under tsx.
 
 ### Tests
-- 41 new tests (26 P0/P1 feature tests + 2 watch tests + 13 token budget tests). Total: 2453 pass, 0 fail, 0 skipped.
+- 28 new tests (26 P0/P1 feature tests + 2 watch tests). Total: 2440 pass, 0 fail, 0 skipped.
 
 ## [3.117.8] — 2026-03-19
 
