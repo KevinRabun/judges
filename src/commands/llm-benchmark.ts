@@ -102,6 +102,16 @@ export function getValidRulePrefixes(): Set<string> {
   return new Set(JUDGES.map((j) => j.rulePrefix));
 }
 
+/**
+ * Valid prefixes for tribunal mode — excludes meta-judges that are not
+ * included in the tribunal prompt (INTENT, COH, MFPR, FPR, OVER).
+ * Findings with these prefixes are hallucinated by the LLM and should
+ * not be scored.
+ */
+export function getTribunalValidPrefixes(): Set<string> {
+  return new Set(TRIBUNAL_JUDGES.map((j) => j.rulePrefix));
+}
+
 export function parseLlmRuleIds(response: string): string[] {
   const validPrefixes = getValidRulePrefixes();
   const pattern = /\b([A-Z]{2,})-(\d{3})\b/g;
@@ -281,6 +291,14 @@ export function scoreLlmCase(
   rawResponse: string,
   tokensUsed?: number,
 ): LlmCaseResult {
+  // ── Prefix-level FP deduplication ─────────────────────────────────────
+  // TPs are counted per-expected-rule using prefix matching: a single
+  // detected CYBER-xxx satisfies all expected CYBER-yyy rules.
+  // FPs should use symmetric counting: each erroneously-firing judge prefix
+  // counts as ONE false positive regardless of how many rule IDs the LLM
+  // generates for that prefix.  This prevents verbose LLM output from
+  // inflating the FP metric (e.g. CYBER-001…005 on clean code = 1 FP,
+  // not 5).
   const detectedPrefixes = new Set(detectedRuleIds.map((r) => r.split("-")[0]));
 
   const matchedExpected = tc.expectedRuleIds.filter((expected) => {
@@ -299,7 +317,7 @@ export function scoreLlmCase(
   // doesn't match any expected prefix (prevents silent over-reporting).
   const isCleanCase = tc.expectedRuleIds.length === 0;
   const expectedPrefixes = new Set(tc.expectedRuleIds.map((r) => r.split("-")[0]));
-  const falsePositiveIds = isCleanCase
+  const falsePositiveIdsRaw = isCleanCase
     ? detectedRuleIds
     : tc.unexpectedRuleIds
       ? detectedRuleIds.filter((found) => {
@@ -310,6 +328,15 @@ export function scoreLlmCase(
           const prefix = found.split("-")[0];
           return !expectedPrefixes.has(prefix);
         });
+
+  // Deduplicate FPs by prefix — keep one representative rule ID per prefix
+  const fpPrefixSeen = new Set<string>();
+  const falsePositiveIds = falsePositiveIdsRaw.filter((id) => {
+    const prefix = id.split("-")[0];
+    if (fpPrefixSeen.has(prefix)) return false;
+    fpPrefixSeen.add(prefix);
+    return true;
+  });
 
   const casePassed = isCleanCase ? falsePositiveIds.length === 0 : matchedExpected.length > 0;
 

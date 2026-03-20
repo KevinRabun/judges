@@ -30,6 +30,7 @@ import {
   selectStratifiedSample,
   extractValidatedLlmFindings,
   getValidRulePrefixes,
+  getTribunalValidPrefixes,
   optimizeBenchmark,
   createEmptyStore,
   mergeAmendments,
@@ -392,7 +393,7 @@ async function runTribunalBatched(
 
       const prompt = constructTribunalPrompt(tc.code, tc.language, [], amendments);
       const response = await sendPrompt(model, prompt, token, cfg);
-      const validation = extractValidatedLlmFindings(response, getValidRulePrefixes());
+      const validation = extractValidatedLlmFindings(response, getTribunalValidPrefixes());
       if (validation.errors.length) {
         log(`⚠️ [${tc.id}/tribunal] validation: ${validation.errors.join("; ")}`);
       }

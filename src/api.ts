@@ -404,6 +404,7 @@ export {
   formatLayerComparisonMarkdown,
   extractValidatedLlmFindings,
   getValidRulePrefixes,
+  getTribunalValidPrefixes,
 } from "./commands/llm-benchmark.js";
 export type { LlmBenchmarkSnapshot, LlmCaseResult } from "./commands/llm-benchmark.js";
 export type { LlmFinding, ValidationResult } from "./probabilistic/llm-response-validator.js";

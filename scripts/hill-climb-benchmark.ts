@@ -38,6 +38,7 @@ import {
   selectStratifiedSample,
   extractValidatedLlmFindings,
   getValidRulePrefixes,
+  getTribunalValidPrefixes,
   optimizeBenchmark,
   createEmptyStore,
   mergeAmendments,
@@ -238,7 +239,7 @@ async function runTribunalBenchmark(
   amendments: PromptAmendment[],
   iteration: number,
 ): Promise<LlmCaseResult[]> {
-  const validPrefixes = getValidRulePrefixes();
+  const validPrefixes = getTribunalValidPrefixes();
   const totalBatches = Math.ceil(cases.length / CONCURRENCY);
 
   // Check for checkpoint to resume from

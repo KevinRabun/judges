@@ -691,7 +691,9 @@ describe("Quickstart: CLI commands referenced in docs exist", () => {
   for (const cmd of documentedCommands) {
     it(`CLI has "${cmd}" command handler`, () => {
       assert.ok(
-        combinedSrc.includes(`args.command === "${cmd}"`) || combinedSrc.includes(`"${cmd}": [`),
+        combinedSrc.includes(`args.command === "${cmd}"`) ||
+          combinedSrc.includes(`"${cmd}": [`) ||
+          combinedSrc.includes(`${cmd}: [`),
         `CLI should have a handler for command "${cmd}" — update docs if commands change`,
       );
     });

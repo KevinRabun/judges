@@ -17,6 +17,7 @@ import {
   extractValidatedLlmFindings,
   parseLlmRuleIds,
   getValidRulePrefixes,
+  getTribunalValidPrefixes,
   TRIBUNAL_JUDGES,
 } from "../src/commands/llm-benchmark.js";
 import type { BenchmarkCase } from "../src/commands/benchmark.js";
@@ -127,7 +128,7 @@ else if (command === "score") {
 
   const cases: Array<BenchmarkCase & { index: number }> = JSON.parse(readFileSync(casesPath, "utf-8"));
   const responses: Record<string, string> = JSON.parse(readFileSync(responsesPath, "utf-8"));
-  const validPrefixes = getValidRulePrefixes();
+  const validPrefixes = getTribunalValidPrefixes();
 
   console.log(`\nScoring ${cases.length} cases...\n`);
 

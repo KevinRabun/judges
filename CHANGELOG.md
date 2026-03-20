@@ -4,6 +4,11 @@ All notable changes to **@kevinrabun/judges** are documented here.
 
 ## [3.120.0] — 2026-03-19
 
+### Fixed
+- **LLM benchmark scoring: symmetric FP counting** — Fixed an asymmetry where true positives used prefix-level matching (one `CYBER-xxx` satisfies any `CYBER-yyy` expected rule) but false positives counted each individual rule ID. Now each erroneously-firing judge prefix counts as ONE false positive regardless of how many rule IDs the LLM generates. Tribunal benchmark: FP 132→47, Precision 70.7%→87.2%, F1 81.3%→91.2% (B→**A** grade).
+- **Meta-judge prefix filtering** — New `getTribunalValidPrefixes()` excludes meta-judge prefixes (INTENT, COH, MFPR, FPR, OVER) from tribunal scoring since these judges aren't in the tribunal prompt — any findings with these prefixes are hallucinated. Updated all benchmark runners (VS Code, hill-climb, copilot).
+- **CLI dispatch test fix** — Test for documented CLI commands (fix, report, diff, deps) now also matches unquoted object keys in the dispatch table.
+
 ### Refactored
 - **P0 — DRY: Single `EXT_TO_LANG` source of truth** — Consolidated 16 duplicated file-extension-to-language maps into `src/ext-to-lang.ts`. New exports: `EXT_TO_LANG`, `SUPPORTED_EXTENSIONS`, `detectLanguageFromPath()`. 13 command files + `github-app.ts` + `parallel.ts` now import from the shared module. VS Code extension gets its own `lang-map.ts` for VS Code languageId mapping (3 files updated).
 - **P1 — Complexity: Split `cli.ts` god file** — Reduced `cli.ts` from 6,350 → 1,494 lines (77% reduction). Extracted `cli-formatters.ts` (output formatting, ~195 lines) and `cli-dispatch.ts` (646-entry command dispatch table, ~650 lines). 12 special commands (version, help, skills, init, watch, lsp, etc.) remain inline.
