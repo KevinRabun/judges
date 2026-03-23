@@ -25,7 +25,11 @@ async function loadThresholds() {
   }
 }
 
-const command = 'npx c8 --config .c8rc.json npx tsx --test "tests/**/*.test.ts"';
+// Use --test-force-exit to avoid the known Node 22 + tsx "Unable to deserialize
+// cloned data" uncaughtException that aborts the test suite under c8 coverage.
+const nodeVersion = parseInt(process.versions.node, 10);
+const forceExit = nodeVersion >= 22 ? '--test-force-exit' : '';
+const command = `npx c8 --config .c8rc.json node --import tsx --test ${forceExit} "tests/**/*.test.ts"`;
 
 async function main() {
   const finalCode = await new Promise((done) => {
