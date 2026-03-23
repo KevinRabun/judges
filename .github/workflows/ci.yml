@@ -116,7 +116,7 @@ jobs:
 
       - name: Upload coverage artifacts
         if: matrix.node-version == '22'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-reports
           path: |
@@ -127,7 +127,7 @@ jobs:
 
       - name: Upload SARIF artifact
         if: matrix.node-version == '22'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: judges-sarif
           path: artifacts/judges.sarif
@@ -228,7 +228,7 @@ jobs:
           CI: true
 
       - name: Upload PR review artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pr-deep-review
           path: artifacts/pr-deep-review.json
