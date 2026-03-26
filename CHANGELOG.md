@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.123.1] — 2026-03-26
+
+### Fixed
+- **Unused import** — Removed unused `getValidRulePrefixes` import in `scripts/copilot-llm-benchmark.ts`.
+- **Calibration test types** — Fixed 6 calibration tests passing `version: "1.0.0"` instead of `version: 1` with required `metadata` field to match `FeedbackStore` interface.
+- **CSV test types** — Fixed 2 CSV export tests with incomplete `TribunalVerdict` shape by adding proper type casts.
+- **PassThrough/IncomingMessage cast** — Fixed unsafe type cast in webhook test by using intermediate `unknown` cast and keeping a `reqStream` reference for `.end()` calls.
+- **ProjectContext type** — Fixed `frameworkVersions: {}` to `frameworkVersions: []` to match `string[]` type in deep-review test.
+
+### Tests
+- 2,482 tests passing, 0 failures.
+
 ## [3.123.0] — 2026-03-26
 
 ### Improved

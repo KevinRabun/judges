@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.123.1] — 2026-03-26
+
+### Fixed
+- **Type errors resolved** — Fixed compile errors in calibration, CSV export, webhook, and deep-review tests. See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.123.0] — 2026-03-26
 
 ### Improved

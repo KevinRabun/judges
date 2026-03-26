@@ -16,7 +16,6 @@ import {
   computeLlmMetrics,
   extractValidatedLlmFindings,
   parseLlmRuleIds,
-  getValidRulePrefixes,
   getTribunalValidPrefixes,
   TRIBUNAL_JUDGES,
 } from "../src/commands/llm-benchmark.js";

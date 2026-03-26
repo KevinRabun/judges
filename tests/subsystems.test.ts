@@ -8227,7 +8227,11 @@ describe("Calibration — buildCalibrationProfile and calibrateFindings", () => 
   });
 
   it("should build inactive profile from empty feedback store", () => {
-    const profile = buildCalibrationProfile({ version: "1.0.0", entries: [] });
+    const profile = buildCalibrationProfile({
+      version: 1,
+      entries: [],
+      metadata: { createdAt: "", lastUpdated: "", totalSubmissions: 0 },
+    });
     assert.equal(profile.isActive, false);
     assert.equal(profile.fpRateByRule.size, 0);
     assert.equal(profile.feedbackCount, 0);
@@ -8264,7 +8268,11 @@ describe("Calibration — buildCalibrationProfile and calibrateFindings", () => 
         language: "typescript",
       },
     ];
-    const profile = buildCalibrationProfile({ version: "1.0.0", entries });
+    const profile = buildCalibrationProfile({
+      version: 1,
+      entries,
+      metadata: { createdAt: "", lastUpdated: "", totalSubmissions: 0 },
+    });
     assert.equal(profile.isActive, true);
     assert.ok(profile.fpRateByRule.has("CYBER-001"));
     assert.equal(profile.fpRateByRule.get("CYBER-001"), 0.5); // 2 FP / 4 total
@@ -8278,7 +8286,11 @@ describe("Calibration — buildCalibrationProfile and calibrateFindings", () => 
       filePath: `file${i}.ts`,
       language: "typescript" as const,
     }));
-    const profile = buildCalibrationProfile({ version: "1.0.0", entries });
+    const profile = buildCalibrationProfile({
+      version: 1,
+      entries,
+      metadata: { createdAt: "", lastUpdated: "", totalSubmissions: 0 },
+    });
     // FP rate = 8/10 = 0.8
 
     const findings = [makeFinding({ ruleId: "FLAKY-001", confidence: 0.7 })];
@@ -8294,7 +8306,11 @@ describe("Calibration — buildCalibrationProfile and calibrateFindings", () => 
       filePath: `file${i}.ts`,
       language: "typescript" as const,
     }));
-    const profile = buildCalibrationProfile({ version: "1.0.0", entries });
+    const profile = buildCalibrationProfile({
+      version: 1,
+      entries,
+      metadata: { createdAt: "", lastUpdated: "", totalSubmissions: 0 },
+    });
     // FP rate = 1/10 = 0.1
 
     const findings = [makeFinding({ ruleId: "SOLID-001", confidence: 0.7 })];
@@ -8303,7 +8319,11 @@ describe("Calibration — buildCalibrationProfile and calibrateFindings", () => 
   });
 
   it("should not modify findings when profile is inactive", () => {
-    const profile = buildCalibrationProfile({ version: "1.0.0", entries: [] });
+    const profile = buildCalibrationProfile({
+      version: 1,
+      entries: [],
+      metadata: { createdAt: "", lastUpdated: "", totalSubmissions: 0 },
+    });
     const findings = [makeFinding({ confidence: 0.6 })];
     const calibrated = calibrateFindings(findings, profile);
     assert.equal(calibrated[0].confidence, 0.6);
@@ -8318,7 +8338,11 @@ describe("Calibration — buildCalibrationProfile and calibrateFindings", () => 
       filePath: `file${i}.ts`,
       language: "typescript" as const,
     }));
-    const profile = buildCalibrationProfile({ version: "1.0.0", entries });
+    const profile = buildCalibrationProfile({
+      version: 1,
+      entries,
+      metadata: { createdAt: "", lastUpdated: "", totalSubmissions: 0 },
+    });
 
     // CYBER prefix should have FP rate (4/5 = 0.8), but CYBER-999 has no rule-level data
     const findings = [makeFinding({ ruleId: "CYBER-999", confidence: 0.7 })];
@@ -9076,7 +9100,7 @@ describe("CSV Formatter", () => {
         }),
       ],
       judgeResults: [],
-    };
+    } as unknown as import("../src/types.js").TribunalVerdict;
     const rows = verdictToCsvRows(verdict, "app.ts");
     assert.equal(rows.length, 1);
     assert.ok(rows[0].includes("app.ts"));
@@ -9096,7 +9120,7 @@ describe("CSV Formatter", () => {
           verdict: "pass" as const,
           findings: [makeFinding()],
           judgeResults: [],
-        },
+        } as unknown as import("../src/types.js").TribunalVerdict,
       },
     ]);
     const lines = csv.trim().split("\n");
@@ -13056,10 +13080,10 @@ describe("GitHub App helpers", () => {
       startAppServer({ appId: "1", privateKey: "key", webhookSecret: "secret", port: 3456 });
       assert.ok(capturedHandler, "Expected HTTP request handler to be captured");
 
-      const req = new PassThrough() as import("http").IncomingMessage;
+      const reqStream = new PassThrough();
       const malformedBody = '{"action":"opened"';
       const signature = `sha256=${crypto.createHmac("sha256", "secret").update(malformedBody).digest("hex")}`;
-      Object.assign(req, {
+      Object.assign(reqStream, {
         url: "/webhook",
         method: "POST",
         headers: {
@@ -13067,6 +13091,7 @@ describe("GitHub App helpers", () => {
           "x-hub-signature-256": signature,
         },
       });
+      const req = reqStream as unknown as import("http").IncomingMessage;
 
       const responseState = { status: 0, body: "" };
       let resolveResponse: (() => void) | undefined;
@@ -13084,7 +13109,7 @@ describe("GitHub App helpers", () => {
       } as unknown as import("http").ServerResponse;
 
       await capturedHandler!(req, res);
-      req.end(malformedBody);
+      reqStream.end(malformedBody);
       await responseDone;
 
       assert.strictEqual(responseState.status, 500);
@@ -15014,7 +15039,7 @@ describe("Deep Review — formatProjectContextSection", () => {
     const { formatProjectContextSection } = await import("../src/tools/deep-review.js");
     const section = formatProjectContextSection({
       frameworks: ["express", "passport"],
-      frameworkVersions: {},
+      frameworkVersions: [],
       entryPointType: "http-server",
       runtime: "node",
       dependencies: [],
