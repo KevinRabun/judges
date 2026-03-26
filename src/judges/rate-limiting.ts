@@ -32,6 +32,15 @@ RULES FOR YOUR EVALUATION:
 - Consider both inbound (protecting your service) and outbound (respecting others') rate limits.
 - Score from 0-100 where 100 means comprehensive rate limiting.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- Rate limiting middleware is applied to public-facing API endpoints (express-rate-limit, API gateway config, etc.).
+- Request body size limits are configured (bodyParser limits, multer limits, etc.).
+- List/query endpoints have pagination with enforced maximum page sizes.
+- External API calls use bounded retries with exponential backoff and jitter.
+- Connection pools and concurrent request limits are bounded.
+If the code meets these criteria, rate limiting is implemented correctly. Do NOT manufacture findings.
+IMPORTANT: CLI tools, data scripts, utility libraries, batch processors, and internal services do NOT need rate limiting. If the code is not a public-facing API or web server, report ZERO findings.
+
 FALSE POSITIVE AVOIDANCE:
 - Only flag rate-limiting issues in code that accepts external requests (APIs, WebSocket servers, public endpoints).
 - Do NOT flag internal services, batch processors, CLI tools, or cron jobs for missing rate limiting.

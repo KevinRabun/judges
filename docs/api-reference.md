@@ -315,7 +315,7 @@ const preset = getPreset("security-only");
 const composed = composePresets(["security-only", "performance"]);
 ```
 
-Available presets: `strict`, `lenient`, `security-only`, `startup`, `compliance`, `performance`, `react`, `express`, `fastapi`, `django`, `spring-boot`, `rails`, `nextjs`, `terraform`, `kubernetes`, `onboarding`, `fintech`, `healthtech`, `saas`, `government`.
+Available presets: `strict`, `lenient`, `security-only`, `startup`, `compliance`, `performance`, `react`, `express`, `fastapi`, `django`, `spring-boot`, `rails`, `nextjs`, `terraform`, `kubernetes`, `onboarding`, `fintech`, `healthtech`, `saas`, `government`, `open-source`, `ai-review`.
 
 ---
 

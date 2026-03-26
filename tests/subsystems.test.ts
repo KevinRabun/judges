@@ -15628,6 +15628,39 @@ Rule ID: DATA-005
     const ids = parseLlmRuleIds(response);
     assert.strictEqual(ids.length, 0);
   });
+
+  it("extracts alphanumeric rule prefixes like A11Y and I18N", async () => {
+    const { parseLlmRuleIds } = await import("../src/commands/llm-benchmark.js");
+    const response = `
+**A11Y-001** (critical): Missing accessible label on input element.
+**I18N-001** (high): Hardcoded date format string.
+**CYBER-003** (medium): Missing security headers.
+    `;
+    const ids = parseLlmRuleIds(response);
+    assert.ok(ids.includes("A11Y-001"), "should find A11Y-001");
+    assert.ok(ids.includes("I18N-001"), "should find I18N-001");
+    assert.ok(ids.includes("CYBER-003"), "should find CYBER-003");
+    assert.strictEqual(ids.length, 3);
+  });
+
+  it("extracts short rule IDs with 1-2 digit suffixes", async () => {
+    const { parseLlmRuleIds } = await import("../src/commands/llm-benchmark.js");
+    const response = `
+**SEC-01** (high): Plaintext HTTP for credentials.
+**RATE-1** (critical): No rate limiting on login endpoint.
+**AGENT-03** (critical): Unsafe override pattern.
+**CYBER-001** (medium): Standard 3-digit ID still works.
+CWE-89 should not match. AU-3 should not match.
+    `;
+    const ids = parseLlmRuleIds(response);
+    assert.ok(ids.includes("SEC-01"), "should find SEC-01");
+    assert.ok(ids.includes("RATE-1"), "should find RATE-1");
+    assert.ok(ids.includes("AGENT-03"), "should find AGENT-03");
+    assert.ok(ids.includes("CYBER-001"), "should find CYBER-001");
+    assert.ok(!ids.some((id) => id.startsWith("CWE")), "should not match CWE references");
+    assert.ok(!ids.some((id) => id.startsWith("AU")), "should not match NIST references");
+    assert.strictEqual(ids.length, 4);
+  });
 });
 
 describe("LLM Benchmark — constructPerJudgePrompt", () => {
@@ -15649,21 +15682,6 @@ describe("LLM Benchmark — constructPerJudgePrompt", () => {
     assert.ok(prompt.includes("typescript"), "should include the language");
     assert.ok(prompt.includes("TST-"), "should include the rule prefix");
     assert.ok(prompt.includes("PRECISION MANDATE"), "should include precision mandate");
-  });
-});
-
-describe("LLM Benchmark — constructTribunalPrompt", () => {
-  it("produces a prompt with all judges and shared mandates", async () => {
-    const { constructTribunalPrompt } = await import("../src/commands/llm-benchmark.js");
-    const prompt = constructTribunalPrompt("const x = 1;", "javascript");
-    assert.ok(prompt.includes("Judges Panel"), "should reference the panel");
-    assert.ok(prompt.includes("ADVERSARIAL MANDATE"), "should include adversarial mandate");
-    assert.ok(prompt.includes("PRECISION MANDATE"), "should include precision mandate");
-    assert.ok(prompt.includes("const x = 1;"), "should include the code");
-    assert.ok(prompt.includes("javascript"), "should include the language");
-    // Should reference multiple judges
-    assert.ok(prompt.includes("CYBER-"), "should reference cybersecurity prefix");
-    assert.ok(prompt.includes("AUTH-"), "should reference auth prefix");
   });
 });
 
@@ -15827,6 +15845,29 @@ describe("LLM Benchmark — computeLlmMetrics", () => {
     assert.strictEqual(snapshot.provider, "openai");
     assert.ok(snapshot.perCategory["injection"], "should have injection category");
     assert.ok(snapshot.perCategory["auth"], "should have auth category");
+  });
+
+  it("attributes false positives to judges on dirty cases", async () => {
+    const { computeLlmMetrics } = await import("../src/commands/llm-benchmark.js");
+    const cases = [
+      {
+        caseId: "dirty-fp",
+        category: "injection",
+        difficulty: "easy",
+        passed: true,
+        expectedRuleIds: ["CYBER-001"],
+        detectedRuleIds: ["CYBER-001", "SWDEV-003", "MAINT-002"],
+        missedRuleIds: [],
+        falsePositiveRuleIds: ["SWDEV-003", "MAINT-002"],
+        rawResponse: "found multiple",
+      },
+    ];
+    const snapshot = computeLlmMetrics(cases, "3.38.0", "gpt-4o", "openai", "tribunal", 60);
+    assert.strictEqual(snapshot.falsePositives, 2, "overall FP count");
+    assert.strictEqual(snapshot.perJudge["CYBER"].truePositives, 1);
+    assert.strictEqual(snapshot.perJudge["CYBER"].falsePositives, 0);
+    assert.strictEqual(snapshot.perJudge["SWDEV"].falsePositives, 1, "SWDEV FP attributed on dirty case");
+    assert.strictEqual(snapshot.perJudge["MAINT"].falsePositives, 1, "MAINT FP attributed on dirty case");
   });
 });
 

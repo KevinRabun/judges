@@ -15,7 +15,7 @@ An MCP (Model Context Protocol) server that provides a panel of **45 specialized
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![npm downloads](https://img.shields.io/npm/dw/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-2481-brightgreen)](https://github.com/KevinRabun/judges/actions)
+[![Tests](https://img.shields.io/badge/tests-2482-brightgreen)](https://github.com/KevinRabun/judges/actions)
 
 > 🔰 **Packages**
 > - **CLI**: `@kevinrabun/judges-cli` → binary `judges` (use `npx @kevinrabun/judges-cli eval --file app.ts`).
@@ -731,6 +731,8 @@ Use `--preset` to apply pre-configured evaluation settings:
 | `healthtech` | Healthcare — HIPAA compliance, data sovereignty, encryption, audit trails |
 | `saas` | Multi-tenant SaaS — tenant isolation, rate limiting, scalability |
 | `government` | Government/public sector — compliance, sovereignty, authentication |
+| `open-source` | Open-source projects — documentation, backwards compatibility, security, dependency health |
+| `ai-review` | AI-generated code review — hallucination detection, security, authentication, correctness |
 
 ```bash
 judges eval --preset security-only src/api.ts
@@ -833,7 +835,7 @@ The tribunal operates in three layers:
 
 2. **AST-Based Structural Analysis** — The Code Structure judge (`STRUCT-*` rules) uses real Abstract Syntax Tree parsing to measure cyclomatic complexity, nesting depth, function length, parameter count, dead code, and type safety with precision that regex cannot achieve. All supported languages — **TypeScript, JavaScript, Python, Rust, Go, Java, C#, and C++** — are parsed via **tree-sitter WASM grammars** (real syntax trees compiled to WebAssembly, in-process, zero native dependencies). A scope-tracking structural parser is kept as a fallback when WASM grammars are unavailable. No external AST server required.
 
-3. **LLM-Powered Deep Analysis (Prompts)** — The server exposes MCP prompts (e.g., `judge-data-security`, `full-tribunal`) that provide each judge's expert persona as a system prompt. When used by an LLM-based client (Copilot, Claude, Cursor, etc.), the host LLM performs deeper, context-aware probabilistic analysis beyond what static patterns can detect. This is where the `systemPrompt` on each judge comes alive — Judges itself makes no LLM calls, but it provides the expert criteria so your AI assistant can act as 45 specialized reviewers.
+3. **LLM-Powered Deep Analysis (Prompts)** — The server exposes MCP prompts (e.g., `judge-data-security`, `judge-cybersecurity`) that provide each judge's expert persona as a system prompt. When used by an LLM-based client (Copilot, Claude, Cursor, etc.), the host LLM performs deeper, context-aware probabilistic analysis beyond what static patterns can detect. This is where the `systemPrompt` on each judge comes alive — Judges itself makes no LLM calls, but it provides the expert criteria so your AI assistant can act as 45 specialized reviewers.
 
 ---
 
@@ -877,7 +879,7 @@ When your AI coding assistant connects to multiple MCP servers, each one contrib
   │   Judges     │  │  CVE / │  │ Linter │
   │   Panel      │  │  SBOM  │  │ Server │
   │ ─────────────│  └────────┘  └────────┘
-  │ 36 Heuristic │   Vuln DB     Style &
+  │ 44 Heuristic │   Vuln DB     Style &
   │   judges     │   scanning    correctness
   │ + AST judge  │
   └──────────────┘
@@ -1130,7 +1132,7 @@ Re-run the tribunal with **prior findings as context** for iterative refinement.
 
 #### Judge IDs
 
-`data-security` · `cybersecurity` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure` · `agent-instructions` · `ai-code-safety` · `framework-safety` · `iac-security` · `false-positive-review`
+`data-security` · `cybersecurity` · `security` · `cost-effectiveness` · `scalability` · `cloud-readiness` · `software-practices` · `accessibility` · `api-design` · `api-contract` · `reliability` · `observability` · `performance` · `compliance` · `data-sovereignty` · `testing` · `documentation` · `internationalization` · `dependency-health` · `concurrency` · `ethics-bias` · `maintainability` · `error-handling` · `authentication` · `database` · `caching` · `configuration-management` · `backwards-compatibility` · `portability` · `ux` · `logging-privacy` · `rate-limiting` · `ci-cd` · `code-structure` · `agent-instructions` · `ai-code-safety` · `framework-safety` · `iac-security` · `hallucination-detection` · `intent-alignment` · `multi-turn-coherence` · `model-fingerprint` · `over-engineering` · `logic-review` · `false-positive-review`
 
 ---
 
@@ -1186,7 +1188,6 @@ Each judge has a corresponding prompt for LLM-powered deep analysis:
 | `judge-over-engineering` | Deep review of unnecessary abstractions, wrapper-mania, premature generalization |
 | `judge-logic-review` | Deep review of logic correctness, semantic mismatches, and dead code in AI-generated code |
 | `judge-false-positive-review` | Meta-judge review of pattern-based findings for false positive detection and accuracy |
-| `full-tribunal` | all 45 judges in a single prompt |
 <!-- PROMPTS_TABLE_END -->
 
 ---
@@ -1216,7 +1217,7 @@ Create a `.judgesrc.json` (or `.judgesrc`) file in your project root to customiz
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `$schema` | `string` | — | JSON Schema URL for IDE validation |
-| `preset` | `string` | — | Named preset (see [Named Presets](#named-presets) for all 18 options) |
+| `preset` | `string` | — | Named preset (see [Named Presets](#named-presets) for all 22 options) |
 | `minSeverity` | `string` | `"info"` | Minimum severity to report: `critical` · `high` · `medium` · `low` · `info` |
 | `disabledRules` | `string[]` | `[]` | Rule IDs or prefix wildcards to suppress (e.g. `"COST-*"`, `"SEC-003"`) |
 | `disabledJudges` | `string[]` | `[]` | Judge IDs to skip entirely (e.g. `"cost-effectiveness"`) |
@@ -1344,7 +1345,7 @@ judges/
 │   ├── evaluators/           # Analysis engine for each judge
 │   │   ├── index.ts          # evaluateWithJudge(), evaluateWithTribunal(), evaluateProject(), etc.
 │   │   ├── shared.ts         # Scoring, verdict logic, markdown formatters
-│   │   └── *.ts              # One analyzer per judge (39 files)
+│   │   └── *.ts              # One analyzer per judge (45 files)
 │   ├── formatters/           # Output formatters
 │   │   ├── sarif.ts              # SARIF 2.1.0 output
 │   │   ├── html.ts               # Self-contained HTML report (dark/light theme, filters)
@@ -1371,12 +1372,12 @@ judges/
 │   │   └── config-share.ts       # Shareable team/org configuration
 │   ├── presets.ts            # Named evaluation presets (strict, lenient, security-only, …)
 │   ├── patches/
-│   │   └── index.ts              # 53 deterministic auto-fix patch rules
+│   │   └── index.ts              # 201 deterministic auto-fix patch rules
 │   ├── tools/                # MCP tool registrations
 │   │   ├── register.ts           # Tool registration orchestrator
 │   │   ├── register-evaluation.ts    # Evaluation tools (evaluate_code, etc.)
 │   │   ├── register-workflow.ts      # Workflow tools (app builder, reports, etc.)
-│   │   ├── prompts.ts            # MCP prompt registrations (per-judge + full-tribunal)
+│   │   ├── prompts.ts            # MCP prompt registrations (per-judge prompts)
 │   │   └── schemas.ts            # Zod schemas for tool parameters
 │   ├── reports/
 │   │   └── public-repo-report.ts   # Public repo clone + full tribunal report generation

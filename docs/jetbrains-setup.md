@@ -1,6 +1,6 @@
 # JetBrains IDE Integration
 
-Judges exposes 29 MCP tools via stdio transport, making it compatible with any JetBrains IDE that supports the Model Context Protocol (IntelliJ IDEA, WebStorm, PyCharm, GoLand, Rider, etc.).
+Judges exposes 31 MCP tools via stdio transport, making it compatible with any JetBrains IDE that supports the Model Context Protocol (IntelliJ IDEA, WebStorm, PyCharm, GoLand, Rider, etc.).
 
 ## Prerequisites
 
@@ -81,6 +81,10 @@ Once connected, the following tools are available to the AI Assistant:
 | `session_status` | View evaluation session state |
 | `list_files` | List files in a directory |
 | `read_file` | Read a file from disk |
+| `evaluate_batch` | Evaluate multiple code snippets in one call |
+| `evaluate_git_diff` | Evaluate changed files from a Git diff |
+| `re_evaluate_with_context` | Re-evaluate findings with developer context |
+| `record_feedback` | Record feedback on findings (true positive, false positive, won't fix) |
 
 See the [API Reference](api-reference.md) for complete tool parameters.
 

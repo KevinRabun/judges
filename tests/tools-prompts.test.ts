@@ -44,19 +44,5 @@ describe("tools/prompts", () => {
     assert.match(messageText, new RegExp(JUDGES[0].name));
     assert.match(messageText, /PRECISION MANDATE/);
     assert.match(messageText, /console\.log/);
-
-    // Tribunal prompt should include adversarial + precision mandates once and all judge criteria
-    const tribunal = server.registrations.find((r) => r.name === "full-tribunal");
-    assert.ok(tribunal, "full-tribunal prompt registered");
-    const tribunalResult = await tribunal!.handler({ code: "print('ok')", language: "python" });
-    const tribunalText = tribunalResult.messages[0].content.text as string;
-    assert.match(tribunalText, /Judges Panel/);
-    assert.match(tribunalText, /ADVERSARIAL MANDATE/);
-    assert.match(tribunalText, /PRECISION MANDATE/);
-    // Ensure judge criteria are included (condensed)
-    const firstJudge = JUDGES[0];
-    const condensed = getCondensedCriteria(firstJudge.systemPrompt);
-    assert.match(tribunalText, new RegExp(firstJudge.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.match(tribunalText, new RegExp(condensed.split("\n")[0].slice(0, 10))); // a snippet from condensed criteria
   });
 });

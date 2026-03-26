@@ -325,18 +325,25 @@ export function activate(context: vscode.ExtensionContext): void {
             });
             await vscode.window.showTextDocument(doc, { preview: true });
 
-            const f1 = result.perJudge ? `Per-Judge F1: ${(result.perJudge.f1Score * 100).toFixed(1)}%` : "";
-            const f1t = result.tribunal ? `Tribunal F1: ${(result.tribunal.f1Score * 100).toFixed(1)}%` : "";
+            const f1 = result.snapshot ? `F1: ${(result.snapshot.f1Score * 100).toFixed(1)}%` : "";
 
-            const action = await vscode.window.showInformationMessage(
-              `Judges: LLM Benchmark complete. ${[f1, f1t].filter(Boolean).join(" · ")}`,
-              "Save to Workspace",
-            );
+            // Auto-save results to workspace benchmarks/ folder
+            const reportUri = await saveResultsToWorkspace(storageUri);
+            if (reportUri) {
+              vscode.window.showInformationMessage(
+                `Judges: LLM Benchmark complete. ${f1} — Results saved to benchmarks/`,
+              );
+            } else {
+              const action = await vscode.window.showInformationMessage(
+                `Judges: LLM Benchmark complete. ${f1}`,
+                "Save to Workspace",
+              );
 
-            if (action === "Save to Workspace") {
-              const reportUri = await saveResultsToWorkspace(storageUri);
-              if (reportUri) {
-                vscode.window.showInformationMessage("Benchmark results saved to benchmarks/ — ready to commit.");
+              if (action === "Save to Workspace") {
+                const saved = await saveResultsToWorkspace(storageUri);
+                if (saved) {
+                  vscode.window.showInformationMessage("Benchmark results saved to benchmarks/ — ready to commit.");
+                }
               }
             }
           } catch (error) {

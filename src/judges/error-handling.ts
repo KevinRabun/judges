@@ -32,6 +32,15 @@ RULES FOR YOUR EVALUATION:
 - Flag any code path that could throw without a handler in scope.
 - Score from 0-100 where 100 means robust error handling.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- Try-catch blocks wrap code paths that can throw, with meaningful handling (log, re-throw, or recover).
+- Async operations use try-catch or .catch() to handle rejections.
+- Error responses return consistent structures with appropriate HTTP status codes.
+- Resources (connections, file handles, streams) are cleaned up in finally blocks or using disposal patterns.
+- Framework error middleware or global handlers are present (Express error middleware, Spring @ExceptionHandler, etc.).
+- Stack traces and internal details are not exposed to end users in error responses.
+If the code meets these criteria, error handling is implemented correctly. Do NOT manufacture findings.
+
 FALSE POSITIVE AVOIDANCE:
 - Do NOT flag error handling in code that delegates error handling to a framework (Express middleware, Spring @ExceptionHandler, etc.).
 - Try-catch with logging and re-throw is a valid error handling pattern, not a deficiency.

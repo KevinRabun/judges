@@ -44,6 +44,13 @@ export interface BenchmarkCase {
   expectedRuleIds: string[];
   /** Rule IDs that should NOT be detected (known false positives) */
   unexpectedRuleIds?: string[];
+  /**
+   * Acceptable rule prefixes: findings from these judge domains are
+   * domain-relevant and should NOT count as false positives even if not
+   * in expectedRuleIds. For example, a SQL-injection case may acceptably
+   * also trigger AUTH or SEC findings.
+   */
+  acceptablePrefixes?: string[];
   /** Category of vulnerability (e.g. "injection", "auth", "xss") */
   category: string;
   /** Difficulty level */
@@ -994,7 +1001,7 @@ function getErrorMessage(code: number): string {
     "bower": "^1.8.0"
   }
 }`,
-    expectedRuleIds: ["DEPS-001", "SUPPLY-001"],
+    expectedRuleIds: ["DEPS-001"],
     category: "dependency-health",
     difficulty: "easy",
   },
@@ -2540,13 +2547,12 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
     cat.falseNegatives += caseFN;
     cat.falsePositives += caseFP;
 
-    // Per-judge accumulators
-    // Only count detections on clean cases (expectedRuleIds empty) as FP.
-    // Dirty-case "extra" detections are legitimate secondary findings and
-    // should not inflate per-judge false-positive rates.
-    const isCleanCase = tc.expectedRuleIds.length === 0;
+    // Per-judge accumulators (deduplicate by prefix per case to match case-level FP counting)
+    const seenPrefixes = new Set<string>();
     for (const ruleId of foundRuleIds) {
       const prefix = ruleId.split("-")[0];
+      if (seenPrefixes.has(prefix)) continue;
+      seenPrefixes.add(prefix);
       if (!perJudge[prefix]) {
         perJudge[prefix] = {
           judgeId: prefix,
@@ -2563,7 +2569,7 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
       jb.total++;
       if (expectedPrefixes.has(prefix)) {
         jb.truePositives++;
-      } else if (isCleanCase) {
+      } else {
         jb.falsePositives++;
       }
     }

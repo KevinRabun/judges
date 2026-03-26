@@ -44,7 +44,7 @@ function normalizeRuleId(id: string): string {
 }
 
 function isValidRuleId(id: string, validPrefixes: Set<string>): boolean {
-  const match = id.match(/^([A-Z]{2,})-\d{3}$/);
+  const match = id.match(/^([A-Z][A-Z0-9]+)-\d{1,3}$/);
   if (!match) return false;
   return validPrefixes.has(match[1]);
 }

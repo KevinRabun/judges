@@ -25,7 +25,7 @@ npm test
 
 ### Coverage notes
 - Coverage config lives in `.c8rc.json` (reporters: text, lcov, json-summary). Thresholds are pulled by `scripts/run-tests-with-coverage.mjs` so CI stays in sync.
-- Temporary exclusion: `src/cli.ts` is excluded while we refactor dispatch into testable helpers. Please do **not** remove the exclusion until CLI tests are added; once done, remove both the c8 exclusion and the `/* c8 ignore file */` comment at the top of `src/cli.ts`.
+- Temporary exclusion: `src/cli.ts` is excluded from coverage. The dispatch logic has been refactored into `cli-dispatch.ts` and `cli-formatters.ts` (v3.120.0), but `cli.ts` itself remains excluded until full CLI entry-point tests are added. Once done, remove both the c8 exclusion in `.c8rc.json` and the `/* c8 ignore file */` comment at the top of `src/cli.ts`.
 - To inspect gaps:
   ```bash
   node -e "const s=require('./coverage/coverage-summary.json');const e=Object.entries(s).filter(([k])=>k!=='total');e.sort((a,b)=>a[1].lines.pct-b[1].lines.pct);console.table(e.slice(0,10).map(([k,v])=>({file:k.replace(process.cwd(),'').replace(/^\\/,'')||'total', pct:v.lines.pct.toFixed(2)})))"

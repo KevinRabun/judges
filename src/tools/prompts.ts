@@ -2,21 +2,18 @@
 // Expose judge system prompts as MCP prompts so LLM-based clients can use
 // them for deeper, AI-powered analysis beyond pattern matching.
 //
-// Token-optimised: shared behavioural directives (adversarial mandate,
-// precision mandate) are stated ONCE in the tribunal preamble instead of
-// being duplicated across all 44 judges. Per-judge sections include only
-// the unique evaluation criteria, domain-specific rules, and FP-avoidance
-// guidance. This reduces the tribunal prompt by ~40 000 chars (~10 000
-// tokens) without removing any evaluation criteria.
+// Each per-judge prompt includes shared behavioural directives (adversarial
+// mandate, precision mandate, clean-code gate) plus the judge's unique
+// evaluation criteria, domain-specific rules, and FP-avoidance guidance.
 // ──────────────────────────────────────────────────────────────────────────────
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { JUDGES } from "../judges/index.js";
 
-// ─── Shared Behavioural Directives ───────────────────────────────────────────
-// Stated ONCE in the tribunal preamble so every judge benefits without
-// repeating the text 39 times.
+// ─── Shared Behavioural Directives & Gates ──────────────────────────────────
+// Included in every per-judge prompt to ensure consistent evaluation
+// behaviour across all judges.
 // ──────────────────────────────────────────────────────────────────────────────
 
 /** Adversarial evaluation stance — shared across all judges. */
@@ -37,7 +34,23 @@ export const PRECISION_MANDATE = `PRECISION MANDATE (this section OVERRIDES the 
 - RECOGNIZE SECURE PATTERNS: Code using established security libraries and patterns (e.g. helmet, bcrypt/argon2, parameterized queries, input validation, CSRF tokens, rate limiters, proper TLS) is correctly implementing security. Do NOT flag these as insufficient or suggest alternatives unless a concrete vulnerability exists.
 - SCOPE LIMITATION: Only evaluate code that is actually present. Do NOT flag missing features, tests, logging, documentation, error handling, or infrastructure that may exist in other files. Evaluate what IS provided, not what COULD be elsewhere.
 - CONFIDENCE THRESHOLD: Only report findings where you are highly confident (≥80%) that a real, exploitable issue or concrete deficiency exists in the provided code. When in doubt, do NOT report.
-- FALSE POSITIVE COST: A false positive is MORE harmful than a missed finding. False positives erode developer trust and cause real issues to be ignored. When uncertain, silence is better than a questionable finding.`;
+- FALSE POSITIVE COST: A false positive is MORE harmful than a missed finding. False positives erode developer trust and cause real issues to be ignored. When uncertain, silence is better than a questionable finding.
+
+COMMON FALSE POSITIVE PATTERNS (do NOT report these):
+- ERR: Do not flag error handling as inadequate when try/catch blocks, validation, or error middleware are present. Missing error handling in a utility function that is clearly called within a guarded context is NOT a finding.
+- LOGIC: Do not flag logic issues for standard patterns (early returns, guard clauses, switch/case with default). Only flag logic errors when you can demonstrate a concrete input that produces an incorrect output.
+- MAINT: Do not flag maintainability concerns for code that follows the language's established idioms. Complexity or length alone is NOT a finding unless it introduces a concrete maintenance burden.
+- SEC: Do not flag security issues when established security libraries (helmet, cors, bcrypt, parameterized queries) are correctly used. "Could be stronger" is NOT a vulnerability.
+- STRUCT: Do not flag code structure preferences (file organization, naming conventions) unless they create a concrete deficiency like circular dependencies or unreachable code.`;
+
+/** Clean code gate — explicit instructions when code quality is high. */
+export const CLEAN_CODE_GATE = `CLEAN CODE GATE (applies AFTER individual judge evaluation):
+- Before reporting findings, assess the OVERALL quality of the code. If the code follows established conventions, uses appropriate patterns, handles errors, and has no concrete vulnerabilities or deficiencies, the expected output is ZERO findings across ALL judges.
+- Do NOT report stylistic preferences, alternative approaches, or "nice to have" improvements as findings. These are opinions, not defects.
+- Do NOT report findings about missing functionality that is likely in other files (tests, configs, middleware, error handlers, logging setup).
+- Do NOT report theoretical risks that require assumptions about the runtime environment, deployment configuration, or code outside the provided snippet.
+- SELF-CHECK before finalizing: For each finding, ask "Would a senior engineer reviewing this code in a PR agree this must be fixed before merging?" If the answer is not a clear YES, discard the finding.
+- The goal is to match what a thoughtful, experienced human reviewer would flag — not to demonstrate comprehensive knowledge of every possible concern.`;
 
 // ─── Criteria Extraction ─────────────────────────────────────────────────────
 
@@ -85,13 +98,11 @@ export function getCondensedCriteria(systemPrompt: string): string {
 /**
  * Register all MCP prompts on the given server:
  *  - One per-judge prompt (`judge-{id}`) for single-persona deep reviews
- *  - A `full-tribunal` prompt that convenes all judges at once
  */
 export function registerPrompts(server: McpServer): void {
   // ── Per-judge prompts ──────────────────────────────────────────────────
-  // Each prompt uses condensed criteria (adversarial mandate stripped) plus
-  // the shared mandates, mirroring the tribunal architecture for consistency
-  // and better precision on clean code.
+  // Each prompt uses condensed criteria plus the shared mandates for
+  // better precision on clean code.
   for (const judge of JUDGES) {
     server.prompt(
       `judge-${judge.id}`,
@@ -109,6 +120,7 @@ export function registerPrompts(server: McpServer): void {
           `${SHARED_ADVERSARIAL_MANDATE}\n\n` +
           `${PRECISION_MANDATE}\n\n` +
           `${criteria}\n\n` +
+          `${CLEAN_CODE_GATE}\n\n` +
           `Please evaluate the following ${language} code:\n\n\`\`\`${language}\n${code}\n\`\`\`` +
           (context ? `\n\nAdditional context: ${context}` : "") +
           `\n\nProvide your evaluation as structured findings with rule IDs (prefix: ${judge.rulePrefix}-), severity levels (critical/high/medium/low/info), descriptions, and actionable recommendations. If no issues meet the confidence threshold, report zero findings explicitly. End with an overall score (0-100) and verdict (pass/warning/fail).`;
@@ -127,53 +139,4 @@ export function registerPrompts(server: McpServer): void {
       },
     );
   }
-
-  // ── Full tribunal prompt (token-optimised) ─────────────────────────────
-  // Shared directives (adversarial mandate, precision mandate) are stated
-  // ONCE in the preamble. Each judge section includes only its unique
-  // evaluation criteria, domain-specific rules, and FP-avoidance guidance.
-  server.prompt(
-    "full-tribunal",
-    `Convene the full Judges Panel — all ${JUDGES.length} judges evaluate the code in their respective domains and produce a combined verdict.`,
-    {
-      code: z.string().describe("The source code to evaluate"),
-      language: z.string().describe("The programming language"),
-      context: z.string().optional().describe("Additional context about the code"),
-    },
-    async ({ code, language, context }) => {
-      const judgeInstructions = JUDGES.map(
-        (j) =>
-          `### ${j.name} — ${j.domain}\n**Rule prefix:** \`${j.rulePrefix}-\`\n\n${getCondensedCriteria(j.systemPrompt)}`,
-      ).join("\n\n---\n\n");
-
-      const userMessage =
-        `You are the Judges Panel — a panel of ${JUDGES.length} expert judges who independently evaluate code for quality, security, and operational readiness.\n\n` +
-        `## Universal Evaluation Directives\n\n` +
-        `${SHARED_ADVERSARIAL_MANDATE}\n\n` +
-        `${PRECISION_MANDATE}\n\n` +
-        `## Evaluation Instructions\n\n` +
-        `Evaluate the following ${language} code from the perspective of ALL ${JUDGES.length} judges below. For each judge, provide:\n` +
-        `1. Judge name and domain\n` +
-        `2. Verdict (PASS / WARNING / FAIL)\n` +
-        `3. Score (0-100)\n` +
-        `4. Specific findings with rule IDs (using each judge's rule prefix), severity, and recommendations\n\n` +
-        `For judges where no issues meet the confidence threshold, report a PASS verdict with zero findings.\n\n` +
-        `Then provide an OVERALL TRIBUNAL VERDICT that synthesizes all judges' input.\n\n` +
-        `## The Judges\n\n${judgeInstructions}\n\n` +
-        `## Code to Evaluate\n\n\`\`\`${language}\n${code}\n\`\`\`` +
-        (context ? `\n\n## Additional Context\n${context}` : "");
-
-      return {
-        messages: [
-          {
-            role: "user" as const,
-            content: {
-              type: "text" as const,
-              text: userMessage,
-            },
-          },
-        ],
-      };
-    },
-  );
 }

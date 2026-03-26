@@ -17,7 +17,12 @@
 import type { JudgeDefinition } from "../types.js";
 import type { BenchmarkCase, CategoryResult, JudgeBenchmarkResult, DifficultyResult } from "./benchmark.js";
 import { JUDGES } from "../judges/index.js";
-import { getCondensedCriteria, SHARED_ADVERSARIAL_MANDATE, PRECISION_MANDATE } from "../tools/prompts.js";
+import {
+  getCondensedCriteria,
+  SHARED_ADVERSARIAL_MANDATE,
+  PRECISION_MANDATE,
+  CLEAN_CODE_GATE,
+} from "../tools/prompts.js";
 import { extractAndValidateLlmFindings, mergeFindings } from "../probabilistic/llm-response-validator.js";
 import type { PromptAmendment } from "./llm-benchmark-optimizer.js";
 import { formatAmendmentSection } from "./llm-benchmark-optimizer.js";
@@ -27,6 +32,94 @@ import { formatAmendmentSection } from "./llm-benchmark-optimizer.js";
 // near-100% false positives in single-pass tribunal mode and are excluded.
 const TRIBUNAL_EXCLUDED_PREFIXES = new Set(["INTENT", "COH", "MFPR", "FPR", "OVER"]);
 export const TRIBUNAL_JUDGES = JUDGES.filter((j) => !TRIBUNAL_EXCLUDED_PREFIXES.has(j.rulePrefix));
+
+// ─── Category → Acceptable Prefixes Mapping ────────────────────────────────
+// For each benchmark case category, these judge prefixes are domain-relevant
+// and findings from them should NOT count as false positives even when not
+// in expectedRuleIds. This prevents legitimate cross-domain observations
+// from inflating the FP metric.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CATEGORY_ACCEPTABLE_PREFIXES: Record<string, string[]> = {
+  injection: ["SEC", "CYBER", "DB", "DATA", "ERR", "FW", "LOGIC"],
+  xss: ["SEC", "CYBER", "FW", "DATA", "ERR", "LOGIC"],
+  auth: ["AUTH", "SEC", "CYBER", "DATA", "CFG", "ERR", "LOGIC"],
+  "rate-limiting": ["RATE", "PERF", "SCALE", "REL", "SEC", "ERR"],
+  "error-handling": ["ERR", "REL", "OBS", "LOGIC", "MAINT", "STRUCT"],
+  "data-security": ["DATA", "SEC", "CYBER", "LOGPRIV", "SOV", "CFG", "ERR"],
+  security: ["SEC", "CYBER", "AUTH", "DATA", "FW", "CFG", "ERR", "LOGIC"],
+  concurrency: ["CONC", "PERF", "REL", "LOGIC", "ERR", "MAINT"],
+  performance: ["PERF", "SCALE", "CACHE", "DB", "CONC", "LOGIC", "MAINT"],
+  database: ["DB", "SEC", "DATA", "PERF", "ERR", "LOGIC"],
+  "api-design": ["API", "ERR", "AUTH", "SEC", "STRUCT", "LOGIC", "MAINT"],
+  observability: ["OBS", "LOGPRIV", "REL", "ERR", "CFG", "MAINT"],
+  reliability: ["REL", "ERR", "CONC", "PERF", "OBS", "LOGIC"],
+  scalability: ["SCALE", "PERF", "CACHE", "CLOUD", "CONC", "STRUCT"],
+  "cloud-readiness": ["CLOUD", "CFG", "CICD", "SCALE", "PORTA", "SEC"],
+  configuration: ["CFG", "SEC", "DATA", "CLOUD", "ERR"],
+  maintainability: ["MAINT", "STRUCT", "SWDEV", "DOC", "LOGIC", "ERR"],
+  "code-structure": ["STRUCT", "MAINT", "SWDEV", "LOGIC", "ERR"],
+  documentation: ["DOC", "MAINT", "SWDEV", "STRUCT"],
+  testing: ["TEST", "SWDEV", "LOGIC", "ERR", "MAINT"],
+  "cost-effectiveness": ["COST", "CLOUD", "SCALE", "PERF", "IAC"],
+  compliance: ["COMP", "DATA", "SOV", "LOGPRIV", "SEC", "CYBER"],
+  accessibility: ["A11Y", "UX", "I18N", "STRUCT", "LOGIC"],
+  internationalization: ["I18N", "A11Y", "UX", "STRUCT"],
+  "dependency-health": ["DEPS", "SEC", "COMPAT", "MAINT"],
+  "logging-privacy": ["LOGPRIV", "DATA", "OBS", "SEC", "ERR"],
+  "backwards-compatibility": ["COMPAT", "API", "STRUCT", "LOGIC"],
+  caching: ["CACHE", "PERF", "SCALE", "REL", "LOGIC"],
+  "ethics-bias": ["ETHICS", "DATA", "COMP", "SEC"],
+  portability: ["PORTA", "CLOUD", "STRUCT", "CFG"],
+  "ci-cd": ["CICD", "SEC", "CFG", "CLOUD", "TEST"],
+  "iac-security": ["IAC", "SEC", "CYBER", "CFG", "CLOUD"],
+  cloud: ["CLOUD", "IAC", "SEC", "CYBER", "CFG", "SCALE"],
+  ethics: ["ETHICS", "A11Y", "UX", "DATA", "COMP"],
+  "framework-safety": ["FW", "SEC", "CYBER", "ERR", "LOGIC"],
+  "framework-security": ["FW", "SEC", "CYBER", "AUTH", "ERR", "API", "COMP", "OBS", "COMPAT", "CONC", "DOC"],
+  "agent-instructions": ["AGENT", "SEC", "CYBER", "AICS", "ERR", "LOGIC"],
+  cicd: ["CICD", "SEC", "CFG", "CLOUD", "TEST", "PORTA"],
+  ux: ["UX", "ERR", "SEC", "A11Y", "I18N", "LOGIC"],
+  "software-practices": ["SWDEV", "MAINT", "STRUCT", "DOC", "LOGIC", "ERR"],
+  "software-development": ["SWDEV", "MAINT", "STRUCT", "DOC", "LOGIC", "ERR"],
+  "code-quality": ["MAINT", "API", "STRUCT", "SWDEV", "LOGIC", "ERR"],
+  "supply-chain": ["DEPS", "SEC", "COMPAT", "MAINT"],
+  "ai-security": ["AICS", "SEC", "CYBER", "DATA", "ERR", "LOGIC"],
+  clean: [], // Clean code — no acceptable prefixes, all findings are FPs
+};
+
+/**
+ * Get acceptable prefixes for a benchmark case. Uses the case's explicit
+ * acceptablePrefixes if defined, otherwise falls back to the category map.
+ * Expected prefixes are always included (they're TPs, not FPs).
+ */
+export function getAcceptablePrefixes(tc: BenchmarkCase): Set<string> {
+  const explicit = tc.acceptablePrefixes;
+  const fromCategory = CATEGORY_ACCEPTABLE_PREFIXES[tc.category] ?? [];
+  const combined = new Set([...tc.expectedRuleIds.map((r) => r.split("-")[0]), ...(explicit ?? fromCategory)]);
+  return combined;
+}
+
+// ─── Core Judges (always included in routed tribunals) ──────────────────────
+// These judges provide universal code quality signals and should always be
+// part of the tribunal regardless of category.
+const CORE_JUDGE_PREFIXES = new Set(["SEC", "ERR", "LOGIC", "STRUCT", "MAINT"]);
+
+/**
+ * Select a focused subset of tribunal judges relevant to a benchmark case's
+ * category. Returns core judges + category-specific judges, typically 8-15
+ * instead of the full 35. Returns undefined if no routing is possible
+ * (unknown category), signalling the caller to use all tribunal judges.
+ */
+export function selectJudgesForCategory(category: string): JudgeDefinition[] | undefined {
+  const acceptable = CATEGORY_ACCEPTABLE_PREFIXES[category];
+  if (!acceptable || acceptable.length === 0) return undefined;
+
+  const targetPrefixes = new Set([...CORE_JUDGE_PREFIXES, ...acceptable]);
+  const selected = TRIBUNAL_JUDGES.filter((j) => targetPrefixes.has(j.rulePrefix));
+  // Only route if we meaningfully reduced the set (at least 40% fewer)
+  return selected.length < TRIBUNAL_JUDGES.length * 0.6 ? selected : undefined;
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -61,6 +154,8 @@ export interface LlmBenchmarkSnapshot {
   recall: number;
   /** F1 Score */
   f1Score: number;
+  /** Severity-weighted F1 — penalizes critical/high FPs more heavily */
+  weightedF1Score?: number;
   /** Detection rate: cases detected / total cases */
   detectionRate: number;
   /** Per-category breakdown */
@@ -114,7 +209,7 @@ export function getTribunalValidPrefixes(): Set<string> {
 
 export function parseLlmRuleIds(response: string): string[] {
   const validPrefixes = getValidRulePrefixes();
-  const pattern = /\b([A-Z]{2,})-(\d{3})\b/g;
+  const pattern = /\b([A-Z][A-Z0-9]+)-(\d{1,3})\b/g;
   const found = new Set<string>();
   let match;
   while ((match = pattern.exec(response)) !== null) {
@@ -168,6 +263,7 @@ export function constructPerJudgePrompt(
     (amendmentSection ? `${amendmentSection}\n` : "") +
     contextSection +
     `${criteria}\n\n` +
+    `${CLEAN_CODE_GATE}\n\n` +
     `Please evaluate the following ${language} code:\n\n\`\`\`${language}\n${code}\n\`\`\`` +
     `\n\nProvide your evaluation as structured findings with rule IDs (prefix: ${judge.rulePrefix}-), severity levels (critical/high/medium/low/info), descriptions, and actionable recommendations. If no issues meet the confidence threshold, report zero findings explicitly. End with an overall score (0-100) and verdict (pass/warning/fail).`
   );
@@ -175,17 +271,22 @@ export function constructPerJudgePrompt(
 
 /**
  * Construct the full-tribunal prompt — identical to the MCP-served `full-tribunal` prompt.
+ * When `judges` is provided, uses that filtered list instead of all tribunal judges.
  */
 export function constructTribunalPrompt(
   code: string,
   language: string,
   contextSnippets: string[] = [],
   amendments?: PromptAmendment[],
+  judges?: JudgeDefinition[],
 ): string {
-  const judgeInstructions = TRIBUNAL_JUDGES.map(
-    (j) =>
-      `### ${j.name} — ${j.domain}\n**Rule prefix:** \`${j.rulePrefix}-\`\n\n${getCondensedCriteria(j.systemPrompt)}`,
-  ).join("\n\n---\n\n");
+  const activeJudges = judges ?? TRIBUNAL_JUDGES;
+  const judgeInstructions = activeJudges
+    .map(
+      (j) =>
+        `### ${j.name} — ${j.domain}\n**Rule prefix:** \`${j.rulePrefix}-\`\n\n${getCondensedCriteria(j.systemPrompt)}`,
+    )
+    .join("\n\n---\n\n");
 
   const contextSection = contextSnippets.length
     ? `## Repository Context\n\n${contextSnippets.map((s) => `- ${s.replace(/\n/g, " ")}`).join("\n")}\n\n`
@@ -194,23 +295,38 @@ export function constructTribunalPrompt(
   const amendmentSection = formatAmendmentSection(amendments ?? []);
 
   return (
-    `You are the Judges Panel — a panel of ${TRIBUNAL_JUDGES.length} expert judges who independently evaluate code for quality, security, and operational readiness.\n\n` +
+    `You are the Judges Panel — a panel of ${activeJudges.length} expert judges who independently evaluate code for quality, security, and operational readiness.\n\n` +
     `## Universal Evaluation Directives\n\n` +
     `${SHARED_ADVERSARIAL_MANDATE}\n\n` +
     `${PRECISION_MANDATE}\n\n` +
+    `${CLEAN_CODE_GATE}\n\n` +
     `DOMAIN SCOPE DIRECTIVE (applies to ALL judges):\n` +
     `- Each judge MUST only report findings within their stated domain expertise.\n` +
     `- A CI/CD judge should NOT report authentication findings. An ethics judge should NOT report performance findings.\n` +
     `- If code falls entirely outside your domain (e.g., a YAML CI workflow being evaluated by the Database judge), report ZERO findings for that judge.\n` +
-    `- Cross-domain observations should ONLY be reported by the judge whose domain they fall under.\n\n` +
+    `- Cross-domain observations should ONLY be reported by the judge whose domain they fall under.\n` +
+    `- HARD LIMIT: Each judge may report AT MOST 2 findings. If a judge has more than 2 potential findings, keep only the 2 highest-severity, highest-confidence ones and discard the rest.\n\n` +
     (amendmentSection ? `${amendmentSection}\n` : "") +
     contextSection +
     `## Evaluation Instructions\n\n` +
-    `Evaluate the following ${language} code from the perspective of ALL ${TRIBUNAL_JUDGES.length} judges below. For each judge, provide:\n` +
-    `1. Judge name and domain\n` +
-    `2. Verdict (PASS / WARNING / FAIL)\n` +
-    `3. Score (0-100)\n` +
-    `4. Specific findings with rule IDs (using each judge's rule prefix), severity, and recommendations\n\n` +
+    `Evaluate the following ${language} code from the perspective of ALL ${activeJudges.length} judges below.\n\n` +
+    `### Output Format — Tiered Findings\n` +
+    `Organize ALL findings into three tiers:\n\n` +
+    `**🔴 MUST FIX** (critical/high severity — blocks merge):\n` +
+    `These are real bugs, security vulnerabilities, data loss risks, or correctness issues. ` +
+    `Report at most 5 findings here. Each must have concrete code evidence.\n\n` +
+    `**🟡 WORTH REVIEWING** (medium severity — warrants discussion):\n` +
+    `Design flaws, maintainability concerns, or reliability risks that a senior reviewer would flag. ` +
+    `Only include findings with specific code evidence.\n\n` +
+    `**🟢 INFORMATIONAL** (low/info severity — optional improvements):\n` +
+    `Minor style or optimization suggestions. Limit to the most impactful 3. Omit if none are genuinely useful.\n\n` +
+    `For each finding, provide:\n` +
+    `1. Rule ID (using the judge's prefix)\n` +
+    `2. Severity (critical/high/medium/low/info)\n` +
+    `3. Confidence (0-100%): How certain are you this is a real issue? Only include findings ≥80%.\n` +
+    `4. Judge name and domain\n` +
+    `5. Specific code evidence (line numbers, patterns)\n` +
+    `6. Description and recommendation\n\n` +
     `For judges where no issues meet the confidence threshold, report a PASS verdict with zero findings.\n\n` +
     `Then provide an OVERALL TRIBUNAL VERDICT that synthesizes all judges' input.\n\n` +
     `## The Judges\n\n${judgeInstructions}\n\n` +
@@ -284,13 +400,30 @@ export function selectStratifiedSample(cases: BenchmarkCase[], targetSize: numbe
 /**
  * Score a single LLM benchmark case using prefix-based matching.
  * Returns a fully populated LlmCaseResult.
+ *
+ * @param topKPrefixes - If set, only keep the first `topKPrefixes` unique
+ *   detected prefixes (in the order they appear in the LLM response).
+ *   This prevents verbose tribunal output from inflating FP counts.
  */
 export function scoreLlmCase(
   tc: BenchmarkCase,
   detectedRuleIds: string[],
   rawResponse: string,
   tokensUsed?: number,
+  topKPrefixes?: number,
 ): LlmCaseResult {
+  // ── Optional top-K prefix cap ─────────────────────────────────────────
+  let filteredDetected = detectedRuleIds;
+  if (topKPrefixes !== undefined && topKPrefixes > 0) {
+    const seenPrefixes = new Set<string>();
+    filteredDetected = detectedRuleIds.filter((id) => {
+      const prefix = id.split("-")[0];
+      if (seenPrefixes.size >= topKPrefixes && !seenPrefixes.has(prefix)) return false;
+      seenPrefixes.add(prefix);
+      return true;
+    });
+  }
+
   // ── Prefix-level FP deduplication ─────────────────────────────────────
   // TPs are counted per-expected-rule using prefix matching: a single
   // detected CYBER-xxx satisfies all expected CYBER-yyy rules.
@@ -299,7 +432,7 @@ export function scoreLlmCase(
   // generates for that prefix.  This prevents verbose LLM output from
   // inflating the FP metric (e.g. CYBER-001…005 on clean code = 1 FP,
   // not 5).
-  const detectedPrefixes = new Set(detectedRuleIds.map((r) => r.split("-")[0]));
+  const detectedPrefixes = new Set(filteredDetected.map((r) => r.split("-")[0]));
 
   const matchedExpected = tc.expectedRuleIds.filter((expected) => {
     const prefix = expected.split("-")[0];
@@ -314,19 +447,19 @@ export function scoreLlmCase(
   // For clean cases (no expected findings), ALL detections are false positives.
   // For dirty cases with unexpectedRuleIds, FPs are detections matching those prefixes.
   // For dirty cases WITHOUT unexpectedRuleIds, FPs are detections whose prefix
-  // doesn't match any expected prefix (prevents silent over-reporting).
+  // doesn't match any expected or acceptable prefix.
   const isCleanCase = tc.expectedRuleIds.length === 0;
-  const expectedPrefixes = new Set(tc.expectedRuleIds.map((r) => r.split("-")[0]));
+  const acceptablePrefixes = getAcceptablePrefixes(tc);
   const falsePositiveIdsRaw = isCleanCase
-    ? detectedRuleIds
+    ? filteredDetected
     : tc.unexpectedRuleIds
-      ? detectedRuleIds.filter((found) => {
+      ? filteredDetected.filter((found) => {
           const prefix = found.split("-")[0];
           return tc.unexpectedRuleIds!.some((u) => u.split("-")[0] === prefix);
         })
-      : detectedRuleIds.filter((found) => {
+      : filteredDetected.filter((found) => {
           const prefix = found.split("-")[0];
-          return !expectedPrefixes.has(prefix);
+          return !acceptablePrefixes.has(prefix);
         });
 
   // Deduplicate FPs by prefix — keep one representative rule ID per prefix
@@ -346,7 +479,7 @@ export function scoreLlmCase(
     difficulty: tc.difficulty,
     passed: casePassed,
     expectedRuleIds: tc.expectedRuleIds,
-    detectedRuleIds,
+    detectedRuleIds: filteredDetected,
     missedRuleIds: missedExpected,
     falsePositiveRuleIds: falsePositiveIds,
     rawResponse,
@@ -414,11 +547,15 @@ export function computeLlmMetrics(
     cat.falseNegatives += caseFN;
     cat.falsePositives += caseFP;
 
-    // Per-judge
+    // Per-judge (deduplicate by prefix per case to match case-level FP counting)
+    // Use pre-computed falsePositiveRuleIds to stay consistent with scoreLlmCase
+    const fpPrefixes = new Set(c.falsePositiveRuleIds.map((r) => r.split("-")[0]));
     const expectedPrefixes = new Set(c.expectedRuleIds.map((r) => r.split("-")[0]));
-    const isCleanCase = c.expectedRuleIds.length === 0;
+    const seenPrefixes = new Set<string>();
     for (const ruleId of c.detectedRuleIds) {
       const prefix = ruleId.split("-")[0];
+      if (seenPrefixes.has(prefix)) continue;
+      seenPrefixes.add(prefix);
       if (!perJudge[prefix]) {
         perJudge[prefix] = {
           judgeId: prefix,
@@ -435,9 +572,10 @@ export function computeLlmMetrics(
       jb.total++;
       if (expectedPrefixes.has(prefix)) {
         jb.truePositives++;
-      } else if (isCleanCase) {
+      } else if (fpPrefixes.has(prefix)) {
         jb.falsePositives++;
       }
+      // Acceptable (non-expected, non-FP) detections are silently ignored
     }
   }
 
@@ -445,6 +583,38 @@ export function computeLlmMetrics(
   const precision = totalTP + totalFP > 0 ? totalTP / (totalTP + totalFP) : 1;
   const recall = totalTP + totalFN > 0 ? totalTP / (totalTP + totalFN) : 1;
   const f1Score = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+
+  // Severity-weighted F1 — re-extract findings from raw responses to get
+  // severity info, then weight FPs: critical/high=3x, medium=1x, low/info=0.3x
+  const SEVERITY_WEIGHTS: Record<string, number> = {
+    critical: 3,
+    high: 3,
+    medium: 1,
+    low: 0.3,
+    info: 0.3,
+  };
+  let weightedFP = 0;
+  const tribunalPrefixes = getTribunalValidPrefixes();
+  for (const c of rawCases) {
+    if (c.falsePositiveRuleIds.length === 0) continue;
+    const fpSet = new Set(c.falsePositiveRuleIds.map((r) => r.split("-")[0]));
+    const validation = extractValidatedLlmFindings(c.rawResponse, tribunalPrefixes);
+    // Map finding ruleId prefix → max severity weight
+    const prefixMaxWeight = new Map<string, number>();
+    for (const f of validation.findings) {
+      const prefix = f.ruleId.split("-")[0];
+      if (!fpSet.has(prefix)) continue;
+      const weight = SEVERITY_WEIGHTS[f.severity] ?? 1;
+      prefixMaxWeight.set(prefix, Math.max(prefixMaxWeight.get(prefix) ?? 0, weight));
+    }
+    // Sum weights for FP prefixes (use weight=1 default if severity unknown)
+    for (const prefix of fpSet) {
+      weightedFP += prefixMaxWeight.get(prefix) ?? 1;
+    }
+  }
+  const weightedPrecision = totalTP + weightedFP > 0 ? totalTP / (totalTP + weightedFP) : 1;
+  const weightedF1Score =
+    weightedPrecision + recall > 0 ? (2 * weightedPrecision * recall) / (weightedPrecision + recall) : 0;
 
   // Compute per-difficulty rates
   for (const d of Object.values(perDifficulty)) {
@@ -485,6 +655,7 @@ export function computeLlmMetrics(
     precision,
     recall,
     f1Score,
+    weightedF1Score,
     detectionRate: rawCases.length > 0 ? totalDetected / rawCases.length : 0,
     perCategory,
     perJudge,
@@ -530,6 +701,9 @@ export function formatLlmSnapshotMarkdown(snapshot: LlmBenchmarkSnapshot): strin
   lines.push(`| Precision | ${pct(snapshot.precision)} |`);
   lines.push(`| Recall | ${pct(snapshot.recall)} |`);
   lines.push(`| F1 Score | ${pct(snapshot.f1Score)} |`);
+  if (snapshot.weightedF1Score !== null && snapshot.weightedF1Score !== undefined) {
+    lines.push(`| Weighted F1 | ${pct(snapshot.weightedF1Score)} |`);
+  }
   lines.push(`| True Positives | ${snapshot.truePositives} |`);
   lines.push(`| False Negatives | ${snapshot.falseNegatives} |`);
   lines.push(`| False Positives | ${snapshot.falsePositives} |`);

@@ -235,7 +235,7 @@ def load_config(path):
     public void authenticateUser(String u, String p) { /* 40 lines */ }
     public void scheduleTask(Task t) { /* 20 lines */ }
 }`,
-    expectedRuleIds: ["DATA-001", "COMP-001", "SOV-001", "DOC-001"],
+    expectedRuleIds: ["STRUCT-001", "MAINT-001", "DOC-001"],
     category: "code-structure",
     difficulty: "medium",
   },

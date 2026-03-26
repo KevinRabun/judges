@@ -893,13 +893,26 @@ async function handleBenchmark(
   const storageUri = _extensionContext.globalStorageUri;
 
   try {
-    // Resolve the model from the chat context
+    // Use the model the user selected in the Copilot Chat model picker (request.model),
+    // falling back to selectChatModels() if that fails (e.g. "auto" pseudo-model).
     let chatModel: vscode.LanguageModelChat | undefined;
-    try {
-      const models = await vscode.lm.selectChatModels();
-      chatModel = models[0];
-    } catch {
-      // will fall back inside runner
+    if (request.model) {
+      try {
+        // Verify the model can actually send requests
+        await request.model.countTokens("test");
+        chatModel = request.model;
+      } catch {
+        // request.model is a pseudo-model; fall through to selectChatModels
+      }
+    }
+    if (!chatModel) {
+      try {
+        const models = await vscode.lm.selectChatModels();
+        const preferred = models.filter((m) => m.vendor === "copilot");
+        chatModel = preferred[0] ?? models[0];
+      } catch {
+        // will fall back inside runner
+      }
     }
 
     const result = await runLlmBenchmark(
@@ -919,23 +932,12 @@ async function handleBenchmark(
     // Stream the executive summary
     stream.markdown("### ✅ LLM Benchmark Complete\n\n");
 
-    if (result.perJudge && result.tribunal) {
+    if (result.snapshot) {
       const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
       stream.markdown(
-        `| Mode | F1 | Precision | Recall | Detection Rate |\n` +
-          `|------|----|-----------|--------|----------------|\n` +
-          `| Per-Judge | ${pct(result.perJudge.f1Score)} | ${pct(result.perJudge.precision)} | ${pct(result.perJudge.recall)} | ${pct(result.perJudge.detectionRate)} |\n` +
-          `| Tribunal | ${pct(result.tribunal.f1Score)} | ${pct(result.tribunal.precision)} | ${pct(result.tribunal.recall)} | ${pct(result.tribunal.detectionRate)} |\n\n`,
+        `**F1:** ${pct(result.snapshot.f1Score)} · **Precision:** ${pct(result.snapshot.precision)} · ` +
+          `**Recall:** ${pct(result.snapshot.recall)} · **Detection Rate:** ${pct(result.snapshot.detectionRate)}\n\n`,
       );
-    } else {
-      const s = result.perJudge ?? result.tribunal;
-      if (s) {
-        const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
-        stream.markdown(
-          `**F1:** ${pct(s.f1Score)} · **Precision:** ${pct(s.precision)} · ` +
-            `**Recall:** ${pct(s.recall)} · **Detection Rate:** ${pct(s.detectionRate)}\n\n`,
-        );
-      }
     }
 
     stream.markdown(

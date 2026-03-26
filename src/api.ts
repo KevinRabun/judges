@@ -398,6 +398,7 @@ export {
   constructPerJudgePrompt,
   constructTribunalPrompt,
   selectStratifiedSample,
+  selectJudgesForCategory,
   scoreLlmCase,
   computeLlmMetrics,
   formatLlmSnapshotMarkdown,
@@ -410,12 +411,7 @@ export type { LlmBenchmarkSnapshot, LlmCaseResult } from "./commands/llm-benchma
 export type { LlmFinding, ValidationResult } from "./probabilistic/llm-response-validator.js";
 
 // ─── LLM Benchmark Optimizer (Self-Teaching) ────────────────────────────────
-export {
-  optimizeBenchmark,
-  formatAmendmentSection,
-  createEmptyStore,
-  mergeAmendments,
-} from "./commands/llm-benchmark-optimizer.js";
+
 export type {
   PromptAmendment,
   OptimizerInsight,

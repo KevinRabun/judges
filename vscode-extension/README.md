@@ -49,7 +49,7 @@ Natural language works too — Copilot auto-routes these:
 | `judges.minSeverity` | `"high"` | Only critical + high findings shown by default |
 | `judges.confidenceTier` | `"important"` | Suppresses low-confidence results (< 0.6) |
 | `judges.preset` | `""` | Named presets: `strict`, `lenient`, `security-only`, `startup`, `compliance`, `performance` |
-| `judges.enabledJudges` | `[]` | Restrict to specific judge IDs (empty = all 39) |
+| `judges.enabledJudges` | `[]` | Restrict to specific judge IDs (empty = all 45) |
 | `judges.exclude` | `[]` | Glob patterns to skip files (e.g., `**/test/**`) |
 
 Start with defaults and tighten or relax as your team's workflow evolves.
@@ -95,7 +95,7 @@ Or run **Judges: Add CI Workflow** from the Command Palette to generate the work
 | `judges.evaluateOnSave` | `true` | Evaluate automatically on file save |
 | `judges.preset` | `""` | Named preset or comma-separated composition |
 | `judges.minSeverity` | `"high"` | Minimum severity level to display |
-| `judges.enabledJudges` | `[]` | Restrict to specific judges (empty = all 39) |
+| `judges.enabledJudges` | `[]` | Restrict to specific judges (empty = all 45) |
 | `judges.debounceMs` | `1000` | Debounce delay (ms) for on-save evaluation |
 | `judges.exclude` | `[]` | Glob patterns to exclude from workspace evaluation |
 | `judges.include` | `[]` | Glob patterns to include in workspace evaluation |

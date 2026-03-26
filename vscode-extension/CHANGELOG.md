@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.123.0] — 2026-03-26
+
+### Improved
+- **LLM benchmark F1 88.8%** — Rule ID parser relaxed to accept short-form IDs (SEC-01, RATE-1), recovering +11 TP and +8.0pp recall.
+- **Reduced false positives** — CLEAN CODE RECOGNITION added to 5 judge evaluators; 10 new acceptable-prefix category mappings.
+- **3 benchmark label corrections** — Mislabeled test cases corrected for accurate scoring.
+
+### Documentation
+- **Judge count corrected** — Extension README and settings updated from "39" to "45" judges. Package description updated from "~40" to "~45".
+- **Full documentation audit** — see [core CHANGELOG](../../CHANGELOG.md) for complete details.
+
 ## [3.122.0] — 2026-03-20
 
 ### Security

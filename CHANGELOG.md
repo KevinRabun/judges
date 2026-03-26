@@ -2,6 +2,29 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.123.0] — 2026-03-26
+
+### Improved
+- **LLM benchmark F1 improvement** — Rule ID parser relaxed from `\d{3}` to `\d{1,3}` to accept short-form IDs (e.g., SEC-01, RATE-1) that LLMs commonly produce. Recovers +11 TP, +8.0pp recall, F1 84.7% → 88.8%.
+- **LLM response validator** — `isValidRuleId` regex updated to match short-form rule IDs consistently with the benchmark parser.
+- **CLEAN CODE RECOGNITION** — Added to 5 judge evaluators (cybersecurity, security, authentication, error-handling, rate-limiting) plus DOMAIN BOUNDARY sections for CYBER/SEC/AUTH. Reduces false positives on well-written code.
+- **Benchmark accuracy** — 10 new `CATEGORY_ACCEPTABLE_PREFIXES` entries (framework-security, agent-instructions, cicd, ux, software-practices, software-development, code-quality, supply-chain, ai-security) prevent legitimate cross-domain observations from inflating FP metrics.
+- **3 mislabeled benchmark cases corrected** — `cicd-deep-insecure-workflow-patterns` (CLOUD/PORTA → SEC), `struct-god-class-java` (DATA/COMP/SOV/DOC → STRUCT/MAINT/DOC), `swdev-deep-god-class` (SOV → MAINT).
+- **2 hallucination test cases fixed** — `hallu-deep-nonexistent-method` and `hallu-deep-fake-api-import` expectedRuleIds corrected to `["HALLU-001"]`.
+
+### Documentation
+- **Comprehensive documentation audit** — Fixed stale counts and claims across 10 files:
+  - README.md: test badge (2481→2482), MCP stack diagram (36→44 judges), preset count (18→22), judge IDs list (37→45), removed nonexistent `full-tribunal` prompt, project structure evaluator count (39→45) and patch count (53→201).
+  - docs/api-reference.md: added 2 missing presets (open-source, ai-review).
+  - docs/jetbrains-setup.md: MCP tool count (29→31), added 4 missing tools to table.
+  - vscode-extension/README.md: judge count (39→45, 2 occurrences).
+  - vscode-extension/package.json: judge count (~40→~45).
+  - CONTRIBUTING.md: updated stale cli.ts refactor note.
+  - scripts/sync-docs.ts: removed stale `full-tribunal` row from prompt table generator.
+
+### Tests
+- 2,482 tests pass, 0 fail. Total: 2482 pass, 0 fail, 0 skipped.
+
 ## [3.122.0] — 2026-03-20
 
 ### Security
@@ -13,7 +36,7 @@ All notable changes to **@kevinrabun/judges** are documented here.
 - **Dependency vulnerability fixed** — Upgraded `flatted` 3.4.1 → 3.4.2 (GHSA-rf6f-7fwh-wjgh, prototype pollution via `parse()`). Dev-dependency only (eslint → file-entry-cache → flat-cache → flatted).
 
 ### Tests
-- 2,481 tests pass, 0 fail.
+- 2,482 tests pass, 0 fail. Total: 2482 pass, 0 fail, 0 skipped.
 
 ## [3.121.0] — 2026-03-20
 

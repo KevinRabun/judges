@@ -1,39 +1,28 @@
 /**
- * LLM Benchmark Runner v2 — Micro-Batch, Self-Teaching, Stable
+ * LLM Benchmark Runner — Per-Judge Mode
  *
- * Key improvements over v1:
- * 1. Tribunal-only by default (1 call/case vs ~12; 12x faster)
- * 2. Micro-batch architecture (8 cases/batch with memory cleanup)
- * 3. Self-teaching: loads prompt amendments from prior runs, runs
- *    optimizer after completion, saves amendments for next run
- * 4. Simplified checkpoint (per-batch, not per-call)
- * 5. Reduced memory pressure (no per-judge accumulated state)
+ * Each relevant judge evaluates cases independently with its specialised
+ * prompt, yielding high precision (95%+) and actionable findings.
+ *
+ * Key features:
+ * 1. Per-judge architecture — one LLM call per judge per case
+ * 2. Micro-batch execution (configurable batch size with memory cleanup)
+ * 3. Checkpoint/resume for long-running benchmarks
+ * 4. Parallel judge calls within a case (configurable concurrency)
  */
 
 import * as vscode from "vscode";
 import process from "node:process";
 import { JUDGES, BENCHMARK_CASES } from "@kevinrabun/judges/api";
-import type {
-  BenchmarkCase,
-  LlmBenchmarkSnapshot,
-  LlmCaseResult,
-  PromptAmendment,
-  AmendmentStore,
-  OptimizationResult,
-} from "@kevinrabun/judges/api";
+import type { BenchmarkCase, LlmBenchmarkSnapshot, LlmCaseResult } from "@kevinrabun/judges/api";
 import {
   parseLlmRuleIds,
   scoreLlmCase,
   computeLlmMetrics,
-  constructTribunalPrompt,
   constructPerJudgePrompt,
   selectStratifiedSample,
   extractValidatedLlmFindings,
   getValidRulePrefixes,
-  getTribunalValidPrefixes,
-  optimizeBenchmark,
-  createEmptyStore,
-  mergeAmendments,
 } from "@kevinrabun/judges/api";
 import type { JudgeDefinition } from "@kevinrabun/judges/api";
 import { formatStandaloneBenchmarkReport } from "./llm-benchmark-format";
@@ -56,11 +45,11 @@ export interface BenchmarkProgress {
 }
 
 export interface BenchmarkRunResult {
-  perJudge?: LlmBenchmarkSnapshot;
-  tribunal?: LlmBenchmarkSnapshot;
+  snapshot: LlmBenchmarkSnapshot;
   reportMarkdown: string;
   snapshotJson: string;
-  optimization?: OptimizationResult;
+  /** Full untruncated LLM responses keyed by case ID */
+  fullResponses?: Record<string, string>;
 }
 
 // ─── Configuration ──────────────────────────────────────────────────────────
@@ -82,25 +71,22 @@ interface BenchmarkConfig {
   responseSnapshotChars: number;
   /** Soft heap guard (MB) */
   maxHeapMb: number;
-  /** Run per-judge mode in addition to tribunal (default: false) */
-  includePerJudge: boolean;
-  /** Enable self-teaching optimizer (default: true) */
-  selfTeaching: boolean;
+  /** Number of parallel judge calls within a single per-judge case (default: 2) */
+  perJudgeConcurrency: number;
 }
 
 const DEFAULTS: BenchmarkConfig = {
   enabled: false,
   sampleSize: 40,
-  maxOutputTokens: 1024,
+  maxOutputTokens: 16384,
   batchSize: 8,
-  interRequestDelayMs: 300,
+  interRequestDelayMs: 500,
   maxRetries: 2,
   retryBaseDelayMs: 2000,
   maxConsecutiveEmpty: 5,
-  responseSnapshotChars: 1000,
+  responseSnapshotChars: 10000,
   maxHeapMb: 1024,
-  includePerJudge: false,
-  selfTeaching: true,
+  perJudgeConcurrency: 2,
 };
 
 function readConfig(): BenchmarkConfig {
@@ -120,7 +106,7 @@ function readConfig(): BenchmarkConfig {
       env("JUDGES_LLM_BENCHMARK_SAMPLE_SIZE") ?? cfg.get<number>("llmBenchmark.sampleSize") ?? DEFAULTS.sampleSize,
     ),
     maxOutputTokens: Math.min(
-      4096,
+      16384,
       env("JUDGES_LLM_BENCHMARK_MAX_OUTPUT_TOKENS") ??
         cfg.get<number>("llmBenchmark.maxOutputTokens") ??
         DEFAULTS.maxOutputTokens,
@@ -152,12 +138,15 @@ function readConfig(): BenchmarkConfig {
       DEFAULTS.responseSnapshotChars,
     maxHeapMb:
       env("JUDGES_LLM_BENCHMARK_MAX_HEAP_MB") ?? cfg.get<number>("llmBenchmark.maxHeapMb") ?? DEFAULTS.maxHeapMb,
-    includePerJudge:
-      envBool("JUDGES_LLM_BENCHMARK_INCLUDE_PER_JUDGE") ||
-      (cfg.get<boolean>("llmBenchmark.includePerJudge") ?? DEFAULTS.includePerJudge),
-    selfTeaching:
-      !envBool("JUDGES_LLM_BENCHMARK_NO_SELF_TEACHING") &&
-      (cfg.get<boolean>("llmBenchmark.selfTeaching") ?? DEFAULTS.selfTeaching),
+    perJudgeConcurrency: Math.max(
+      1,
+      Math.min(
+        8,
+        env("JUDGES_LLM_BENCHMARK_PER_JUDGE_CONCURRENCY") ??
+          cfg.get<number>("llmBenchmark.perJudgeConcurrency") ??
+          DEFAULTS.perJudgeConcurrency,
+      ),
+    ),
   };
 }
 
@@ -170,14 +159,12 @@ interface BatchCheckpoint {
   sampleCaseIds: string[];
   configHash: string;
   startTime: number;
-  tribunalResults: Array<{ idx: number; result: LlmCaseResult }>;
   perJudgeResults: Array<{ idx: number; result: LlmCaseResult }>;
-  phase: "tribunal" | "per-judge" | "complete";
+  phase: "running" | "complete";
 }
 
 let _storageUri: vscode.Uri | undefined;
 const CHECKPOINT_FILE = ".llm-benchmark-checkpoint-v2.json";
-const AMENDMENTS_FILE = "llm-benchmark-amendments.json";
 
 function cfgHash(cfg: BenchmarkConfig, sampleSize: number): string {
   return `${sampleSize}:${cfg.maxOutputTokens}:${cfg.batchSize}`;
@@ -216,27 +203,6 @@ async function deleteCheckpoint(): Promise<void> {
   }
 }
 
-// ─── Amendment Store I/O ────────────────────────────────────────────────────
-
-async function loadAmendmentStore(): Promise<AmendmentStore> {
-  if (!_storageUri) return createEmptyStore();
-  try {
-    const data = await vscode.workspace.fs.readFile(vscode.Uri.joinPath(_storageUri, AMENDMENTS_FILE));
-    const store = JSON.parse(new TextDecoder().decode(data)) as AmendmentStore;
-    return store.version === 1 ? store : createEmptyStore();
-  } catch {
-    return createEmptyStore();
-  }
-}
-
-async function saveAmendmentStore(store: AmendmentStore): Promise<void> {
-  if (!_storageUri) return;
-  await vscode.workspace.fs.writeFile(
-    vscode.Uri.joinPath(_storageUri, AMENDMENTS_FILE),
-    new TextEncoder().encode(JSON.stringify(store, null, 2)),
-  );
-}
-
 // ─── Model + LLM Calls ─────────────────────────────────────────────────────
 
 async function resolveModel(token: vscode.CancellationToken): Promise<vscode.LanguageModelChat> {
@@ -244,7 +210,29 @@ async function resolveModel(token: vscode.CancellationToken): Promise<vscode.Lan
   if (models.length === 0) {
     throw new Error("No language model available. Ensure you have a Copilot subscription and a model selected.");
   }
-  return models[0];
+  log(`Available models: ${models.map((m) => `${m.id} (vendor=${m.vendor})`).join(", ")}`);
+
+  // Prefer copilot vendor models — other vendors (e.g. claude-code) may not
+  // stream text correctly through the VS Code Language Model API.
+  const preferred = models.filter((m) => m.vendor === "copilot");
+  const candidates = preferred.length > 0 ? preferred : models;
+
+  if (candidates.length === 1) return candidates[0];
+
+  // Let the user choose when multiple models are available
+  const picks = candidates.map((m) => ({
+    label: m.name || m.id,
+    description: `vendor: ${m.vendor || "unknown"}`,
+    model: m,
+  }));
+  const selected = await vscode.window.showQuickPick(picks, {
+    placeHolder: "Select a language model for the benchmark",
+    ignoreFocusOut: true,
+  });
+  if (!selected || token.isCancellationRequested) {
+    throw new Error("Benchmark cancelled: no model selected.");
+  }
+  return selected.model;
 }
 
 function delay(ms: number): Promise<void> {
@@ -261,20 +249,27 @@ async function healthCheck(
   cfg: BenchmarkConfig,
 ): Promise<boolean> {
   const messages = [vscode.LanguageModelChatMessage.User("Reply with exactly: HEALTH_OK")];
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const maxAttempts = Math.max(2, cfg.maxRetries + 1);
+  log(
+    `Health check: model.id=${model.id}, model.name=${model.name || "(none)"}, vendor=${model.vendor || "(none)"}, maxAttempts=${maxAttempts}`,
+  );
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (token.isCancellationRequested) return false;
     try {
       enforceHeapGuard(cfg.maxHeapMb);
-      const response = await model.sendRequest(messages, { modelOptions: { max_tokens: 16 } }, token);
+      const response = await model.sendRequest(messages, {}, token);
       let text = "";
       for await (const chunk of response.text) text += chunk;
       if (text.trim().length > 0) {
-        log(`Health check passed (attempt ${attempt + 1})`);
+        log(`Health check passed (attempt ${attempt + 1}): "${text.trim().slice(0, 50)}"`);
         return true;
       }
-      await delay(cfg.retryBaseDelayMs);
-    } catch {
-      await delay(cfg.retryBaseDelayMs);
+      log(`Health check attempt ${attempt + 1}/${maxAttempts}: empty response`);
+      await delay(cfg.retryBaseDelayMs * Math.pow(2, attempt));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log(`Health check attempt ${attempt + 1}/${maxAttempts} error: ${msg}`);
+      await delay(cfg.retryBaseDelayMs * Math.pow(2, attempt));
     }
   }
   return false;
@@ -311,9 +306,13 @@ async function sendPrompt(
       }
     } catch (error) {
       if (token.isCancellationRequested || error instanceof vscode.CancellationError) return "";
+      const msg = error instanceof Error ? error.message : String(error);
+      const isRateLimit = /rate.limit|too many requests|429|throttl/i.test(msg);
       if (attempt < cfg.maxRetries) {
-        const backoff = cfg.retryBaseDelayMs * Math.pow(2, attempt);
-        log(`Error attempt ${attempt + 1}: ${error instanceof Error ? error.message : String(error)}, retrying`);
+        const backoff = isRateLimit
+          ? cfg.retryBaseDelayMs * Math.pow(2, attempt + 2) // longer backoff for rate limits
+          : cfg.retryBaseDelayMs * Math.pow(2, attempt);
+        log(`${isRateLimit ? "Rate limited" : "Error"} attempt ${attempt + 1}: ${msg}, retrying in ${backoff}ms`);
         await delay(backoff);
       } else {
         throw error;
@@ -343,85 +342,12 @@ function truncate(s: string, max: number): string {
   return s.length <= max ? s : `${s.slice(0, max)}\n…(truncated ${s.length - max} chars)`;
 }
 
-// ─── Micro-Batch Tribunal Execution ─────────────────────────────────────────
+// ─── Execution Helpers ──────────────────────────────────────────────────────
 
-async function runTribunalBatched(
-  model: vscode.LanguageModelChat,
-  cases: BenchmarkCase[],
-  amendments: PromptAmendment[],
-  token: vscode.CancellationToken,
-  cfg: BenchmarkConfig,
-  onProgress: (p: BenchmarkProgress) => void,
-  checkpoint: BatchCheckpoint,
-): Promise<LlmCaseResult[]> {
-  const results: (LlmCaseResult | undefined)[] = cases.map(() => undefined);
-  const completedSet = new Set(checkpoint.tribunalResults.map((e) => e.idx));
+/** Full untruncated responses collected during the run, keyed by case ID */
+let _fullResponses: Map<string, string> = new Map();
 
-  // Restore completed results from checkpoint
-  for (const entry of checkpoint.tribunalResults) {
-    results[entry.idx] = entry.result;
-  }
-
-  const remaining = cases.map((_, i) => i).filter((i) => !completedSet.has(i));
-
-  if (completedSet.size > 0) {
-    log(`Resuming tribunal: ${completedSet.size}/${cases.length} already completed`);
-  }
-
-  let completed = completedSet.size;
-
-  // Process in micro-batches
-  for (let batchStart = 0; batchStart < remaining.length; batchStart += cfg.batchSize) {
-    if (token.isCancellationRequested) break;
-
-    const batchIndices = remaining.slice(batchStart, batchStart + cfg.batchSize);
-    const batchNum = Math.floor(batchStart / cfg.batchSize) + 1;
-    const totalBatches = Math.ceil(remaining.length / cfg.batchSize);
-
-    log(`Batch ${batchNum}/${totalBatches} (${batchIndices.length} cases)`);
-
-    for (const idx of batchIndices) {
-      if (token.isCancellationRequested) break;
-
-      const tc = cases[idx];
-      completed++;
-      onProgress({
-        message: `Tribunal: ${tc.id} [batch ${batchNum}/${totalBatches}] (${completed}/${cases.length})`,
-        completed,
-        total: cases.length,
-      });
-
-      const prompt = constructTribunalPrompt(tc.code, tc.language, [], amendments);
-      const response = await sendPrompt(model, prompt, token, cfg);
-      const validation = extractValidatedLlmFindings(response, getTribunalValidPrefixes());
-      if (validation.errors.length) {
-        log(`⚠️ [${tc.id}/tribunal] validation: ${validation.errors.join("; ")}`);
-      }
-      const ruleIds = validation.ruleIds.length ? validation.ruleIds : parseLlmRuleIds(response);
-      const result = scoreLlmCase(tc, ruleIds, truncate(response, cfg.responseSnapshotChars));
-
-      results[idx] = result;
-      checkpoint.tribunalResults.push({ idx, result });
-    }
-
-    // Save checkpoint after each batch
-    await saveCheckpoint(checkpoint);
-
-    // Memory cleanup between batches
-    if (typeof (globalThis as any).gc === "function") {
-      (globalThis as any).gc();
-    }
-
-    if (_totalCalls % 20 === 0) {
-      const heapMb = process.memoryUsage().heapUsed / 1024 / 1024;
-      log(`Memory: ${heapMb.toFixed(1)} MB after ${_totalCalls} calls`);
-    }
-  }
-
-  return results.filter((r): r is LlmCaseResult => r !== undefined);
-}
-
-// ─── Per-Judge Execution (opt-in) ───────────────────────────────────────────
+// ─── Per-Judge Execution ────────────────────────────────────────────────────
 
 function selectRelevantJudges(tc: BenchmarkCase): JudgeDefinition[] {
   if (tc.expectedRuleIds.length === 0) return [...JUDGES];
@@ -432,7 +358,6 @@ function selectRelevantJudges(tc: BenchmarkCase): JudgeDefinition[] {
 async function runPerJudgeBatched(
   model: vscode.LanguageModelChat,
   cases: BenchmarkCase[],
-  amendments: PromptAmendment[],
   token: vscode.CancellationToken,
   cfg: BenchmarkConfig,
   onProgress: (p: BenchmarkProgress) => void,
@@ -470,22 +395,37 @@ async function runPerJudgeBatched(
       const tc = cases[idx];
       const judges = selectRelevantJudges(tc);
 
-      for (const judge of judges) {
+      // Process judges in parallel chunks for throughput
+      const concurrency = cfg.perJudgeConcurrency;
+      for (let jStart = 0; jStart < judges.length; jStart += concurrency) {
         if (token.isCancellationRequested) break;
-        tasksDone++;
-        onProgress({
-          message: `Per-judge: ${tc.id} → ${judge.name} (${tasksDone}/${totalTasks})`,
-          completed: tasksDone,
-          total: totalTasks,
-        });
 
-        const prompt = constructPerJudgePrompt(judge, tc.code, tc.language, [], amendments);
-        const response = await sendPrompt(model, prompt, token, cfg);
-        const validation = extractValidatedLlmFindings(response, getValidRulePrefixes());
-        const ruleIds = validation.ruleIds.length ? validation.ruleIds : parseLlmRuleIds(response);
+        const judgeChunk = judges.slice(jStart, jStart + concurrency);
+        const chunkResults = await Promise.all(
+          judgeChunk.map(async (judge) => {
+            const prompt = constructPerJudgePrompt(judge, tc.code, tc.language, []);
+            const response = await sendPrompt(model, prompt, token, cfg);
+            const validation = extractValidatedLlmFindings(response, getValidRulePrefixes());
+            const ruleIds = validation.ruleIds.length ? validation.ruleIds : parseLlmRuleIds(response);
+            return { ruleIds, response };
+          }),
+        );
 
-        caseRuleIds[idx].push(...ruleIds);
-        caseResponses[idx].push(truncate(response, cfg.responseSnapshotChars));
+        for (const { ruleIds, response } of chunkResults) {
+          tasksDone++;
+          onProgress({
+            message: `Per-judge: ${tc.id} (${tasksDone}/${totalTasks})`,
+            completed: tasksDone,
+            total: totalTasks,
+          });
+          caseRuleIds[idx].push(...ruleIds);
+          caseResponses[idx].push(truncate(response, cfg.responseSnapshotChars));
+        }
+
+        // Delay between parallel chunks to respect rate limits
+        if (jStart + concurrency < judges.length) {
+          await delay(cfg.interRequestDelayMs);
+        }
       }
 
       const uniqueRuleIds = [...new Set(caseRuleIds[idx])];
@@ -527,6 +467,7 @@ export async function runLlmBenchmark(
   _consecutiveEmpty = 0;
   _totalEmpty = 0;
   _totalCalls = 0;
+  _fullResponses = new Map();
 
   if (!_channel) _channel = vscode.window.createOutputChannel("Judges LLM Benchmark");
   _channel.show(true);
@@ -536,31 +477,23 @@ export async function runLlmBenchmark(
   const modelName = model.name || model.id;
   const provider = model.vendor || "vscode";
 
-  log(`Starting benchmark v2: model=${modelName}, sampleSize=${cfg.sampleSize}, batchSize=${cfg.batchSize}`);
-  log(`Modes: tribunal=always, per-judge=${cfg.includePerJudge}, self-teaching=${cfg.selfTeaching}`);
+  log(`Starting benchmark: model=${modelName}, sampleSize=${cfg.sampleSize}, batchSize=${cfg.batchSize}`);
 
   // 2. Health check
   onProgress({ message: "Verifying model health…", completed: 0, total: 1 });
   if (!(await healthCheck(model, token, cfg))) {
-    throw new Error(`Health check failed: ${modelName} is not responding.`);
+    throw new Error(
+      `Health check failed: ${modelName} is not responding. ` +
+        "Ensure GitHub Copilot is signed in and the model is available (check the Judges LLM Benchmark output channel for details).",
+    );
   }
 
-  // 3. Load prompt amendments from previous runs
-  const amendmentStore = await loadAmendmentStore();
-  const amendments = amendmentStore.amendments;
-  if (amendments.length > 0) {
-    log(`Loaded ${amendments.length} prompt amendments from self-teaching history`);
-    for (const a of amendments) {
-      log(`  - ${a.judgePrefix}: ${a.reason}`);
-    }
-  }
-
-  // 4. Select stratified sample
+  // 3. Select stratified sample
   const cases = selectStratifiedSample(BENCHMARK_CASES, cfg.sampleSize);
   const sampleCaseIds = cases.map((c: BenchmarkCase) => c.id);
   log(`Selected ${cases.length} stratified cases from ${BENCHMARK_CASES.length} total`);
 
-  // 5. Check for checkpoint
+  // 4. Check for checkpoint
   try {
     await vscode.workspace.fs.createDirectory(storageUri);
   } catch {
@@ -578,9 +511,9 @@ export async function runLlmBenchmark(
     const sameConfig = checkpoint.configHash === hash;
 
     if (sameModel && sameSample && sameConfig && checkpoint.phase !== "complete") {
-      const done = checkpoint.tribunalResults.length;
+      const done = checkpoint.perJudgeResults.length;
       const choice = await vscode.window.showInformationMessage(
-        `Found checkpoint: ${done}/${cases.length} tribunal cases done. Resume?`,
+        `Found checkpoint: ${done} per-judge results done. Resume?`,
         "Resume",
         "Start Fresh",
       );
@@ -598,105 +531,45 @@ export async function runLlmBenchmark(
       sampleCaseIds,
       configHash: hash,
       startTime: Date.now(),
-      tribunalResults: [],
       perJudgeResults: [],
-      phase: "tribunal",
+      phase: "running",
     };
     await saveCheckpoint(checkpoint);
   }
 
   const startTime = checkpoint.startTime;
 
-  // 6. Run tribunal benchmark (always)
-  let tribunalResults: LlmCaseResult[];
-  const trStart = Date.now();
+  // 5. Run per-judge benchmark
+  log("Starting per-judge benchmark…");
+  onProgress({ message: "Running per-judge benchmark…", completed: 0, total: 1 });
+  const results = await runPerJudgeBatched(model, cases, token, cfg, onProgress, checkpoint);
+  const duration = Math.round((Date.now() - startTime) / 1000);
+  log(`Benchmark complete: ${duration}s total, ${_totalCalls} calls, ${_totalEmpty} empty`);
 
-  if (checkpoint.phase === "tribunal") {
-    log("Starting tribunal benchmark (micro-batch mode)…");
-    onProgress({
-      message: `Running tribunal (${cases.length} cases, batch=${cfg.batchSize})…`,
-      completed: 0,
-      total: cases.length,
-    });
-    tribunalResults = await runTribunalBatched(model, cases, amendments, token, cfg, onProgress, checkpoint);
-    const trDuration = Math.round((Date.now() - trStart) / 1000);
-    log(`Tribunal complete: ${_totalCalls} calls, ${_totalEmpty} empty, ${trDuration}s`);
-
-    if (token.isCancellationRequested) {
-      await saveCheckpoint(checkpoint);
-      return buildResult([], tribunalResults, modelName, provider, startTime);
-    }
-
-    checkpoint.phase = cfg.includePerJudge ? "per-judge" : "complete";
+  if (token.isCancellationRequested) {
     await saveCheckpoint(checkpoint);
-  } else {
-    tribunalResults = checkpoint.tribunalResults.map((e) => e.result);
-    log("Tribunal phase already complete, skipping…");
+    const snapshot = computeLlmMetrics(results, getVersion(), modelName, provider, "per-judge", duration);
+    const report = formatStandaloneBenchmarkReport(snapshot);
+    return { snapshot, reportMarkdown: report, snapshotJson: JSON.stringify(snapshot, null, 2) };
   }
 
-  // 7. Run per-judge benchmark (opt-in)
-  let perJudgeResults: LlmCaseResult[] = [];
+  checkpoint.phase = "complete";
+  await saveCheckpoint(checkpoint);
 
-  if (cfg.includePerJudge && checkpoint.phase === "per-judge") {
-    _consecutiveEmpty = 0;
-    log("Starting per-judge benchmark…");
-    onProgress({ message: "Running per-judge benchmark…", completed: 0, total: 1 });
-    perJudgeResults = await runPerJudgeBatched(model, cases, amendments, token, cfg, onProgress, checkpoint);
-    const pjDuration = Math.round((Date.now() - trStart) / 1000);
-    log(`Per-judge complete: ${pjDuration}s`);
-
-    checkpoint.phase = "complete";
-    await saveCheckpoint(checkpoint);
-  }
-
-  const totalDuration = Math.round((Date.now() - startTime) / 1000);
-  log(`Benchmark complete: ${totalDuration}s total, ${_totalCalls} calls, ${_totalEmpty} empty`);
-
-  // 8. Compute snapshots
+  // 6. Compute snapshot and format outputs
   const version = getVersion();
-  const tribunalSnapshot = computeLlmMetrics(tribunalResults, version, modelName, provider, "tribunal", totalDuration);
-
-  const perJudgeSnapshot =
-    perJudgeResults.length > 0
-      ? computeLlmMetrics(perJudgeResults, version, modelName, provider, "per-judge", totalDuration)
-      : undefined;
-
-  // 9. Self-teaching: run optimizer and save amendments
-  let optimization: OptimizationResult | undefined;
-
-  if (cfg.selfTeaching) {
-    log("Running self-teaching optimizer…");
-    optimization = optimizeBenchmark(tribunalSnapshot, amendments);
-
-    log(`Optimizer: ${optimization.amendments.length} new amendments, ${optimization.insights.length} insights`);
-    log(
-      `  Current F1: ${(optimization.summary.currentF1 * 100).toFixed(1)}% → ` +
-        `Projected: ${(optimization.summary.projectedF1 * 100).toFixed(1)}% ` +
-        `(+${(optimization.projectedF1Improvement * 100).toFixed(1)}%)`,
-    );
-
-    for (const insight of optimization.insights) {
-      log(`  [${insight.severity}] ${insight.target}: ${insight.recommendation}`);
-    }
-
-    // Merge and save amendments for next run
-    const updatedStore = mergeAmendments(amendmentStore, optimization, tribunalSnapshot.f1Score);
-    await saveAmendmentStore(updatedStore);
-    log(`Saved ${updatedStore.amendments.length} amendments for next run`);
-  }
-
-  // 10. Format and write outputs
-  const reportMarkdown = formatStandaloneBenchmarkReport(perJudgeSnapshot, tribunalSnapshot, optimization);
-  const snapshotJson = JSON.stringify(tribunalSnapshot, null, 2);
-  await writeOutputFiles(storageUri, snapshotJson, reportMarkdown);
+  const snapshot = computeLlmMetrics(results, version, modelName, provider, "per-judge", duration);
+  const reportMarkdown = formatStandaloneBenchmarkReport(snapshot);
+  const snapshotJson = JSON.stringify(snapshot, null, 2);
+  const fullResponses = Object.fromEntries(_fullResponses);
+  await writeOutputFiles(storageUri, snapshotJson, reportMarkdown, fullResponses);
   await deleteCheckpoint();
 
   return {
-    perJudge: perJudgeSnapshot,
-    tribunal: tribunalSnapshot,
+    snapshot,
     reportMarkdown,
     snapshotJson,
-    optimization,
+    fullResponses,
   };
 }
 
@@ -710,32 +583,23 @@ function getVersion(): string {
   }
 }
 
-function buildResult(
-  perJudge: LlmCaseResult[],
-  tribunal: LlmCaseResult[],
-  modelName: string,
-  provider: string,
-  startTime: number,
-): BenchmarkRunResult {
-  const d = Math.round((Date.now() - startTime) / 1000);
-  const v = getVersion();
-  const pj = perJudge.length > 0 ? computeLlmMetrics(perJudge, v, modelName, provider, "per-judge", d) : undefined;
-  const tr = tribunal.length > 0 ? computeLlmMetrics(tribunal, v, modelName, provider, "tribunal", d) : undefined;
-  const report = formatStandaloneBenchmarkReport(pj, tr);
-  return {
-    perJudge: pj,
-    tribunal: tr,
-    reportMarkdown: report,
-    snapshotJson: tr ? JSON.stringify(tr, null, 2) : "{}",
-  };
-}
-
-async function writeOutputFiles(dir: vscode.Uri, snapshot: string, report: string): Promise<void> {
+async function writeOutputFiles(
+  dir: vscode.Uri,
+  snapshot: string,
+  report: string,
+  fullResponses?: Record<string, string>,
+): Promise<void> {
   const enc = new TextEncoder();
   await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(dir, "llm-snapshot-latest.json"), enc.encode(snapshot));
   await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(dir, "llm-benchmark-report.md"), enc.encode(report));
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(dir, `llm-snapshot-${ts}.json`), enc.encode(snapshot));
+  if (fullResponses && Object.keys(fullResponses).length > 0) {
+    await vscode.workspace.fs.writeFile(
+      vscode.Uri.joinPath(dir, "llm-responses-latest.json"),
+      enc.encode(JSON.stringify(fullResponses, null, 2)),
+    );
+  }
 }
 
 /**
@@ -755,7 +619,7 @@ export async function saveResultsToWorkspace(storageUri: vscode.Uri): Promise<vs
     /* exists */
   }
 
-  for (const name of ["llm-snapshot-latest.json", "llm-benchmark-report.md"]) {
+  for (const name of ["llm-snapshot-latest.json", "llm-benchmark-report.md", "llm-responses-latest.json"]) {
     try {
       const data = await vscode.workspace.fs.readFile(vscode.Uri.joinPath(storageUri, name));
       await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(benchmarksDir, name), data);

@@ -2,7 +2,7 @@
   "name": "judges-panel",
   "displayName": "Judges Panel",
   "description": "45 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.122.0",
+  "version": "3.123.0",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -386,9 +386,10 @@
         },
         "judges.llmBenchmark.maxOutputTokens": {
           "type": "number",
-          "default": 1024,
+          "default": 16384,
           "minimum": 128,
-          "description": "Maximum output tokens requested per LLM call. Env override: JUDGES_LLM_BENCHMARK_MAX_OUTPUT_TOKENS. Lowering reduces memory/latency."
+          "maximum": 16384,
+          "description": "Maximum output tokens per LLM call. Tribunal mode convenes ~45 judges — 16384 prevents response truncation. Env override: JUDGES_LLM_BENCHMARK_MAX_OUTPUT_TOKENS."
         },
         "judges.llmBenchmark.concurrency": {
           "type": "number",
@@ -423,9 +424,9 @@
         },
         "judges.llmBenchmark.responseSnapshotChars": {
           "type": "number",
-          "default": 1000,
+          "default": 10000,
           "minimum": 128,
-          "description": "Truncate stored raw LLM responses to this many characters to reduce memory. Env override: JUDGES_LLM_BENCHMARK_RESPONSE_SNAPSHOT_CHARS."
+          "description": "Truncate stored raw LLM responses in the snapshot to this many characters. Full responses are preserved separately in llm-responses-latest.json. Env override: JUDGES_LLM_BENCHMARK_RESPONSE_SNAPSHOT_CHARS."
         },
         "judges.llmBenchmark.maxHeapMb": {
           "type": "number",

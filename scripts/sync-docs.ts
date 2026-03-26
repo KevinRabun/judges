@@ -93,7 +93,6 @@ function generatePromptsTable(): string {
   for (const j of JUDGES) {
     lines.push(`| \`judge-${j.id}\` | ${j.promptDescription} |`);
   }
-  lines.push(`| \`full-tribunal\` | all ${COUNT} judges in a single prompt |`);
   return lines.join("\n");
 }
 

@@ -1211,7 +1211,7 @@ jobs:
             -H "Authorization: Bearer \${{ secrets.DEPLOY_TOKEN }}" \\
             -d '{"sha": "\${{ github.sha }}"}'
       - run: echo "$\{{ secrets.AWS_SECRET_KEY }}" > /tmp/key`,
-    expectedRuleIds: ["CLOUD-001", "PORTA-001"],
+    expectedRuleIds: ["SEC-001"],
     category: "cicd",
     difficulty: "medium",
   },

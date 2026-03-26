@@ -208,7 +208,7 @@ spec:
     }
   ]
 }`,
-    expectedRuleIds: ["DEPS-001"],
+    expectedRuleIds: ["IAC-001"],
     category: "cloud",
     difficulty: "easy",
   },

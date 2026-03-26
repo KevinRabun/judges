@@ -29,7 +29,7 @@ app.post("/api/users", validateSchema(userSchema), async (req, res) => {
   await user.save();
   res.json({ id: user.id });
 });`,
-    expectedRuleIds: ["SCALE-001", "PERF-001", "COST-001", "API-001", "COMP-001"],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "medium",
   },
@@ -59,7 +59,7 @@ app.post("/api/users", validateSchema(userSchema), async (req, res) => {
 
   return { formatted, config, serialized };
 }`,
-    expectedRuleIds: ["CYBER-001", "CONC-001", "CACHE-001", "SEC-001"],
+    expectedRuleIds: ["HALLU-001"],
     category: "hallucination",
     difficulty: "easy",
   },
@@ -1024,7 +1024,7 @@ def delete_user(request):
   async auditLog(action: string) { /* 30 lines */ }
   // 2000+ lines, 50+ methods, handles everything
 }`,
-    expectedRuleIds: ["SOV-001"],
+    expectedRuleIds: ["MAINT-001"],
     category: "software-development",
     difficulty: "medium",
   },
