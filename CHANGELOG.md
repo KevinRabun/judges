@@ -2,6 +2,17 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.123.2] — 2026-03-26
+
+### Security
+- **Dependency updates** — Resolved 3 moderate Dependabot vulnerabilities:
+  - `brace-expansion` <5.0.5 → 5.0.5 (process hang via zero-step sequence, GHSA-f886-m6hf-6m8v)
+  - `picomatch` 4.0.0–4.0.3 → 4.0.4 (method injection in POSIX char classes, GHSA-3v7f-55p6-f55p)
+  - `yaml` 2.0.0–2.8.2 → 2.8.3 (stack overflow via deeply nested collections, GHSA-48c2-rrv3-qjmp)
+
+### Tests
+- 2,482 tests passing, 0 failures.
+
 ## [3.123.1] — 2026-03-26
 
 ### Fixed

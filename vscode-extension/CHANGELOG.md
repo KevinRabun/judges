@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.123.2] — 2026-03-26
+
+### Security
+- **Dependency updates** — Resolved 3 moderate vulnerabilities in dev dependencies (brace-expansion, picomatch, yaml). See [core CHANGELOG](../../CHANGELOG.md) for details.
+
 ## [3.123.1] — 2026-03-26
 
 ### Fixed
