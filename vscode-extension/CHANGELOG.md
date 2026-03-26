@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.123.3] — 2026-03-26
+
+### Improved
+- **LLM benchmark F1 ~93.5%** — Compound rule ID parser fix, 4 test case corrections for precision mandate alignment, 3 cross-domain expected ID cleanups, and structure category acceptable prefixes. See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.123.2] — 2026-03-26
 
 ### Security

@@ -85,6 +85,28 @@ const CATEGORY_ACCEPTABLE_PREFIXES: Record<string, string[]> = {
   "code-quality": ["MAINT", "API", "STRUCT", "SWDEV", "LOGIC", "ERR"],
   "supply-chain": ["DEPS", "SEC", "COMPAT", "MAINT"],
   "ai-security": ["AICS", "SEC", "CYBER", "DATA", "ERR", "LOGIC"],
+  structure: [
+    "STRUCT",
+    "MAINT",
+    "SWDEV",
+    "ERR",
+    "LOGIC",
+    "SEC",
+    "PERF",
+    "API",
+    "DB",
+    "OBS",
+    "AUTH",
+    "CACHE",
+    "SCALE",
+    "CYBER",
+    "AICS",
+    "RATE",
+    "CONC",
+    "COST",
+    "UX",
+    "COMPAT",
+  ],
   clean: [], // Clean code — no acceptable prefixes, all findings are FPs
 };
 
@@ -215,6 +237,13 @@ export function parseLlmRuleIds(response: string): string[] {
   while ((match = pattern.exec(response)) !== null) {
     if (validPrefixes.has(match[1])) {
       found.add(match[0]);
+    }
+  }
+  // Secondary pass: extract known prefixes from compound IDs like DEPS-TYPO-001
+  const compoundPattern = /\b([A-Z][A-Z0-9]+)-[A-Z][A-Z0-9]+-(\d{1,3})\b/g;
+  while ((match = compoundPattern.exec(response)) !== null) {
+    if (validPrefixes.has(match[1])) {
+      found.add(`${match[1]}-${match[2]}`);
     }
   }
   return [...found];

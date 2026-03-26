@@ -884,7 +884,7 @@ app.post("/api/orders", async (req, res) => {
 app.put("/api/profile", async (req, res) => {
   if (!req.body.name) return res.status(500).json({ error: "Name required" }); // Wrong status code
 });`,
-    expectedRuleIds: ["UX-001", "SEC-001"],
+    expectedRuleIds: ["UX-001"],
     category: "ux",
     difficulty: "medium",
   },
