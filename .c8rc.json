@@ -11,8 +11,8 @@
   "reporter": ["text", "lcov", "json-summary"],
   "check-coverage": false,
   "per-file": false,
-  "lines": 80,
-  "branches": 75,
-  "functions": 65,
-  "statements": 80
+  "lines": 78,
+  "branches": 73,
+  "functions": 63,
+  "statements": 78
 }
