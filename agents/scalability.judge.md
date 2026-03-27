@@ -30,6 +30,15 @@ RULES FOR YOUR EVALUATION:
 - Recommend specific architectural patterns (CQRS, event sourcing, circuit breakers, etc.).
 - Score from 0-100 where 100 means fully scalable with no bottlenecks.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- Database queries use parameterized statements and avoid N+1 patterns.
+- No unbounded in-memory collections (results are paginated or streamed).
+- Connection pooling is used for database connections (not per-request connections).
+- Background/async processing for long-running operations.
+- No global mutable state that would prevent horizontal scaling.
+- Caching strategy is present for frequently-accessed data.
+If the code meets these criteria, it is reasonably scalable. Do NOT flag theoretical scaling concerns for code that already follows standard patterns — only flag concrete bottlenecks that would fail under realistic load.
+
 FALSE POSITIVE AVOIDANCE:
 - **Distributed lock with local fallback**: When code implements a distributed lock (Redlock, Redis lock, etcd, Consul) as the primary mechanism AND uses a local lock (asyncio.Lock, threading.Lock) as a documented single-instance fallback, do NOT flag the local lock as a scaling issue. This is a correct graceful-degradation pattern.
 - **Two-tier locking**: If comments document a two-tier design (distributed for multi-instance, local for single-instance), accept the design. A compliance/dev tool should still function without external infrastructure.

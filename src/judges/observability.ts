@@ -32,6 +32,14 @@ RULES FOR YOUR EVALUATION:
 - Evaluate whether the observability data would be useful during a production incident.
 - Score from 0-100 where 100 means fully observable and debuggable in production.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- Logging is present at key decision points (request handling, error paths, important state changes).
+- Log statements include contextual data (request IDs, user identifiers, operation names).
+- Errors are logged with sufficient context for debugging (error message, stack trace, or relevant state).
+- Structured logging format is used (JSON, key-value pairs) rather than bare string concatenation.
+- Health check or readiness endpoints exist for services.
+If the code meets these criteria, observability is adequate. Do NOT flag missing OpenTelemetry, Prometheus metrics, or distributed tracing when basic logging is already present — those are operational enhancements, not code defects.
+
 FALSE POSITIVE AVOIDANCE:
 - Only flag observability issues in application code that handles requests, processes events, or performs business operations.
 - Do NOT flag utility functions, type definitions, or configuration files for missing observability.

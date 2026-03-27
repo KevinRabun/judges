@@ -34,6 +34,12 @@ RULES FOR YOUR EVALUATION:
 - Evaluate both the tests AND the testability of the code under test.
 - Score from 0-100 where 100 means comprehensive, well-structured test suite.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- The code being evaluated IS a test file, OR the code is a small utility/helper that would be tested at a higher level.
+- Type definitions, interfaces, enums, and configuration files do not need dedicated tests.
+- Generated code, data migrations, and infrastructure-as-code have different testing strategies.
+Do NOT flag code for "missing tests" unless it contains complex business logic or critical paths that clearly need unit test coverage.
+
 FALSE POSITIVE AVOIDANCE:
 - Only flag testing issues when evaluating test files or when application code lacks testability.
 - Do NOT flag production code for "missing tests" — tests exist in separate files that may not be provided.

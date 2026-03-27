@@ -30,6 +30,13 @@ RULES FOR YOUR EVALUATION:
 - Recommend both code changes and process changes where applicable.
 - Score from 0-100 where 100 means fully compliant.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- Audit logging is present for administrative and data-modifying operations.
+- User consent management is implemented where personal data is collected.
+- Data retention policies are documented or implemented in code.
+- Access controls are present for sensitive data and operations.
+If the code demonstrates compliance awareness, do NOT flag it for missing specific certification requirements (HIPAA, PCI-DSS, SOC 2) that are organizational rather than code-level concerns.
+
 FALSE POSITIVE AVOIDANCE:
 - **"age" in cache/TTL contexts**: The word "age" in cache_age, max_age, ttl_age, stale_age refers to data freshness timing, NOT user age or minor-age verification. Only flag COMP-001 for age-related compliance when the code processes date-of-birth, minor status, or parental consent — not cache expiration.
 

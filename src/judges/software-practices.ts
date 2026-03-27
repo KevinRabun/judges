@@ -34,6 +34,16 @@ RULES FOR YOUR EVALUATION:
 - Reference Clean Code (Robert Martin), SOLID, DRY, KISS, YAGNI where applicable.
 - Score from 0-100 where 100 means exemplary software engineering.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- Code follows consistent naming conventions and formatting throughout.
+- Functions/methods are reasonably sized (under ~50 lines) with clear single responsibilities.
+- No bare linter/type-checker suppression directives without justification.
+- Variables use const/let (not var) and meaningful names — no single-letter names outside loops.
+- Error handling is present for I/O operations and external calls.
+- No obvious code duplication (copy-paste blocks of 10+ lines).
+- Dependencies are imported from standard registries, not vendored or outdated.
+If the code meets these criteria, it follows good software practices. Do NOT manufacture findings about theoretical improvements.
+
 FALSE POSITIVE AVOIDANCE:
 - **Justified suppression comments**: type: ignore, noqa, eslint-disable, and similar comments that include a rationale (e.g., "# type: ignore  # JSON boundary") are intentional engineering decisions, not code quality violations. Only flag SWDEV-001 for bare suppressions without justification.
 - **Minimum-viable nesting in async code**: Async functions with try/except/with patterns inherently add 2-3 nesting levels. Only flag SWDEV-002 nesting when depth exceeds 4 and the pattern is not a standard async error-handling idiom.

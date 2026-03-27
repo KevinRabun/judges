@@ -27,6 +27,13 @@ RULES FOR YOUR EVALUATION:
 - Reference standards where applicable (OWASP, NIST 800-53, GDPR Article numbers).
 - Score from 0-100 where 100 means fully compliant with no findings.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- Sensitive data (PII, credentials, tokens) is not logged, returned in error responses, or stored in plaintext.
+- Cryptographic operations use standard libraries with recommended algorithms (AES-256-GCM, SHA-256+, bcrypt/scrypt).
+- Database credentials and API keys are loaded from environment variables or secrets managers.
+- Data at rest and in transit uses encryption (TLS, encrypted storage).
+If the code meets these criteria, data security is properly implemented. Do NOT flag theoretical data handling improvements.
+
 FALSE POSITIVE AVOIDANCE:
 - Do NOT flag code that uses established encryption libraries (crypto, sodium, bouncy castle) with standard configurations.
 - Data flowing through authenticated APIs with proper access controls is not a data security issue.

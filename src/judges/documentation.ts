@@ -34,6 +34,13 @@ RULES FOR YOUR EVALUATION:
 - Evaluate from the perspective of a new developer encountering the code for the first time.
 - Score from 0-100 where 100 means exemplary documentation.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- Public/exported functions have JSDoc, docstrings, or clear descriptive names that convey purpose.
+- Complex algorithms or non-obvious logic have inline comments explaining the "why."
+- Function/method names and parameter names are self-documenting.
+- Module or file has a top-level comment or README describing its purpose (if it's a standalone module).
+If the code is reasonably self-documenting, do NOT demand exhaustive JSDoc on every function. Well-named code does not need redundant documentation.
+
 FALSE POSITIVE AVOIDANCE:
 - Do NOT flag missing documentation for self-documenting code (clear function names, obvious parameters, standard patterns).
 - Configuration files, data files, and infrastructure code have different documentation standards than application code.

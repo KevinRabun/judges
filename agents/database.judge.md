@@ -30,6 +30,14 @@ RULES FOR YOUR EVALUATION:
 - Flag patterns that will degrade as data volume grows.
 - Score from 0-100 where 100 means excellent database practices.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- Queries use parameterized statements or an ORM with proper escaping.
+- Connection pooling is configured (not per-request connections).
+- Transactions are used for multi-step data modifications.
+- No SELECT * in production queries — columns are explicitly listed.
+- Indexes are referenced in query design or migration files.
+If the code uses an ORM with standard patterns, database practices are adequate. Do NOT flag ORM-generated queries or standard CRUD operations.
+
 FALSE POSITIVE AVOIDANCE:
 - **Environment variable fallback defaults**: Connection strings in os.environ.get('DB_URL', 'sqlite:///default.db') or process.env.DB_URL || 'localhost' are standard development defaults, NOT hardcoded production credentials. Only flag DB-001 when a connection string with real credentials appears outside an env-var fallback pattern.
 - **In-memory/embedded databases as defaults**: SQLite, DuckDB, or H2 defaults are normal for local development and testing. Flag only when production deployment docs are missing, not the default value itself.

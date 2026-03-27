@@ -32,6 +32,13 @@ RULES FOR YOUR EVALUATION:
 - Recommend specific services or patterns (e.g., "Use Azure Key Vault instead of .env files in production").
 - Score from 0-100 where 100 means fully cloud-native.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- Configuration is loaded from environment variables or external config stores.
+- The application binds to configurable ports, not hardcoded values.
+- File system usage is for temporary/cache purposes, not persistent state.
+- External dependencies (DB, cache, queues) use client libraries with connection pooling.
+If the code follows 12-factor app principles, it is cloud-ready. Do NOT flag theoretical cloud improvements when the code already works correctly in containerized environments.
+
 FALSE POSITIVE AVOIDANCE:
 - Only flag cloud-readiness issues in code that involves cloud deployment, containerization, or distributed systems.
 - Do NOT flag local development utilities, CLI tools, or scripts for cloud-readiness issues.

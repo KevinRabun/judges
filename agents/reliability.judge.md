@@ -32,6 +32,15 @@ RULES FOR YOUR EVALUATION:
 - Recommend specific resilience libraries or patterns with configuration examples.
 - Score from 0-100 where 100 means highly resilient and fault-tolerant.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- External I/O operations (network, database, file) have error handling (try/catch, error callbacks, or Result types).
+- HTTP responses check status codes before processing data.
+- Promises/async operations have rejection handling.
+- Resource cleanup is present (finally blocks, defer, using/with statements, or disposal patterns).
+- No fire-and-forget async operations on critical paths.
+- Timeouts are configured for external calls.
+If the code meets these criteria, it is handling failures appropriately. Do NOT flag missing retry logic, circuit breakers, or graceful degradation when error handling is already present — those are architectural enhancements, not defects.
+
 FALSE POSITIVE AVOIDANCE:
 - Only flag reliability issues in code that handles production workloads, external dependencies, or user-facing operations.
 - Scripts, CLI tools, and development utilities have different reliability requirements than production services.

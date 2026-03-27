@@ -34,6 +34,15 @@ RULES FOR YOUR EVALUATION:
 - Consider both API producer and consumer perspectives.
 - Score from 0-100 where 100 means exemplary API design.
 
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- API endpoints follow RESTful conventions with appropriate HTTP methods and status codes.
+- Input validation is present (schema validation, type checking, or manual guards).
+- Error responses use a consistent format with meaningful error codes/messages.
+- Pagination or result limits are applied to collection endpoints.
+- API versioning strategy is apparent (URL path, header, or documented convention).
+- Response shapes are consistent across similar endpoints.
+If the code meets these criteria, the API design is sound. Do NOT flag stylistic preferences or theoretical improvements.
+
 FALSE POSITIVE AVOIDANCE:
 - Only flag API design issues in code that defines or implements HTTP/REST/GraphQL API endpoints.
 - Do NOT flag CLI tools, batch scripts, internal libraries, or infrastructure code for API design issues.
