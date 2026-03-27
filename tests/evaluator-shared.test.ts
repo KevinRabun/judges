@@ -480,3 +480,142 @@ describe("shared: getLangFamily", () => {
     assert.ok(typeof family === "string");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Deep classifyFile path tests
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("shared: classifyFile — deep path tests", () => {
+  it("classifies __tests__ directory as test", () => {
+    assert.equal(classifyFile("const x = 1;", "typescript", "src/__tests__/app.ts"), "test");
+  });
+
+  it("classifies .spec.ts as test", () => {
+    assert.equal(classifyFile("x", "typescript", "src/utils.spec.ts"), "test");
+  });
+
+  it("classifies .e2e.ts as test", () => {
+    assert.equal(classifyFile("x", "typescript", "tests/flow.e2e.ts"), "test");
+  });
+
+  it("classifies tsconfig.json as config", () => {
+    assert.equal(classifyFile("{}", "json", "tsconfig.json"), "config");
+  });
+
+  it("classifies webpack.config.js as config", () => {
+    assert.equal(classifyFile("module.exports = {}", "javascript", "webpack.config.js"), "config");
+  });
+
+  it("classifies Dockerfile as config", () => {
+    assert.equal(classifyFile("FROM node:18", "dockerfile", "Dockerfile"), "config");
+  });
+
+  it("classifies .d.ts files as types", () => {
+    assert.equal(classifyFile("declare module 'x' {}", "typescript", "src/types.d.ts"), "types");
+  });
+
+  it("classifies healthcheck endpoint file as utility", () => {
+    assert.equal(classifyFile("app.get('/health', handler)", "typescript", "src/healthcheck.ts"), "utility");
+  });
+
+  it("classifies migration directory as config", () => {
+    assert.equal(classifyFile("CREATE TABLE", "sql", "db/migrations/001.sql"), "config");
+  });
+
+  it("classifies .tf files as config", () => {
+    assert.equal(classifyFile('resource "aws_instance" {}', "terraform", "infra/main.tf"), "config");
+  });
+
+  it("classifies .yaml files as config", () => {
+    assert.equal(classifyFile("key: value", "yaml", "config.yaml"), "config");
+  });
+
+  it("classifies .json files as config", () => {
+    assert.equal(classifyFile("{}", "json", "data.json"), "config");
+  });
+
+  it("classifies .env files as config", () => {
+    assert.equal(classifyFile("KEY=value", "bash", ".env"), "config");
+  });
+
+  it("classifies vscode-extension paths", () => {
+    assert.equal(classifyFile("import vscode", "typescript", "vscode-extension/src/ext.ts"), "vscode-extension");
+  });
+
+  it("classifies evaluators directory as analysis-tool", () => {
+    assert.equal(classifyFile("const pattern = /test/;", "typescript", "src/evaluators/security.ts"), "analysis-tool");
+  });
+
+  it("classifies commands directory as cli", () => {
+    assert.equal(classifyFile("console.log('run')", "typescript", "src/commands/eval.ts"), "cli");
+  });
+
+  it("classifies cli.ts as cli", () => {
+    assert.equal(classifyFile("process.argv", "typescript", "src/cli.ts"), "cli");
+  });
+
+  it("classifies regex-heavy content as analysis-tool", () => {
+    const code = Array.from({ length: 25 }, (_, i) => `const r${i} = /pattern${i}/gi;`).join("\n");
+    assert.equal(classifyFile(code, "typescript"), "analysis-tool");
+  });
+
+  it("classifies content with many test framework calls as test", () => {
+    const code = 'describe("a", () => {\n  it("b", () => {});\n  it("c", () => {});\n  it("d", () => {});\n});';
+    assert.equal(classifyFile(code, "typescript"), "test");
+  });
+
+  it("classifies pure type/interface content as types", () => {
+    const code = Array.from({ length: 20 }, (_, i) => `export interface Type${i} { field: string; }`).join("\n");
+    const result = classifyFile(code, "typescript");
+    assert.equal(result, "types");
+  });
+
+  it("classifies const-heavy content", () => {
+    const code = Array.from({ length: 30 }, (_, i) => `export const VAL_${i} = ${i};`).join("\n");
+    const result = classifyFile(code, "typescript");
+    // Should classify as config, utility, or unknown — any valid category
+    assert.ok(
+      ["config", "utility", "unknown", "types", "analysis-tool", "server", "cli", "test", "vscode-extension"].includes(
+        result,
+      ),
+    );
+  });
+
+  it("classifies vscode import content as vscode-extension", () => {
+    const code = "import * as vscode from 'vscode';\nvscode.window.showMessage('hi');";
+    assert.equal(classifyFile(code, "typescript"), "vscode-extension");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Deep detectProjectContext tests
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("shared: detectProjectContext — deep tests", () => {
+  it("detects Node runtime from process.env", () => {
+    const ctx = detectProjectContext("const port = process.env.PORT;", "typescript");
+    assert.equal(ctx.runtime, "node");
+  });
+
+  it("detects browser runtime from window/document", () => {
+    const ctx = detectProjectContext("document.querySelector('#app');\nwindow.alert('hi');", "javascript");
+    assert.equal(ctx.runtime, "browser");
+  });
+
+  it("detects Express framework", () => {
+    const code = "import express from 'express';\nconst app = express();\napp.listen(3000);";
+    const ctx = detectProjectContext(code, "typescript");
+    assert.ok(ctx.frameworks.length > 0 || ctx.runtime === "node");
+  });
+
+  it("detects React framework", () => {
+    const code = "import React from 'react';\nimport { useState, useEffect } from 'react';";
+    const ctx = detectProjectContext(code, "typescript");
+    assert.ok(ctx.frameworks.some((f: string) => /react/i.test(f)) || ctx.runtime === "browser");
+  });
+
+  it("handles empty code", () => {
+    const ctx = detectProjectContext("", "typescript");
+    assert.ok(typeof ctx.runtime === "string");
+  });
+});

@@ -379,3 +379,124 @@ describe("config: validatePluginSpecifiers", () => {
     assert.ok(errors.length > 0);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  mergeConfigs — deep policy enforcement tests
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("config: mergeConfigs — policy enforcement", () => {
+  it("enforces lockedRules — cannot disable locked rules", () => {
+    const result = mergeConfigs({ lockedRules: ["SEC-001", "CYBER-001"] }, { disabledRules: ["SEC-001", "PERF-001"] });
+    // SEC-001 is locked, should be removed from disabledRules
+    assert.ok(!result.disabledRules?.includes("SEC-001"));
+    // PERF-001 is not locked, should remain disabled
+    assert.ok(result.disabledRules?.includes("PERF-001"));
+  });
+
+  it("enforces lockedJudges — cannot disable locked judges", () => {
+    const result = mergeConfigs(
+      { lockedJudges: ["cybersecurity"] },
+      { disabledJudges: ["cybersecurity", "documentation"] },
+    );
+    assert.ok(!result.disabledJudges?.includes("cybersecurity"));
+    assert.ok(result.disabledJudges?.includes("documentation"));
+  });
+
+  it("enforces lockedMinSeverity — keeps strictest lock", () => {
+    const result = mergeConfigs(
+      { lockedMinSeverity: "high" },
+      { minSeverity: "low" }, // More lenient than lock
+    );
+    assert.equal(result.minSeverity, "high"); // Enforced to locked level
+  });
+
+  it("allows stricter minSeverity than lock", () => {
+    const result = mergeConfigs(
+      { lockedMinSeverity: "medium" },
+      { minSeverity: "critical" }, // Stricter than lock
+    );
+    assert.equal(result.minSeverity, "critical"); // Allowed — stricter is fine
+  });
+
+  it("accumulates locked fields across configs", () => {
+    const result = mergeConfigs({ lockedRules: ["SEC-001"] }, { lockedRules: ["CYBER-001"] });
+    assert.ok(result.lockedRules?.includes("SEC-001"));
+    assert.ok(result.lockedRules?.includes("CYBER-001"));
+  });
+
+  it("merges exclude and include with dedup", () => {
+    const result = mergeConfigs(
+      { exclude: ["dist/**"], include: ["src/**"] },
+      { exclude: ["dist/**", "build/**"], include: ["lib/**"] },
+    );
+    assert.ok(result.exclude?.includes("dist/**"));
+    assert.ok(result.exclude?.includes("build/**"));
+    assert.equal(result.exclude?.filter((e) => e === "dist/**").length, 1); // Deduplicated
+    assert.ok(result.include?.includes("src/**"));
+    assert.ok(result.include?.includes("lib/**"));
+  });
+
+  it("merges plugins with dedup", () => {
+    const result = mergeConfigs({ plugins: ["./a.js"] }, { plugins: ["./a.js", "./b.js"] });
+    assert.deepEqual(result.plugins, ["./a.js", "./b.js"]);
+  });
+
+  it("merges judgeWeights", () => {
+    const result = mergeConfigs({ judgeWeights: { cybersecurity: 2.0 } }, { judgeWeights: { performance: 0.5 } });
+    assert.equal(result.judgeWeights?.cybersecurity, 2.0);
+    assert.equal(result.judgeWeights?.performance, 0.5);
+  });
+
+  it("later judgeWeights override earlier", () => {
+    const result = mergeConfigs({ judgeWeights: { cybersecurity: 2.0 } }, { judgeWeights: { cybersecurity: 1.5 } });
+    assert.equal(result.judgeWeights?.cybersecurity, 1.5);
+  });
+
+  it("merges failOnScoreBelow", () => {
+    const result = mergeConfigs({ failOnScoreBelow: 80 }, { failOnScoreBelow: 90 });
+    assert.equal(result.failOnScoreBelow, 90); // Last wins
+  });
+
+  it("cleans up empty disabledRules after lock enforcement", () => {
+    const result = mergeConfigs({ lockedRules: ["SEC-001"] }, { disabledRules: ["SEC-001"] });
+    // All disabled rules removed by lock enforcement → field deleted
+    assert.equal(result.disabledRules, undefined);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  parseConfig — additional field validation
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("config: parseConfig — additional fields", () => {
+  it("parses lockedRules", () => {
+    const cfg = parseConfig('{"lockedRules": ["SEC-001"]}');
+    assert.deepEqual(cfg.lockedRules, ["SEC-001"]);
+  });
+
+  it("parses lockedJudges", () => {
+    const cfg = parseConfig('{"lockedJudges": ["cybersecurity"]}');
+    assert.deepEqual(cfg.lockedJudges, ["cybersecurity"]);
+  });
+
+  it("parses lockedMinSeverity", () => {
+    const cfg = parseConfig('{"lockedMinSeverity": "high"}');
+    assert.equal(cfg.lockedMinSeverity, "high");
+  });
+
+  it("parses failOnScoreBelow", () => {
+    const cfg = parseConfig('{"failOnScoreBelow": 7.5}');
+    assert.equal(cfg.failOnScoreBelow, 7.5);
+  });
+
+  it("parses judgeWeights", () => {
+    const cfg = parseConfig('{"judgeWeights": {"cybersecurity": 2.0, "documentation": 0.5}}');
+    assert.equal(cfg.judgeWeights?.cybersecurity, 2.0);
+    assert.equal(cfg.judgeWeights?.documentation, 0.5);
+  });
+
+  it("parses plugins", () => {
+    const cfg = parseConfig('{"plugins": ["./my-judge.js"]}');
+    assert.deepEqual(cfg.plugins, ["./my-judge.js"]);
+  });
+});
