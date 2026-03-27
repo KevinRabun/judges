@@ -278,3 +278,167 @@ describe("Patches: edge cases", () => {
     assert.ok(Array.isArray(result));
   });
 });
+
+// ── Additional patch categories ──────────────────────────────────────────
+
+describe("Patches: error handling", () => {
+  it("empty catch → catch with handler", () => {
+    const code = "try { riskyOp(); } catch () {}";
+    const f = [makeFinding("Empty catch block swallows errors", "ERR-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assertPatched(result, "empty catch");
+  });
+});
+
+describe("Patches: CORS/CSP", () => {
+  it("wildcard CORS → env-based origin", () => {
+    const code = 'app.use(cors({ origin: "*" }));';
+    const f = [makeFinding("Wildcard CORS configuration", "CYBER-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("ALLOWED_ORIGIN"));
+  });
+
+  it("CSP unsafe-inline → nonce-based", () => {
+    const code = "res.setHeader('Content-Security-Policy', 'script-src \\'unsafe-inline\\'');";
+    const f = [makeFinding("Content-Security-Policy with unsafe-inline", "CYBER-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("nonce"));
+  });
+});
+
+describe("Patches: cookie security", () => {
+  it("secure: false → secure: true", () => {
+    const code = "cookie: { secure: false, httpOnly: true }";
+    const f = [makeFinding("Cookie security missing secure flag", "SEC-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("true"));
+  });
+});
+
+describe("Patches: authentication", () => {
+  it("jwt.decode → jwt.verify", () => {
+    const code = "const payload = jwt.decode(token);";
+    const f = [makeFinding("JWT decoded without verification", "AUTH-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("verify"));
+  });
+
+  it("rejectUnauthorized: false → true", () => {
+    const code = "const agent = new https.Agent({ rejectUnauthorized: false });";
+    const f = [makeFinding("TLS certificate validation disabled", "SEC-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("true"));
+  });
+});
+
+describe("Patches: async/sync I/O", () => {
+  it("readFileSync → await readFile", () => {
+    const code = 'const data = readFileSync("config.json", "utf-8");';
+    const f = [makeFinding("Synchronous blocking I/O", "PERF-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("await"));
+  });
+
+  it(".then without .catch → add catch", () => {
+    const code = "fetchData().then(process);";
+    const f = [makeFinding("Promise then without catch handler", "ERR-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("catch"));
+  });
+});
+
+describe("Patches: database", () => {
+  it("SELECT * → explicit columns reminder", () => {
+    const code = 'db.query("SELECT * FROM users WHERE id = $1", [id]);';
+    const f = [makeFinding("SELECT * used in query", "DB-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("specify columns"));
+  });
+});
+
+describe("Patches: Docker", () => {
+  it(":latest → pinned version", () => {
+    const code = "FROM node:latest";
+    const f = [makeFinding("Docker latest tag used", "CICD-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("lts-slim"));
+  });
+
+  it("npm install → npm ci", () => {
+    const code = "RUN npm install";
+    const f = [makeFinding("npm install instead of npm ci", "CICD-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("npm ci"));
+  });
+});
+
+describe("Patches: Python-specific", () => {
+  it("hashlib.md5 → hashlib.sha256", () => {
+    const code = "h = hashlib.md5(data)";
+    const f = [makeFinding("Weak hash algorithm used", "SEC-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("sha256"));
+  });
+
+  it("pickle.loads → json.loads", () => {
+    const code = "data = pickle.loads(raw)";
+    const f = [makeFinding("Unsafe deserialization with pickle", "SEC-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("json.loads"));
+  });
+
+  it("yaml.load → yaml.safe_load", () => {
+    const code = "config = yaml.load(raw_data)";
+    const f = [makeFinding("Unsafe YAML load", "SEC-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("safe_load"));
+  });
+
+  it("os.system → subprocess.run", () => {
+    const code = 'os.system(f"rm -rf {path}")';
+    const f = [makeFinding("Command injection via os.system", "CYBER-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("subprocess.run"));
+  });
+});
+
+describe("Patches: configuration", () => {
+  it("debug: true → env-based", () => {
+    const code = "const config = { debug: true };";
+    const f = [makeFinding("Debug mode enabled in production", "SEC-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("NODE_ENV"));
+  });
+
+  it("hardcoded connection string → env var", () => {
+    const code = 'const db = connect("mongodb://admin:pass@host/db");';
+    const f = [makeFinding("Hardcoded connection string in code", "SEC-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("DATABASE_URL"));
+  });
+});
+
+describe("Patches: accessibility", () => {
+  it("outline: none → visible focus style", () => {
+    const code = "a:focus { outline: none; }";
+    const f = [makeFinding("Focus indicator removed with outline: none", "A11Y-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("2px solid"));
+  });
+
+  it("img without alt → add alt", () => {
+    const code = '<img src="/logo.png" />';
+    const f = [makeFinding("Image missing alt text", "A11Y-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("alt"));
+  });
+});
+
+describe("Patches: network", () => {
+  it("0.0.0.0 → 127.0.0.1", () => {
+    const code = 'app.listen(3000, "0.0.0.0");';
+    const f = [makeFinding("Binds to all network interfaces (0.0.0.0)", "SEC-001", [1])];
+    const result = enrichWithPatches(f, code);
+    if (result[0].patch) assert.ok(result[0].patch.newText.includes("127.0.0.1"));
+  });
+});
