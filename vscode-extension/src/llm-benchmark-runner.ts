@@ -102,7 +102,7 @@ function readConfig(): BenchmarkConfig {
   return {
     enabled: envBool("JUDGES_LLM_BENCHMARK_ENABLED") || (cfg.get<boolean>("llmBenchmark.enabled") ?? DEFAULTS.enabled),
     sampleSize: Math.min(
-      200,
+      2000,
       env("JUDGES_LLM_BENCHMARK_SAMPLE_SIZE") ?? cfg.get<number>("llmBenchmark.sampleSize") ?? DEFAULTS.sampleSize,
     ),
     maxOutputTokens: Math.min(
