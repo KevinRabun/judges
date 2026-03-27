@@ -2,6 +2,17 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.123.5] — 2026-03-27
+
+### Improved
+- **CLEAN CODE RECOGNITION for 11 judges** — Added structured clean-code-gate sections to 11 judge prompts that previously lacked them: software-practices, api-design, reliability, scalability, observability, data-security, documentation, testing, cloud-readiness, compliance, and database. Each section defines specific criteria for recognizing well-written code and instructs the judge to report ZERO findings when all criteria are met. This targets the root cause of the LLM benchmark F1 drop (82 of 87 false positives came from clean code cases). Previously only 5 judges had this section (authentication, cybersecurity, error-handling, rate-limiting, security); now all 16 judges with FP risk have clean code gates.
+
+### Tests
+- **968 new tests since v3.123.4** — Massive test coverage push across 31+ new test files covering escalation, finding-lifecycle, SAST integration, A2A protocol, feedback loop, audit trail, security/performance/false-positive-review evaluators, git-diff, project evaluator, deep patches, pipeline internals, multi-judge coverage, tribunal pipeline, AST analysis, diff/V2 evaluation, pipeline options, output formatters (SARIF/JUnit/CodeClimate/CSV/HTML/PDF/badge/diagnostics), language coverage (Swift/Kotlin/PowerShell/Dart/Bicep/K8s/SQL), scoring module, evaluator deep coverage, cross-file taint, custom rules, and config.
+- **CI coverage restored** — Coverage thresholds restored to 80/75/65/80 after adding 149 tests for shared.ts, evaluation-session.ts, and config.ts.
+- **LLM benchmark sample size cap** raised from 200 → 2000 for full benchmark runs.
+- 3,586 tests passing, 0 failures.
+
 ## [3.123.4] — 2026-03-27
 
 ### Improved

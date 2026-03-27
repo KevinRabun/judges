@@ -4,6 +4,12 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.123.5] — 2026-03-27
+
+### Improved
+- **CLEAN CODE RECOGNITION for 11 judges** — Reduced false positives on well-written code by adding clean-code-gate sections to 11 additional judge prompts (software-practices, api-design, reliability, scalability, observability, data-security, documentation, testing, cloud-readiness, compliance, database). All 16 FP-prone judges now have structured clean code recognition.
+- **968 new tests** — Massive test coverage push (3,586 total). See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.123.4] — 2026-03-27
 
 ### Improved
