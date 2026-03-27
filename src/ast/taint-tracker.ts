@@ -61,7 +61,7 @@ export type TaintSinkKind =
 
 // ─── Source / Sink Definitions ───────────────────────────────────────────────
 
-const SOURCE_PATTERNS: Array<{ pattern: RegExp; kind: TaintSourceKind }> = [
+export const SOURCE_PATTERNS: Array<{ pattern: RegExp; kind: TaintSourceKind }> = [
   { pattern: /\breq(?:uest)?\.(?:body|query|params|headers|cookies)\b/i, kind: "http-param" },
   { pattern: /\brequest\.(?:form|args|json|data|values|files|get)\b/i, kind: "http-param" },
   { pattern: /\b(?:ctx|context)\.(?:query|params|request)\b/i, kind: "http-param" },
@@ -73,7 +73,7 @@ const SOURCE_PATTERNS: Array<{ pattern: RegExp; kind: TaintSourceKind }> = [
   { pattern: /\.(?:useSearchParams|useParams)\b/i, kind: "url-param" },
 ];
 
-const SINK_PATTERNS: Array<{ pattern: RegExp; kind: TaintSinkKind }> = [
+export const SINK_PATTERNS: Array<{ pattern: RegExp; kind: TaintSinkKind }> = [
   { pattern: /\beval\s*\(/i, kind: "code-execution" },
   { pattern: /\bnew\s+Function\s*\(/i, kind: "code-execution" },
   { pattern: /\bvm\.run(?:InContext|InNewContext|InThisContext)?\s*\(/i, kind: "code-execution" },
@@ -100,7 +100,7 @@ const SINK_PATTERNS: Array<{ pattern: RegExp; kind: TaintSinkKind }> = [
 // ─── Sanitizer Recognition ──────────────────────────────────────────────────
 
 /** Known sanitizer/escaping functions that neutralize taint */
-const SANITIZER_PATTERNS: RegExp[] = [
+export const SANITIZER_PATTERNS: RegExp[] = [
   // DOM / HTML sanitizers
   /\bDOMPurify\.sanitize\s*\(/i,
   /\bsanitizeHtml\s*\(/i,
@@ -132,7 +132,7 @@ const SANITIZER_PATTERNS: RegExp[] = [
 ];
 
 /** Check if a code expression passes through a known sanitizer */
-function isSanitized(expression: string): boolean {
+export function isSanitized(expression: string): boolean {
   return SANITIZER_PATTERNS.some((p) => p.test(expression));
 }
 

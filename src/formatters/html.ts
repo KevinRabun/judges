@@ -10,36 +10,9 @@
  */
 
 import type { TribunalVerdict, JudgeEvaluation, Finding } from "../types.js";
-
-// ─── HTML Escaping ──────────────────────────────────────────────────────────
-
-function esc(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+import { esc, severityColor } from "./shared.js";
 
 // ─── Severity Colors ────────────────────────────────────────────────────────
-
-function severityColor(severity: string): string {
-  switch (severity) {
-    case "critical":
-      return "#dc2626";
-    case "high":
-      return "#ea580c";
-    case "medium":
-      return "#ca8a04";
-    case "low":
-      return "#2563eb";
-    case "info":
-      return "#6b7280";
-    default:
-      return "#6b7280";
-  }
-}
 
 function verdictColor(verdict: string): string {
   switch (verdict) {

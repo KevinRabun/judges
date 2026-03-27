@@ -956,7 +956,10 @@ export function analyzeCybersecurity(code: string, language: string, context?: A
   if (lang === "rust") {
     const unsafeLines = getLineNumbers(code, /\bunsafe\s*\{/g);
     if (unsafeLines.length > 0) {
-      const hasSafetyDoc = testCode(code, /\/\/\s*SAFETY:|\/\/\s*UNSAFE:|#\[allow\(unsafe_code\)\]/gi);
+      // Check raw code (not comment-stripped) because SAFETY docs ARE comments
+      const safetyDocRe = /\/\/\s*SAFETY:|\/\/\s*UNSAFE:|#\[allow\(unsafe_code\)\]/gi;
+      safetyDocRe.lastIndex = 0;
+      const hasSafetyDoc = safetyDocRe.test(code);
       if (!hasSafetyDoc) {
         findings.push({
           ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,

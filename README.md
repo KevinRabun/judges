@@ -573,7 +573,7 @@ Evaluate a file with all 45 judges or a single judge.
 | `--baseline <path>` / `-b <path>` | JSON baseline file — suppress known findings |
 | `--summary` | Print a single summary line (ideal for scripts) |
 | `--config <path>` | Load a `.judgesrc` / `.judgesrc.json` config file |
-| `--preset <name>` | Use a named preset (see [Named Presets](#named-presets) for all 18 options) |
+| `--preset <name>` | Use a named preset (see [Named Presets](#named-presets) for all 22 options) |
 | `--min-score <n>` | Exit with code 1 if overall score is below this threshold |
 | `--verbose` | Print timing and debug information |
 | `--quiet` | Suppress non-essential output |
@@ -1129,6 +1129,32 @@ Re-run the tribunal with **prior findings as context** for iterative refinement.
 | `deepReview` | boolean | no | Include LLM deep-review prompt section |
 | `relatedFiles` | array | no | Cross-file context `{ path, snippet, relationship? }[]` |
 | `maxPromptChars` | number | no | Max character budget for LLM prompts (default: 100000, 0 = unlimited) |
+
+### Additional MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `evaluate_file` | Read a file from disk and submit it to the full panel. Auto-detects language from extension. |
+| `evaluate_code_streaming` | Streaming evaluation — returns per-judge results as each judge completes with running aggregates. |
+| `evaluate_focused` | Run only specified judges. Use after an initial full evaluation to re-check specific areas. |
+| `evaluate_batch` | Evaluate multiple code files in a single call. Returns per-file verdicts plus aggregate statistics. |
+| `evaluate_then_fix` | Evaluate code and automatically generate fix patches for all findings with auto-fix support. |
+| `evaluate_with_progress` | Evaluate with progress callbacks for long-running evaluations. |
+| `evaluate_policy_aware` | Policy-aware evaluation with named profiles (startup, regulated, healthcare, fintech, public-sector). |
+| `fix_code` | Evaluate code and apply all available auto-fix patches. Returns fixed code with applied/remaining summary. |
+| `explain_finding` | Explain a finding in plain language with OWASP/CWE references, risk context, and remediation guidance. |
+| `triage_finding` | Set triage status of a finding (accepted-risk, deferred, wont-fix, false-positive) with attribution. |
+| `record_feedback` | Record user feedback (true-positive, false-positive, wont-fix) to calibrate confidence scores. |
+| `get_finding_stats` | Finding lifecycle statistics: open, fixed, recurring, and triaged counts plus trends. |
+| `get_suppression_analytics` | Analyze suppression patterns: FP rates by rule, suppression rates, auto-suppress candidates. |
+| `list_triaged_findings` | List triaged findings, optionally filtered by triage status. |
+| `benchmark_gate` | Run benchmarks against quality thresholds. Returns pass/fail with F1, precision, recall metrics. |
+| `run_benchmark` | Run the full benchmark suite with per-judge, per-category, per-difficulty breakdowns. |
+| `scaffold_judge` | Generate boilerplate files to add a new judge: definition, evaluator skeleton, and registration. |
+| `scaffold_plugin` | Generate a starter plugin template with custom rules, judges, and lifecycle hooks. |
+| `session_status` | Current evaluation session state: evaluation count, frameworks, verdict history, stability. |
+| `list_files` | List files and directories in the workspace for project exploration. |
+| `read_file` | Read file contents from the workspace. |
 
 #### Judge IDs
 

@@ -223,13 +223,13 @@ describe("Documentation: MCP tool count", () => {
 // ─── Formatter Count ────────────────────────────────────────────────────────
 
 describe("Documentation: Formatters", () => {
-  it("has 9 formatter files", () => {
+  it("has 10 formatter files", () => {
     const formattersDir = resolve(ROOT, "src", "formatters");
     const formatterFiles = readdirSync(formattersDir).filter((f) => f.endsWith(".ts"));
     assert.equal(
       formatterFiles.length,
-      9,
-      `Expected 9 formatter files but found ${formatterFiles.length}. Update documentation if formatters change.`,
+      10,
+      `Expected 10 formatter files but found ${formatterFiles.length}. Update documentation if formatters change.`,
     );
   });
 
@@ -245,6 +245,7 @@ describe("Documentation: Formatters", () => {
       "junit.ts",
       "pdf.ts",
       "sarif.ts",
+      "shared.ts",
     ];
     for (const file of expected) {
       assert.ok(existsSync(resolve(formattersDir, file)), `Expected formatter file ${file} not found`);

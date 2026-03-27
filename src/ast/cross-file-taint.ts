@@ -18,6 +18,9 @@ import {
   type TaintFlow as _TaintFlow,
   type TaintSourceKind,
   type TaintSinkKind,
+  SOURCE_PATTERNS,
+  SINK_PATTERNS,
+  isSanitized,
 } from "./taint-tracker.js";
 import { normalizeLanguage } from "../language-patterns.js";
 
@@ -78,50 +81,7 @@ interface ImportBinding {
   line: number;
 }
 
-// ─── Source / Sink pattern references (same as taint-tracker.ts) ─────────────
-
-const SOURCE_PATTERNS: Array<{ pattern: RegExp; kind: TaintSourceKind }> = [
-  { pattern: /\breq(?:uest)?\.(?:body|query|params|headers|cookies)\b/i, kind: "http-param" },
-  { pattern: /\brequest\.(?:form|args|json|data|values|files|get)\b/i, kind: "http-param" },
-  { pattern: /\b(?:ctx|context)\.(?:query|params|request)\b/i, kind: "http-param" },
-  { pattern: /\bgetParameter\s*\(/i, kind: "http-param" },
-  { pattern: /\bRequest\.(?:Form|QueryString|Params)\b/i, kind: "http-param" },
-  { pattern: /\b(?:process\.argv|sys\.argv|os\.Args|args)\b/i, kind: "user-input" },
-  { pattern: /\b(?:prompt|readline|input)\s*\(/i, kind: "user-input" },
-  { pattern: /\bsearchParams\.get\s*\(/i, kind: "url-param" },
-  { pattern: /\.(?:useSearchParams|useParams)\b/i, kind: "url-param" },
-];
-
-const SINK_PATTERNS: Array<{ pattern: RegExp; kind: TaintSinkKind }> = [
-  { pattern: /\beval\s*\(/i, kind: "code-execution" },
-  { pattern: /\bnew\s+Function\s*\(/i, kind: "code-execution" },
-  { pattern: /\b(?:exec|execSync|system|popen|subprocess\.(?:Popen|run|call)|os\.system)\s*\(/i, kind: "command-exec" },
-  { pattern: /\b(?:spawn|spawnSync)\s*\(/i, kind: "command-exec" },
-  { pattern: /\.(?:query|execute|exec)\s*\(/i, kind: "sql-query" },
-  { pattern: /\.innerHTML\s*=/i, kind: "xss" },
-  { pattern: /\bdocument\.write\s*\(/i, kind: "xss" },
-  { pattern: /\bdangerouslySetInnerHTML/i, kind: "xss" },
-  { pattern: /\b(?:readFile|readFileSync|open)\s*\(/i, kind: "path-traversal" },
-  { pattern: /\.redirect\s*\(/i, kind: "redirect" },
-  { pattern: /\b(?:render_template_string|nunjucks\.renderString|Handlebars\.compile)\s*\(/i, kind: "template" },
-];
-
-const SANITIZER_PATTERNS: RegExp[] = [
-  /\bDOMPurify\.sanitize\s*\(/i,
-  /\bsanitizeHtml\s*\(/i,
-  /\bescapeHtml\s*\(/i,
-  /\bencodeURIComponent\s*\(/i,
-  /\bvalidator\.\w+\s*\(/i,
-  /\b(?:joi|yup|zod|ajv)\b.*\.(?:validate|parse|safeParse)\s*\(/i,
-  /\$\d+/,
-  /\?\s*(?:,|\))/,
-  /\bpath\.(?:normalize|resolve|basename)\s*\(/i,
-  /\bPreparedStatement\b/i,
-];
-
-function isSanitized(expression: string): boolean {
-  return SANITIZER_PATTERNS.some((p) => p.test(expression));
-}
+// ─── Source / Sink patterns imported from taint-tracker.ts ───────────────────
 
 // ─── Export Analysis ─────────────────────────────────────────────────────────
 

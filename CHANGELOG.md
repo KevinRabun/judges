@@ -2,6 +2,25 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.123.4] — 2026-03-27
+
+### Improved
+- **Documentation audit** — Comprehensive accuracy review across all documentation:
+  - Fixed stale preset count ("18" → "22") in README CLI flags table.
+  - Regenerated `docs/benchmark-report.md` from v3.38.0 to current v3.123.3 (F1=90.5%, Precision=99.8%, 1048 cases).
+  - Added 21 previously undocumented MCP tools to README (fix_code, explain_finding, triage_finding, session_status, scaffold_judge, and more — now all 31 tools are documented).
+
+### Fixed
+- **DRY: Taint pattern deduplication** — `SOURCE_PATTERNS`, `SINK_PATTERNS`, `SANITIZER_PATTERNS`, and `isSanitized()` were duplicated between `cross-file-taint.ts` and `taint-tracker.ts`. Extracted to shared exports from `taint-tracker.ts`; `cross-file-taint.ts` now imports them (−40 lines).
+- **DRY: Formatter utility extraction** — `severityColor()` and `esc()` were identically defined in both `html.ts` and `pdf.ts`. Extracted to new `src/formatters/shared.ts`; both formatters import from it (−56 lines).
+- **Cybersecurity evaluator: Rust SAFETY comment detection** — `// SAFETY:` documentation comments were being stripped by `testCode()` before checking, causing `unsafe` blocks with proper safety documentation to always be flagged. Fixed to check raw code instead of comment-stripped code.
+
+### Tests
+- **136 new tests** — Comprehensive test suites for `cybersecurity.ts` (90 tests) and `cli-formatters.ts` (46 tests) covering all detection categories and output code paths with both positive and negative cases.
+- `cybersecurity.ts` coverage: 22.8% → **93.9%** line coverage.
+- `cli-formatters.ts` coverage: 12.4% → **99.0%** line coverage.
+- 2,618 tests passing, 0 failures.
+
 ## [3.123.3] — 2026-03-26
 
 ### Improved

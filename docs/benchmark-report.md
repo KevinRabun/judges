@@ -1,6 +1,6 @@
 # Judges Panel — Benchmark Report
 
-> Auto-generated on 2026-03-11T14:10:12.416Z · v3.38.0
+> Auto-generated on 2026-03-27T12:34:09.748Z · v3.123.3
 
 ## How to Read This Report
 
@@ -46,20 +46,20 @@ vary across runs and models.
 |--------|-------|
 | Overall Grade | 🟢 **A** |
 | Test Cases | 1048 |
-| Detection Rate | 100.0% (1048/1048) |
-| Precision (lenient) | 100.0% |
-| Recall (lenient) | 88.6% |
-| F1 Score (lenient) | 94.0% |
-| Precision (strict) | 100.0% |
-| Recall (strict) | 75.8% |
-| F1 Score (strict) | 86.2% |
-| True Positives | 1215 (strict: 1039) |
-| False Negatives | 156 (strict: 332) |
-| False Positives | 0 |
+| Detection Rate | 90.2% (945/1048) |
+| Precision (lenient) | 99.8% |
+| Recall (lenient) | 82.8% |
+| F1 Score (lenient) | 90.5% |
+| Precision (strict) | 99.8% |
+| Recall (strict) | 70.3% |
+| F1 Score (strict) | 82.5% |
+| True Positives | 1222 (strict: 1038) |
+| False Negatives | 254 (strict: 438) |
+| False Positives | 2 |
 
 ## False Positive Rate
 
-**Overall FP Rate: 0.0%**
+**Overall FP Rate: 0.2%**
 
 The false positive rate measures how often the tool flags code that is actually correct.
 Lower is better. Industry-standard SAST tools typically range from 20-60% FP rates.
@@ -68,118 +68,118 @@ Lower is better. Industry-standard SAST tools typically range from 20-60% FP rat
 
 | Difficulty | Detected | Total | Rate |
 |------------|----------|-------|------|
-| easy | 372 | 372 | 100.0% |
-| medium | 469 | 469 | 100.0% |
-| hard | 207 | 207 | 100.0% |
+| easy | 338 | 372 | 90.9% |
+| medium | 422 | 469 | 90.0% |
+| hard | 185 | 207 | 89.4% |
 
 ## Results by Category
 
 | Category | Detected | Total | Precision | Recall | F1 | FP Rate |
 |----------|----------|-------|-----------|--------|-----|---------|
-| accessibility | 15 | 15 | 100.0% | 93.8% | 96.8% | 0.0% |
-| agent-instructions | 8 | 8 | 100.0% | 80.0% | 88.9% | 0.0% |
-| agent-security | 13 | 13 | 100.0% | 100.0% | 100.0% | 0.0% |
-| ai-code-safety | 25 | 25 | 100.0% | 81.0% | 89.5% | 0.0% |
+| accessibility | 14 | 15 | 100.0% | 87.5% | 93.3% | 0.0% |
+| agent-instructions | 6 | 8 | 100.0% | 70.6% | 82.8% | 0.0% |
+| agent-security | 13 | 13 | 100.0% | 95.7% | 97.8% | 0.0% |
+| ai-code-safety | 24 | 25 | 100.0% | 79.7% | 88.7% | 0.0% |
 | ai-dependency-confusion | 1 | 1 | 100.0% | 100.0% | 100.0% | 0.0% |
 | ai-logic-error | 10 | 10 | 100.0% | 76.9% | 87.0% | 0.0% |
 | ai-negative | 3 | 3 | 100.0% | 100.0% | 100.0% | 0.0% |
 | ai-security | 2 | 2 | 100.0% | 80.0% | 88.9% | 0.0% |
 | ai-test-quality | 2 | 2 | 100.0% | 100.0% | 100.0% | 0.0% |
-| api-design | 9 | 9 | 100.0% | 100.0% | 100.0% | 0.0% |
-| auth | 42 | 42 | 100.0% | 87.7% | 93.4% | 0.0% |
-| backwards-compatibility | 8 | 8 | 100.0% | 100.0% | 100.0% | 0.0% |
-| caching | 11 | 11 | 100.0% | 84.6% | 91.7% | 0.0% |
-| ci-cd | 9 | 9 | 100.0% | 71.4% | 83.3% | 0.0% |
-| cicd | 6 | 6 | 100.0% | 100.0% | 100.0% | 0.0% |
-| clean | 191 | 191 | 100.0% | 100.0% | 100.0% | 0.0% |
-| cloud | 6 | 6 | 100.0% | 80.0% | 88.9% | 0.0% |
-| cloud-readiness | 8 | 8 | 100.0% | 78.6% | 88.0% | 0.0% |
+| api-design | 8 | 9 | 100.0% | 90.9% | 95.2% | 0.0% |
+| auth | 41 | 42 | 100.0% | 86.6% | 92.8% | 0.0% |
+| backwards-compatibility | 6 | 8 | 100.0% | 80.0% | 88.9% | 0.0% |
+| caching | 10 | 11 | 100.0% | 80.0% | 88.9% | 0.0% |
+| ci-cd | 4 | 9 | 100.0% | 36.4% | 53.3% | 0.0% |
+| cicd | 4 | 6 | 100.0% | 71.4% | 83.3% | 0.0% |
+| clean | 189 | 191 | 85.7% | 100.0% | 92.3% | 14.3% |
+| cloud | 2 | 6 | 100.0% | 37.5% | 54.5% | 0.0% |
+| cloud-readiness | 7 | 8 | 100.0% | 73.3% | 84.6% | 0.0% |
 | code-quality | 4 | 4 | 100.0% | 90.0% | 94.7% | 0.0% |
-| code-structure | 9 | 9 | 100.0% | 80.0% | 88.9% | 0.0% |
+| code-structure | 6 | 9 | 100.0% | 50.0% | 66.7% | 0.0% |
 | compatibility | 4 | 4 | 100.0% | 100.0% | 100.0% | 0.0% |
-| compliance | 16 | 16 | 100.0% | 100.0% | 100.0% | 0.0% |
-| concurrency | 25 | 25 | 100.0% | 96.8% | 98.4% | 0.0% |
-| configuration | 14 | 14 | 100.0% | 84.6% | 91.7% | 0.0% |
-| cost-effectiveness | 11 | 11 | 100.0% | 75.0% | 85.7% | 0.0% |
-| data-security | 12 | 12 | 100.0% | 92.9% | 96.3% | 0.0% |
+| compliance | 12 | 16 | 100.0% | 78.9% | 88.2% | 0.0% |
+| concurrency | 21 | 25 | 100.0% | 85.7% | 92.3% | 0.0% |
+| configuration | 10 | 14 | 100.0% | 73.3% | 84.6% | 0.0% |
+| cost-effectiveness | 6 | 11 | 100.0% | 57.1% | 72.7% | 0.0% |
+| data-security | 11 | 12 | 100.0% | 89.7% | 94.5% | 0.0% |
 | data-sovereignty | 8 | 8 | 100.0% | 76.5% | 86.7% | 0.0% |
-| database | 16 | 16 | 100.0% | 90.6% | 95.1% | 0.0% |
+| database | 15 | 16 | 100.0% | 87.9% | 93.5% | 0.0% |
 | dependencies | 1 | 1 | 100.0% | 100.0% | 100.0% | 0.0% |
-| dependency-health | 9 | 9 | 100.0% | 90.0% | 94.7% | 0.0% |
-| documentation | 17 | 17 | 100.0% | 87.5% | 93.3% | 0.0% |
-| error-handling | 33 | 33 | 100.0% | 100.0% | 100.0% | 0.0% |
-| ethics | 8 | 8 | 100.0% | 100.0% | 100.0% | 0.0% |
-| ethics-bias | 8 | 8 | 100.0% | 100.0% | 100.0% | 0.0% |
+| dependency-health | 8 | 9 | 100.0% | 90.0% | 94.7% | 0.0% |
+| documentation | 11 | 17 | 100.0% | 71.4% | 83.3% | 0.0% |
+| error-handling | 29 | 33 | 100.0% | 89.7% | 94.6% | 0.0% |
+| ethics | 4 | 8 | 100.0% | 50.0% | 66.7% | 0.0% |
+| ethics-bias | 4 | 8 | 100.0% | 50.0% | 66.7% | 0.0% |
 | framework-safety | 11 | 11 | 100.0% | 88.0% | 93.6% | 0.0% |
 | framework-security | 2 | 2 | 100.0% | 88.9% | 94.1% | 0.0% |
-| hallucination | 32 | 32 | 100.0% | 91.4% | 95.5% | 0.0% |
-| hallucination-detection | 20 | 20 | 100.0% | 92.3% | 96.0% | 0.0% |
-| iac-security | 35 | 35 | 100.0% | 70.8% | 82.9% | 0.0% |
-| injection | 68 | 68 | 100.0% | 91.8% | 95.7% | 0.0% |
-| internationalization | 13 | 13 | 100.0% | 90.0% | 94.7% | 0.0% |
+| hallucination | 26 | 32 | 100.0% | 79.5% | 88.6% | 0.0% |
+| hallucination-detection | 18 | 20 | 100.0% | 88.5% | 93.9% | 0.0% |
+| iac-security | 32 | 35 | 100.0% | 66.7% | 80.0% | 0.0% |
+| injection | 67 | 68 | 100.0% | 91.2% | 95.4% | 0.0% |
+| internationalization | 6 | 13 | 100.0% | 42.9% | 60.0% | 0.0% |
 | logging-privacy | 11 | 11 | 100.0% | 84.6% | 91.7% | 0.0% |
-| maintainability | 13 | 13 | 100.0% | 97.0% | 98.5% | 0.0% |
-| observability | 11 | 11 | 100.0% | 86.4% | 92.7% | 0.0% |
+| maintainability | 13 | 13 | 100.0% | 96.9% | 98.4% | 0.0% |
+| observability | 9 | 11 | 100.0% | 79.2% | 88.4% | 0.0% |
 | performance | 24 | 24 | 100.0% | 96.9% | 98.4% | 0.0% |
-| portability | 12 | 12 | 100.0% | 90.9% | 95.2% | 0.0% |
-| rate-limiting | 12 | 12 | 100.0% | 92.3% | 96.0% | 0.0% |
+| portability | 9 | 12 | 100.0% | 71.4% | 83.3% | 0.0% |
+| rate-limiting | 10 | 12 | 100.0% | 85.7% | 92.3% | 0.0% |
 | reliability | 15 | 15 | 100.0% | 89.5% | 94.4% | 0.0% |
-| scalability | 14 | 14 | 100.0% | 90.2% | 94.9% | 0.0% |
-| security | 125 | 125 | 100.0% | 86.2% | 92.6% | 0.0% |
-| software-development | 7 | 7 | 100.0% | 90.0% | 94.7% | 0.0% |
-| software-practices | 9 | 9 | 100.0% | 76.9% | 87.0% | 0.0% |
-| sovereignty | 4 | 4 | 100.0% | 100.0% | 100.0% | 0.0% |
+| scalability | 13 | 14 | 100.0% | 88.1% | 93.7% | 0.0% |
+| security | 120 | 125 | 100.0% | 85.1% | 91.9% | 0.0% |
+| software-development | 6 | 7 | 100.0% | 80.0% | 88.9% | 0.0% |
+| software-practices | 8 | 9 | 100.0% | 69.2% | 81.8% | 0.0% |
+| sovereignty | 3 | 4 | 100.0% | 75.0% | 85.7% | 0.0% |
 | structure | 1 | 1 | 100.0% | 100.0% | 100.0% | 0.0% |
-| supply-chain | 2 | 2 | 100.0% | 100.0% | 100.0% | 0.0% |
+| supply-chain | 1 | 2 | 100.0% | 66.7% | 80.0% | 0.0% |
 | testing | 18 | 18 | 100.0% | 100.0% | 100.0% | 0.0% |
-| user-experience | 2 | 2 | 100.0% | 50.0% | 66.7% | 0.0% |
-| ux | 12 | 12 | 100.0% | 77.8% | 87.5% | 0.0% |
-| xss | 11 | 11 | 100.0% | 94.4% | 97.1% | 0.0% |
+| user-experience | 1 | 2 | 100.0% | 33.3% | 50.0% | 0.0% |
+| ux | 11 | 12 | 100.0% | 76.5% | 86.7% | 0.0% |
+| xss | 10 | 11 | 100.0% | 89.5% | 94.4% | 0.0% |
 
 ## Results by Judge
 
 | Judge | Findings | TP | FP | Precision | FP Rate |
 |-------|----------|-----|-----|-----------|---------|
-| A11Y | 54 | 38 | 7 | 84.4% | 15.6% |
-| AGENT | 3 | 3 | 0 | 100.0% | 0.0% |
-| AICS | 182 | 64 | 9 | 87.7% | 12.3% |
-| API | 204 | 45 | 16 | 73.8% | 26.2% |
-| AUTH | 66 | 46 | 1 | 97.9% | 2.1% |
-| CACHE | 20 | 11 | 2 | 84.6% | 15.4% |
-| CFG | 9 | 2 | 0 | 100.0% | 0.0% |
-| CICD | 22 | 4 | 0 | 100.0% | 0.0% |
-| CLOUD | 47 | 11 | 1 | 91.7% | 8.3% |
-| COMP | 99 | 40 | 7 | 85.1% | 14.9% |
-| COMPAT | 26 | 10 | 0 | 100.0% | 0.0% |
-| CONC | 75 | 29 | 7 | 80.6% | 19.4% |
-| COST | 75 | 29 | 7 | 80.6% | 19.4% |
-| CYBER | 410 | 291 | 22 | 93.0% | 7.0% |
-| DATA | 187 | 64 | 5 | 92.8% | 7.2% |
-| DB | 83 | 35 | 3 | 92.1% | 7.9% |
-| DEPS | 24 | 17 | 4 | 81.0% | 19.0% |
-| DOC | 16 | 9 | 2 | 81.8% | 18.2% |
-| ERR | 131 | 50 | 16 | 75.8% | 24.2% |
-| ETHICS | 12 | 9 | 1 | 90.0% | 10.0% |
-| FW | 25 | 6 | 1 | 85.7% | 14.3% |
-| HALLU | 9 | 7 | 0 | 100.0% | 0.0% |
-| I18N | 31 | 18 | 4 | 81.8% | 18.2% |
-| IAC | 87 | 69 | 10 | 87.3% | 12.7% |
-| INTENT | 28 | 0 | 0 | 100.0% | 0.0% |
-| LOGIC | 22 | 10 | 3 | 76.9% | 23.1% |
-| LOGPRIV | 43 | 21 | 7 | 75.0% | 25.0% |
-| MAINT | 15 | 11 | 2 | 84.6% | 15.4% |
-| OBS | 96 | 23 | 5 | 82.1% | 17.9% |
-| PERF | 127 | 59 | 13 | 81.9% | 18.1% |
-| PORTA | 75 | 27 | 9 | 75.0% | 25.0% |
-| RATE | 45 | 14 | 2 | 87.5% | 12.5% |
-| REL | 100 | 38 | 5 | 88.4% | 11.6% |
-| SCALE | 156 | 45 | 18 | 71.4% | 28.6% |
-| SEC | 426 | 228 | 20 | 91.9% | 8.1% |
-| SOV | 75 | 28 | 6 | 82.4% | 17.6% |
-| STRUCT | 18 | 14 | 4 | 77.8% | 22.2% |
-| SWDEV | 25 | 11 | 1 | 91.7% | 8.3% |
-| TEST | 69 | 38 | 13 | 74.5% | 25.5% |
-| UX | 67 | 18 | 7 | 72.0% | 28.0% |
+| A11Y | 33 | 19 | 14 | 57.6% | 42.4% |
+| AGENT | 2 | 2 | 0 | 100.0% | 0.0% |
+| AICS | 148 | 38 | 110 | 25.7% | 74.3% |
+| API | 154 | 31 | 123 | 20.1% | 79.9% |
+| AUTH | 64 | 44 | 20 | 68.8% | 31.3% |
+| CACHE | 18 | 8 | 10 | 44.4% | 55.6% |
+| CFG | 9 | 2 | 7 | 22.2% | 77.8% |
+| CICD | 22 | 3 | 19 | 13.6% | 86.4% |
+| CLOUD | 44 | 10 | 34 | 22.7% | 77.3% |
+| COMP | 78 | 25 | 53 | 32.1% | 67.9% |
+| COMPAT | 24 | 9 | 15 | 37.5% | 62.5% |
+| CONC | 67 | 24 | 43 | 35.8% | 64.2% |
+| COST | 81 | 27 | 54 | 33.3% | 66.7% |
+| CYBER | 327 | 236 | 91 | 72.2% | 27.8% |
+| DATA | 152 | 52 | 100 | 34.2% | 65.8% |
+| DB | 59 | 27 | 32 | 45.8% | 54.2% |
+| DEPS | 20 | 12 | 8 | 60.0% | 40.0% |
+| DOC | 124 | 11 | 113 | 8.9% | 91.1% |
+| ERR | 126 | 49 | 77 | 38.9% | 61.1% |
+| ETHICS | 12 | 9 | 3 | 75.0% | 25.0% |
+| FW | 19 | 4 | 15 | 21.1% | 78.9% |
+| HALLU | 30 | 26 | 4 | 86.7% | 13.3% |
+| I18N | 14 | 6 | 8 | 42.9% | 57.1% |
+| IAC | 48 | 34 | 14 | 70.8% | 29.2% |
+| INTENT | 46 | 0 | 46 | 0.0% | 100.0% |
+| LOGIC | 20 | 10 | 10 | 50.0% | 50.0% |
+| LOGPRIV | 30 | 13 | 17 | 43.3% | 56.7% |
+| MAINT | 15 | 10 | 5 | 66.7% | 33.3% |
+| OBS | 96 | 22 | 74 | 22.9% | 77.1% |
+| PERF | 117 | 53 | 64 | 45.3% | 54.7% |
+| PORTA | 56 | 18 | 38 | 32.1% | 67.9% |
+| RATE | 44 | 13 | 31 | 29.5% | 70.5% |
+| REL | 98 | 37 | 61 | 37.8% | 62.2% |
+| SCALE | 141 | 39 | 102 | 27.7% | 72.3% |
+| SEC | 306 | 167 | 139 | 54.6% | 45.4% |
+| SOV | 61 | 18 | 43 | 29.5% | 70.5% |
+| STRUCT | 14 | 9 | 5 | 64.3% | 35.7% |
+| SWDEV | 25 | 10 | 15 | 40.0% | 60.0% |
+| TEST | 57 | 26 | 31 | 45.6% | 54.4% |
+| UX | 58 | 12 | 46 | 20.7% | 79.3% |
 
 ## Clean Code (False Positive Tests)
 
@@ -348,7 +348,7 @@ Any finding on these cases is a false positive.
 | clean-aics-proper-model-serving | ✅ | none |
 | clean-aics-proper-vector-store | ✅ | none |
 | clean-hallu-proper-react | ✅ | none |
-| clean-well-documented-library-ts | ✅ | none |
+| clean-well-documented-library-ts | ❌ | DOC-900 |
 | clean-proper-api-design-ts | ✅ | none |
 | clean-structured-logging-py | ✅ | none |
 | clean-proper-error-handling-go | ✅ | none |
@@ -363,7 +363,7 @@ Any finding on these cases is a false positive.
 | clean-github-actions-secure-yaml | ✅ | none |
 | clean-data-sovereignty-compliant-ts | ✅ | none |
 | clean-agent-guardrails-ts | ✅ | none |
-| clean-well-tested-utility-ts | ✅ | none |
+| clean-well-tested-utility-ts | ❌ | DOC-900 |
 | clean-robust-error-handling-ts | ✅ | none |
 | clean-accessible-form-tsx | ✅ | none |
 | clean-i18n-proper-formatting-ts | ✅ | none |
@@ -380,7 +380,115 @@ Any finding on these cases is a false positive.
 | adv-clean-secure-upload-ts | ✅ | none |
 | adv-clean-structured-error-handler-ts | ✅ | none |
 
-**Clean code FP rate: 0/191 cases had false positives (0.0%)**
+**Clean code FP rate: 2/191 cases had false positives (1.0%)**
+
+## Failed Cases
+
+| Case | Difficulty | Category | Missed Rules | False Positives |
+|------|------------|----------|--------------|-----------------|
+| cost-wasteful-resources | medium | cost-effectiveness | COST-001 | — |
+| i18n-hardcoded-strings | easy | internationalization | I18N-001 | — |
+| python-biased-model | medium | ethics-bias | ETHICS-001 | — |
+| python-ai-deprecated-api | medium | ai-code-safety | FW-001 | — |
+| cicd-insecure-workflow | medium | ci-cd | CICD-001 | — |
+| conc-ts-async-race | hard | concurrency | CONC-001 | — |
+| sec-deep-ssrf-java-url | medium | security | SEC-001 | — |
+| sec-deep-deserial-csharp-binary | medium | security | SEC-001 | — |
+| sec-deep-xxe-python-etree | medium | security | SEC-001 | — |
+| sec-deep-sqli-ruby-interpolation | easy | injection | SEC-001 | — |
+| sec-deep-xss-go-fprintf | easy | xss | SEC-001 | — |
+| err-deep-process-exit | medium | error-handling | ERR-001 | — |
+| conc-deep-missing-await | medium | concurrency | CONC-001 | — |
+| cicd-deep-insecure-workflow-patterns | medium | cicd | SEC-001 | — |
+| obs-no-trace-spans-java | medium | observability | OBS-001 | — |
+| doc-outdated-readme-example-py | medium | documentation | DOC-001 | — |
+| cicd-no-test-stage-yaml | easy | ci-cd | CICD-001 | — |
+| cicd-hardcoded-creds-in-pipeline-yaml | easy | ci-cd | CICD-001 | — |
+| lang-go-fmt-errorf-no-wrap | medium | error-handling | ERR-001 | — |
+| lang-csharp-insecure-deserialization | medium | security | SEC-001 | — |
+| lang-csharp-controller-no-auth | medium | auth | AUTH-001 | — |
+| lang-java-thread-unsafe-singleton | medium | concurrency | CONC-001 | — |
+| lang-python-assert-validation | medium | error-handling | ERR-001 | — |
+| lang-cpp-use-after-free | hard | security | SEC-001 | — |
+| lang-swift-force-unwrap-chain | easy | error-handling | ERR-001 | — |
+| cloud-deep-aws-wildcard-iam | easy | cloud | IAC-001 | — |
+| cfg-deep-env-no-validation | easy | configuration | CFG-001 | — |
+| iac-deep-terraform-no-logging | medium | iac-security | IAC-001 | — |
+| iac-deep-terraform-unencrypted-ebs | easy | iac-security | IAC-001 | — |
+| cicd-deep-self-hosted-runner-risk | hard | cicd | CICD-001 | — |
+| cloud-deep-gcp-default-network | medium | cloud | CLOUD-001 | — |
+| cloud-deep-aws-rds-no-ssl | hard | cloud | CLOUD-001 | — |
+| cloud-deep-aws-lambda-vpc-no-nat | hard | cloud | CLOUD-001 | — |
+| cost-deep-no-resource-tags | easy | cost-effectiveness | COST-001 | — |
+| cost-deep-over-provisioned-instance | medium | cost-effectiveness | COST-001 | — |
+| scale-deep-global-singleton-state | hard | scalability | SCALE-001 | — |
+| rate-deep-graphql-no-depth | hard | rate-limiting | RATE-001 | — |
+| rate-deep-websocket-no-limit | medium | rate-limiting | RATE-001 | — |
+| comp-deep-minor-data-no-coppa | hard | compliance | COMP-001 | — |
+| ethics-deep-discriminatory-pricing | easy | ethics | ETHICS-001 | — |
+| ethics-deep-addictive-mechanics | hard | ethics | ETHICS-001 | — |
+| a11y-deep-color-only-indicator | medium | accessibility | A11Y-001 | — |
+| i18n-deep-date-format-hardcoded | medium | internationalization | I18N-001 | — |
+| i18n-deep-string-concat-plurals | medium | internationalization | I18N-001 | — |
+| i18n-deep-regex-ascii-only | medium | internationalization | I18N-001 | — |
+| ux-deep-inconsistent-error-messages | medium | ux | UX-001 | — |
+| comp-deep-right-to-erasure-missing | hard | compliance | COMP-001 | — |
+| comp-deep-biometric-no-consent | hard | compliance | COMP-001 | — |
+| sov-deep-cdn-no-geo-restriction | hard | sovereignty | SOV-001 | — |
+| ethics-deep-shadow-banning | hard | ethics | ETHICS-001 | — |
+| ethics-deep-algorithmic-bias-hiring | hard | ethics | ETHICS-001 | — |
+| deps-deep-typosquat-risk | easy | dependency-health | DEPS-001 | — |
+| i18n-deep-locale-dependent-sorting | hard | internationalization | I18N-001 | — |
+| hallu-deep-fake-api-import | medium | hallucination | HALLU-001 | — |
+| hallu-deep-nonexistent-method | easy | hallucination | HALLU-001 | — |
+| hallu-deep-wrong-config-options | medium | hallucination | HALLU-001 | — |
+| hallu-deep-invented-css-properties | medium | hallucination | HALLU-001 | — |
+| swdev-deep-god-class | medium | software-development | MAINT-001 | — |
+| hallu-deep-terraform-fake-resources | hard | hallucination | HALLU-001 | — |
+| hallu-deep-env-var-nonexistent | easy | hallucination | HALLU-001 | — |
+| struct-deeply-nested-conditionals-py | easy | code-structure | STRUCT-001 | — |
+| struct-god-class-java | medium | code-structure | STRUCT-001, MAINT-001, DOC-001 | — |
+| agent-unrestricted-tool-access-ts | medium | agent-instructions | AGENT-001 | — |
+| agent-system-prompt-injection-py | hard | agent-instructions | AGENT-001 | — |
+| ethics-age-filtering-ts | medium | ethics-bias | ETHICS-001 | — |
+| ethics-biased-training-data-py | hard | ethics-bias | ETHICS-001 | — |
+| ethics-location-pricing-js | medium | ethics-bias | ETHICS-001 | — |
+| cicd-secrets-in-workflow-yaml | easy | ci-cd | CICD-001 | — |
+| cicd-no-pinned-actions-yaml | medium | ci-cd | CICD-001 | — |
+| compat-removed-method-signature-ts | medium | backwards-compatibility | COMPAT-001 | — |
+| compat-dropped-optional-param-java | easy | backwards-compatibility | COMPAT-001 | — |
+| doc-missing-module-docs-py | easy | documentation | DOC-001 | — |
+| doc-complex-config-no-docs-ts | medium | documentation | DOC-001 | — |
+| doc-undocumented-go-package | easy | documentation | DOC-001 | — |
+| api-inconsistent-error-responses-py | medium | api-design | API-001 | — |
+| swdev-no-gitignore-sensitive-py | easy | software-practices | SWDEV-001 | — |
+| porta-os-specific-commands-py | easy | portability | PORTA-001 | — |
+| porta-registry-access-csharp | medium | portability | PORTA-001 | — |
+| cache-repeated-db-queries-ts | easy | caching | CACHE-001 | — |
+| cfg-scattered-env-no-validation-ts | easy | configuration | CFG-001 | — |
+| cost-oversized-lambda-py | easy | cost-effectiveness | COST-001 | — |
+| clean-well-documented-library-ts | easy | clean | — | DOC-900 |
+| hallu-python-typing-protocol | medium | hallucination-detection | HALLU-001 | — |
+| struct-circular-dependency-ts | medium | code-structure | STRUCT-001 | — |
+| doc-no-api-changelog-ts | medium | documentation | DOC-001 | — |
+| cloud-singleton-state-ts | medium | cloud-readiness | CLOUD-001 | — |
+| data-graphql-introspection-ts | hard | data-security | DATA-001 | — |
+| obs-lost-error-context-ts | medium | observability | OBS-001 | — |
+| cfg-secrets-in-config-file-json | easy | configuration | CFG-001 | — |
+| i18n-hardcoded-currency-ts | easy | internationalization | I18N-001 | — |
+| ux-confusing-error-messages-ts | easy | user-experience | UX-001 | — |
+| supply-typosquatting-risk-json | medium | supply-chain | DEPS-001 | — |
+| conc-async-generator-deadlock-py | hard | concurrency | CONC-001 | — |
+| cost-no-resource-cleanup-py | hard | cost-effectiveness | COST-001 | — |
+| porta-os-specific-path-sep-ts | easy | portability | PORTA-001 | — |
+| i18n-string-length-validation-ts | hard | internationalization | I18N-001 | — |
+| comp-no-license-header-ts | easy | compliance | COMP-001 | — |
+| clean-well-tested-utility-ts | medium | clean | — | DOC-900 |
+| doc-jsdoc-param-mismatch-ts | easy | documentation | DOC-001 | — |
+| db-concurrent-counter-no-lock-py | medium | database | DB-001 | — |
+| hallu-css-parent-selector | easy | hallucination-detection | HALLU-001 | — |
+| cfg-env-not-validated-ts | easy | configuration | CFG-001 | — |
+| adv-iac-s3-no-versioning-hcl | easy | iac-security | IAC-001 | — |
 
 ---
 

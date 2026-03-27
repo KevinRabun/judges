@@ -4,6 +4,13 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.123.4] — 2026-03-27
+
+### Improved
+- **Documentation audit** — All 31 MCP tools now documented in README. Stale preset count and benchmark report corrected.
+- **DRY refactoring** — Taint patterns and formatter utilities deduplicated across modules.
+- **136 new tests** — Cybersecurity evaluator (93.9% coverage) and CLI formatters (99.0% coverage). See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.123.3] — 2026-03-26
 
 ### Improved

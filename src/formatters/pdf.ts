@@ -10,32 +10,7 @@
  */
 
 import type { TribunalVerdict, Finding } from "../types.js";
-
-function esc(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function severityColor(severity: string): string {
-  switch (severity) {
-    case "critical":
-      return "#dc2626";
-    case "high":
-      return "#ea580c";
-    case "medium":
-      return "#ca8a04";
-    case "low":
-      return "#2563eb";
-    case "info":
-      return "#6b7280";
-    default:
-      return "#6b7280";
-  }
-}
+import { esc, severityColor } from "./shared.js";
 
 function renderFinding(f: Finding): string {
   const color = severityColor(f.severity);
