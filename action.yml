@@ -265,22 +265,21 @@ runs:
           }
         "
 
-        # ── Upload SARIF to GitHub Code Scanning (optional) ──
-        if [ "$INPUT_UPLOAD_SARIF" = "true" ]; then
-          echo "::group::Uploading SARIF report"
-          # If judges produced SARIF, it will be saved as judges.sarif by default
-          if [ -f judges.sarif ]; then
-            gh code-scanning upload --sarif=judges.sarif --category=judges --commit-sha="${GITHUB_SHA}" --ref="${GITHUB_REF}" || true
-          elif [ -f judges-results.json ]; then
-            # Convert JSON to SARIF on the fly
-            node -e "
-              const fs = require('fs');
-              const { verdictToSarif } = require('@kevinrabun/judges/sarif');
-              const results = JSON.parse(fs.readFileSync('judges-results.json','utf8'));
-              const sarif = verdictToSarif(results);
-              fs.writeFileSync('judges.sarif', JSON.stringify(sarif, null, 2));
-            "
-            gh code-scanning upload --sarif=judges.sarif --category=judges --commit-sha="${GITHUB_SHA}" --ref="${GITHUB_REF}" || true
+        # ── Generate SARIF file (for upload or display) ──
+        if [ "$INPUT_UPLOAD_SARIF" = "true" ] || [ "$INPUT_FORMAT" = "sarif" ]; then
+          echo "::group::Generating SARIF report"
+          if [ -f "$INPUT_PATH" ]; then
+            SARIF_ARGS=(eval --file "$INPUT_PATH" --format sarif)
+            if [ -n "$INPUT_LANGUAGE" ]; then SARIF_ARGS+=(--language "$INPUT_LANGUAGE"); fi
+            if [ -n "$INPUT_JUDGE" ]; then SARIF_ARGS+=(--judge "$INPUT_JUDGE"); fi
+            if [ -n "$INPUT_PRESET" ]; then SARIF_ARGS+=(--preset "$INPUT_PRESET"); fi
+            if [ -n "$INPUT_CONFIG" ]; then SARIF_ARGS+=(--config "$INPUT_CONFIG"); fi
+            judges "${SARIF_ARGS[@]}" > judges-results.sarif 2>/dev/null || true
+          elif [ -d "$INPUT_PATH" ]; then
+            judges report "$INPUT_PATH" --format sarif --output judges-results.sarif --max-files "$INPUT_MAX_FILES" 2>/dev/null || true
+          fi
+          if [ -f judges-results.sarif ]; then
+            echo "sarif_file=judges-results.sarif" >> "$GITHUB_OUTPUT"
           fi
           echo "::endgroup::"
         fi
@@ -299,10 +298,6 @@ runs:
         echo "high=$HIGH" >> "$GITHUB_OUTPUT"
 
         # Display results in requested format
-        if [ "$INPUT_FORMAT" = "sarif" ] || [ "$INPUT_UPLOAD_SARIF" = "true" ]; then
-          judges eval --file "$INPUT_PATH" --format sarif > judges-results.sarif 2>/dev/null || true
-          echo "sarif_file=judges-results.sarif" >> "$GITHUB_OUTPUT"
-        fi
         if [ "$INPUT_FORMAT" = "text" ]; then
           cat judges-results.json | node -e "const r=JSON.parse(require('fs').readFileSync(0,'utf8')); const f=r.findings||(r.files||[]).flatMap(x=>(x.verdict?.findings||[])); f.forEach(x=>console.log('['+x.severity.toUpperCase()+'] '+x.ruleId+': '+x.title))"
         elif [ "$INPUT_FORMAT" = "markdown" ]; then
@@ -334,6 +329,14 @@ runs:
         echo "| Critical | $CRITICAL |" >> "$GITHUB_STEP_SUMMARY"
         echo "| High | $HIGH |" >> "$GITHUB_STEP_SUMMARY"
         echo "" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload SARIF to GitHub Code Scanning
+      if: inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: judges-results.sarif
+        category: judges
+      continue-on-error: true
 
     - name: Post PR review comments (with dedup)
       if: inputs.pr-review == 'true' && github.event_name == 'pull_request'

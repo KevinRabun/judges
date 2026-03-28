@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.124.3] — 2026-03-28
+
+### Fixed
+- **GitHub Action: SARIF upload rewritten** — Now uses `github/codeql-action/upload-sarif@v3` with CLI-generated SARIF. See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.124.2] — 2026-03-28
 
 ### Fixed

@@ -2,6 +2,16 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.124.3] — 2026-03-28
+
+### Fixed
+- **GitHub Action: SARIF upload completely rewritten** — Replaced broken `gh code-scanning upload` (non-existent command) with proper `github/codeql-action/upload-sarif@v3` step. SARIF is now generated via the CLI (`judges eval --format sarif` for files, `judges report --format sarif` for directories) instead of a broken `require()` call to an ESM package. SARIF uploads with `category: judges` to avoid conflicts with CodeQL.
+- **GitHub Action: removed broken SARIF import path** — The action was calling `require('@kevinrabun/judges/sarif')` which fails because the package is ESM-only and `verdictsToSarif` (plural) doesn't exist as an export.
+- **GitHub Action: directory SARIF display** — The display step no longer re-runs `judges eval --file` when the path is a directory.
+
+### Tests
+- 3,590 tests passing, 0 failures.
+
 ## [3.124.2] — 2026-03-28
 
 ### Fixed
