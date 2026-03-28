@@ -2,6 +2,20 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.124.1] — 2026-03-28
+
+### Fixed
+- **JWT false-positive reduction** — `declare namespace` and `declare const` type stubs no longer trigger JWT-related AUTH findings. The JWT detector now filters out ambient declaration lines before scanning for `jwt.sign`/`jwt.decode`/`jwt.verify` patterns.
+- **FP review: ambient declarations** — The false-positive review layer (section 5) now recognizes `declare namespace|const|function|class|module|...` lines as type-only declarations, suppressing findings that only target ambient declaration lines across all evaluators.
+
+### Added
+- **New rule: JWT verify without algorithm restriction** — Flags `jwt.verify()` calls that lack an explicit `algorithms` option (e.g., `{ algorithms: ['HS256'] }`). Without algorithm pinning, servers may accept tokens signed with unexpected algorithms including `'none'`. Severity: high, confidence: 0.85.
+- **`jwt.verify()` with `algorithms` recognized as safe** — `algorithms: ["HS256"]` in a `verify()` call options object is now correctly recognized as an algorithm restriction and not flagged.
+
+### Tests
+- 4 new tests: declare namespace/const JWT type stubs (FP), jwt.verify with/without algorithms option.
+- 3,590 tests passing, 0 failures.
+
 ## [3.124.0] — 2026-03-28
 
 ### Added

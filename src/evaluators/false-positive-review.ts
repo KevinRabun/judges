@@ -815,7 +815,8 @@ function getFpReason(
           /^from\s/.test(trimmed) ||
           /^export\s+(?:type|interface|abstract)\s/.test(trimmed) ||
           /^(?:type|interface)\s+\w+/.test(trimmed) ||
-          /^using\s/.test(trimmed)
+          /^using\s/.test(trimmed) ||
+          /^declare\s+(?:namespace|const|function|class|module|var|let|type|interface|enum|abstract)\b/.test(trimmed)
         );
       });
       if (allImportsOrTypes) {

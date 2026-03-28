@@ -5351,3 +5351,65 @@ app.listen(3000);
     assert.ok(absenceFindings.length > 0, "Absence findings should be allowed in project mode");
   });
 });
+
+// ─── JWT: declare namespace/const type stubs should NOT trigger JWT findings ──
+describe("FP Regression — JWT type stubs (declare namespace/const)", () => {
+  it("should NOT flag declare namespace jwt type stubs as JWT vulnerabilities", () => {
+    const code = `
+declare namespace jwt {
+  function sign(payload: object, secret: string, options?: object): string;
+  function verify(token: string, secret: string, options?: object): object;
+  function decode(token: string, options?: object): object | null;
+}
+`;
+    const findings = analyzeAuthentication(code, "typescript");
+    const jwtFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("jwt") || f.title.toLowerCase().includes("token"),
+    );
+    assert.strictEqual(jwtFindings.length, 0, "declare namespace type stubs should not trigger JWT findings");
+  });
+
+  it("should NOT flag declare const jwt type stubs as JWT vulnerabilities", () => {
+    const code = `
+declare const jwt: {
+  sign(payload: object, secret: string): string;
+  verify(token: string, secret: string): object;
+  decode(token: string): object | null;
+};
+`;
+    const findings = analyzeAuthentication(code, "typescript");
+    const jwtFindings = findings.filter(
+      (f) => f.title.toLowerCase().includes("jwt") || f.title.toLowerCase().includes("token"),
+    );
+    assert.strictEqual(jwtFindings.length, 0, "declare const type stubs should not trigger JWT findings");
+  });
+});
+
+// ─── JWT: verify with algorithms: ["HS256"] should NOT be flagged ────────────
+describe("FP Regression — JWT verify with algorithm restriction is safe", () => {
+  it("should NOT flag jwt.verify with algorithms option", () => {
+    const code = `
+import jwt from "jsonwebtoken";
+
+export function validateToken(token: string) {
+  return jwt.verify(token, process.env.JWT_SECRET!, { algorithms: ["HS256"] });
+}
+`;
+    const findings = analyzeAuthentication(code, "typescript");
+    const algoFindings = findings.filter((f) => /algorithm.*restrict/i.test(f.title));
+    assert.strictEqual(algoFindings.length, 0, "jwt.verify with algorithms option should not be flagged");
+  });
+
+  it("SHOULD flag jwt.verify WITHOUT algorithms option (TP)", () => {
+    const code = `
+import jwt from "jsonwebtoken";
+
+export function validateToken(token: string) {
+  return jwt.verify(token, process.env.JWT_SECRET!);
+}
+`;
+    const findings = analyzeAuthentication(code, "typescript");
+    const algoFindings = findings.filter((f) => /algorithm.*restrict/i.test(f.title));
+    assert.ok(algoFindings.length > 0, "jwt.verify without algorithms option should be flagged");
+  });
+});

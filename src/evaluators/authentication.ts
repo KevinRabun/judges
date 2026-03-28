@@ -305,9 +305,13 @@ export function analyzeAuthentication(code: string, language: string, context?: 
   // JWT without verification
   // This is absence-based in single-file mode: verification middleware often
   // lives in a separate file from the login/sign endpoint.
-  const hasJwt = testCode(code, /jwt|jsonwebtoken|jose/gi);
-  const hasJwtVerify = testCode(code, /jwt\.verify|jwtVerify|verifyToken|jose\.jwtVerify/gi);
-  const hasJwtSign = testCode(code, /jwt\.sign|jwtSign|signToken/gi);
+  // Skip ambient type declarations (declare namespace/const) — type stubs
+  // describe APIs, they don't implement auth flows.
+  const isDeclareStubFile = /^\s*declare\s+(?:namespace|const|module|function|class)\b/m.test(code);
+  const nonDeclareCode = isDeclareStubFile ? lines.filter((ln) => !/^\s*declare\b/.test(ln)).join("\n") : code;
+  const hasJwt = testCode(nonDeclareCode, /jwt|jsonwebtoken|jose/gi);
+  const hasJwtVerify = testCode(nonDeclareCode, /jwt\.verify|jwtVerify|verifyToken|jose\.jwtVerify/gi);
+  const hasJwtSign = testCode(nonDeclareCode, /jwt\.sign|jwtSign|signToken/gi);
   if (hasJwt && hasJwtSign && !hasJwtVerify) {
     findings.push({
       ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
@@ -327,8 +331,10 @@ export function analyzeAuthentication(code: string, language: string, context?: 
   }
 
   // JWT decode used for auth decisions without signature verification
-  const hasJwtDecode = testCode(code, /jwt\.decode|jwtDecode|jose\.decodeJwt/gi);
-  const jwtDecodeLines = getLineNumbers(code, /jwt\.decode\s*\(|jwtDecode\s*\(|jose\.decodeJwt\s*\(/gi);
+  const hasJwtDecode = testCode(nonDeclareCode, /jwt\.decode|jwtDecode|jose\.decodeJwt/gi);
+  const jwtDecodeLines = getLineNumbers(code, /jwt\.decode\s*\(|jwtDecode\s*\(|jose\.decodeJwt\s*\(/gi).filter(
+    (ln) => !/^\s*declare\b/.test(lines[ln - 1] || ""),
+  );
   // Python PyJWT: jwt.decode(token, key, algorithms=[...]) DOES verify the signature
   const hasPyJwtVerify = /jwt\.decode\s*\([^)]*,\s*\w+[^)]*algorithms/i.test(code);
   if (hasJwtDecode && !hasJwtVerify && !hasPyJwtVerify) {
@@ -376,6 +382,42 @@ export function analyzeAuthentication(code: string, language: string, context?: 
         suggestedFix:
           "Restrict algorithms: jwt.verify(token, secret, { algorithms: ['HS256'] }); — remove 'none' from any algorithm list.",
         confidence: 0.95,
+      });
+    }
+  }
+
+  // JWT verify without explicit algorithm restriction
+  // Without an `algorithms` option, some JWT libraries accept any algorithm
+  // including "none", allowing attackers to forge tokens.
+  {
+    const verifyNoAlgoLines: number[] = [];
+    const verifyCallPattern = /jwt\.verify\s*\(/gi;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!/^\s*declare\b/.test(line) && verifyCallPattern.test(line)) {
+        // Look at a window around the call for an algorithms option
+        const windowStart = Math.max(0, i - 1);
+        const windowEnd = Math.min(lines.length, i + 6);
+        const window = lines.slice(windowStart, windowEnd).join("\n");
+        if (!/algorithms\s*:\s*\[/i.test(window)) {
+          verifyNoAlgoLines.push(i + 1);
+        }
+      }
+      verifyCallPattern.lastIndex = 0;
+    }
+    if (verifyNoAlgoLines.length > 0) {
+      findings.push({
+        ruleId: `${prefix}-${String(ruleNum++).padStart(3, "0")}`,
+        severity: "high",
+        title: "JWT verify without explicit algorithm restriction",
+        description:
+          "jwt.verify() is called without an explicit `algorithms` option. Without algorithm pinning, the server may accept tokens signed with unexpected algorithms (including 'none'), enabling token forgery.",
+        lineNumbers: verifyNoAlgoLines,
+        recommendation:
+          "Always pass an explicit algorithm whitelist: jwt.verify(token, secret, { algorithms: ['HS256'] }). This prevents algorithm confusion and 'none' algorithm attacks.",
+        reference: "CWE-757: Selection of Less-Secure Algorithm During Negotiation / OWASP JWT Cheat Sheet",
+        suggestedFix: "Add algorithm restriction: jwt.verify(token, secret, { algorithms: ['HS256'] })",
+        confidence: 0.85,
       });
     }
   }

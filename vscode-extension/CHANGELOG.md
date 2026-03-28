@@ -4,6 +4,12 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.124.1] — 2026-03-28
+
+### Fixed
+- **JWT false-positive reduction** — Type stubs (`declare namespace`/`declare const`) no longer trigger JWT findings. New rule detects `jwt.verify()` without algorithm restriction.
+- See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.124.0] — 2026-03-28
 
 ### Added
