@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.124.4] — 2026-03-28
+
+### Fixed
+- **GitHub Action: directory SARIF generation** — Switched from `judges report` (markdown-only) to `judges eval` (full multi-file pipeline with SARIF support). See [core CHANGELOG](../../CHANGELOG.md) for details.
+
 ## [3.124.3] — 2026-03-28
 
 ### Fixed

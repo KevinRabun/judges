@@ -137,47 +137,41 @@ runs:
           echo "::endgroup::"
         else
           ARGS=()
-          SKIP_EVAL=false
+
+          # Build common args for both file and directory mode
+          if [ -n "$INPUT_LANGUAGE" ]; then ARGS+=(--language "$INPUT_LANGUAGE"); fi
+          if [ -n "$INPUT_JUDGE" ]; then ARGS+=(--judge "$INPUT_JUDGE"); fi
+          if [ -n "$INPUT_PRESET" ]; then ARGS+=(--preset "$INPUT_PRESET"); fi
+          if [ -n "$INPUT_CONFIG" ]; then ARGS+=(--config "$INPUT_CONFIG"); fi
+          if [ "$INPUT_FIX" = "true" ]; then ARGS+=(--fix); fi
+          if [ "$INPUT_MIN_CONFIDENCE" != "0" ]; then ARGS+=(--min-confidence "$INPUT_MIN_CONFIDENCE"); fi
+          if [ -n "$INPUT_EXCLUDE" ]; then
+            IFS=',' read -ra EXCLUDE_PATTERNS <<< "$INPUT_EXCLUDE"
+            for pat in "${EXCLUDE_PATTERNS[@]}"; do
+              ARGS+=(--exclude "$(echo "$pat" | xargs)")
+            done
+          fi
+          if [ -n "$INPUT_INCLUDE" ]; then
+            IFS=',' read -ra INCLUDE_PATTERNS <<< "$INPUT_INCLUDE"
+            for pat in "${INCLUDE_PATTERNS[@]}"; do
+              ARGS+=(--include "$(echo "$pat" | xargs)")
+            done
+          fi
 
           # Determine if path is file or directory
           if [ -f "$INPUT_PATH" ]; then
-            ARGS+=(eval --file "$INPUT_PATH")
+            judges eval --file "$INPUT_PATH" "${ARGS[@]}" --format json > judges-results.json 2>/dev/null || true
           elif [ -d "$INPUT_PATH" ]; then
             echo "::group::Analyzing directory: $INPUT_PATH"
-            REPORT_ARGS=(report "$INPUT_PATH" --format json --output judges-results.json --max-files "$INPUT_MAX_FILES")
-            judges "${REPORT_ARGS[@]}" 2>/dev/null || true
+            judges eval "$INPUT_PATH" "${ARGS[@]}" --max-files "$INPUT_MAX_FILES" --format json --output judges-results.json --quiet 2>/dev/null || true
             echo "::endgroup::"
             if [ ! -f judges-results.json ]; then
               echo "::error::Failed to generate judges-results.json for directory analysis"
               exit 1
             fi
-            SKIP_EVAL=true
           else
             echo "::error::Path not found: $INPUT_PATH"
             exit 1
-          fi
-
-          if [ "$SKIP_EVAL" = "false" ]; then
-            if [ -n "$INPUT_LANGUAGE" ]; then ARGS+=(--language "$INPUT_LANGUAGE"); fi
-            if [ -n "$INPUT_JUDGE" ]; then ARGS+=(--judge "$INPUT_JUDGE"); fi
-            if [ -n "$INPUT_PRESET" ]; then ARGS+=(--preset "$INPUT_PRESET"); fi
-            if [ -n "$INPUT_CONFIG" ]; then ARGS+=(--config "$INPUT_CONFIG"); fi
-            if [ "$INPUT_FIX" = "true" ]; then ARGS+=(--fix); fi
-            if [ "$INPUT_MIN_CONFIDENCE" != "0" ]; then ARGS+=(--min-confidence "$INPUT_MIN_CONFIDENCE"); fi
-            if [ -n "$INPUT_EXCLUDE" ]; then
-              IFS=',' read -ra EXCLUDE_PATTERNS <<< "$INPUT_EXCLUDE"
-              for pat in "${EXCLUDE_PATTERNS[@]}"; do
-                ARGS+=(--exclude "$(echo "$pat" | xargs)")
-              done
-            fi
-            if [ -n "$INPUT_INCLUDE" ]; then
-              IFS=',' read -ra INCLUDE_PATTERNS <<< "$INPUT_INCLUDE"
-              for pat in "${INCLUDE_PATTERNS[@]}"; do
-                ARGS+=(--include "$(echo "$pat" | xargs)")
-              done
-            fi
-
-            judges "${ARGS[@]}" --format json > judges-results.json 2>/dev/null || true
           fi
         fi
 
@@ -276,7 +270,7 @@ runs:
             if [ -n "$INPUT_CONFIG" ]; then SARIF_ARGS+=(--config "$INPUT_CONFIG"); fi
             judges "${SARIF_ARGS[@]}" > judges-results.sarif 2>/dev/null || true
           elif [ -d "$INPUT_PATH" ]; then
-            judges report "$INPUT_PATH" --format sarif --output judges-results.sarif --max-files "$INPUT_MAX_FILES" 2>/dev/null || true
+            judges eval "$INPUT_PATH" --format sarif --output judges-results.sarif --max-files "$INPUT_MAX_FILES" --quiet 2>/dev/null || true
           fi
           if [ -f judges-results.sarif ]; then
             echo "sarif_file=judges-results.sarif" >> "$GITHUB_OUTPUT"

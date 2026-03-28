@@ -2,6 +2,15 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.124.4] — 2026-03-28
+
+### Fixed
+- **GitHub Action: directory mode produced markdown instead of JSON/SARIF** — The action used `judges report` for directory scans, which is a markdown report generator that ignores `--format sarif`. Replaced with `judges eval <dir>` which uses the full multi-file evaluation pipeline and correctly supports `--format json`, `--format sarif`, and all other formats via `formatTribunalOutput`.
+- **`judges report --format sarif` no longer silently produces markdown** — Added `sarif` to the report command's format type. It now outputs a valid (empty) SARIF envelope with a stderr warning directing users to `judges eval <dir> --format sarif` for full per-finding SARIF output.
+
+### Tests
+- 3,590 tests passing, 0 failures.
+
 ## [3.124.3] — 2026-03-28
 
 ### Fixed

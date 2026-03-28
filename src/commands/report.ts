@@ -14,12 +14,13 @@ import { existsSync, writeFileSync, statSync } from "fs";
 import { resolve, basename } from "path";
 
 import { generateRepoReportFromLocalPath } from "../reports/public-repo-report.js";
+import { findingsToSarif } from "../formatters/sarif.js";
 
 // ─── Report Arguments ───────────────────────────────────────────────────────
 
 interface ReportArgs {
   path: string;
-  format: "text" | "json" | "html" | "markdown";
+  format: "text" | "json" | "html" | "markdown" | "sarif";
   output: string | undefined;
   maxFiles: number;
   maxFileBytes: number;
@@ -140,6 +141,15 @@ export function runReport(argv: string[]): void {
         2,
       );
       break;
+    case "sarif": {
+      console.error("⚠ 'judges report --format sarif' produces a summary SARIF with limited detail.");
+      console.error(
+        "  For full SARIF output with per-finding locations, use: judges eval <dir> --format sarif --output report.sarif",
+      );
+      const sarif = findingsToSarif([], projectName);
+      output = JSON.stringify(sarif, null, 2);
+      break;
+    }
     case "html": {
       // Wrap as a simple HTML page with the markdown
       const escapedMd = result.markdown.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
