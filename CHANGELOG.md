@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.124.2] — 2026-03-28
+
+### Fixed
+- **GitHub Action: JSON parse crash** — When `path` is a directory, the action no longer falls through to run `judges eval` with empty arguments (which printed help text and overwrote the valid JSON). Added `SKIP_EVAL` flag so directory-mode uses `judges report` exclusively.
+- **GitHub Action: stderr corrupting JSON/SARIF output** — Replaced all `2>&1` redirections on CLI commands with `2>/dev/null` so stderr info messages (e.g., `ℹ No .judgesrc found`) no longer contaminate stdout JSON/SARIF files.
+- **GitHub Action: JSON validation guard** — After CLI invocation, the action now validates that `judges-results.json` contains valid JSON before parsing. Falls back to a safe empty result with a `::warning` annotation.
+- **GitHub Action: SARIF category conflict** — Added `--category=judges` to `gh code-scanning upload` calls so Judges SARIF uploads no longer conflict with CodeQL's default category.
+- **GitHub Action: broken SARIF import** — Fixed `verdictsToSarif` (non-existent function) → `verdictToSarif` from `@kevinrabun/judges/sarif`.
+
+### Tests
+- 3,590 tests passing, 0 failures.
+
 ## [3.124.1] — 2026-03-28
 
 ### Fixed

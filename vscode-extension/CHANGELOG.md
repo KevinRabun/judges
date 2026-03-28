@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.124.2] — 2026-03-28
+
+### Fixed
+- **GitHub Action fixes** — JSON parse crash on directory paths, stderr corrupting SARIF output, SARIF category conflict with CodeQL, broken SARIF import. See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.124.1] — 2026-03-28
 
 ### Fixed
