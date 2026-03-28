@@ -4,6 +4,12 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.124.0] — 2026-03-28
+
+### Added
+- **`@kevinrabun/judges-cli` now published to npm** — The standalone CLI can be installed via `npm install -g @kevinrabun/judges-cli` for CI/CD pipelines. Published automatically alongside the core package.
+- See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.123.5] — 2026-03-27
 
 ### Improved

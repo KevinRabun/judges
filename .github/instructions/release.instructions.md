@@ -7,9 +7,10 @@ When preparing and publishing a new release of `@kevinrabun/judges`, follow this
 Publishing is triggered by pushing a **`v*` git tag** (e.g., `v3.18.1`). The [`publish-mcp.yml`](../../.github/workflows/publish-mcp.yml) workflow handles:
 
 1. **npm publish** — builds, packs, and publishes `@kevinrabun/judges` to the npm registry with provenance
-2. **GitHub Release** — creates a release from the tag with auto-generated notes
-3. **MCP Registry** — publishes `server.json` to the Model Context Protocol registry via `mcp-publisher`
-4. **VS Code Marketplace** — syncs the extension version from the git tag, installs the local tarball, and publishes via `vsce`
+2. **npm publish (CLI)** — publishes `@kevinrabun/judges-cli` to the npm registry with provenance (version synced automatically)
+3. **GitHub Release** — creates a release from the tag with auto-generated notes
+4. **MCP Registry** — publishes `server.json` to the Model Context Protocol registry via `mcp-publisher`
+5. **VS Code Marketplace** — syncs the extension version from the git tag, installs the local tarball, and publishes via `vsce`
 
 You do **not** need to run `npm publish` or `vsce publish` locally — the action does it all. Your responsibility is: version bumps, changelogs, commit, and tag.
 

@@ -45,6 +45,21 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      # ── Publish judges-cli npm package ───────────────────────
+
+      - name: Publish judges-cli to npm
+        run: |
+          cd packages/judges-cli
+          npm publish --provenance --access public || {
+            if npm view "@kevinrabun/judges-cli@$(node -p 'require("./package.json").version')" version > /dev/null 2>&1; then
+              echo "Version already published to npm — skipping"
+            else
+              exit 1
+            fi
+          }
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       # ── Create GitHub Release (skip if already exists) ───────
 
       - name: Create GitHub Release

@@ -1,6 +1,6 @@
 {
   "name": "@kevinrabun/judges-cli",
-  "version": "3.123.4",
+  "version": "3.124.0",
   "description": "CLI wrapper for the Judges code review toolkit.",
   "type": "module",
   "main": "dist/cli.js",
@@ -21,9 +21,9 @@
     "bin/judges.js",
     "dist/**/*.js",
     "dist/**/*.d.ts",
-    "README.md",
-    "../../agents/**/*.judge.md",
-    "../../skills/**/*.skill.md"
+    "agents/**/*.judge.md",
+    "skills/**/*.skill.md",
+    "README.md"
   ],
   "scripts": {
     "build": "node ../../scripts/prepare-cli-package.mjs"

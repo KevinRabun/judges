@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.124.0] — 2026-03-28
+
+### Added
+- **`@kevinrabun/judges-cli` npm publishing** — The CLI package is now published to npm alongside the main `@kevinrabun/judges` package on every release. Install globally with `npm install -g @kevinrabun/judges-cli` for use in CI/CD pipelines without needing the full MCP server.
+- **CLI package is now self-contained** — Build script copies `agents/` and `skills/` into the CLI package directory so npm publish includes them (previously used `../../` relative paths which npm silently ignored).
+
+### Changed
+- **Publish workflow** — `publish-mcp.yml` now publishes both `@kevinrabun/judges` and `@kevinrabun/judges-cli` to npm with provenance.
+- **Release instructions** — Updated to reflect dual-package publishing.
+
+### Tests
+- 3,586 tests passing, 0 failures.
+
 ## [3.123.5] — 2026-03-27
 
 ### Improved
