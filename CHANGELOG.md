@@ -2,6 +2,14 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.124.5] — 2026-03-29
+
+### Fixed
+- **GitHub Action: bash expanding JS template literals** — The "Derive outputs" `node -e` block used JS template literals (`` `verdict=${verdict}` ``) inside bash double quotes, causing bash to expand `${verdict}`, `${score}`, `${bySeverity.critical}`, etc. to empty strings before Node.js executed. All template literals replaced with string concatenation.
+
+### Tests
+- 3,590 tests passing, 0 failures.
+
 ## [3.124.4] — 2026-03-28
 
 ### Fixed

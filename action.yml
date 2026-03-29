@@ -221,15 +221,15 @@ runs:
           const total = allFindings.length;
 
           const outLines = [
-            `verdict=${verdict}`,
-            `score=${score}`,
-            `findings=${total}`,
-            `critical=${bySeverity.critical}`,
-            `high=${bySeverity.high}`,
-            `medium=${bySeverity.medium}`,
-            `low=${bySeverity.low}`,
-            `info=${bySeverity.info}`,
-            `sarif_file=${results.sarifFile || ''}`,
+            'verdict=' + verdict,
+            'score=' + score,
+            'findings=' + total,
+            'critical=' + bySeverity.critical,
+            'high=' + bySeverity.high,
+            'medium=' + bySeverity.medium,
+            'low=' + bySeverity.low,
+            'info=' + bySeverity.info,
+            'sarif_file=' + (results.sarifFile || ''),
           ];
           if (outPath) fs.appendFileSync(outPath, outLines.join('\n') + '\n');
 
@@ -237,24 +237,24 @@ runs:
             const lines = [];
             lines.push('## Judges Summary');
             lines.push('');
-            lines.push(`- Verdict: **${verdict.toUpperCase()}**`);
-            lines.push(`- Score: **${score}**`);
-            lines.push(`- Findings: **${total}** (critical: ${bySeverity.critical}, high: ${bySeverity.high}, medium: ${bySeverity.medium}, low: ${bySeverity.low}, info: ${bySeverity.info})`);
+            lines.push('- Verdict: **' + verdict.toUpperCase() + '**');
+            lines.push('- Score: **' + score + '**');
+            lines.push('- Findings: **' + total + '** (critical: ' + bySeverity.critical + ', high: ' + bySeverity.high + ', medium: ' + bySeverity.medium + ', low: ' + bySeverity.low + ', info: ' + bySeverity.info + ')');
             if (results._baselineFiltered) {
-              lines.push(`- Baseline-suppressed: ${results._baselineFiltered}`);
+              lines.push('- Baseline-suppressed: ' + results._baselineFiltered);
             }
             lines.push('');
             lines.push('| Severity | Count |');
             lines.push('|---|---|');
             for (const sev of ['critical','high','medium','low','info']) {
-              lines.push(`| ${sev} | ${bySeverity[sev]} |`);
+              lines.push('| ' + sev + ' | ' + bySeverity[sev] + ' |');
             }
             fs.appendFileSync(summaryPath, lines.join('\n') + '\n');
           }
 
           const failOnFindings = (process.env.INPUT_FAIL_ON_FINDINGS || '').toLowerCase() === 'true';
           if (failOnFindings && (bySeverity.critical > 0 || bySeverity.high > 0)) {
-            console.error(`Failing because fail-on-findings=true and critical/high findings present: ${bySeverity.critical + bySeverity.high}`);
+            console.error('Failing because fail-on-findings=true and critical/high findings present: ' + (bySeverity.critical + bySeverity.high));
             process.exit(1);
           }
         "

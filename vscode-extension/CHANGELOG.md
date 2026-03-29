@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.124.5] — 2026-03-29
+
+### Fixed
+- **GitHub Action: bash template literal expansion** — Fixed `node -e` block where JS `${...}` was expanded by bash. See [core CHANGELOG](../../CHANGELOG.md) for details.
+
 ## [3.124.4] — 2026-03-28
 
 ### Fixed
