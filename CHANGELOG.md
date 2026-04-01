@@ -2,6 +2,18 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.125.0] — 2026-03-31
+
+### Fixed
+- **LLM benchmark: eliminated adversarial anti-pattern from all 37 judge prompts** — Every judge had "Absence of findings does not mean the code is X. It means your analysis reached its limits." which directly instructed the LLM to never report zero findings on clean code, undermining the CLEAN_CODE_GATE and PRECISION_MANDATE. Replaced with instruction to report ZERO findings when no concrete issues exist.
+- **LLM benchmark: `parseLlmRuleIds` no longer extracts rule IDs from zero-findings rationale** — The regex fallback was parsing rule IDs mentioned in explanatory text (e.g., "Per the ERR-001 criteria...") as detected findings. Now splits response into paragraphs and skips sections that explicitly declare zero/no findings.
+
+### Added
+- **CLEAN CODE RECOGNITION sections for 5 judges** — Added structured clean-code-gate sections to logic-review (LOGIC), ai-code-safety (AICS), maintainability (MAINT), framework-safety (FW), and cost-effectiveness (COST) — all top-15 FP producers that previously lacked this section.
+
+### Tests
+- 3,590 tests passing, 0 failures.
+
 ## [3.124.5] — 2026-03-29
 
 ### Fixed

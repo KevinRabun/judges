@@ -33,7 +33,15 @@ FALSE POSITIVE AVOIDANCE:
 - Guard clauses that return early are NOT dead code
 - Feature flags intentionally create "dead" branches — skip if flag-guarded
 - Test files may intentionally test edge cases with unusual conditions
-- Framework-required patterns (e.g., exhaustive switch in Redux) are intentional`,
+- Framework-required patterns (e.g., exhaustive switch in Redux) are intentional
+
+CLEAN CODE RECOGNITION (if ALL of the following are true, report ZERO findings):
+- Control flow is straightforward with no inverted conditions or unreachable code
+- Functions return consistent types and handle edge cases
+- Boolean expressions read naturally without double negatives
+- Switch/match statements cover expected cases
+- No partial refactor artifacts, dead code, or contradictory logic
+- Guard clauses and early returns used appropriately`,
   analyze: analyzeLogicReview,
 };
 

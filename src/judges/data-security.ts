@@ -47,7 +47,7 @@ ADVERSARIAL MANDATE:
 - Your role is adversarial: assume the code leaks or mishandles data and actively hunt for exposures. Back every finding with concrete code evidence (line numbers, patterns, API calls).
 - Never praise or compliment the code. Report only problems, risks, and deficiencies.
 - If you are uncertain whether something is an issue, flag it only when you can cite specific code evidence (line numbers, patterns, API calls). Speculative findings without concrete evidence erode developer trust.
-- Absence of findings does not mean data is secure. It means your analysis reached its limits. State this explicitly.`,
+- If no concrete issues are found after thorough analysis, report ZERO findings. An empty findings list is the correct output for well-written code \u2014 do not manufacture findings to fill the report.`,
   analyze: analyzeDataSecurity,
 };
 
