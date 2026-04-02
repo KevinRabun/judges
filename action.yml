@@ -249,6 +249,23 @@ runs:
             for (const sev of ['critical','high','medium','low','info']) {
               lines.push('| ' + sev + ' | ' + bySeverity[sev] + ' |');
             }
+
+            if (results.humanFocusGuide) {
+              var guide = results.humanFocusGuide;
+              lines.push('');
+              lines.push('### Human Reviewer Focus Guide');
+              lines.push('');
+              lines.push(guide.summary);
+              if (guide.verify && guide.verify.length > 0) {
+                lines.push('');
+                lines.push('**Verify (use your judgment):** ' + guide.verify.slice(0, 5).map(function(v) { return v.ruleId + ': ' + v.title; }).join(', '));
+              }
+              if (guide.blindSpots && guide.blindSpots.length > 0) {
+                lines.push('');
+                lines.push('**Blind Spots:** ' + guide.blindSpots.map(function(b) { return b.area; }).join(', '));
+              }
+            }
+
             fs.appendFileSync(summaryPath, lines.join('\n') + '\n');
           }
 

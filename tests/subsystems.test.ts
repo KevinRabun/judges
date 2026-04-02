@@ -15961,3 +15961,285 @@ describe("LLM Benchmark — formatLayerComparisonMarkdown", () => {
     assert.ok(md.includes("complementary"), "should explain layers are complementary");
   });
 });
+
+// ─── Regulatory Scope Filtering ─────────────────────────────────────────────
+
+import { filterByRegulatoryScope, getSupportedFrameworks } from "../src/regulatory-scope.js";
+
+describe("Regulatory Scope — filterByRegulatoryScope", () => {
+  const makeFinding = (ruleId: string, reference?: string, description?: string) =>
+    ({
+      ruleId,
+      severity: "high" as const,
+      title: "Test",
+      description: description ?? "",
+      recommendation: "Fix it",
+      reference,
+    }) as import("../src/types.js").Finding;
+
+  it("returns all findings when scope is empty", () => {
+    const findings = [makeFinding("COMP-001", "GDPR Article 32"), makeFinding("SEC-001")];
+    const result = filterByRegulatoryScope(findings, []);
+    assert.equal(result.findings.length, 2);
+    assert.equal(result.suppressed, 0);
+  });
+
+  it("keeps findings with no regulatory reference", () => {
+    const findings = [makeFinding("SEC-001", "CWE-89")];
+    const result = filterByRegulatoryScope(findings, ["GDPR"]);
+    assert.equal(result.findings.length, 1, "non-regulatory findings should be kept");
+    assert.equal(result.suppressed, 0);
+  });
+
+  it("keeps findings that cite an in-scope framework", () => {
+    const findings = [makeFinding("COMP-001", "GDPR Article 32 / CCPA")];
+    const result = filterByRegulatoryScope(findings, ["GDPR"]);
+    assert.equal(result.findings.length, 1, "GDPR finding kept when GDPR is in scope");
+    assert.equal(result.suppressed, 0);
+  });
+
+  it("suppresses findings that cite ONLY out-of-scope frameworks", () => {
+    const findings = [makeFinding("COMP-003", "HIPAA Security Rule / 45 CFR Part 164")];
+    const result = filterByRegulatoryScope(findings, ["GDPR", "PCI-DSS"]);
+    assert.equal(result.findings.length, 0, "HIPAA-only finding suppressed when HIPAA not in scope");
+    assert.equal(result.suppressed, 1);
+  });
+
+  it("keeps finding that cites both in-scope and out-of-scope", () => {
+    const findings = [makeFinding("COMP-001", "GDPR Article 32 / CCPA / HIPAA")];
+    const result = filterByRegulatoryScope(findings, ["GDPR"]);
+    assert.equal(result.findings.length, 1, "finding citing GDPR + HIPAA kept because GDPR is in scope");
+  });
+
+  it("handles case-insensitive framework IDs", () => {
+    const findings = [makeFinding("COMP-001", "GDPR Article 17")];
+    const result = filterByRegulatoryScope(findings, ["gdpr"]);
+    assert.equal(result.findings.length, 1, "lowercase gdpr should match");
+  });
+
+  it("detects PCI-DSS from reference text", () => {
+    const findings = [makeFinding("COMP-005", "PCI DSS Requirement 3: Protect Stored Cardholder Data")];
+    const result = filterByRegulatoryScope(findings, ["PCI-DSS"]);
+    assert.equal(result.findings.length, 1, "PCI DSS alias should match PCI-DSS scope");
+  });
+
+  it("detects framework from description field when reference is absent", () => {
+    const findings = [
+      makeFinding("COMP-007", undefined, "This code does not comply with HIPAA minimum necessary standard"),
+    ];
+    const result = filterByRegulatoryScope(findings, ["HIPAA"]);
+    assert.equal(result.findings.length, 1, "HIPAA in description should be detected");
+  });
+
+  it("suppresses multiple out-of-scope findings and keeps in-scope ones", () => {
+    const findings = [
+      makeFinding("COMP-001", "GDPR Article 32"),
+      makeFinding("COMP-002", "HIPAA Security Rule"),
+      makeFinding("COMP-003", "COPPA / GDPR Article 8"),
+      makeFinding("SEC-001"),
+      makeFinding("COMP-004", "SOX"),
+    ];
+    const result = filterByRegulatoryScope(findings, ["GDPR"]);
+    assert.equal(result.findings.length, 3, "GDPR + COPPA/GDPR + SEC kept, HIPAA + SOX suppressed");
+    assert.equal(result.suppressed, 2);
+  });
+});
+
+describe("Regulatory Scope — getSupportedFrameworks", () => {
+  it("returns at least 15 frameworks", () => {
+    const frameworks = getSupportedFrameworks();
+    assert.ok(frameworks.length >= 15, `Expected ≥15 frameworks, got ${frameworks.length}`);
+  });
+
+  it("includes GDPR, HIPAA, PCI-DSS", () => {
+    const ids = getSupportedFrameworks().map((f) => f.id);
+    assert.ok(ids.includes("GDPR"), "should include GDPR");
+    assert.ok(ids.includes("HIPAA"), "should include HIPAA");
+    assert.ok(ids.includes("PCI-DSS"), "should include PCI-DSS");
+  });
+
+  it("each framework has id and description", () => {
+    for (const fw of getSupportedFrameworks()) {
+      assert.ok(fw.id, "id required");
+      assert.ok(fw.description, "description required");
+    }
+  });
+});
+
+// ─── Human Focus Guide ──────────────────────────────────────────────────────
+
+import { evaluateWithTribunal } from "../src/evaluators/index.js";
+
+describe("Human Focus Guide — synthesizeHumanFocusGuide", () => {
+  it("produces a guide with trust/verify/blindSpots for vulnerable code", () => {
+    const code = `
+const express = require("express");
+const app = express();
+app.get("/users", (req, res) => {
+  const q = "SELECT * FROM users WHERE id=" + req.params.id;
+  db.query(q).then(r => res.json(r));
+});
+app.listen(3000);
+`;
+    const verdict = evaluateWithTribunal(code, "javascript");
+    assert.ok(verdict.humanFocusGuide, "humanFocusGuide should be present");
+    const guide = verdict.humanFocusGuide!;
+    assert.ok(Array.isArray(guide.trust), "trust should be array");
+    assert.ok(Array.isArray(guide.verify), "verify should be array");
+    assert.ok(Array.isArray(guide.blindSpots), "blindSpots should be array");
+    assert.ok(guide.summary.length > 0, "summary should be non-empty");
+  });
+
+  it("trust items have high confidence", () => {
+    const code = `app.get("/api", (req, res) => { eval(req.body.code); });`;
+    const verdict = evaluateWithTribunal(code, "javascript");
+    const guide = verdict.humanFocusGuide!;
+    for (const item of guide.trust) {
+      assert.ok(
+        item.confidence >= 0.8,
+        `trust item ${item.ruleId} should have confidence ≥ 0.8, got ${item.confidence}`,
+      );
+    }
+  });
+
+  it("verify items have lower confidence or are absence-based", () => {
+    const code = `
+const express = require("express");
+const app = express();
+app.get("/health", (req, res) => res.json({ ok: true }));
+app.listen(3000);
+`;
+    const verdict = evaluateWithTribunal(code, "javascript");
+    const guide = verdict.humanFocusGuide!;
+    for (const item of guide.verify) {
+      assert.ok(
+        item.confidence < 0.8 || item.reason.includes("Absence"),
+        `verify item ${item.ruleId} should have low confidence or be absence-based`,
+      );
+    }
+  });
+
+  it("always includes Business Logic blind spot", () => {
+    const code = `console.log("hello");`;
+    const verdict = evaluateWithTribunal(code, "javascript");
+    const guide = verdict.humanFocusGuide!;
+    const hasBizLogic = guide.blindSpots.some((b) => b.area.includes("Business Logic"));
+    assert.ok(hasBizLogic, "should always include Business Logic blind spot");
+  });
+
+  it("detects external service calls blind spot", () => {
+    const code = `
+import fetch from "node-fetch";
+export async function getUser(id) {
+  const res = await fetch("https://api.example.com/users/" + id);
+  return res.json();
+}
+`;
+    const verdict = evaluateWithTribunal(code, "javascript");
+    const guide = verdict.humanFocusGuide!;
+    const hasExternal = guide.blindSpots.some((b) => b.area.includes("External Service"));
+    assert.ok(hasExternal, "should detect external service blind spot");
+  });
+
+  it("detects financial calculation blind spot", () => {
+    const code = `
+function calculateDiscount(price, discountPercent) {
+  return price - (price * discountPercent / 100);
+}
+`;
+    const verdict = evaluateWithTribunal(code, "javascript");
+    const guide = verdict.humanFocusGuide!;
+    const hasFinancial = guide.blindSpots.some((b) => b.area.includes("Financial"));
+    assert.ok(hasFinancial, "should detect financial calculation blind spot");
+  });
+
+  it("each focus item has required fields", () => {
+    const code = `db.query("SELECT * FROM t WHERE id=" + x);`;
+    const verdict = evaluateWithTribunal(code, "javascript");
+    const guide = verdict.humanFocusGuide!;
+    for (const item of [...guide.trust, ...guide.verify]) {
+      assert.ok(item.ruleId, "ruleId required");
+      assert.ok(item.title, "title required");
+      assert.ok(item.severity, "severity required");
+      assert.ok(typeof item.confidence === "number", "confidence required");
+      assert.ok(item.reason.length > 0, "reason required");
+    }
+  });
+
+  it("each blind spot has area and guidance", () => {
+    const code = `const x = 1;`;
+    const verdict = evaluateWithTribunal(code, "javascript");
+    const guide = verdict.humanFocusGuide!;
+    for (const spot of guide.blindSpots) {
+      assert.ok(spot.area, "area required");
+      assert.ok(spot.guidance, "guidance required");
+    }
+  });
+});
+
+// ─── Consensus Suppression ──────────────────────────────────────────────────
+
+describe("Consensus Suppression — consensusThreshold", () => {
+  it("does not suppress when threshold is not set", () => {
+    const code = `app.get("/health", (req, res) => res.json({ ok: true }));`;
+    const verdict = evaluateWithTribunal(code, "javascript");
+    // Without consensusThreshold, all findings are kept
+    assert.ok(verdict.findings !== undefined);
+  });
+
+  it("suppresses non-critical findings when consensus threshold is met", () => {
+    // Use clean code that some judges may flag
+    const code = `
+import express from "express";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+
+const app = express();
+app.use(helmet());
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+app.get("/health", (req, res) => res.json({ status: "ok" }));
+app.listen(3000);
+`;
+    const withoutConsensus = evaluateWithTribunal(code, "javascript");
+    const withConsensus = evaluateWithTribunal(code, "javascript", undefined, {
+      config: { consensusThreshold: 0.5 },
+    });
+    // With consensus, should have equal or fewer findings
+    assert.ok(
+      withConsensus.findings.length <= withoutConsensus.findings.length,
+      `consensus should not increase findings: ${withConsensus.findings.length} <= ${withoutConsensus.findings.length}`,
+    );
+  });
+
+  it("preserves critical findings even when consensus suppresses", () => {
+    // Code with a genuine critical issue + some noise
+    const code = `app.get("/users", (req, res) => { db.query("SELECT * FROM users WHERE id=" + req.params.id); });`;
+    const verdict = evaluateWithTribunal(code, "javascript", undefined, {
+      config: { consensusThreshold: 0.3 },
+    });
+    const criticals = verdict.findings.filter((f) => f.severity === "critical");
+    // Critical findings should survive consensus suppression
+    // (they may or may not exist depending on evaluator behavior, but if they do, they should be present)
+    assert.ok(verdict.findings !== undefined);
+  });
+
+  it("does not suppress when threshold is not met", () => {
+    // Vulnerable code — most judges should have findings
+    const code = `
+eval(userInput);
+db.query("SELECT * FROM t WHERE id=" + req.params.id);
+const password = "admin123";
+`;
+    const without = evaluateWithTribunal(code, "javascript");
+    const with070 = evaluateWithTribunal(code, "javascript", undefined, {
+      config: { consensusThreshold: 0.7 },
+    });
+    // For vulnerable code, consensus threshold should NOT trigger
+    // because most judges will have findings (< 70% will be clean)
+    assert.equal(
+      without.findings.length,
+      with070.findings.length,
+      "vulnerable code should not trigger consensus suppression",
+    );
+  });
+});

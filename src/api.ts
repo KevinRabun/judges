@@ -44,6 +44,9 @@ export type {
   JudgeSelectionContext,
   JudgeSelectionResult,
   SessionContext,
+  HumanFocusGuide,
+  FocusItem,
+  BlindSpot,
 } from "./types.js";
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
@@ -268,6 +271,9 @@ export {
   clearPlugins,
 } from "./plugins.js";
 export type { CustomRule, JudgesPlugin, PluginRegistration } from "./plugins.js";
+
+// ─── Regulatory Scope ────────────────────────────────────────────────────────
+export { filterByRegulatoryScope, getSupportedFrameworks } from "./regulatory-scope.js";
 
 // ─── Judge Registry ──────────────────────────────────────────────────────────
 export { JudgeRegistry, defaultRegistry } from "./judge-registry.js";

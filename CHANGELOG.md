@@ -2,6 +2,21 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.126.0] — 2026-04-02
+
+### Added
+- **Human Focus Guide** — New `humanFocusGuide` field on `TribunalVerdict` that categorizes findings into three buckets for human reviewers: **Trust** (high-confidence, act directly), **Verify** (lower-confidence, use judgment), and **Blind Spots** (areas automated analysis cannot evaluate: business logic, complex control flow, external service integration, financial calculations, PII handling, architectural fit). Appears in CLI text/markdown output, GitHub Action step summary, and JSON/SARIF output.
+- **Regulatory Scope Filtering** — New `regulatoryScope` config field in `.judgesrc`. When set (e.g., `["GDPR", "PCI-DSS"]`), findings that cite ONLY out-of-scope frameworks are suppressed. Supports 17 frameworks: GDPR, CCPA, HIPAA, PCI-DSS, SOC2, SOX, COPPA, FERPA, FedRAMP, NIST, ISO27001, ePrivacy, DORA, NIS2, EU-AI-Act, LGPD, PIPEDA.
+- **`judges list --frameworks`** — New CLI command to discover supported regulatory framework IDs and usage examples.
+- **Consensus Suppression** — New `consensusThreshold` config field (0–1). When set, if the configured fraction of judges report zero findings for a file, minority findings are suppressed as outliers (critical findings always preserved). Recommended: 0.7 for CI pipelines.
+
+### Improved
+- **CLEAN_CODE_GATE prompt strengthened** — Added SINGLE-FILE LIMITATION directive (missing tests/docs/configs expected in single-file review) and FINAL GATE backstop (auto-discard findings when code uses established libraries correctly). Targets the root cause of LLM benchmark clean-code false positives.
+
+### Tests
+- 24 new tests: regulatory scope filtering (11), Human Focus Guide (9), consensus suppression (4).
+- 3,614 tests passing, 0 failures.
+
 ## [3.125.0] — 2026-03-31
 
 ### Fixed

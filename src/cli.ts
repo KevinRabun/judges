@@ -52,6 +52,7 @@ import { formatComparisonReport, formatFullComparisonMatrix, TOOL_PROFILES } fro
 import { loadOverrideStore, applyOverrides } from "./commands/override.js";
 import { runGit } from "./tools/command-safety.js";
 import { detectLanguageFromPath, SUPPORTED_EXTENSIONS } from "./ext-to-lang.js";
+import { getSupportedFrameworks } from "./regulatory-scope.js";
 import {
   formatTribunalOutput,
   writeOutputIfSpecified,
@@ -282,6 +283,8 @@ function printHelp(): void {
    * over-promising features that aren't wired yet.
    */
   const coreCommands: Array<[string, string]> = [
+    ["judges list", "List all available judges"],
+    ["judges list --frameworks", "List supported regulatory frameworks"],
     ["judges eval [options] [file]", "Evaluate code with the full tribunal"],
     ["judges eval --judge <id> [file]", "Evaluate with a single judge"],
     ["judges init", "Interactive project setup wizard"],
@@ -560,6 +563,26 @@ function listJudges(): void {
   console.log("");
 }
 
+// ─── List Regulatory Frameworks ─────────────────────────────────────────────
+
+function listFrameworks(): void {
+  const frameworks = getSupportedFrameworks();
+  console.log("");
+  console.log("  Supported Regulatory Frameworks:");
+  console.log("  " + "─".repeat(60));
+  console.log("  Use these IDs in .judgesrc → regulatoryScope: [...]");
+  console.log("");
+  for (const fw of frameworks) {
+    console.log(`  ${fw.id.padEnd(15)} ${fw.description}`);
+  }
+  console.log("");
+  console.log(`  Total: ${frameworks.length} frameworks`);
+  console.log("");
+  console.log("  Example .judgesrc:");
+  console.log('  { "regulatoryScope": ["GDPR", "PCI-DSS", "SOC2"] }');
+  console.log("");
+}
+
 // ─── Version ────────────────────────────────────────────────────────────────
 
 function getPackageVersion(): string {
@@ -776,7 +799,11 @@ export async function runCli(argv: string[]): Promise<void> {
 
   // ─── List Command ────────────────────────────────────────────────────
   if (args.command === "list") {
-    listJudges();
+    if (argv.includes("--frameworks")) {
+      listFrameworks();
+    } else {
+      listJudges();
+    }
     process.exit(0);
   }
 

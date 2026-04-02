@@ -156,6 +156,46 @@ export function formatTextOutput(verdict: TribunalVerdict): string {
     lines.push("");
   }
 
+  // Human Focus Guide
+  if (verdict.humanFocusGuide) {
+    const guide = verdict.humanFocusGuide;
+    lines.push("  👤 Human Reviewer Focus Guide");
+    lines.push("  " + "─".repeat(60));
+    lines.push(`  ${guide.summary}`);
+    lines.push("");
+
+    if (guide.trust.length > 0) {
+      lines.push("  ✅ TRUST (act on these directly):");
+      for (const item of guide.trust.slice(0, 10)) {
+        const lineRef = item.lineNumbers?.[0] ? ` L${item.lineNumbers[0]}` : "";
+        lines.push(`     [${item.severity.toUpperCase()}] ${item.ruleId}${lineRef}: ${item.title}`);
+        lines.push(`            ${item.reason}`);
+      }
+      if (guide.trust.length > 10) lines.push(`     ... and ${guide.trust.length - 10} more`);
+      lines.push("");
+    }
+
+    if (guide.verify.length > 0) {
+      lines.push("  🔍 VERIFY (use your judgment):");
+      for (const item of guide.verify.slice(0, 10)) {
+        const lineRef = item.lineNumbers?.[0] ? ` L${item.lineNumbers[0]}` : "";
+        lines.push(`     [${item.severity.toUpperCase()}] ${item.ruleId}${lineRef}: ${item.title}`);
+        lines.push(`            ${item.reason}`);
+      }
+      if (guide.verify.length > 10) lines.push(`     ... and ${guide.verify.length - 10} more`);
+      lines.push("");
+    }
+
+    if (guide.blindSpots.length > 0) {
+      lines.push("  🔦 BLIND SPOTS (automated analysis cannot evaluate):");
+      for (const spot of guide.blindSpots) {
+        lines.push(`     • ${spot.area}`);
+        lines.push(`       ${spot.guidance.slice(0, 120)}${spot.guidance.length > 120 ? "…" : ""}`);
+      }
+      lines.push("");
+    }
+  }
+
   // Exit guidance
   if (verdict.overallVerdict === "fail") {
     lines.push("  ⛔ FAIL — This code has issues that should be addressed before shipping.");

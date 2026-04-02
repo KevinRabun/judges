@@ -4,6 +4,15 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.126.0] — 2026-04-02
+
+### Added
+- **Human Focus Guide** — Trust/Verify/Blind Spots categorization for human reviewers in tribunal output.
+- **Regulatory Scope** — `.judgesrc` `regulatoryScope` field to filter findings by applicable regulations (17 frameworks).
+- **Consensus Suppression** — `.judgesrc` `consensusThreshold` field to suppress outlier findings when most judges agree code is clean.
+- **`judges list --frameworks`** — CLI command to list supported regulatory frameworks.
+- See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.125.0] — 2026-03-31
 
 ### Fixed

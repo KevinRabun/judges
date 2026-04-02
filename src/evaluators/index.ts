@@ -19,6 +19,9 @@ import type {
   ExecutionTrace,
   RuleTrace,
   JudgeSelectionContext,
+  FocusItem,
+  BlindSpot,
+  HumanFocusGuide,
 } from "../types.js";
 import { JUDGES } from "../judges/index.js";
 import { analyzeStructure } from "../ast/index.js";
@@ -27,6 +30,7 @@ import type { CodeStructure, FunctionInfo } from "../ast/types.js";
 import type { TaintFlow } from "../ast/taint-tracker.js";
 import { LRUCache, contentHash } from "../cache.js";
 import { getSharedDiskCache } from "../disk-cache.js";
+import { filterByRegulatoryScope } from "../regulatory-scope.js";
 
 // ─── Shared Utilities ────────────────────────────────────────────────────────
 import {
@@ -621,6 +625,163 @@ function synthesizeReviewDecision(findings: Finding[]): ReviewDecision {
   };
 }
 
+// ─── Human Focus Guide ────────────────────────────────────────────────────────
+
+/**
+ * Synthesize a Human Focus Guide from tribunal findings.
+ *
+ * Categorizes findings into three buckets:
+ * - **Trust**: High-confidence, evidence-backed findings (confidence ≥ 0.8)
+ * - **Verify**: Lower-confidence or absence-based findings (confidence < 0.8 or absence-based)
+ * - **Blind spots**: Areas automated analysis cannot evaluate (business logic, architecture, UX judgment)
+ *
+ * Also detects code characteristics that suggest human attention is needed.
+ */
+function synthesizeHumanFocusGuide(findings: Finding[], code?: string, language?: string): HumanFocusGuide {
+  const trust: FocusItem[] = [];
+  const verify: FocusItem[] = [];
+
+  for (const f of findings) {
+    const conf = f.confidence ?? 0.7;
+    const item: FocusItem = {
+      ruleId: f.ruleId,
+      title: f.title,
+      severity: f.severity,
+      confidence: conf,
+      lineNumbers: f.lineNumbers,
+      reason: "",
+    };
+
+    if (f.isAbsenceBased) {
+      item.reason = "Absence-based — the detected issue may be handled in another file";
+      verify.push(item);
+    } else if (conf >= 0.8 && (f.provenance === "ast-confirmed" || f.provenance === "taint-flow")) {
+      item.reason = "AST/taint-flow confirmed with high confidence";
+      trust.push(item);
+    } else if (conf >= 0.8) {
+      item.reason = "High confidence with concrete evidence";
+      trust.push(item);
+    } else if (conf >= 0.5) {
+      item.reason = `Moderate confidence (${Math.round(conf * 100)}%) — verify manually`;
+      verify.push(item);
+    } else {
+      item.reason = `Low confidence (${Math.round(conf * 100)}%) — may be a false positive`;
+      verify.push(item);
+    }
+  }
+
+  // ── Blind spots: areas automated analysis cannot evaluate ──
+  const blindSpots: BlindSpot[] = [];
+
+  // Always include core blind spots
+  blindSpots.push({
+    area: "Business Logic Correctness",
+    guidance:
+      "Verify that the code implements the intended requirements correctly. Automated analysis checks for patterns and vulnerabilities but cannot validate business rules, domain constraints, or functional correctness.",
+  });
+
+  // Code-characteristic-based blind spots
+  if (code) {
+    const lines = code.split("\n");
+    const lineCount = lines.length;
+
+    // Complex branching
+    const branchCount = (code.match(/\bif\b|\belse\b|\bswitch\b|\bcase\b|\?\s*:/g) || []).length;
+    if (branchCount > lineCount * 0.15 && branchCount > 10) {
+      blindSpots.push({
+        area: "Complex Control Flow",
+        guidance: `This code has dense branching logic (~${branchCount} branch points). Review edge cases, boundary conditions, and off-by-one errors that pattern matching cannot reliably detect.`,
+      });
+    }
+
+    // External API/service calls
+    const hasExternalCalls = /fetch\(|axios\.|http\.|https\.|\.request\(|urllib|requests\.|HttpClient|WebClient/i.test(
+      code,
+    );
+    if (hasExternalCalls) {
+      blindSpots.push({
+        area: "External Service Integration",
+        guidance:
+          "This code calls external services. Verify timeout behavior, retry logic, circuit breaking, and graceful degradation when services are unavailable. Automated analysis can detect missing patterns but cannot validate the integration logic.",
+      });
+    }
+
+    // Financial/monetary operations
+    const hasFinancial = /price|amount|balance|payment|invoice|refund|discount|tax|currency|decimal|money/i.test(code);
+    if (hasFinancial) {
+      blindSpots.push({
+        area: "Financial/Monetary Calculations",
+        guidance:
+          "This code handles monetary values. Verify rounding behavior, currency precision, and that floating-point arithmetic is not used for financial calculations.",
+      });
+    }
+
+    // Complex regex
+    const complexRegex = (code.match(/\/[^/\n]{30,}\//g) || []).length;
+    if (complexRegex > 0) {
+      blindSpots.push({
+        area: "Complex Regular Expressions",
+        guidance: `Found ${complexRegex} complex regex pattern(s). Verify they match the intended inputs and don't have catastrophic backtracking on adversarial input.`,
+      });
+    }
+
+    // State machines / workflow
+    const hasStateMachine = /state\s*[=:]\s*['"][^'"]+['"]|status\s*===?\s*['"]|transition|workflow|step.*next/i.test(
+      code,
+    );
+    if (hasStateMachine) {
+      blindSpots.push({
+        area: "State Management / Workflow Logic",
+        guidance:
+          "This code manages state transitions or workflow steps. Verify that all valid state transitions are handled and invalid transitions are rejected. Automated analysis cannot validate state machine correctness.",
+      });
+    }
+
+    // PII/sensitive data handling
+    const hasPII =
+      /\b(email|ssn|social.security|phone.number|address|birth.date|passport|national.id|credit.card)\b/i.test(code);
+    if (hasPII) {
+      blindSpots.push({
+        area: "PII / Sensitive Data Handling",
+        guidance:
+          "This code handles personally identifiable information. Verify data minimization, consent tracking, retention policies, and that PII is not logged or transmitted unnecessarily.",
+      });
+    }
+  }
+
+  // Architecture blind spot (always relevant for non-trivial code)
+  if (code && code.split("\n").length > 50) {
+    blindSpots.push({
+      area: "Architectural Fit",
+      guidance:
+        "Verify this code fits the project's architectural patterns (service boundaries, dependency direction, naming conventions). Automated analysis evaluates code in isolation and cannot assess architectural context.",
+    });
+  }
+
+  // ── Build summary ──
+  const trustCount = trust.length;
+  const verifyCount = verify.length;
+  const blindCount = blindSpots.length;
+  const parts: string[] = [];
+
+  if (trustCount > 0) {
+    parts.push(`${trustCount} high-confidence finding${trustCount > 1 ? "s" : ""} you can act on directly`);
+  }
+  if (verifyCount > 0) {
+    parts.push(`${verifyCount} finding${verifyCount > 1 ? "s" : ""} that need your judgment`);
+  }
+  if (blindCount > 0) {
+    parts.push(`${blindCount} area${blindCount > 1 ? "s" : ""} that automated analysis cannot evaluate`);
+  }
+
+  const summary =
+    parts.length > 0
+      ? `Human reviewer: ${parts.join(", ")}. Focus your review time on the "Verify" and "Blind Spots" sections — the "Trust" findings have strong automated evidence.`
+      : "No findings — code looks clean. Focus your review on business logic correctness and architectural fit.";
+
+  return { trust, verify, blindSpots, summary };
+}
+
 /**
  * Cap the number of findings by priority-sorting and keeping only
  * the top N.  Ensures high-severity / high-confidence findings always survive.
@@ -794,6 +955,17 @@ export function evaluateWithTribunal(
     }
   }
 
+  // ── Regulatory scope filtering ──
+  // When regulatoryScope is set in config, suppress findings that cite ONLY
+  // out-of-scope regulatory frameworks.
+  let regulatorySuppressed = 0;
+  if (options?.config?.regulatoryScope && options.config.regulatoryScope.length > 0) {
+    const scopeResult = filterByRegulatoryScope(configFiltered, options.config.regulatoryScope);
+    configFiltered.length = 0;
+    configFiltered.push(...scopeResult.findings);
+    regulatorySuppressed = scopeResult.suppressed;
+  }
+
   // ── Feedback-driven confidence calibration & auto-tuning ──
   // When options.calibrate is set, load the feedback store and apply:
   // 1. Auto-suppression of rules with FP rate ≥ 80%
@@ -936,8 +1108,28 @@ export function evaluateWithTribunal(
     };
   });
 
+  // ── Consensus-based suppression ──
+  // When consensusThreshold is set: if a supermajority of judges reported
+  // zero findings, suppress findings from the minority outlier judges.
+  // This catches cases where most judges agree code is clean but a few
+  // structurally over-flag (e.g. error-handling, testing).
+  let consensusSuppressed = 0;
+  let postConsensuFindings = allFindings;
+  const consensusThreshold = options?.config?.consensusThreshold;
+  if (consensusThreshold !== undefined && consensusThreshold > 0 && evaluations.length > 0) {
+    const zeroFindingJudges = evaluations.filter((e) => e.findings.length === 0).length;
+    const totalJudges = evaluations.length;
+    const cleanRatio = zeroFindingJudges / totalJudges;
+    if (cleanRatio >= consensusThreshold) {
+      // Majority says clean — suppress minority findings (keep critical severity)
+      const before = postConsensuFindings.length;
+      postConsensuFindings = postConsensuFindings.filter((f) => f.severity === "critical");
+      consensusSuppressed = before - postConsensuFindings.length;
+    }
+  }
+
   // ── Structured CWE/OWASP IDs and Learn More URLs ──
-  const enrichedFindings = enrichWithSecurityIds(allFindings);
+  const enrichedFindings = enrichWithSecurityIds(postConsensuFindings);
 
   const mustFixGate = evaluateMustFixGate(enrichedFindings, options?.mustFixGate);
   const criticalCount = enrichedFindings.filter((f) => f.severity === "critical").length;
@@ -974,6 +1166,7 @@ export function evaluateWithTribunal(
       })),
     },
     reviewDecision: synthesizeReviewDecision(enrichedFindings),
+    humanFocusGuide: synthesizeHumanFocusGuide(enrichedFindings, code, language),
   };
 
   // ── Deep review prompt attachment (P0.1) ──

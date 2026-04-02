@@ -351,6 +351,45 @@ export interface JudgesConfig {
     url?: string;
     headers?: Record<string, string>;
   };
+  /**
+   * Regulatory frameworks in scope for this project. When set, findings that
+   * cite ONLY out-of-scope frameworks are suppressed, and in-scope findings
+   * are elevated to ensure visibility.
+   *
+   * If not set, all regulatory findings are reported (no filtering).
+   *
+   * Supported values: "GDPR", "CCPA", "HIPAA", "PCI-DSS", "SOC2", "SOX",
+   * "COPPA", "FERPA", "FedRAMP", "NIST", "ISO27001", "ePrivacy", "DORA",
+   * "NIS2", "EU-AI-Act", "LGPD", "PIPEDA"
+   *
+   * Example:
+   * ```json
+   * { "regulatoryScope": ["GDPR", "PCI-DSS", "SOC2"] }
+   * ```
+   */
+  regulatoryScope?: string[];
+  /**
+   * Consensus suppression threshold (0–1). When set, if at least this
+   * fraction of judges report zero findings for a file, findings from
+   * the remaining minority judges are suppressed as outliers.
+   *
+   * This reduces false positives from judges that are structurally prone
+   * to over-flagging clean code. A value of 0.7 means "if 70% of judges
+   * agree the code is clean, suppress the other 30%."
+   *
+   * Default: not set (no consensus suppression).
+   *
+   * Recommended values:
+   * - `0.7` — moderate: suppresses when most judges agree (good for CI)
+   * - `0.8` — conservative: only suppresses with strong consensus
+   * - `0.6` — aggressive: suppresses with slight majority
+   *
+   * Example:
+   * ```json
+   * { "consensusThreshold": 0.7 }
+   * ```
+   */
+  consensusThreshold?: number;
 }
 
 /**
@@ -682,6 +721,53 @@ export interface ReviewDecision {
   blockingIssues: string[];
 }
 
+// ─── Human Focus Guide ────────────────────────────────────────────────────────
+
+/**
+ * A finding categorized for the human focus guide.
+ */
+export interface FocusItem {
+  /** Rule ID (e.g. "SEC-001") */
+  ruleId: string;
+  /** Short title */
+  title: string;
+  /** Severity level */
+  severity: Severity;
+  /** Confidence score (0-1) */
+  confidence: number;
+  /** Line numbers if available */
+  lineNumbers?: number[];
+  /** Why this item is in its bucket */
+  reason: string;
+}
+
+/**
+ * An area the automated analysis could not evaluate — requires human judgment.
+ */
+export interface BlindSpot {
+  /** Category label (e.g. "Business Logic", "Architectural Fit") */
+  area: string;
+  /** Description of what the reviewer should look for */
+  guidance: string;
+  /** Optional: specific lines or patterns that triggered this recommendation */
+  triggers?: string[];
+}
+
+/**
+ * Human Focus Guide — directs human reviewers to the areas where their
+ * attention adds the most value beyond what automated analysis provides.
+ */
+export interface HumanFocusGuide {
+  /** High-confidence, evidence-backed findings the reviewer can trust */
+  trust: FocusItem[];
+  /** Lower-confidence or absence-based findings that need human verification */
+  verify: FocusItem[];
+  /** Areas the automated analysis cannot evaluate — human judgment required */
+  blindSpots: BlindSpot[];
+  /** One-paragraph summary for the reviewer */
+  summary: string;
+}
+
 /**
  * The combined result from the full tribunal panel.
  */
@@ -716,6 +802,12 @@ export interface TribunalVerdict {
    * act as a primary code reviewer rather than just a warning list.
    */
   reviewDecision?: ReviewDecision;
+  /**
+   * Human Focus Guide — directs human reviewers to the areas where their
+   * attention adds the most value beyond what automated analysis provides.
+   * Categorizes findings into trust/verify/blind-spots buckets.
+   */
+  humanFocusGuide?: HumanFocusGuide;
   /**
    * AI model detection escalation. Present when the model-fingerprint judge
    * detects AI-generated code patterns (MFPR-* rules). Downstream consumers

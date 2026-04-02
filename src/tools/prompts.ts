@@ -50,7 +50,9 @@ export const CLEAN_CODE_GATE = `CLEAN CODE GATE (applies AFTER individual judge 
 - Do NOT report findings about missing functionality that is likely in other files (tests, configs, middleware, error handlers, logging setup).
 - Do NOT report theoretical risks that require assumptions about the runtime environment, deployment configuration, or code outside the provided snippet.
 - SELF-CHECK before finalizing: For each finding, ask "Would a senior engineer reviewing this code in a PR agree this must be fixed before merging?" If the answer is not a clear YES, discard the finding.
-- The goal is to match what a thoughtful, experienced human reviewer would flag — not to demonstrate comprehensive knowledge of every possible concern.`;
+- The goal is to match what a thoughtful, experienced human reviewer would flag — not to demonstrate comprehensive knowledge of every possible concern.
+- SINGLE-FILE LIMITATION: You are reviewing a code snippet, not a complete project. Missing tests, missing docs, missing middleware, missing configs, missing CI/CD, missing logging setup — these are EXPECTED in a single-file review. Only flag what is WRONG in the code present, not what is ABSENT from the project.
+- FINAL GATE: If your evaluation produces findings for a code snippet that uses established libraries correctly, has proper error handling, follows language idioms, and contains no security vulnerabilities — your findings are almost certainly false positives. Discard them and report ZERO findings.`;
 
 // ─── Criteria Extraction ─────────────────────────────────────────────────────
 

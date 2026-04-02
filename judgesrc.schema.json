@@ -88,6 +88,20 @@
       "type": "array",
       "items": { "type": "string" },
       "description": "Plugin module specifiers (npm packages or relative file paths) that export custom JudgeDefinition arrays. Each module must export { judges: JudgeDefinition[] } or a default export."
+    },
+    "regulatoryScope": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["GDPR", "CCPA", "HIPAA", "PCI-DSS", "SOC2", "SOX", "COPPA", "FERPA", "FedRAMP", "NIST", "ISO27001", "ePrivacy", "DORA", "NIS2", "EU-AI-Act", "LGPD", "PIPEDA"]
+      },
+      "description": "Regulatory frameworks in scope for this project. Findings citing ONLY out-of-scope frameworks are suppressed. If omitted, all regulatory findings are reported."
+    },
+    "consensusThreshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Consensus suppression threshold (0-1). If this fraction of judges report zero findings, minority findings are suppressed. Recommended: 0.7 (moderate), 0.8 (conservative). If omitted, no consensus suppression is applied."
     }
   },
   "additionalProperties": false

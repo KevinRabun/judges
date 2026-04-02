@@ -1214,6 +1214,41 @@ export function formatVerdictAsMarkdown(verdict: TribunalVerdict): string {
     }
   }
 
+  // Human Focus Guide
+  if (verdict.humanFocusGuide) {
+    const guide = verdict.humanFocusGuide;
+    md += `## 👤 Human Reviewer Focus Guide\n\n`;
+    md += `${guide.summary}\n\n`;
+
+    if (guide.trust.length > 0) {
+      md += `### ✅ Trust (act on these directly)\n\n`;
+      md += `| Severity | Rule | Finding | Reason |\n|---|---|---|---|\n`;
+      for (const item of guide.trust.slice(0, 15)) {
+        md += `| ${item.severity} | \`${item.ruleId}\` | ${item.title} | ${item.reason} |\n`;
+      }
+      if (guide.trust.length > 15) md += `\n*...and ${guide.trust.length - 15} more*\n`;
+      md += `\n`;
+    }
+
+    if (guide.verify.length > 0) {
+      md += `### 🔍 Verify (use your judgment)\n\n`;
+      md += `| Severity | Rule | Finding | Reason |\n|---|---|---|---|\n`;
+      for (const item of guide.verify.slice(0, 15)) {
+        md += `| ${item.severity} | \`${item.ruleId}\` | ${item.title} | ${item.reason} |\n`;
+      }
+      if (guide.verify.length > 15) md += `\n*...and ${guide.verify.length - 15} more*\n`;
+      md += `\n`;
+    }
+
+    if (guide.blindSpots.length > 0) {
+      md += `### 🔦 Blind Spots (automated analysis cannot evaluate)\n\n`;
+      for (const spot of guide.blindSpots) {
+        md += `- **${spot.area}** — ${spot.guidance}\n`;
+      }
+      md += `\n`;
+    }
+  }
+
   return md;
 }
 
