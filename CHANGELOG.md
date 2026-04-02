@@ -2,6 +2,14 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.126.1] — 2026-04-02
+
+### Security
+- **Fixed `path-to-regexp` ReDoS vulnerability** (GHSA-j3q9-mxjg-w52f, high severity) — Updated transitive dependency via `@modelcontextprotocol/sdk` → `express` 5.x → `router` → `path-to-regexp` to patched version. `npm audit` now reports 0 vulnerabilities.
+
+### Tests
+- 3,614 tests passing, 0 failures.
+
 ## [3.126.0] — 2026-04-02
 
 ### Added
