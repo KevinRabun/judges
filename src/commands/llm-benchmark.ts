@@ -234,15 +234,17 @@ export function parseLlmRuleIds(response: string): string[] {
   const pattern = /\b([A-Z][A-Z0-9]+)-(\d{1,3})\b/g;
   const found = new Set<string>();
 
-  // Split response into paragraphs/sections and skip sections that explicitly
-  // declare zero findings — rule IDs mentioned in "zero findings" rationale
-  // are explanatory references, not actual detections.
-  const sections = response.split(/\n{2,}/);
+  // Split response into judge sections (separated by --- dividers or ## headers)
+  // and skip entire sections that declare zero/no findings. This prevents rule
+  // IDs mentioned in rationale text or findings tables of "clean" judge sections
+  // from being counted as detections.
+  const sections = response.split(/(?:^|\n)---\s*\n|(?=^## )/m);
   const zeroFindingsPattern =
-    /\*?\*?(?:ZERO|zero|0|no)\s+findings?\*?\*?|(?:findings?|issues?)[\s:]*\*?\*?(?:none|0|zero)\*?\*?|no\s+(?:issues?|findings?|problems?|concerns?)\s+(?:found|detected|identified|reported)/i;
+    /\*?\*?(?:ZERO|zero|0|no)\s+findings?\*?\*?|(?:findings?|issues?)[\s:]*\*?\*?(?:none|0|zero)\*?\*?|no\s+(?:issues?|findings?|problems?|concerns?)\s+(?:found|detected|identified|reported)|report(?:ing)?\s+zero|Score\s*[|:]\s*\*?\*?100\s*\/?\s*100\*?\*?/i;
 
   for (const section of sections) {
-    // If this section explicitly declares zero/no findings, skip rule ID extraction
+    // If this section explicitly declares zero/no findings or a perfect score,
+    // skip rule ID extraction — any rule IDs are explanatory references
     if (zeroFindingsPattern.test(section)) continue;
 
     let match;
@@ -254,13 +256,16 @@ export function parseLlmRuleIds(response: string): string[] {
     }
   }
 
-  // Secondary pass on full text: extract known prefixes from compound IDs like DEPS-TYPO-001
-  // These are almost always in findings tables, not rationale
-  const compoundPattern = /\b([A-Z][A-Z0-9]+)-[A-Z][A-Z0-9]+-(\d{1,3})\b/g;
-  let match;
-  while ((match = compoundPattern.exec(response)) !== null) {
-    if (validPrefixes.has(match[1])) {
-      found.add(`${match[1]}-${match[2]}`);
+  // Secondary pass: extract compound IDs like DEPS-TYPO-001 from sections
+  // that did NOT declare zero findings (reuse the filtered sections)
+  for (const section of sections) {
+    if (zeroFindingsPattern.test(section)) continue;
+    const compoundPattern = /\b([A-Z][A-Z0-9]+)-[A-Z][A-Z0-9]+-(\d{1,3})\b/g;
+    let match;
+    while ((match = compoundPattern.exec(section)) !== null) {
+      if (validPrefixes.has(match[1])) {
+        found.add(`${match[1]}-${match[2]}`);
+      }
     }
   }
   return [...found];

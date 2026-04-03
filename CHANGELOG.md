@@ -2,6 +2,14 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.126.2] — 2026-04-03
+
+### Fixed
+- **LLM benchmark: section-aware rule ID parser** — `parseLlmRuleIds` now splits responses on `---` dividers and `## ` headers (judge section boundaries) instead of double-newlines. When a judge section declares "ZERO findings" or "Score: 100/100", the entire section is skipped for rule ID extraction. Previously, rule IDs mentioned in rationale text of clean judge sections were counted as false detections. Projected ~50% reduction in clean-code FPs (F1 87.4% → ~91.6%).
+
+### Tests
+- 3,614 tests passing, 0 failures.
+
 ## [3.126.1] — 2026-04-02
 
 ### Security

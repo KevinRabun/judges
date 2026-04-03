@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.126.2] — 2026-04-03
+
+### Fixed
+- **LLM benchmark: section-aware parser** — Eliminates false detections from zero-findings rationale in multi-judge responses. See [core CHANGELOG](../../CHANGELOG.md).
+
 ## [3.126.0] — 2026-04-02
 
 ### Added
