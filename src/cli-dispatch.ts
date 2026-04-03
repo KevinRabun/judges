@@ -7,6 +7,7 @@
 export const COMMAND_TABLE: Record<string, [string, string]> = {
   "adoption-report": ["./commands/adoption-report.js", "runAdoptionReport"],
   "adoption-track": ["./commands/adoption-track.js", "runAdoptionTrack"],
+  "codify-amendments": ["./commands/codify-amendments.js", "runCodifyAmendments"],
   "ai-gate": ["./commands/ai-gate.js", "runAiGate"],
   "ai-model-trust": ["./commands/ai-model-trust.js", "runAiModelTrust"],
   "ai-output-compare": ["./commands/ai-output-compare.js", "runAiOutputCompare"],

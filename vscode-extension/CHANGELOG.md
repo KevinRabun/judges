@@ -4,6 +4,12 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.127.0] — 2026-04-03
+
+### Added
+- **Self-teaching amendments** — Benchmark auto-generates and loads precision amendments for low-accuracy judges. Use `judges codify-amendments` to bake into the distributed package.
+- See [core CHANGELOG](../../CHANGELOG.md) for full details.
+
 ## [3.126.2] — 2026-04-03
 
 ### Fixed

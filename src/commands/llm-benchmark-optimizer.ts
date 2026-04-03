@@ -72,9 +72,9 @@ export interface AmendmentStore {
 // ─── Thresholds ─────────────────────────────────────────────────────────────
 
 /** Judges below this precision get amendments */
-const AMENDMENT_PRECISION_THRESHOLD = 0.4;
+const AMENDMENT_PRECISION_THRESHOLD = 0.7;
 /** Minimum findings before generating amendment (avoid noise) */
-const MIN_FINDINGS_FOR_AMENDMENT = 5;
+const MIN_FINDINGS_FOR_AMENDMENT = 3;
 /** Categories below this F1 get flagged */
 const CATEGORY_F1_THRESHOLD = 0.5;
 /** Difficulty detection rate below this gets flagged */

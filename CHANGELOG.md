@@ -2,6 +2,19 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.127.0] — 2026-04-03
+
+### Added
+- **Self-teaching amendment pipeline** — The VS Code LLM benchmark now auto-generates precision amendments for judges with <70% precision after each run, saves them to global storage, and loads them into subsequent runs. Amendments inject empirical FP feedback directly into per-judge prompts.
+- **`judges codify-amendments`** — New CLI command that bakes self-teaching amendments from benchmark data into agent `.judge.md` files as `BENCHMARK-LEARNED PRECISION GUIDANCE` sections, making improvements part of the distributed package.
+- **Optimizer functions exported** — `optimizeBenchmark`, `mergeAmendments`, `createEmptyStore`, `formatAmendmentSection` now available from public API.
+
+### Changed
+- **Amendment precision threshold lowered** — 0.4 → 0.7 and minimum findings 5 → 3, catching all judges below 70% precision (ERR, SWDEV, LOGIC, REL, DB, AUTH, etc.).
+
+### Tests
+- 3,614 tests passing, 0 failures.
+
 ## [3.126.2] — 2026-04-03
 
 ### Fixed

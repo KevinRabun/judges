@@ -424,6 +424,12 @@ export type {
   OptimizationResult,
   AmendmentStore,
 } from "./commands/llm-benchmark-optimizer.js";
+export {
+  optimizeBenchmark,
+  mergeAmendments,
+  createEmptyStore,
+  formatAmendmentSection,
+} from "./commands/llm-benchmark-optimizer.js";
 
 // Review autopilot (GitHub App / scripts)
 export { runReviewAutopilot, dedupeComments, filterAlreadyPostedComments } from "./commands/review.js";

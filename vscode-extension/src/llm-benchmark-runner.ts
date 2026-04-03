@@ -25,6 +25,13 @@ import {
   getValidRulePrefixes,
 } from "@kevinrabun/judges/api";
 import type { JudgeDefinition } from "@kevinrabun/judges/api";
+import {
+  optimizeBenchmark,
+  mergeAmendments,
+  createEmptyStore,
+  type PromptAmendment,
+  type AmendmentStore,
+} from "@kevinrabun/judges/api";
 import { formatStandaloneBenchmarkReport } from "./llm-benchmark-format";
 
 // ─── Output Channel ─────────────────────────────────────────────────────────
@@ -165,6 +172,24 @@ interface BatchCheckpoint {
 
 let _storageUri: vscode.Uri | undefined;
 const CHECKPOINT_FILE = ".llm-benchmark-checkpoint-v2.json";
+const AMENDMENTS_FILE = "llm-benchmark-amendments.json";
+
+// ─── Amendment Store I/O ────────────────────────────────────────────────────
+
+async function loadAmendmentStore(storageUri: vscode.Uri): Promise<AmendmentStore> {
+  try {
+    const uri = vscode.Uri.joinPath(storageUri, AMENDMENTS_FILE);
+    const data = await vscode.workspace.fs.readFile(uri);
+    return JSON.parse(Buffer.from(data).toString("utf8")) as AmendmentStore;
+  } catch {
+    return createEmptyStore();
+  }
+}
+
+async function saveAmendmentStore(storageUri: vscode.Uri, store: AmendmentStore): Promise<void> {
+  const uri = vscode.Uri.joinPath(storageUri, AMENDMENTS_FILE);
+  await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(store, null, 2)));
+}
 
 function cfgHash(cfg: BenchmarkConfig, sampleSize: number): string {
   return `${sampleSize}:${cfg.maxOutputTokens}:${cfg.batchSize}`;
@@ -362,6 +387,7 @@ async function runPerJudgeBatched(
   cfg: BenchmarkConfig,
   onProgress: (p: BenchmarkProgress) => void,
   checkpoint: BatchCheckpoint,
+  amendments?: PromptAmendment[],
 ): Promise<LlmCaseResult[]> {
   const caseRuleIds: string[][] = cases.map(() => []);
   const caseResponses: string[][] = cases.map(() => []);
@@ -403,7 +429,7 @@ async function runPerJudgeBatched(
         const judgeChunk = judges.slice(jStart, jStart + concurrency);
         const chunkResults = await Promise.all(
           judgeChunk.map(async (judge) => {
-            const prompt = constructPerJudgePrompt(judge, tc.code, tc.language, []);
+            const prompt = constructPerJudgePrompt(judge, tc.code, tc.language, [], amendments);
             const response = await sendPrompt(model, prompt, token, cfg);
             const validation = extractValidatedLlmFindings(response, getValidRulePrefixes());
             const ruleIds = validation.ruleIds.length ? validation.ruleIds : parseLlmRuleIds(response);
@@ -539,10 +565,14 @@ export async function runLlmBenchmark(
 
   const startTime = checkpoint.startTime;
 
-  // 5. Run per-judge benchmark
+  // 5. Load amendments from previous runs and run per-judge benchmark
+  const amendmentStore = await loadAmendmentStore(storageUri);
+  if (amendmentStore.amendments.length > 0) {
+    log(`Loaded ${amendmentStore.amendments.length} amendment(s) from previous optimization`);
+  }
   log("Starting per-judge benchmark…");
   onProgress({ message: "Running per-judge benchmark…", completed: 0, total: 1 });
-  const results = await runPerJudgeBatched(model, cases, token, cfg, onProgress, checkpoint);
+  const results = await runPerJudgeBatched(model, cases, token, cfg, onProgress, checkpoint, amendmentStore.amendments);
   const duration = Math.round((Date.now() - startTime) / 1000);
   log(`Benchmark complete: ${duration}s total, ${_totalCalls} calls, ${_totalEmpty} empty`);
 
@@ -564,6 +594,22 @@ export async function runLlmBenchmark(
   const fullResponses = Object.fromEntries(_fullResponses);
   await writeOutputFiles(storageUri, snapshotJson, reportMarkdown, fullResponses);
   await deleteCheckpoint();
+
+  // 7. Self-teaching: generate amendments from FP patterns for next run
+  try {
+    const optimization = optimizeBenchmark(snapshot, amendmentStore.amendments);
+    if (optimization.amendments.length > 0) {
+      const updatedStore = mergeAmendments(amendmentStore, optimization, snapshot.f1Score);
+      await saveAmendmentStore(storageUri, updatedStore);
+      log(
+        `Generated ${optimization.amendments.length} amendment(s) for next run (projected F1 improvement: +${(optimization.projectedF1Improvement * 100).toFixed(1)}pp)`,
+      );
+    } else {
+      log("No new amendments needed — all judges above precision threshold");
+    }
+  } catch (e) {
+    log(`Amendment generation failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
+  }
 
   return {
     snapshot,
