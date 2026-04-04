@@ -20,7 +20,6 @@ Desktop.ini
 
 # IDE / Editor
 .vscode/*
-!.vscode/settings.json
 !.vscode/launch.json
 !.vscode/extensions.json
 .idea/
