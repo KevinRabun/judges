@@ -44,7 +44,7 @@ export function parseSkillFrontmatter(raw: string): { meta: SkillMeta; body: str
       i++;
       continue;
     }
-    const kv = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*)[ \t]*:[ \t]*(.*)$/);
+    const kv = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*)[ \t]*:[ \t]*(.*?)$/s);
     if (!kv) {
       i++;
       continue;

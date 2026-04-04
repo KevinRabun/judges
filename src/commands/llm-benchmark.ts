@@ -240,7 +240,7 @@ export function parseLlmRuleIds(response: string): string[] {
   // from being counted as detections.
   const sections = response.split(/(?:^|\n)---\s*\n|(?=^## )/m);
   const zeroFindingsPattern =
-    /\*?\*?(?:ZERO|zero|0|no)\s+findings?\*?\*?|(?:findings?|issues?)[\s:]*\*?\*?(?:none|0|zero)\*?\*?|no\s+(?:issues?|findings?|problems?|concerns?)\s+(?:found|detected|identified|reported)|report(?:ing)?\s+zero|Score\s*[|:]\s*\*?\*?100\s*\/?\s*100\*?\*?/i;
+    /(?:ZERO|zero|0|no) findings?|findings?[:\s]*(?:none|0|zero)|no (?:issues|findings|problems|concerns) (?:found|detected|identified|reported)|reporting? zero|Score[|: ]*100/i;
 
   for (const section of sections) {
     // If this section explicitly declares zero/no findings or a perfect score,

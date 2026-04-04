@@ -726,9 +726,8 @@ function synthesizeHumanFocusGuide(findings: Finding[], code?: string, language?
     }
 
     // State machines / workflow
-    const hasStateMachine = /state\s*[=:]\s*['"][^'"]+['"]|status\s*===?\s*['"]|transition|workflow|step.*next/i.test(
-      code,
-    );
+    const hasStateMachine =
+      /state\s*[=:]\s*['"][^'"]+['"]|status\s*===?\s*['"]|transition|workflow|step[\w\s]{0,20}next/i.test(code);
     if (hasStateMachine) {
       blindSpots.push({
         area: "State Management / Workflow Logic",

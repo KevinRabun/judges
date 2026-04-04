@@ -422,8 +422,8 @@ async function main() {
     process.exit(1);
   }
 
-  // Log key presence only — CodeQL flags any env-derived data in logs (js/clear-text-logging)
-  console.log(`  API Key:        [set, ${apiKey.length} chars]\n`);
+  // Log key presence only (no sensitive data)
+  console.log(`  API Key:        [set]\n`);
 
   // Initialize
   _client = new Anthropic({ apiKey });
