@@ -457,6 +457,37 @@ async function runPerJudgeBatched(
       const uniqueRuleIds = [...new Set(caseRuleIds[idx])];
       const caseResult = scoreLlmCase(tc, uniqueRuleIds, caseResponses[idx].join("\n---\n"));
       checkpoint.perJudgeResults.push({ idx, result: caseResult });
+
+      // Log progress to output channel so it's always visible
+      const completedCount = checkpoint.perJudgeResults.length;
+      const totalCases = cases.length;
+      const pct = Math.round((completedCount / totalCases) * 100);
+      const icon = caseResult.passed ? "✅" : "❌";
+      const fpCount = caseResult.falsePositiveRuleIds.length;
+      const fnCount = caseResult.missedRuleIds.length;
+      const fpLabel = fpCount > 0 ? ` FP=${fpCount}` : "";
+      const fnLabel = fnCount > 0 ? ` FN=${fnCount}` : "";
+      log(
+        `[${completedCount}/${totalCases}] ${pct}% ${icon} ${tc.id} (${tc.category}/${tc.difficulty})${fpLabel}${fnLabel}`,
+      );
+
+      // Log running F1 every 10 cases
+      if (completedCount % 10 === 0 || completedCount === totalCases) {
+        let tp = 0,
+          fp = 0,
+          fn = 0;
+        for (const entry of checkpoint.perJudgeResults) {
+          tp += entry.result.detectedRuleIds.length - entry.result.falsePositiveRuleIds.length;
+          fp += entry.result.falsePositiveRuleIds.length;
+          fn += entry.result.missedRuleIds.length;
+        }
+        const prec = tp + fp > 0 ? tp / (tp + fp) : 0;
+        const rec = tp + fn > 0 ? tp / (tp + fn) : 0;
+        const f1 = prec + rec > 0 ? (2 * prec * rec) / (prec + rec) : 0;
+        log(
+          `  📊 Running: F1=${(f1 * 100).toFixed(1)}% Prec=${(prec * 100).toFixed(1)}% Rec=${(rec * 100).toFixed(1)}% | TP=${tp} FP=${fp} FN=${fn}`,
+        );
+      }
     }
 
     await saveCheckpoint(checkpoint);
