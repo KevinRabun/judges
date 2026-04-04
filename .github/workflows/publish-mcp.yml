@@ -72,6 +72,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # ── Sync Wiki from README ────────────────────────────────
+
+      - name: Sync wiki Home.md from README
+        run: |
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/KevinRabun/judges.wiki.git ../judges.wiki || true
+          if [ -d ../judges.wiki ]; then
+            npx tsx scripts/sync-wiki.ts
+            cd ../judges.wiki
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git diff --cached --quiet || git commit -m "docs: auto-sync wiki from README (${{ github.ref_name }})"
+            git push || echo "Wiki push failed — non-fatal"
+          else
+            echo "Wiki clone failed — skipping sync"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # ── Publish to MCP Registry ─────────────────────────────
 
       - name: Wait for npm propagation
