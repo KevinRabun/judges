@@ -76,7 +76,7 @@ jobs:
 
       - name: Sync wiki Home.md from README
         run: |
-          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/KevinRabun/judges.wiki.git ../judges.wiki || true
+          git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/KevinRabun/judges.wiki.git" ../judges.wiki || true
           if [ -d ../judges.wiki ]; then
             npx tsx scripts/sync-wiki.ts
             cd ../judges.wiki
