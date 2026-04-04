@@ -2,6 +2,20 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.127.2] — 2026-04-04
+
+### Security
+- **Fixed 6 CodeQL alerts** — ReDoS in `parseLlmRuleIds` regex (#142/#143), `synthesizeHumanFocusGuide` state machine pattern (#141), skill-loader frontmatter parser (#136), LLM response JSON extractor (#134/#135). Regex injection in `compileExcludeRegexes` (#132) — user input now always escaped before `new RegExp()`. Clear-text logging of API key length removed (#133).
+
+### Docs
+- **README** — Test badge updated (3614), added Human Focus Guide / Regulatory Scope / Self-Teaching Amendments sections, added 8 missing `.judgesrc` config fields, added `list --frameworks` and `codify-amendments` commands.
+- **API Reference** — `JudgesConfig` expanded from 8 to 22 documented fields.
+- **Extension README** — Added Human Focus Guide documentation.
+- **CLI README** — Expanded with full usage guide, config example, and package links.
+
+### Tests
+- 3,614 tests passing, 0 failures. Total: 3614 pass, 0 fail, 0 skipped.
+
 ## [3.127.1] — 2026-04-04
 
 ### Fixed
