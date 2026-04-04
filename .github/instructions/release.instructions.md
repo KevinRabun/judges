@@ -76,6 +76,16 @@ npm test
 
 All tests must pass. Note the total count (e.g., "963 tests pass") for the changelog.
 
+### 1b. Sync test count badges
+
+If the test count changed, run:
+
+```bash
+npx tsx scripts/sync-test-count.ts --count <N>
+```
+
+This updates the README badge and the wiki Home.md in one step. Commit and push both repos.
+
 ### 2. Bump versions
 
 Update the version in all four locations listed above. Use a single coordinated edit to avoid partial updates.
