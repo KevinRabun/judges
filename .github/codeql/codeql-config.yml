@@ -1,0 +1,8 @@
+# CodeQL configuration — exclude benchmark test data files.
+# Benchmark files contain intentional vulnerable code specimens as template
+# literal strings. These trigger false positives for regex escapes, eval(),
+# SQL injection patterns, etc. They are test data, not production code.
+
+paths-ignore:
+  - src/commands/benchmark*.ts
+  - src/commands/benchmark-*.ts
