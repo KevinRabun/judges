@@ -28,6 +28,7 @@ import { BENCHMARK_COMPLIANCE_ETHICS } from "./benchmark-compliance-ethics.js";
 import { BENCHMARK_AI_AGENTS } from "./benchmark-ai-agents.js";
 import { BENCHMARK_ADVANCED_CASES } from "./benchmark-advanced.js";
 import { BENCHMARK_AI_OUTPUT } from "./benchmark-ai-output.js";
+import { BENCHMARK_COVERAGE_GAPS } from "./benchmark-coverage-gaps.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -2402,6 +2403,7 @@ export function UserList({ users, onSelect, searchLabel = "Search users" }: User
   ...BENCHMARK_AI_AGENTS,
   ...BENCHMARK_ADVANCED_CASES,
   ...BENCHMARK_AI_OUTPUT,
+  ...BENCHMARK_COVERAGE_GAPS,
 ];
 
 // ─── Benchmark Runner ───────────────────────────────────────────────────────
