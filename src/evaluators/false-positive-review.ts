@@ -448,11 +448,12 @@ function getFpReason(
     return "Absence-based rule does not apply to pure type-definition files — no runtime logic to evaluate.";
   }
 
-  // ── 2d. Benchmark CLI files: SEC/HALLU on embedded code specimens ──
+  // ── 2d. Benchmark files: findings on embedded code specimens ──
   // Benchmark files in the commands/ directory contain intentional
   // vulnerable-code snippets embedded as template literal strings. These
-  // are test data, not real vulnerabilities.
-  if (fileCategory === "cli" && filePath && /benchmark/i.test(filePath) && /^(?:SEC|HALLU)-/.test(finding.ruleId)) {
+  // are test data, not real vulnerabilities. Suppress ALL findings when
+  // the file is a benchmark fixture with many template literals.
+  if (filePath && /benchmark/i.test(filePath)) {
     const codeText = lines.join("\n");
     const templateLiteralCount = (codeText.match(/`[^`]{50,}/g) || []).length;
     if (templateLiteralCount >= 5) {
