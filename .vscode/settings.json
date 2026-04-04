@@ -1,6 +1,6 @@
 {
   "judges.llmBenchmark.enabled": true,
-  "judges.llmBenchmark.sampleSize": 500,
+  "judges.llmBenchmark.sampleSize": 200,
   "judges.llmBenchmark.maxOutputTokens": 16384,
   "judges.llmBenchmark.batchSize": 4,
   "judges.llmBenchmark.interRequestDelayMs": 500,

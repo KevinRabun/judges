@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.127.1] — 2026-04-04
+
+### Fixed
+- **Amendment recall preservation** — Refined amendment generation to surgically target clean-code FPs without suppressing real findings. See [core CHANGELOG](../../CHANGELOG.md).
+
 ## [3.127.0] — 2026-04-03
 
 ### Added

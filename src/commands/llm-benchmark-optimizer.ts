@@ -195,6 +195,7 @@ function generateAmendment(
 
   // Analyze what the FPs look like — which categories get falsely flagged
   const fpCategories = new Map<string, number>();
+  const tpCategories = new Map<string, number>();
   // Collect specific FP case IDs for pattern extraction
   const fpCaseExamples: Array<{ caseId: string; category: string; ruleId: string }> = [];
   for (const c of snapshot.cases) {
@@ -206,43 +207,43 @@ function generateAmendment(
         }
       }
     }
+    // Also track where this judge produces TRUE positives
+    for (const det of c.detectedRuleIds) {
+      if (det.startsWith(prefix + "-") && !c.falsePositiveRuleIds.includes(det)) {
+        tpCategories.set(c.category, (tpCategories.get(c.category) ?? 0) + 1);
+      }
+    }
   }
 
-  const topFpCategories = [...fpCategories.entries()]
+  // Identify categories that are FP-only (no TPs) — safe to suppress
+  const fpOnlyCategories = [...fpCategories.entries()]
+    .filter(([cat]) => !tpCategories.has(cat))
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([cat]) => cat);
 
-  // Build specific anti-FP instructions based on observed patterns
-  const categoryBlocklist =
-    topFpCategories.length > 0
-      ? `\nDo NOT report ${prefix}- findings on code in these categories: ${topFpCategories.join(", ")}. ` +
-        `These categories fall outside ${domain} and historically produce false positives.`
+  // Build targeted anti-FP instructions — only suppress on clean/FP-only categories
+  const cleanFPs = fpCaseExamples.filter((e) => e.category === "clean" || e.category.startsWith("ai-negative")).length;
+  const nonCleanFPOnlyWarning =
+    fpOnlyCategories.length > 0
+      ? `\nHistorically produces false positives on: ${fpOnlyCategories.join(", ")}. Apply extra scrutiny on these categories — require concrete evidence before reporting.`
       : "";
 
-  // Extract specific FP patterns for concrete guidance
-  const fpRuleIds = new Set(fpCaseExamples.map((e) => e.ruleId));
-  const specificRules = [...fpRuleIds].slice(0, 5).join(", ");
-  const ruleWarning = specificRules
-    ? `\nSpecific rule IDs with high FP rates: ${specificRules}. Require >=80% confidence with exact line citations before reporting these.`
-    : "";
-
-  // Identify if clean cases are a problem for this judge
-  const cleanFPs = fpCaseExamples.filter((e) => e.category === "clean" || e.category.startsWith("ai-negative")).length;
   const cleanWarning =
     cleanFPs > 0
-      ? `\nThis judge produced ${cleanFPs} false positives on CLEAN code. Well-written code using standard patterns exists. If the code follows established best practices, report ZERO ${prefix}- findings.`
+      ? `\nThis judge produced ${cleanFPs} false positive(s) on CLEAN code. If code uses standard patterns correctly (proper error handling, established libraries, framework conventions), report ZERO ${prefix}- findings. Clean, well-written code exists — do not manufacture findings.`
       : "";
 
+  // IMPORTANT: Do NOT restrict the judge from detecting real issues in vulnerable code.
+  // Only add caution for clean-code patterns, not a blanket confidence floor.
   const amendment =
-    `PRECISION OVERRIDE for ${judgeName} (${prefix}-): ` +
-    `Empirical precision: ${pct(precision)} (${fpCount} FP in ${total} findings). ` +
-    `SCOPE: Only report ${prefix}- findings for code that specifically involves ${domain}. ` +
-    `EVIDENCE: Every ${prefix}- finding MUST cite exact line numbers and specific code patterns.` +
-    categoryBlocklist +
-    ruleWarning +
+    `PRECISION CALIBRATION for ${judgeName} (${prefix}-): ` +
+    `Empirical precision: ${pct(precision)} in recent benchmarks. ` +
+    `IMPORTANT: Continue detecting genuine ${domain} issues in vulnerable code — do NOT reduce sensitivity to real problems. ` +
+    `CALIBRATION: The false positives come from flagging well-written code that correctly uses established patterns. ` +
+    `Before reporting ${prefix}- findings, verify the code actually has a deficiency — not just a theoretical improvement opportunity.` +
     cleanWarning +
-    ` When confidence is below 80%, OMIT the ${prefix}- finding.`;
+    nonCleanFPOnlyWarning;
 
   return {
     judgePrefix: prefix,
@@ -264,11 +265,12 @@ export function formatAmendmentSection(amendments: PromptAmendment[]): string {
   if (amendments.length === 0) return "";
 
   const lines = [
-    "## Precision Overrides — Based on Empirical Benchmark Data",
+    "## Precision Calibration — Based on Empirical Benchmark Data",
     "",
-    "The following judges have been identified as having high false positive rates. " +
-      "Apply EXTRA scrutiny before reporting findings with these prefixes. " +
-      "False positives erode developer trust more than missed findings.",
+    "The following judges have historically produced false positives on clean code. " +
+      "Apply the calibration guidance below to avoid repeating these errors. " +
+      "IMPORTANT: These calibrations target CLEAN CODE false positives only — " +
+      "continue detecting genuine issues in vulnerable code with full sensitivity.",
     "",
   ];
 
