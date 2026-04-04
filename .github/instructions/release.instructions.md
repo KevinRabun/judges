@@ -76,15 +76,15 @@ npm test
 
 All tests must pass. Note the total count (e.g., "963 tests pass") for the changelog.
 
-### 1b. Sync test count badges
+### 1b. Sync wiki
 
-If the test count changed, run:
+If the README changed (new features, test count, benchmark scores), regenerate the wiki:
 
 ```bash
-npx tsx scripts/sync-test-count.ts --count <N>
+npx tsx scripts/sync-wiki.ts --push
 ```
 
-This updates the README badge and the wiki Home.md in one step. Commit and push both repos.
+This auto-generates `../judges.wiki/Home.md` from the README and pushes it.
 
 ### 2. Bump versions
 
