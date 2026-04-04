@@ -13,7 +13,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { resolve, dirname } from "path";
-import { evaluateWithTribunal, evaluateWithJudge } from "../evaluators/index.js";
+import { evaluateWithTribunal, evaluateWithJudge, evaluateProject } from "../evaluators/index.js";
 import { getJudge, JUDGES } from "../judges/index.js";
 import type { Finding } from "../types.js";
 import type { LlmBenchmarkSnapshot } from "./llm-benchmark.js";
@@ -29,6 +29,7 @@ import { BENCHMARK_AI_AGENTS } from "./benchmark-ai-agents.js";
 import { BENCHMARK_ADVANCED_CASES } from "./benchmark-advanced.js";
 import { BENCHMARK_AI_OUTPUT } from "./benchmark-ai-output.js";
 import { BENCHMARK_COVERAGE_GAPS } from "./benchmark-coverage-gaps.js";
+import { BENCHMARK_MULTI_FILE } from "./benchmark-multi-file.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,13 @@ export interface BenchmarkCase {
   difficulty: "easy" | "medium" | "hard";
   /** AI model/tool that generated this code (e.g. "gpt-4", "claude", "copilot") */
   aiSource?: string;
+  /**
+   * Multi-file scenario. When present, the case represents a cross-file
+   * vulnerability pattern. The `code` field serves as the primary file,
+   * and `files` provides additional project files for context.
+   * The benchmark runner uses `evaluateProject()` instead of single-file eval.
+   */
+  files?: Array<{ path: string; content: string; language: string }>;
 }
 
 export interface BenchmarkResult {
@@ -2404,6 +2412,7 @@ export function UserList({ users, onSelect, searchLabel = "Search users" }: User
   ...BENCHMARK_ADVANCED_CASES,
   ...BENCHMARK_AI_OUTPUT,
   ...BENCHMARK_COVERAGE_GAPS,
+  ...BENCHMARK_MULTI_FILE,
 ];
 
 // ─── Benchmark Runner ───────────────────────────────────────────────────────
@@ -2431,6 +2440,11 @@ export function runBenchmarkSuite(cases?: BenchmarkCase[], judgeId?: string): Be
       if (!judge) continue;
       const evaluation = evaluateWithJudge(judge, tc.code, tc.language);
       findings = evaluation.findings;
+    } else if (tc.files && tc.files.length > 0) {
+      // Multi-file scenario — use project evaluation with cross-file analysis
+      const projectFiles = [{ path: tc.id + "." + tc.language, content: tc.code, language: tc.language }, ...tc.files];
+      const projectVerdict = evaluateProject(projectFiles);
+      findings = projectVerdict.fileResults.flatMap((f: { findings: Finding[] }) => f.findings);
     } else {
       const verdict = evaluateWithTribunal(tc.code, tc.language);
       findings = verdict.findings;
