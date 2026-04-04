@@ -292,15 +292,21 @@ export function activate(context: vscode.ExtensionContext): void {
       const cts = new vscode.CancellationTokenSource();
       const storageUri = context.globalStorageUri;
 
+      // Register a disposable command to allow explicit cancellation
+      const stopDisposable = vscode.commands.registerCommand("judges.stopLlmBenchmark", () => {
+        cts.cancel();
+        vscode.window.showInformationMessage("Judges: Stopping LLM Benchmark…");
+      });
+
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
           title: "Judges: Running LLM Benchmark…",
-          cancellable: true,
+          // cancellable: false — closing the notification should NOT stop the benchmark.
+          // Use "Judges: Stop LLM Benchmark" command to cancel explicitly.
+          cancellable: false,
         },
-        async (progress, progressToken) => {
-          progressToken.onCancellationRequested(() => cts.cancel());
-
+        async (progress) => {
           try {
             const result = await runLlmBenchmark(
               cts.token,
@@ -355,6 +361,7 @@ export function activate(context: vscode.ExtensionContext): void {
         },
       );
 
+      stopDisposable.dispose();
       cts.dispose();
     }),
 

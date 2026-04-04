@@ -892,6 +892,13 @@ async function handleBenchmark(
 
   const storageUri = _extensionContext.globalStorageUri;
 
+  // Use an independent cancellation token so the benchmark survives
+  // when the user closes the chat panel or dismisses the response.
+  // The chat token (from request) would cancel on panel close.
+  const benchmarkCts = new vscode.CancellationTokenSource();
+  // If the user explicitly cancels the chat request, propagate to benchmark
+  token.onCancellationRequested(() => benchmarkCts.cancel());
+
   try {
     // Use the model the user selected in the Copilot Chat model picker (request.model),
     // falling back to selectChatModels() if that fails (e.g. "auto" pseudo-model).
@@ -916,15 +923,20 @@ async function handleBenchmark(
     }
 
     const result = await runLlmBenchmark(
-      token,
+      benchmarkCts.token,
       (p) => {
-        stream.progress(`[${p.completed}/${p.total}] ${p.message}`);
+        // Only report progress if chat stream is still active
+        try {
+          stream.progress(`[${p.completed}/${p.total}] ${p.message}`);
+        } catch {
+          /* stream closed */
+        }
       },
       storageUri,
       chatModel,
     );
 
-    if (token.isCancellationRequested) {
+    if (benchmarkCts.token.isCancellationRequested) {
       stream.markdown("### ⚠️ Benchmark Cancelled\n\nPartial results have been saved.\n");
       return;
     }
