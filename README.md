@@ -15,7 +15,7 @@ An MCP (Model Context Protocol) server that provides a panel of **45 specialized
 [![npm](https://img.shields.io/npm/v/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![npm downloads](https://img.shields.io/npm/dw/@kevinrabun/judges)](https://www.npmjs.com/package/@kevinrabun/judges)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-2482-brightgreen)](https://github.com/KevinRabun/judges/actions)
+[![Tests](https://img.shields.io/badge/tests-3614-brightgreen)](https://github.com/KevinRabun/judges/actions)
 
 > 🔰 **Packages**
 > - **CLI**: `@kevinrabun/judges-cli` → binary `judges` (use `npx @kevinrabun/judges-cli eval --file app.ts`).
@@ -843,7 +843,7 @@ The tribunal operates in three layers:
 
 Judges Panel is a **dual-layer** review system: instant **deterministic tools** (offline, no API keys) for pattern and AST analysis, plus **45 expert-persona MCP prompts** that unlock LLM-powered deep analysis when connected to an AI client. It does not try to be a CVE scanner or a linter. Those capabilities belong in dedicated MCP servers that an AI agent can orchestrate alongside Judges.
 
-### Built-in AST Analysis (v2.0.0+)
+### Built-in AST Analysis
 
 Unlike earlier versions that recommended a separate AST MCP server, Judges Panel now includes **real AST-based structural analysis** out of the box:
 
@@ -1236,7 +1236,9 @@ Create a `.judgesrc.json` (or `.judgesrc`) file in your project root to customiz
   "languages": ["typescript", "python"],
   "format": "text",
   "failOnFindings": false,
-  "baseline": ""
+  "baseline": "",
+  "regulatoryScope": ["GDPR", "PCI-DSS", "SOC2"],
+  "consensusThreshold": 0.7
 }
 ```
 
@@ -1252,6 +1254,14 @@ Create a `.judgesrc.json` (or `.judgesrc`) file in your project root to customiz
 | `format` | `string` | `"text"` | Default output format: `text` · `json` · `sarif` · `markdown` · `html` · `pdf` · `junit` · `codeclimate` · `github-actions` |
 | `failOnFindings` | `boolean` | `false` | Exit code 1 when verdict is `fail` — useful for CI gates |
 | `baseline` | `string` | `""` | Path to a baseline JSON file — matching findings are suppressed |
+| `plugins` | `string[]` | `[]` | Plugin module specifiers (npm packages or relative paths) that export custom judges |
+| `judgeWeights` | `object` | `{}` | Weighted importance per judge for aggregated scoring (e.g. `{ "cybersecurity": 2.0 }`) |
+| `failOnScoreBelow` | `number` | — | Minimum score (0–100) for the run to pass; complements `failOnFindings` |
+| `regulatoryScope` | `string[]` | — | Regulatory frameworks in scope (e.g. `["GDPR", "PCI-DSS"]`). Findings citing ONLY out-of-scope frameworks are suppressed. Run `judges list --frameworks` for supported values. |
+| `consensusThreshold` | `number` | — | Consensus suppression (0–1). If this fraction of judges report zero findings, minority findings are suppressed. Recommended: `0.7` for CI. |
+| `escalationThreshold` | `number` | — | Confidence threshold (0–1) below which findings are flagged for human review |
+| `overrides` | `array` | `[]` | Path-scoped config overrides (e.g. `[{ "files": "**/*.test.ts", "disabledJudges": ["documentation"] }]`) |
+| `customRules` | `array` | `[]` | User-defined regex-based rules for business logic validation |
 
 All evaluation tools (CLI and MCP) accept the same configuration fields via `--config <path>` or inline `config` parameter.
 
@@ -1287,6 +1297,38 @@ Patches include `oldText`, `newText`, `startLine`, and `endLine` for automated a
 ### Cross-Evaluator Deduplication
 
 When multiple judges flag the same issue (e.g., both Data Security and Cybersecurity detect SQL injection on line 15), findings are automatically deduplicated. The highest-severity finding wins, and the description is annotated with cross-references (e.g., *"Also identified by: CYBER-003"*).
+
+### Human Focus Guide
+
+Every tribunal evaluation includes a `humanFocusGuide` that categorizes findings into three buckets for human reviewers:
+
+| Bucket | Description | When to use |
+|--------|-------------|-------------|
+| **✅ Trust** | High-confidence (≥80%), evidence-backed findings with AST/taint confirmation | Act directly — these have strong automated evidence |
+| **🔍 Verify** | Lower-confidence or absence-based findings | Use your judgment — the issue may exist elsewhere in the project |
+| **🔦 Blind Spots** | Areas automated analysis cannot evaluate | Focus your manual review time here |
+
+Blind spots are detected from code characteristics: complex branching logic, external service calls, financial calculations, PII handling, state machines, and complex regex. The guide appears in CLI text/markdown output, JSON/SARIF output, and GitHub Action step summaries.
+
+### Regulatory Scope
+
+Configure which regulatory frameworks apply to your project in `.judgesrc`:
+
+```json
+{ "regulatoryScope": ["GDPR", "PCI-DSS", "SOC2"] }
+```
+
+Findings that cite ONLY out-of-scope frameworks are suppressed. Findings with no regulatory reference (general code quality) are always kept. Run `judges list --frameworks` to see all 17 supported frameworks (GDPR, CCPA, HIPAA, PCI-DSS, SOC2, SOX, COPPA, FedRAMP, NIST, ISO27001, ePrivacy, DORA, NIS2, EU-AI-Act, and more).
+
+### Self-Teaching Amendments
+
+The LLM benchmark system auto-generates precision amendments for judges with high false-positive rates. Amendments are data-driven corrections injected into prompts that improve accuracy over successive benchmark runs.
+
+The self-teaching loop:
+1. Run benchmark → analyzer identifies judges below 70% precision
+2. Generates targeted amendments (e.g., "Judge ERR: do not flag clean Express code with framework error middleware")
+3. Next benchmark run loads amendments → precision improves
+4. Run `judges codify-amendments` to bake amendments permanently into the distributed package
 
 ### Taint Flow Analysis
 
@@ -1475,6 +1517,8 @@ judges/
 | `judges config import <src>` | Import a shared configuration |
 | `judges compare` | Compare judges against other code review tools |
 | `judges list` | List all 45 judges with domains and descriptions |
+| `judges list --frameworks` | List supported regulatory frameworks and `.judgesrc` usage |
+| `judges codify-amendments` | Bake self-teaching amendments into judge source files |
 
 ---
 

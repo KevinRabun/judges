@@ -290,7 +290,8 @@ Returns an array of validation error strings. Empty array means success.
 
 ```typescript
 interface JudgesConfig {
-  disabledRules?: string[];        // e.g., ["SEC-003", "COST-001"]
+  extends?: string | string[];     // inherit from base config files
+  disabledRules?: string[];        // e.g., ["SEC-003", "COST-*"]
   disabledJudges?: string[];       // e.g., ["accessibility", "documentation"]
   ruleOverrides?: Record<string, RuleOverride>;
   minSeverity?: Severity;          // "critical" | "high" | "medium" | "low" | "info"
@@ -298,6 +299,22 @@ interface JudgesConfig {
   exclude?: string[];              // glob patterns to exclude files
   include?: string[];              // glob patterns to include only matching files
   maxFiles?: number;               // max files in directory mode
+  preset?: string;                 // named preset (e.g., "strict", "security-only,react")
+  format?: string;                 // output format (text/json/sarif/markdown/html/...)
+  failOnFindings?: boolean;        // exit code 1 on fail verdict (CI gates)
+  failOnScoreBelow?: number;       // minimum score (0-100) to pass
+  baseline?: string;               // path to baseline JSON file
+  plugins?: string[];              // plugin module specifiers
+  judgeWeights?: Record<string, number>; // per-judge scoring weights
+  regulatoryScope?: string[];      // regulatory frameworks in scope (e.g., ["GDPR", "PCI-DSS"])
+  consensusThreshold?: number;     // consensus suppression threshold (0-1)
+  escalationThreshold?: number;    // confidence below this → flagged for human review
+  overrides?: Array<{ files: string } & Partial<JudgesConfig>>; // path-scoped overrides
+  languageProfiles?: Record<string, Partial<JudgesConfig>>;     // per-language overrides
+  customRules?: CustomRule[];      // user-defined regex-based rules
+  lockedRules?: string[];          // org-policy: rules children cannot un-disable
+  lockedJudges?: string[];         // org-policy: judges children cannot disable
+  dataAdapter?: { type: "filesystem" | "http"; url?: string };
 }
 ```
 

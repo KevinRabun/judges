@@ -8,7 +8,7 @@ All notable changes to **@kevinrabun/judges** are documented here.
 - **Amendment generation refined to preserve recall** — Removed three over-suppressive patterns from `generateAmendment()` that were causing recall loss: (1) "SCOPE: Only report for code in your domain" killed cross-domain detection, (2) "When confidence < 80%, OMIT" blanket floor suppressed legitimate findings, (3) category blocklists blocked entire categories even with real issues. Replaced with surgical calibration: amendments now explicitly instruct judges to "Continue detecting genuine issues" while only targeting clean-code false positive patterns.
 
 ### Tests
-- 3,614 tests passing, 0 failures.
+- 3,614 tests passing, 0 failures. Total: 3614 pass, 0 fail, 0 skipped.
 
 ## [3.127.0] — 2026-04-03
 

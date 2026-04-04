@@ -54,6 +54,16 @@ Natural language works too — Copilot auto-routes these:
 
 Start with defaults and tighten or relax as your team's workflow evolves.
 
+## Human Focus Guide
+
+Every evaluation includes a **Human Focus Guide** that categorizes findings to help you prioritize your review:
+
+- **✅ Trust** — High-confidence findings backed by AST/taint analysis. Act on these directly.
+- **🔍 Verify** — Lower-confidence or absence-based findings. Use your judgment — the issue may be handled elsewhere.
+- **🔦 Blind Spots** — Areas automated analysis cannot evaluate (business logic, complex control flow, financial calculations, architectural fit). Focus your manual review here.
+
+The guide appears in Copilot Chat responses and CLI output.
+
 ## CI Integration
 
 Add Judges to your GitHub Actions pipeline:
