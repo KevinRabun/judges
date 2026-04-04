@@ -298,71 +298,87 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.showInformationMessage("Judges: Stopping LLM Benchmark…");
       });
 
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "Judges: Running LLM Benchmark…",
-          // cancellable: false — closing the notification should NOT stop the benchmark.
-          // Use "Judges: Stop LLM Benchmark" command to cancel explicitly.
-          cancellable: false,
-        },
-        async (progress) => {
-          try {
-            const result = await runLlmBenchmark(
-              cts.token,
-              (p) => {
-                progress.report({
-                  message: `[${p.completed}/${p.total}] ${p.message}`,
-                  increment: p.total > 0 ? (1 / p.total) * 100 : undefined,
-                });
-              },
-              storageUri,
+      // Show a non-blocking status bar item instead of a blocking notification
+      const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+      statusBar.text = "$(beaker~spin) Judges Benchmark: starting…";
+      statusBar.tooltip = "Click to show output channel. Run 'Judges: Stop LLM Benchmark' to cancel.";
+      statusBar.command = "judges.showBenchmarkOutput";
+      statusBar.show();
+
+      // Register command to show output channel
+      const showOutputDisposable = vscode.commands.registerCommand("judges.showBenchmarkOutput", () => {
+        // The output channel is created in the benchmark runner via log()
+        vscode.commands.executeCommand("workbench.action.output.show", { preserveFocus: true });
+      });
+
+      // Show a brief dismissible notification
+      vscode.window
+        .showInformationMessage(
+          "Judges: LLM Benchmark started. Track progress in the Output channel (Judges LLM Benchmark) or status bar.",
+          "Show Output",
+        )
+        .then((action) => {
+          if (action === "Show Output") {
+            vscode.commands.executeCommand("judges.showBenchmarkOutput");
+          }
+        });
+
+      try {
+        const result = await runLlmBenchmark(
+          cts.token,
+          (p) => {
+            statusBar.text = `$(beaker~spin) Benchmark: [${p.completed}/${p.total}] ${p.message}`;
+          },
+          storageUri,
+        );
+
+        statusBar.text = "$(beaker) Benchmark: complete";
+
+        if (cts.token.isCancellationRequested) {
+          vscode.window.showInformationMessage("Judges: LLM Benchmark cancelled — partial results saved.");
+        } else {
+          // Open the report
+          const doc = await vscode.workspace.openTextDocument({
+            content: result.reportMarkdown,
+            language: "markdown",
+          });
+          await vscode.window.showTextDocument(doc, { preview: true });
+
+          const f1 = result.snapshot ? `F1: ${(result.snapshot.f1Score * 100).toFixed(1)}%` : "";
+
+          const reportUri = await saveResultsToWorkspace(storageUri);
+          if (reportUri) {
+            vscode.window.showInformationMessage(
+              `Judges: LLM Benchmark complete. ${f1} — Results saved to benchmarks/`,
             );
-
-            if (cts.token.isCancellationRequested) {
-              vscode.window.showInformationMessage("Judges: LLM Benchmark cancelled — partial results saved.");
-              return;
-            }
-
-            // Open the report in a new markdown preview tab
-            const doc = await vscode.workspace.openTextDocument({
-              content: result.reportMarkdown,
-              language: "markdown",
-            });
-            await vscode.window.showTextDocument(doc, { preview: true });
-
-            const f1 = result.snapshot ? `F1: ${(result.snapshot.f1Score * 100).toFixed(1)}%` : "";
-
-            // Auto-save results to workspace benchmarks/ folder
-            const reportUri = await saveResultsToWorkspace(storageUri);
-            if (reportUri) {
-              vscode.window.showInformationMessage(
-                `Judges: LLM Benchmark complete. ${f1} — Results saved to benchmarks/`,
-              );
-            } else {
-              const action = await vscode.window.showInformationMessage(
-                `Judges: LLM Benchmark complete. ${f1}`,
-                "Save to Workspace",
-              );
-
-              if (action === "Save to Workspace") {
-                const saved = await saveResultsToWorkspace(storageUri);
-                if (saved) {
-                  vscode.window.showInformationMessage("Benchmark results saved to benchmarks/ — ready to commit.");
-                }
+          } else {
+            const action = await vscode.window.showInformationMessage(
+              `Judges: LLM Benchmark complete. ${f1}`,
+              "Save to Workspace",
+            );
+            if (action === "Save to Workspace") {
+              const saved = await saveResultsToWorkspace(storageUri);
+              if (saved) {
+                vscode.window.showInformationMessage("Benchmark results saved to benchmarks/ — ready to commit.");
               }
             }
-          } catch (error) {
-            if (error instanceof vscode.CancellationError) return;
-            vscode.window.showErrorMessage(
-              `Judges: LLM Benchmark failed — ${error instanceof Error ? error.message : String(error)}`,
-            );
           }
-        },
-      );
-
-      stopDisposable.dispose();
-      cts.dispose();
+        }
+      } catch (error) {
+        if (error instanceof vscode.CancellationError) {
+          statusBar.text = "$(beaker) Benchmark: cancelled";
+        } else {
+          statusBar.text = "$(beaker) Benchmark: failed";
+          vscode.window.showErrorMessage(
+            `Judges: LLM Benchmark failed — ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      } finally {
+        setTimeout(() => statusBar.dispose(), 10_000); // clear status bar after 10s
+        stopDisposable.dispose();
+        showOutputDisposable.dispose();
+        cts.dispose();
+      }
     }),
 
     vscode.commands.registerCommand("judges.saveBenchmarkToWorkspace", async () => {
