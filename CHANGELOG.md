@@ -2,6 +2,15 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.127.3] — 2026-04-04
+
+### Changed
+- **Wiki auto-sync on release** — The publish workflow now auto-generates `wiki/Home.md` from `README.md` via `scripts/sync-wiki.ts` on every `v*` tag push. No more manual wiki maintenance.
+- **`scripts/sync-wiki.ts`** — Generates wiki Home.md from README sections (intro, judges table, features, quick start, benchmark, resources). Replaces the old `sync-test-count.ts`.
+
+### Tests
+- 3,614 tests passing, 0 failures. Total: 3614 pass, 0 fail, 0 skipped.
+
 ## [3.127.2] — 2026-04-04
 
 ### Security
