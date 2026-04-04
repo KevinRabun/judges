@@ -2,6 +2,21 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.128.0] — 2026-04-04
+
+### Added
+- **Multi-file benchmark cases** — 8 cross-file vulnerability scenarios (auth not applied, DB no pool, secrets spread, error handler not wired, partial rate limiting, PII leak in error path, plus 2 clean multi-file cases). `BenchmarkCase.files` field + `evaluateProject()` integration in runner.
+- **29 coverage-gap cases** — 15 real-world attack patterns (GraphQL depth, WebSocket auth, SSRF→metadata, JWT rotation, rate-limit bypass, typosquatting, etc.), 4 uncovered judge prefix cases (INTENT, OVER, COH, MFPR), expanded Go + thin categories. Total: 1,085 cases.
+- **Benchmark output channel logging** — Per-case results and running F1/precision/recall logged to "Judges LLM Benchmark" output channel every case + summary every 10 cases.
+
+### Fixed
+- **Benchmark specimen FP suppression** — All findings on benchmark files with embedded code specimens (5+ long template literals) are now suppressed, not just SEC/HALLU prefixes.
+- **6 CodeQL alerts** — ReDoS in parseLlmRuleIds, evaluators, skill-loader, llm-response-validator. Regex injection in compileExcludeRegexes. Clear-text logging in hill-climb.
+- **CI shellcheck** — Quoted variable in wiki sync git clone URL.
+
+### Tests
+- 3,614 tests passing, 0 failures. Total: 3614 pass, 0 fail, 0 skipped.
+
 ## [3.127.3] — 2026-04-04
 
 ### Changed
