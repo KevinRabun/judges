@@ -4,6 +4,12 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.128.3] — 2026-04-05
+
+### Fixed
+- **LLM benchmark progress alignment** — Status bar and output channel now show consistent case-level progress. After resume, status bar starts from the restored count instead of 0.
+- **Resume feedback** — Output channel logs a summary on checkpoint restore so it's immediately clear the benchmark resumed successfully.
+
 ## [3.127.1] — 2026-04-04
 
 ### Fixed

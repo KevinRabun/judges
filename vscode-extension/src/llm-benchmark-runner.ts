@@ -403,12 +403,15 @@ async function runPerJudgeBatched(
 
   const remaining = cases.map((_, i) => i).filter((i) => !completedIndices.has(i));
 
-  // Count total per-judge tasks for progress
-  let totalTasks = 0;
-  for (const idx of remaining) {
-    totalTasks += selectRelevantJudges(cases[idx]).length;
+  if (completedIndices.size > 0) {
+    log(
+      `Resumed from checkpoint: ${completedIndices.size}/${cases.length} cases already complete, ${remaining.length} remaining`,
+    );
   }
-  let tasksDone = 0;
+
+  // Track case-level progress (aligned with output channel logging)
+  const totalCases = cases.length;
+  let casesCompleted = completedIndices.size;
 
   for (let batchStart = 0; batchStart < remaining.length; batchStart += cfg.batchSize) {
     if (token.isCancellationRequested) break;
@@ -438,12 +441,6 @@ async function runPerJudgeBatched(
         );
 
         for (const { ruleIds, response } of chunkResults) {
-          tasksDone++;
-          onProgress({
-            message: `Per-judge: ${tc.id} (${tasksDone}/${totalTasks})`,
-            completed: tasksDone,
-            total: totalTasks,
-          });
           caseRuleIds[idx].push(...ruleIds);
           caseResponses[idx].push(truncate(response, cfg.responseSnapshotChars));
         }
@@ -457,10 +454,16 @@ async function runPerJudgeBatched(
       const uniqueRuleIds = [...new Set(caseRuleIds[idx])];
       const caseResult = scoreLlmCase(tc, uniqueRuleIds, caseResponses[idx].join("\n---\n"));
       checkpoint.perJudgeResults.push({ idx, result: caseResult });
+      casesCompleted++;
+
+      onProgress({
+        message: `Case ${casesCompleted}/${totalCases}: ${tc.id}`,
+        completed: casesCompleted,
+        total: totalCases,
+      });
 
       // Log progress to output channel so it's always visible
       const completedCount = checkpoint.perJudgeResults.length;
-      const totalCases = cases.length;
       const pct = Math.round((completedCount / totalCases) * 100);
       const icon = caseResult.passed ? "✅" : "❌";
       const fpCount = caseResult.falsePositiveRuleIds.length;

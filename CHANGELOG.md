@@ -2,6 +2,15 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.128.3] — 2026-04-05
+
+### Fixed
+- **LLM benchmark progress alignment** — Status bar now reports case-level progress (e.g., 673/700) matching the output channel, instead of per-judge-task counts. Eliminates confusing discrepancy between the two displays after checkpoint resume.
+- **Resume log message** — Output channel now logs a summary on checkpoint restore (e.g., "Resumed from checkpoint: 673/700 cases already complete, 27 remaining") so users immediately know the benchmark resumed successfully.
+
+### Tests
+- 3,614 tests passing, 0 failures.
+
 ## [3.128.0] — 2026-04-04
 
 ### Added
