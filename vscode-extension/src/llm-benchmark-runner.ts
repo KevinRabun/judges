@@ -374,8 +374,47 @@ let _fullResponses: Map<string, string> = new Map();
 
 // ─── Per-Judge Execution ────────────────────────────────────────────────────
 
+/**
+ * Core judges for external code-review benchmarks.
+ * These cover the most common issue categories found in human code reviews.
+ * Used when the case comes from an external benchmark (approximate prefix mapping)
+ * to ensure we don't miss findings just because the expected→prefix heuristic
+ * mapped to a different judge than the one that would actually catch the issue.
+ */
+const EXTERNAL_BENCHMARK_CORE_PREFIXES = new Set([
+  "CYBER", // Injection, XSS, SSRF, deserialization
+  "SEC", // General security posture
+  "AUTH", // Authentication & authorization
+  "ERR", // Error handling, null safety
+  "CONC", // Concurrency, race conditions
+  "DB", // Database, queries, N+1
+  "LOGIC", // Semantic correctness, type checks
+  "MAINT", // Maintainability, code quality
+  "PERF", // Performance
+  "REL", // Reliability, graceful shutdown
+  "OBS", // Observability, logging
+  "TEST", // Testing quality
+  "CFG", // Configuration, secrets
+  "DATA", // Data security
+  "FW", // Framework safety
+  "COMPAT", // Backwards compatibility
+]);
+
 function selectRelevantJudges(tc: BenchmarkCase): JudgeDefinition[] {
+  // Clean cases (no expected findings) → run all judges
   if (tc.expectedRuleIds.length === 0) return [...JUDGES];
+
+  // External benchmark cases → run the broad code-review core set
+  // so findings from any relevant judge can match the approximate golden→prefix mapping
+  if (tc.aiSource && tc.aiSource !== "gpt-4" && tc.aiSource !== "claude" && tc.aiSource !== "copilot") {
+    const expectedPrefixes = new Set(tc.expectedRuleIds.map((r: string) => r.split("-")[0]));
+    // Union of expected prefixes + code-review core set
+    return JUDGES.filter(
+      (j: JudgeDefinition) => expectedPrefixes.has(j.rulePrefix) || EXTERNAL_BENCHMARK_CORE_PREFIXES.has(j.rulePrefix),
+    );
+  }
+
+  // Internal benchmark cases → strict prefix match (exact expected rule IDs)
   const expectedPrefixes = new Set(tc.expectedRuleIds.map((r: string) => r.split("-")[0]));
   return JUDGES.filter((j: JudgeDefinition) => expectedPrefixes.has(j.rulePrefix));
 }

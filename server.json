@@ -16,12 +16,12 @@
       "mimeType": "image/png"
     }
   ],
-  "version": "3.129.2",
+  "version": "3.129.3",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@kevinrabun/judges",
-      "version": "3.129.2",
+      "version": "3.129.3",
       "transport": {
         "type": "stdio"
       }

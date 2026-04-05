@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.129.3] — 2026-04-05
+
+### Changed
+- **External benchmark: broad judge selection** — External benchmark cases now run 16 core judges per case for cross-domain finding coverage. See [core CHANGELOG](../../CHANGELOG.md).
+
 ## [3.129.2] — 2026-04-05
 
 ### Fixed

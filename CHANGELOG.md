@@ -2,6 +2,14 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.129.3] — 2026-04-05
+
+### Changed
+- **External benchmark: broad judge selection** — External benchmark cases (Martian, OpenSSF, future benchmarks) now run 16 core code-review judges per case instead of only the 1–2 judges matching the expected prefix. This addresses the primary cause of false negatives: golden comments mapping to one prefix (e.g. `AUTH`) while the actual finding fires under a different judge (e.g. `LOGIC` or `ERR`). Internal benchmark cases are unaffected — they continue to use strict prefix matching.
+
+### Tests
+- 3,656 tests passing, 0 failures.
+
 ## [3.129.2] — 2026-04-05
 
 ### Fixed
