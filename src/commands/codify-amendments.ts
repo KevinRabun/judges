@@ -52,22 +52,36 @@ function loadAmendments(filePath?: string): PromptAmendment[] {
     return store.amendments;
   }
 
-  // Try VS Code global storage
-  const appdata = process.env.APPDATA || process.env.HOME;
-  if (!appdata) throw new Error("Cannot determine global storage path. Use --file to specify.");
-  const globalPath = join(
-    appdata,
-    "Code",
-    "User",
-    "globalStorage",
-    "kevinrabun.judges-panel",
-    "llm-benchmark-amendments.json",
-  );
+  const globalPath = getAmendmentStorePath();
   if (!existsSync(globalPath)) {
     throw new Error(`No amendments found at ${globalPath}. Run an LLM benchmark first, or use --file.`);
   }
   const store: AmendmentStore = JSON.parse(readFileSync(globalPath, "utf8"));
   return store.amendments;
+}
+
+/**
+ * Resolve the path to the VS Code global storage amendment file.
+ */
+function getAmendmentStorePath(filePath?: string): string {
+  if (filePath) return resolve(filePath);
+  const appdata = process.env.APPDATA || process.env.HOME;
+  if (!appdata) throw new Error("Cannot determine global storage path. Use --file to specify.");
+  return join(appdata, "Code", "User", "globalStorage", "kevinrabun.judges-panel", "llm-benchmark-amendments.json");
+}
+
+/**
+ * Clear the amendment store after codification to prevent double-application.
+ * Codified amendments live in the .judge.md files; keeping the runtime store
+ * causes them to be injected twice into LLM benchmark prompts.
+ */
+function clearAmendmentStore(filePath?: string): void {
+  const storePath = getAmendmentStorePath(filePath);
+  if (existsSync(storePath)) {
+    const emptyStore: AmendmentStore = { amendments: [], version: 1, history: [] };
+    writeFileSync(storePath, JSON.stringify(emptyStore, null, 2), "utf8");
+    console.log(`  🧹 Cleared amendment store at ${storePath}`);
+  }
 }
 
 /**
@@ -182,6 +196,10 @@ export function runCodifyAmendments(argv: string[]): void {
     `  ${dryRun ? "Would codify" : "Codified"} ${codified}/${amendments.length} amendment(s) into agent files.`,
   );
   if (!dryRun && codified > 0) {
+    // Clear the amendment store so codified amendments aren't double-applied
+    // at runtime during the next LLM benchmark run
+    clearAmendmentStore(filePath);
+
     console.log("  Next steps:");
     console.log("    1. npm run generate:agents:force  — sync .ts files from .judge.md");
     console.log("    2. npm run build                  — rebuild");

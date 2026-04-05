@@ -4,6 +4,12 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.129.1] — 2026-04-05
+
+### Fixed
+- **Martian benchmark L2 accuracy** — Full diff context, multi-file support, improved prefix mapping, and 16KB code limit. See [core CHANGELOG](../../CHANGELOG.md).
+- **Codify-amendments auto-clear** — Amendment store is cleared after codification to prevent double-application.
+
 ## [3.129.0] — 2026-04-05
 
 ### Added

@@ -224,7 +224,8 @@ function fetchPrDiff(prUrl: string): string | undefined {
 
 /**
  * Extract changed file contents from a unified diff.
- * Returns the "after" (added/modified) lines for each file.
+ * Returns the full diff hunks (added, removed, and context lines) for each
+ * file so the LLM sees the complete "before → after" narrative.
  */
 function extractFilesFromDiff(diff: string): Array<{ path: string; content: string; language: string }> {
   const files: Array<{ path: string; content: string; language: string }> = [];
@@ -256,18 +257,39 @@ function extractFilesFromDiff(diff: string): Array<{ path: string; content: stri
     const language = langMap[ext];
     if (!language) continue;
 
-    // Extract added lines (lines starting with +, excluding +++ header)
+    // Extract full hunk content — include context lines, removed lines, and
+    // added lines so the LLM can see the complete change narrative.
     const lines = section.split("\n");
-    const addedLines: string[] = [];
+    const hunkLines: string[] = [];
+    let inHunk = false;
+
     for (const line of lines) {
-      if (line.startsWith("+++")) continue;
-      if (line.startsWith("+")) {
-        addedLines.push(line.slice(1));
+      // Skip diff headers (---, +++, index, etc.)
+      if (line.startsWith("---") || line.startsWith("+++") || line.startsWith("index ")) continue;
+
+      // Hunk header — include it for line number context
+      if (line.startsWith("@@")) {
+        inHunk = true;
+        hunkLines.push(line);
+        continue;
+      }
+
+      if (inHunk) {
+        // Context line (no prefix), added line (+), or removed line (-)
+        if (line.startsWith("+") || line.startsWith("-") || line.startsWith(" ") || line === "") {
+          hunkLines.push(line);
+        } else if (line.startsWith("\\")) {
+          // "\ No newline at end of file" — skip
+          continue;
+        } else {
+          // End of hunk content
+          inHunk = false;
+        }
       }
     }
 
-    if (addedLines.length > 0) {
-      files.push({ path: filePath, content: addedLines.join("\n"), language });
+    if (hunkLines.length > 0) {
+      files.push({ path: filePath, content: hunkLines.join("\n"), language });
     }
   }
 
@@ -285,9 +307,7 @@ function extractFilesFromDiff(diff: string): Array<{ path: string; content: stri
 export function convertPrToBenchmarkCase(pr: MartianPr, repoName: string, diff?: string): BenchmarkCase | undefined {
   const language = REPO_LANGUAGES[repoName] ?? "typescript";
 
-  // Build expected rule IDs from golden comments by mapping severity to prefixes
-  // Since golden comments are semantic (not rule-ID based), we use broad prefixes
-  // that the LLM should fire when it identifies similar issues
+  // Build expected rule IDs from golden comments using improved prefix inference
   const expectedRuleIds: string[] = [];
   const acceptablePrefixes = new Set([
     "CYBER",
@@ -305,6 +325,10 @@ export function convertPrToBenchmarkCase(pr: MartianPr, repoName: string, diff?:
     "FW",
     "RATE",
     "STRUCT",
+    "OBS",
+    "TEST",
+    "DOC",
+    "COMPAT",
   ]);
 
   for (let i = 0; i < pr.comments.length; i++) {
@@ -314,18 +338,40 @@ export function convertPrToBenchmarkCase(pr: MartianPr, repoName: string, diff?:
   }
 
   let code: string;
+  let additionalFiles: Array<{ path: string; content: string; language: string }> | undefined;
+
   if (diff) {
     const files = extractFilesFromDiff(diff);
     if (files.length === 0) return undefined;
 
-    // Use the largest changed file as the primary code
+    // Sort by content length — largest file is primary
     files.sort((a, b) => b.content.length - a.content.length);
-    code = files[0].content;
 
-    // Truncate to avoid token limits
-    if (code.length > 8000) {
-      code = code.slice(0, 8000) + "\n// ... truncated for benchmark";
+    // Primary file gets up to 16KB
+    code = files[0].content;
+    if (code.length > 16_000) {
+      code = code.slice(0, 16_000) + "\n// ... truncated for benchmark";
     }
+
+    // Additional files go into the multi-file field (up to 12KB each)
+    if (files.length > 1) {
+      additionalFiles = files.slice(1, 6).map((f) => ({
+        path: f.path,
+        content: f.content.length > 12_000 ? f.content.slice(0, 12_000) + "\n// ... truncated" : f.content,
+        language: f.language,
+      }));
+    }
+
+    // Prepend PR context header so the LLM knows this is a code review task
+    code = [
+      `// ===== PR CODE REVIEW: ${pr.pr_title} =====`,
+      `// Repository: ${repoName} | Language: ${language}`,
+      `// File: ${files[0].path}`,
+      `// This is a unified diff — lines starting with + are additions, - are removals, @@ are hunk headers`,
+      `// Review this code change for bugs, security issues, and quality problems.`,
+      "",
+      code,
+    ].join("\n");
   } else {
     // Fallback: embed golden comments as context for LLM evaluation
     const lines = [`// PR: ${pr.pr_title}`, `// Review the following changes for issues:`];
@@ -335,7 +381,7 @@ export function convertPrToBenchmarkCase(pr: MartianPr, repoName: string, diff?:
     code = lines.join("\n");
   }
 
-  return {
+  const benchCase: BenchmarkCase = {
     id: `martian-${repoName}-${pr.pr_title
       .slice(0, 40)
       .replace(/[^a-zA-Z0-9]/g, "-")
@@ -349,29 +395,132 @@ export function convertPrToBenchmarkCase(pr: MartianPr, repoName: string, diff?:
     difficulty: pr.comments.some((c) => c.severity === "Critical" || c.severity === "High") ? "hard" : "medium",
     aiSource: "martian-code-review-benchmark",
   };
+
+  // Attach additional files for multi-file evaluation context
+  if (additionalFiles && additionalFiles.length > 0) {
+    benchCase.files = additionalFiles;
+  }
+
+  return benchCase;
 }
 
 /**
  * Infer the most likely judge prefix from a golden comment description.
+ *
+ * Uses weighted pattern matching — each regex contributes a score per prefix,
+ * and the prefix with the highest total wins. This handles comments that span
+ * multiple domains (e.g. "race condition causes null pointer" → CONC > ERR).
  */
 function inferPrefixFromComment(comment: string, severity: string): string {
   const lower = comment.toLowerCase();
 
-  if (/race|deadlock|lock|concurrent|mutex|thread/.test(lower)) return "CONC";
-  if (/sql|query|database|n\+1|select \*/.test(lower)) return "DB";
-  if (/auth|credential|password|token|session|oauth|permission/.test(lower)) return "AUTH";
-  if (/inject|xss|eval|command/.test(lower)) return "CYBER";
-  if (/secret|hardcod|api.?key/.test(lower)) return "CFG";
-  if (/null|undefined|none|nil|attributeerror|typeerror|crash/.test(lower)) return "ERR";
-  if (/error|exception|catch|throw|unhandled|fault/.test(lower)) return "ERR";
-  if (/valid|sanitiz|input|check|assert/.test(lower)) return "SEC";
-  if (/performance|slow|latency|cache|memory/.test(lower)) return "PERF";
-  if (/deprecat|obsolete|legacy|breaking/.test(lower)) return "COMPAT";
-  if (/log|metric|monitor|observ/.test(lower)) return "OBS";
-  if (/test|flaky|mock|assert/.test(lower)) return "TEST";
-  if (/name|typo|rename|docstring|comment/.test(lower)) return "DOC";
-  if (/magic.?number|duplicate|dead.?code|complex/.test(lower)) return "MAINT";
-  if (/isinstance|type|class|inherit/.test(lower)) return "LOGIC";
+  const scores: Record<string, number> = {};
+  function add(prefix: string, weight: number): void {
+    scores[prefix] = (scores[prefix] ?? 0) + weight;
+  }
+
+  // Concurrency / race conditions
+  if (/race\s*condition|data\s*race/.test(lower)) add("CONC", 3);
+  if (/deadlock|mutex|lock\s*(acquisit|order|contention)/.test(lower)) add("CONC", 3);
+  if (/concurrent|thread.?safe|atomic|synchroniz/.test(lower)) add("CONC", 2);
+  if (/parallel|interleav/.test(lower)) add("CONC", 1);
+
+  // Database
+  if (/sql\s*inject|query\s*inject/.test(lower)) add("DB", 3);
+  if (/n\+1|n \+ 1/.test(lower)) add("DB", 3);
+  if (/select\s*\*|query|queryset/.test(lower)) add("DB", 2);
+  if (/database|transaction|rollback|commit/.test(lower)) add("DB", 2);
+  if (/migration|schema|index|join|subquery/.test(lower)) add("DB", 1);
+  if (/paginator|cursor|offset|limit/.test(lower)) add("DB", 1);
+
+  // Authentication / Authorization
+  if (/oauth|csrf|session\s*(secret|fixation|hijack)/.test(lower)) add("AUTH", 3);
+  if (/authenticat|credential|password|passkey/.test(lower)) add("AUTH", 2);
+  if (/authoriz|permission|privilege|role|scope|access\s*control/.test(lower)) add("AUTH", 2);
+  if (/token(?!\s*expir)/.test(lower)) add("AUTH", 1);
+
+  // Cybersecurity / Injection
+  if (/inject(?!ion\s*depend)|xss|cross.?site|command\s*inject/.test(lower)) add("CYBER", 3);
+  if (/deserialization|prototype\s*pollut|path\s*traversal/.test(lower)) add("CYBER", 3);
+  if (/ssrf|open\s*redirect|rce|remote\s*code/.test(lower)) add("CYBER", 3);
+  if (/sanitiz|escap(?!e\s*hatch)|encod/.test(lower)) add("CYBER", 1);
+
+  // Configuration / Secrets
+  if (/hardcod|hard.coded|secret\s*key/.test(lower)) add("CFG", 3);
+  if (/api.?key|config\s*(missing|invalid|hardcod)/.test(lower)) add("CFG", 2);
+  if (/environment\s*variable|\.env|secret/.test(lower)) add("CFG", 1);
+
+  // Error handling / Null safety
+  if (/null\s*(reference|pointer|dereference)|none\s*type|undefined\s*is\s*not/.test(lower)) add("ERR", 3);
+  if (/attributeerror|typeerror|keyerror|indexerror/.test(lower)) add("ERR", 3);
+  if (/unhandled\s*(error|exception|reject)/.test(lower)) add("ERR", 3);
+  if (/null|undefined|nil|\.?none\b/.test(lower)) add("ERR", 2);
+  if (/error\s*handl|exception|try.?catch|throw/.test(lower)) add("ERR", 2);
+  if (/crash|abort|panic|fault/.test(lower)) add("ERR", 1);
+  if (/missing\s*check|guard\s*clause/.test(lower)) add("ERR", 1);
+
+  // Security (general)
+  if (/vulnerab|exploit|attack\s*surface/.test(lower)) add("SEC", 2);
+  if (/valid(?:at(?:e|ion))|sanitiz|input\s*check/.test(lower)) add("SEC", 2);
+  if (/unsafe|insecure|taint/.test(lower)) add("SEC", 1);
+
+  // Performance
+  if (/performance|latency|throughput|bottleneck/.test(lower)) add("PERF", 2);
+  if (/slow|memory\s*leak|cache\s*(miss|invalid)/.test(lower)) add("PERF", 2);
+  if (/O\(n\^?2\)|quadratic|exponential/.test(lower)) add("PERF", 2);
+  if (/blocking|synchronous.*event\s*loop/.test(lower)) add("PERF", 1);
+
+  // Logic / correctness
+  if (/isinstance|subclass|type\s*check|type\s*error/.test(lower)) add("LOGIC", 2);
+  if (/wrong\s*(key|type|value|order|result)/.test(lower)) add("LOGIC", 2);
+  if (/off.by.one|fence\s*post|boundary/.test(lower)) add("LOGIC", 2);
+  if (/logic|incorrect|semantic/.test(lower)) add("LOGIC", 1);
+  if (/always\s*(true|false)|never\s*(true|false|reach)/.test(lower)) add("LOGIC", 2);
+  if (/negative\s*(slice|index|offset)/.test(lower)) add("LOGIC", 2);
+
+  // Observability / Monitoring
+  if (/metric|monitor|observ|telemetry|tracing/.test(lower)) add("OBS", 2);
+  if (/logg?ing|log\s*(level|format|statement)/.test(lower)) add("OBS", 1);
+  if (/alert|dashboard|instrument/.test(lower)) add("OBS", 1);
+
+  // Testing
+  if (/test\s*(flaky|brittle|fragile|unreliable)/.test(lower)) add("TEST", 3);
+  if (/sleep\s*in\s*test|time\.sleep|flaky/.test(lower)) add("TEST", 2);
+  if (/mock|stub|fixture|assert|test\s*coverage/.test(lower)) add("TEST", 1);
+  if (/monkeypatch|test_/.test(lower)) add("TEST", 1);
+
+  // Maintainability
+  if (/magic\s*number|duplicate|copy.?paste|dead\s*code/.test(lower)) add("MAINT", 2);
+  if (/complex|readab|refactor|techni?cal\s*debt/.test(lower)) add("MAINT", 1);
+  if (/naming|misleading|confusing|unclear/.test(lower)) add("MAINT", 1);
+
+  // Documentation
+  if (/docstring|comment|documentation|readme/.test(lower)) add("DOC", 2);
+  if (/typo|spelling|rename/.test(lower)) add("DOC", 1);
+  if (/jsdoc|javadoc|pydoc|rustdoc/.test(lower)) add("DOC", 1);
+
+  // Compatibility
+  if (/breaking\s*change|backwards?\s*compat|deprecat/.test(lower)) add("COMPAT", 2);
+  if (/migration|version|compat/.test(lower)) add("COMPAT", 1);
+
+  // Reliability
+  if (/timeout|retry|circuit.?break|failover/.test(lower)) add("REL", 2);
+  if (/resilien|graceful|recovery|shutdown/.test(lower)) add("REL", 1);
+  if (/terminate|kill|signal|process/.test(lower)) add("REL", 1);
+
+  // Framework safety
+  if (/middleware|express|django|flask|spring/.test(lower)) add("FW", 1);
+  if (/helmet|cors|csrf\s*middleware/.test(lower)) add("FW", 2);
+
+  // Rate limiting
+  if (/rate\s*limit|throttl|brute.?force/.test(lower)) add("RATE", 2);
+  if (/ddos|denial.?of.?service|resource\s*exhaust/.test(lower)) add("RATE", 1);
+
+  // Pick highest-scoring prefix
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  if (sorted.length > 0 && sorted[0][1] > 0) {
+    return sorted[0][0];
+  }
 
   // Default based on severity
   if (severity === "Critical" || severity === "High") return "SEC";

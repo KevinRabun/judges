@@ -2,6 +2,20 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.129.1] — 2026-04-05
+
+### Fixed
+- **Martian benchmark: full diff context** — LLM judges now see removed lines, added lines, and surrounding context (full unified diff hunks) instead of only added lines. This lets the LLM spot regressions, removed checks, and before/after changes.
+- **Martian benchmark: multi-file support** — Up to 6 changed files per PR are passed via `BenchmarkCase.files` for cross-file analysis.
+- **Martian benchmark: PR review header** — Each case includes a contextual prompt explaining the code is a unified diff for code review.
+- **Martian benchmark: improved prefix inference** — Weighted multi-pattern scoring replaces first-match regex. 60+ patterns across 16 judge categories with scores, so comments spanning multiple domains (e.g. “race condition causes null pointer”) map to the most specific prefix.
+- **Martian benchmark: 16KB code limit** — Increased from 8KB to avoid truncating large PR diffs.
+- **Codify-amendments auto-clears store** — `judges codify-amendments` now clears the runtime amendment file after successful codification, preventing double-application in subsequent LLM benchmark runs.
+- **Martian benchmark: acceptablePrefixes expanded** — Added OBS, TEST, DOC, COMPAT to prevent false-positive penalty for legitimate cross-domain findings.
+
+### Tests
+- 3,656 tests passing, 0 failures. 10 new tests covering full diff extraction, multi-file cases, weighted prefix inference (CONC, DB, LOGIC, REL, TEST, OBS), and expanded acceptablePrefixes.
+
 ## [3.129.0] — 2026-04-05
 
 ### Added
