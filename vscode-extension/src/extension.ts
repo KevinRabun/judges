@@ -6,6 +6,7 @@ import { JudgesFindingsPanel } from "./findings-panel";
 import { registerChatParticipant } from "./chat-participant";
 import { registerLmTools } from "./lm-tool";
 import { runLlmBenchmark, saveResultsToWorkspace } from "./llm-benchmark-runner";
+import { runExternalBenchmarkUI } from "./external-benchmark-runner";
 import type { Finding } from "@kevinrabun/judges/api";
 import { getGlobalSession } from "@kevinrabun/judges/api";
 
@@ -385,6 +386,46 @@ export function activate(context: vscode.ExtensionContext): void {
       const reportUri = await saveResultsToWorkspace(context.globalStorageUri);
       if (reportUri) {
         vscode.window.showInformationMessage("Benchmark results saved to benchmarks/ — ready to commit.");
+      }
+    }),
+
+    // ─── External Benchmark Runner ───────────────────────────────────────
+    vscode.commands.registerCommand("judges.runExternalBenchmark", async () => {
+      const cts = new vscode.CancellationTokenSource();
+
+      const stopDisposable = vscode.commands.registerCommand("judges.stopExternalBenchmark", () => {
+        cts.cancel();
+        vscode.window.showInformationMessage("Judges: Stopping External Benchmark…");
+      });
+
+      const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+      statusBar.text = "$(beaker~spin) External Benchmark: selecting…";
+      statusBar.tooltip = "Click to show output. Run 'Judges: Stop External Benchmark' to cancel.";
+      statusBar.command = "judges.showExternalBenchmarkOutput";
+      statusBar.show();
+
+      const showOutputDisposable = vscode.commands.registerCommand("judges.showExternalBenchmarkOutput", () => {
+        vscode.commands.executeCommand("workbench.action.output.show", { preserveFocus: true });
+      });
+
+      try {
+        statusBar.text = "$(beaker~spin) External Benchmark: running…";
+        await runExternalBenchmarkUI(cts.token, context.globalStorageUri);
+        statusBar.text = "$(beaker) External Benchmark: complete";
+      } catch (error) {
+        if (error instanceof vscode.CancellationError) {
+          statusBar.text = "$(beaker) External Benchmark: cancelled";
+        } else {
+          statusBar.text = "$(beaker) External Benchmark: failed";
+          vscode.window.showErrorMessage(
+            `Judges: External Benchmark failed — ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      } finally {
+        setTimeout(() => statusBar.dispose(), 10_000);
+        stopDisposable.dispose();
+        showOutputDisposable.dispose();
+        cts.dispose();
       }
     }),
 

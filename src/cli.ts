@@ -307,6 +307,8 @@ function printHelp(): void {
     ["judges feedback", "Track finding feedback (false positives)"],
     ["judges override", "Manage per-path rule overrides"],
     ["judges benchmark", "Run detection accuracy benchmarks"],
+    ["judges openssf-cve", "Run OpenSSF CVE Benchmark (real-world CVEs)"],
+    ["judges external-benchmark", "Run external benchmarks (OpenSSF, Martian, etc.)"],
     ["judges config", "Export/import shared team configs"],
     ["judges review", "Post inline review comments on a GitHub PR"],
     ["judges app serve", "Start GitHub App webhook server"],

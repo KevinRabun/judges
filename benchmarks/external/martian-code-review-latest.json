@@ -1,0 +1,987 @@
+{
+  "suiteId": "martian-code-review",
+  "suiteName": "Martian Code Review Bench",
+  "suiteUrl": "https://github.com/withmartian/code-review-benchmark",
+  "timestamp": "2026-04-05T15:20:00.528Z",
+  "judgesVersion": "3.128.3",
+  "totalItems": 50,
+  "evaluatedItems": 50,
+  "skippedItems": 0,
+  "precision": 1,
+  "recall": 0,
+  "f1Score": 0,
+  "detectionRate": 0,
+  "truePositives": 0,
+  "falsePositives": 0,
+  "falseNegatives": 136,
+  "perCategory": {
+    "repo:cal_dot_com": {
+      "total": 10,
+      "detected": 0,
+      "rate": 0
+    },
+    "repo:discourse": {
+      "total": 10,
+      "detected": 0,
+      "rate": 0
+    },
+    "repo:grafana": {
+      "total": 10,
+      "detected": 0,
+      "rate": 0
+    },
+    "repo:keycloak": {
+      "total": 10,
+      "detected": 0,
+      "rate": 0
+    },
+    "repo:sentry": {
+      "total": 10,
+      "detected": 0,
+      "rate": 0
+    },
+    "severity:Missed": {
+      "total": 136,
+      "detected": 0,
+      "rate": 0
+    }
+  },
+  "rawData": [
+    {
+      "prTitle": "Async import of the appStore packages",
+      "prUrl": "https://github.com/calcom/cal.com/pull/8087",
+      "sourceRepo": "cal_dot_com",
+      "language": "typescript",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Consider adding try-catch around the await to handle import failures gracefully",
+        "The code uses forEach with async callbacks, which causes asynchronous operations (e.g., calendar/vid"
+      ]
+    },
+    {
+      "prTitle": "feat: 2fa backup codes",
+      "prUrl": "https://github.com/calcom/cal.com/pull/10600",
+      "sourceRepo": "cal_dot_com",
+      "language": "typescript",
+      "goldenComments": 4,
+      "matchedComments": 0,
+      "unmatchedComments": 4,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The exported function TwoFactor handles backup codes and is in BackupCode.tsx. Inconsistent naming.",
+        "Error message mentions 'backup code login' but this is a disable endpoint, not login",
+        "Backup code validation is case-sensitive due to the use of indexOf(). This causes validation to fail",
+        "Because backupCodes are decrypted and mutated in memory before being written back, two concurrent lo"
+      ]
+    },
+    {
+      "prTitle": "fix: handle collective multiple host on destinationCalendar",
+      "prUrl": "https://github.com/calcom/cal.com/pull/10967",
+      "sourceRepo": "cal_dot_com",
+      "language": "typescript",
+      "goldenComments": 5,
+      "matchedComments": 0,
+      "unmatchedComments": 5,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Potential null reference if mainHostDestinationCalendar is undefined if evt.destinationCalendar is n",
+        "The optional chaining on mainHostDestinationCalendar?.integration is redundant since you already che",
+        "Logic error: when externalCalendarId is provided, you're searching for a calendar where externalId =",
+        "Logic inversion in organization creation: The slug property is now conditionally set when IS_TEAM_BI",
+        "The Calendar interface now requires createEvent(event, credentialId), but some implementations (e.g."
+      ]
+    },
+    {
+      "prTitle": "feat: convert InsightsBookingService to use Prisma.sql raw queries",
+      "prUrl": "https://github.com/calcom/cal.com/pull/22345",
+      "sourceRepo": "cal_dot_com",
+      "language": "typescript",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "In getBaseConditions(), the else if (filterConditions) and final else branches are unreachable. This",
+        "Fetching userIdsFromOrg only when teamsFromOrg.length > 0 can exclude org-level members for orgs wit"
+      ]
+    },
+    {
+      "prTitle": "Comprehensive workflow reminder management for booking lifecycle events",
+      "prUrl": "https://github.com/calcom/cal.com/pull/7232",
+      "sourceRepo": "cal_dot_com",
+      "language": "typescript",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Asynchronous functions deleteScheduledEmailReminder and deleteScheduledSMSReminder are called withou",
+        "When immediateDelete is true, the deleteScheduledEmailReminder function cancels the SendGrid email b"
+      ]
+    },
+    {
+      "prTitle": "Advanced date override handling and timezone compatibility improvements",
+      "prUrl": "https://github.com/calcom/cal.com/pull/8330",
+      "sourceRepo": "cal_dot_com",
+      "language": "typescript",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Incorrect end time calculation using slotStartTime instead of slotEndTime",
+        "Using === for dayjs object comparison will always return false as it compares object references, not"
+      ]
+    },
+    {
+      "prTitle": "OAuth credential sync and app integration enhancements",
+      "prUrl": "https://github.com/calcom/cal.com/pull/11059",
+      "sourceRepo": "cal_dot_com",
+      "language": "typescript",
+      "goldenComments": 5,
+      "matchedComments": 0,
+      "unmatchedComments": 5,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The parseRefreshTokenResponse function incorrectly sets refresh_token to the hardcoded string 'refre",
+        "Invalid Zod schema syntax. Computed property keys like [z.string().toString()] are not valid in Zod ",
+        "parseRefreshTokenResponse returns a Zod safeParse result ({ success, data, error }), not the credent",
+        "When APP_CREDENTIAL_SHARING_ENABLED and CALCOM_CREDENTIAL_SYNC_ENDPOINT are set, the refreshFunction",
+        "When the sync endpoint path is used, res is a fetch Response and has no .data; res?.data will be und"
+      ]
+    },
+    {
+      "prTitle": "SMS workflow reminder retry count tracking",
+      "prUrl": "https://github.com/calcom/cal.com/pull/14943",
+      "sourceRepo": "cal_dot_com",
+      "language": "typescript",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Using retryCount: reminder.retryCount + 1 reads a possibly stale value and can lose increments under",
+        "The deletion logic in scheduleSMSReminders.ts incorrectly deletes non-SMS workflow reminders (e.g., "
+      ]
+    },
+    {
+      "prTitle": "Add guest management functionality to existing bookings",
+      "prUrl": "https://github.com/calcom/cal.com/pull/14740",
+      "sourceRepo": "cal_dot_com",
+      "language": "typescript",
+      "goldenComments": 5,
+      "matchedComments": 0,
+      "unmatchedComments": 5,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Case sensitivity bypass in email blacklist",
+        "The logic for checking team admin/owner permissions is incorrect. This condition uses AND (&&) which",
+        "This calls the email sender with the original guests, so existing attendees included in the input wi",
+        "uniqueGuests filters out existing attendees and blacklisted emails but does not deduplicate duplicat",
+        "Starting with an array containing an empty string may cause validation issues. Consider starting wit"
+      ]
+    },
+    {
+      "prTitle": "feat: add calendar cache status and actions (#22532)",
+      "prUrl": "https://github.com/calcom/cal.com/pull/22532",
+      "sourceRepo": "cal_dot_com",
+      "language": "typescript",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The updateManyByCredentialId call uses an empty data object, which prevents Prisma's @updatedAt deco",
+        "logic: macOS-specific sed syntax with empty string after -i flag will fail on Linux systems"
+      ]
+    },
+    {
+      "prTitle": "FEATURE: automatically downsize large images",
+      "prUrl": "https://github.com/ai-code-review-evaluation/discourse-graphite/pull/1",
+      "sourceRepo": "discourse",
+      "language": "ruby",
+      "goldenComments": 3,
+      "matchedComments": 0,
+      "unmatchedComments": 3,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The downsize method is defined twice. The second definition, which expects a single dimensions strin",
+        "Hardcoding maxSizeKB = 10 * 1024 ignores Discourse.SiteSettings['max_' + type + '_size_kb'], so the ",
+        "Passing 80% as the dimensions can fail for animated GIFs when allow_animated_thumbnails is true, sin"
+      ]
+    },
+    {
+      "prTitle": "FEATURE: per-topic unsubscribe option in emails",
+      "prUrl": "https://github.com/ai-code-review-evaluation/discourse-graphite/pull/2",
+      "sourceRepo": "discourse",
+      "language": "ruby",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "logic: Potential nil pointer exception - if no TopicUser record exists, tu will be nil and calling m",
+        "Typo in property name: 'stopNotificiationsText' should be 'stopNotificationsText' (missing 'n' in 'N"
+      ]
+    },
+    {
+      "prTitle": "Add comprehensive email validation for blocked users",
+      "prUrl": "https://github.com/ai-code-review-evaluation/discourse-graphite/pull/3",
+      "sourceRepo": "discourse",
+      "language": "ruby",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "BlockedEmail.should_block_email? method has side effects during a read operation - it updates statis",
+        "Regex pattern @(#{domains}) only matches domain suffixes, not full domains. evil.example.com would m"
+      ]
+    },
+    {
+      "prTitle": "Enhance embed URL handling and validation system",
+      "prUrl": "https://github.com/ai-code-review-evaluation/discourse-graphite/pull/4",
+      "sourceRepo": "discourse",
+      "language": "ruby",
+      "goldenComments": 6,
+      "matchedComments": 0,
+      "unmatchedComments": 6,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "SSRF vulnerability using open(url) without validation",
+        "The current origin validation using indexOf is insufficient and can be bypassed. An attacker could u",
+        "postMessage targetOrigin should be the origin (scheme+host+port), not the full referrer URL; using t",
+        "The code sets X-Frame-Options: ALLOWALL which completely disables clickjacking protection. The refer",
+        "The TopicEmbed.import method is susceptible to a NoMethodError if the contents parameter is nil when",
+        "The ERB block closes with end if, which is invalid Ruby/ERB and will raise at render; it should just"
+      ]
+    },
+    {
+      "prTitle": "Optimize header layout performance with flexbox mixins",
+      "prUrl": "https://github.com/ai-code-review-evaluation/discourse-graphite/pull/5",
+      "sourceRepo": "discourse",
+      "language": "ruby",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Mixing float: left with flexbox causes layout issues. Further this PR removes the float-based right ",
+        "-ms-align-items never existed in any version of IE/Edge; the correct legacy property is -ms-flex-ali"
+      ]
+    },
+    {
+      "prTitle": "UX: show complete URL path if website domain is same as instance domain",
+      "prUrl": "https://github.com/ai-code-review-evaluation/discourse-graphite/pull/6",
+      "sourceRepo": "discourse",
+      "language": "ruby",
+      "goldenComments": 1,
+      "matchedComments": 0,
+      "unmatchedComments": 1,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The include_website_name method is missing the required ? suffix. Rails serializers expect include_ "
+      ]
+    },
+    {
+      "prTitle": "scale-color $lightness must use $secondary for dark themes",
+      "prUrl": "https://github.com/ai-code-review-evaluation/discourse-graphite/pull/7",
+      "sourceRepo": "discourse",
+      "language": "ruby",
+      "goldenComments": 3,
+      "matchedComments": 0,
+      "unmatchedComments": 3,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "In .topic-meta-data h5 a, the original code had color: scale-color($primary, $lightness: 30%) but wa",
+        "This change for desktop/user.css changes $primary from 30% to 50% for the light theme; most other ch",
+        "In topic-post.css the original code used $lightness: 70% but the replacement uses $lightness: 30% fo"
+      ]
+    },
+    {
+      "prTitle": "FIX: proper handling of group memberships",
+      "prUrl": "https://github.com/ai-code-review-evaluation/discourse-graphite/pull/8",
+      "sourceRepo": "discourse",
+      "language": "ruby",
+      "goldenComments": 3,
+      "matchedComments": 0,
+      "unmatchedComments": 3,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        " The findMembers() call is now asynchronous and unhandled. The controller may not have member data i",
+        "In the next action, capping the next offset at user_count can produce an empty page (e.g., total equ",
+        "HTTP method mismatch in .remove_member - test uses PUT but remove_member action expects DELETE"
+      ]
+    },
+    {
+      "prTitle": "FEATURE: Localization fallbacks (server-side)",
+      "prUrl": "https://github.com/ai-code-review-evaluation/discourse-graphite/pull/9",
+      "sourceRepo": "discourse",
+      "language": "ruby",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Thread-safety issue with lazy @loaded_locales",
+        "Consider normalizing the input locale (e.g., to a symbol) when checking/loading here to avoid double"
+      ]
+    },
+    {
+      "prTitle": "FEATURE: Can edit category/host relationships for embedding",
+      "prUrl": "https://github.com/ai-code-review-evaluation/discourse-graphite/pull/10",
+      "sourceRepo": "discourse",
+      "language": "ruby",
+      "goldenComments": 4,
+      "matchedComments": 0,
+      "unmatchedComments": 4,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "NoMethodError before_validation in EmbeddableHost",
+        "The update and destroy methods in Admin::EmbeddableHostsController do not validate the existence of ",
+        "record_for_host compares lower(host) = ? but does not normalize the parameter’s case, so mixed‑case ",
+        "Because this migration inserts embeddable_hosts rows with raw SQL, any existing embeddable_hosts val"
+      ]
+    },
+    {
+      "prTitle": "Anonymous: Add configurable device limit",
+      "prUrl": "https://github.com/grafana/grafana/pull/79265",
+      "sourceRepo": "grafana",
+      "language": "go",
+      "goldenComments": 5,
+      "matchedComments": 0,
+      "unmatchedComments": 5,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Race condition: Multiple concurrent requests could pass the device count check simultaneously and cr",
+        "Anonymous authentication now fails entirely if anonDeviceService.TagDevice returns ErrDeviceLimitRea",
+        "This call won’t compile: dbSession.Exec(args...) is given a []interface{} where the first element is",
+        "Returning ErrDeviceLimitReached when no rows were updated is misleading; the device might not exist.",
+        "Time window calculation inconsistency: Using device.UpdatedAt.UTC().Add(-anonymousDeviceExpiration) "
+      ]
+    },
+    {
+      "prTitle": "AuthZService: improve authz caching",
+      "prUrl": "https://github.com/grafana/grafana/pull/103633",
+      "sourceRepo": "grafana",
+      "language": "go",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The Check operation exhibits asymmetric cache trust logic: cached permission grants are trusted and ",
+        "The test comment says the cached permissions 'allow access', but the map stores false for dashboards"
+      ]
+    },
+    {
+      "prTitle": "Plugins: Chore: Renamed instrumentation middleware to metrics middleware",
+      "prUrl": "https://github.com/grafana/grafana/pull/76186",
+      "sourceRepo": "grafana",
+      "language": "go",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The ContextualLoggerMiddleware methods (QueryData, CallResource, CheckHealth, CollectMetrics) panic ",
+        "The traceID is no longer logged for plugin requests. During a refactoring, the tracing import and th"
+      ]
+    },
+    {
+      "prTitle": "Advanced Query Processing Architecture",
+      "prUrl": "https://github.com/grafana/grafana/pull/107534",
+      "sourceRepo": "grafana",
+      "language": "go",
+      "goldenComments": 1,
+      "matchedComments": 0,
+      "unmatchedComments": 1,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The applyTemplateVariables method is called with request.filters as the third parameter, but this pa"
+      ]
+    },
+    {
+      "prTitle": "Notification Rule Processing Engine",
+      "prUrl": "https://github.com/grafana/grafana/pull/106778",
+      "sourceRepo": "grafana",
+      "language": "go",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The rendered GrafanaRuleListItem is missing the required key prop for React list items. This can cau",
+        "RuleActionsButtons is invoked with only promRule, but SilenceGrafanaRuleDrawer inside RuleActionsBut"
+      ]
+    },
+    {
+      "prTitle": "Dual Storage Architecture",
+      "prUrl": "https://github.com/grafana/grafana/pull/90045",
+      "sourceRepo": "grafana",
+      "language": "go",
+      "goldenComments": 3,
+      "matchedComments": 0,
+      "unmatchedComments": 3,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The context is being created with d.Log instead of the log variable that was initialized with additi",
+        "Bug: calling recordLegacyDuration when storage operation fails should be recordStorageDuration.",
+        "Inconsistency: using name instead of options.Kind for metrics recording differs from other methods."
+      ]
+    },
+    {
+      "prTitle": "Database Performance Optimizations",
+      "prUrl": "https://github.com/grafana/grafana/pull/80329",
+      "sourceRepo": "grafana",
+      "language": "go",
+      "goldenComments": 1,
+      "matchedComments": 0,
+      "unmatchedComments": 1,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The code uses Error log level for what appears to be debugging information. This will pollute error "
+      ]
+    },
+    {
+      "prTitle": "Frontend Asset Optimization",
+      "prUrl": "https://github.com/grafana/grafana/pull/90939",
+      "sourceRepo": "grafana",
+      "language": "go",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The GetWebAssets function implements an incomplete double-checked locking pattern for caching web as",
+        "In addition to the missing double-check, the function has a critical flaw in its error handling: it "
+      ]
+    },
+    {
+      "prTitle": "Advanced SQL Analytics Framework",
+      "prUrl": "https://github.com/grafana/grafana/pull/94942",
+      "sourceRepo": "grafana",
+      "language": "go",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The enableSqlExpressions function has flawed logic that always returns false, effectively disabling ",
+        "Several methods such as NewInMemoryDB().RunCommands and db.QueryFramesInto return 'not implemented'."
+      ]
+    },
+    {
+      "prTitle": "Unified Storage Performance Optimizations",
+      "prUrl": "https://github.com/grafana/grafana/pull/97529",
+      "sourceRepo": "grafana",
+      "language": "go",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "A race condition in BuildIndex allows multiple goroutines to concurrently build the same expensive i",
+        "Calling s.search.TotalDocs() here may race with concurrent index creation: TotalDocs iterates b.cach"
+      ]
+    },
+    {
+      "prTitle": "Fixing Re-authentication with passkeys",
+      "prUrl": "https://github.com/ai-code-review-evaluation/keycloak-greptile/pull/1",
+      "sourceRepo": "keycloak",
+      "language": "java",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "ConditionalPasskeysEnabled() called without UserModel parameter",
+        "With isConditionalPasskeysEnabled(UserModel user) requiring user != null, authenticate(...) will not"
+      ]
+    },
+    {
+      "prTitle": "Add caching support for IdentityProviderStorageProvider.getForLogin operations",
+      "prUrl": "https://github.com/keycloak/keycloak/pull/32918",
+      "sourceRepo": "keycloak",
+      "language": "java",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Recursive caching call using session instead of delegate",
+        "Cleanup reference uses incorrect alias - should be 'idp-alias-' + i instead of 'alias'."
+      ]
+    },
+    {
+      "prTitle": "Add AuthzClientCryptoProvider for authorization client cryptographic operations",
+      "prUrl": "https://github.com/keycloak/keycloak/pull/33832",
+      "sourceRepo": "keycloak",
+      "language": "java",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Returns wrong provider (default keystore instead of BouncyCastle)",
+        "Dead code exists where ASN1Encoder instances are created and written to, but their results are immed"
+      ]
+    },
+    {
+      "prTitle": "Add rolling-updates feature flag and compatibility framework",
+      "prUrl": "https://github.com/keycloak/keycloak/pull/36882",
+      "sourceRepo": "keycloak",
+      "language": "java",
+      "goldenComments": 1,
+      "matchedComments": 0,
+      "unmatchedComments": 1,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Incorrect method call for exit codes. The picocli.exit() method calls System.exit() directly, which "
+      ]
+    },
+    {
+      "prTitle": "Add Client resource type and scopes to authorization schema",
+      "prUrl": "https://github.com/keycloak/keycloak/pull/36880",
+      "sourceRepo": "keycloak",
+      "language": "java",
+      "goldenComments": 3,
+      "matchedComments": 0,
+      "unmatchedComments": 3,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Inconsistent feature flag bug causing orphaned permissions. The AdminPermissions event listener, res",
+        "In hasPermission(ClientModel client, String scope), the resource lookup uses findByName(server, clie",
+        "In getClientsWithPermission(String scope), iterating resourceStore.findByType(server, AdminPermissio"
+      ]
+    },
+    {
+      "prTitle": "Add Groups resource type and scopes to authorization schema",
+      "prUrl": "https://github.com/keycloak/keycloak/pull/37038",
+      "sourceRepo": "keycloak",
+      "language": "java",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Incorrect permission check in canManage() method",
+        "In getGroupIdsWithViewPermission, hasPermission is called with groupResource.getId() and the same gr"
+      ]
+    },
+    {
+      "prTitle": "Add HTML sanitizer for translated message resources",
+      "prUrl": "https://github.com/keycloak/keycloak/pull/37429",
+      "sourceRepo": "keycloak",
+      "language": "java",
+      "goldenComments": 4,
+      "matchedComments": 0,
+      "unmatchedComments": 4,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The translation is in Italian instead of Lithuanian. This should be translated to Lithuanian to matc",
+        "The totpStep1 value uses Traditional Chinese terms in the Simplified Chinese file (zh_CN), which is ",
+        "The anchor sanitization logic has a potential issue where it consumes English matcher groups without",
+        "The method name 'santizeAnchors' should be 'sanitizeAnchors' (missing 'i')."
+      ]
+    },
+    {
+      "prTitle": "Implement access token context encoding framework",
+      "prUrl": "https://github.com/keycloak/keycloak/pull/37634",
+      "sourceRepo": "keycloak",
+      "language": "java",
+      "goldenComments": 4,
+      "matchedComments": 0,
+      "unmatchedComments": 4,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Wrong parameter in null check (grantType vs. rawTokenId)",
+        "In isAccessTokenId, the substring for the grant shortcut and the equality check look inverted: the g",
+        "Javadoc mentions \"usually like 3-letters shortcut\" but some implementations use 2-letter shortcuts (",
+        " Catching generic RuntimeException is too broad. The implementation throws IllegalArgumentException "
+      ]
+    },
+    {
+      "prTitle": "Implement recovery key support for user storage providers",
+      "prUrl": "https://github.com/keycloak/keycloak/pull/38446",
+      "sourceRepo": "keycloak",
+      "language": "java",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Unsafe raw List deserialization without type safety. Calling Optional.get() directly on the Optional",
+        "After creating the RecoveryAuthnCodesCredentialModel, consider setting its id from the stored creden"
+      ]
+    },
+    {
+      "prTitle": "Fix concurrent group access to prevent NullPointerException",
+      "prUrl": "https://github.com/keycloak/keycloak/pull/40940",
+      "sourceRepo": "keycloak",
+      "language": "java",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Returning null from getSubGroupsCount() violates the GroupModel contract (Javadoc says it never retu",
+        "The reader thread isn’t waited for; flipping deletedAll to true and asserting immediately can race a"
+      ]
+    },
+    {
+      "prTitle": "Enhanced Pagination Performance for High-Volume Audit Logs",
+      "prUrl": "https://github.com/ai-code-review-evaluation/sentry-greptile/pull/1",
+      "sourceRepo": "sentry",
+      "language": "python",
+      "goldenComments": 3,
+      "matchedComments": 0,
+      "unmatchedComments": 3,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Django querysets do not support negative slicing",
+        "When requests are authenticated with API keys or org auth tokens (which have user_id=None), organiza",
+        "get_item_key assumes a numeric key, but the paginator is used with order_by=-datetime in the audit l"
+      ]
+    },
+    {
+      "prTitle": "Optimize spans buffer insertion with eviction during insert",
+      "prUrl": "https://github.com/ai-code-review-evaluation/sentry-greptile/pull/2",
+      "sourceRepo": "sentry",
+      "language": "python",
+      "goldenComments": 3,
+      "matchedComments": 0,
+      "unmatchedComments": 3,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "OptimizedCursorPaginator negative-offset branch slices QuerySet with a negative start index",
+        "BasePaginator negative-offset branch slices QuerySet with a negative start index",
+        "OptimizedCursorPaginator.get_item_key uses floor/ceil on a datetime key (order_by='-datetime'), caus"
+      ]
+    },
+    {
+      "prTitle": "feat(upsampling) - Support upsampled error count with performance optimizations",
+      "prUrl": "https://github.com/ai-code-review-evaluation/sentry-greptile/pull/3",
+      "sourceRepo": "sentry",
+      "language": "python",
+      "goldenComments": 3,
+      "matchedComments": 0,
+      "unmatchedComments": 3,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "sample_rate = 0.0 is falsy and skipped",
+        "Using Python’s built-in hash() to build cache keys is non-deterministic across processes (hash rando",
+        "The upsampling eligibility check passes the outer dataset instead of the actual dataset used by scop"
+      ]
+    },
+    {
+      "prTitle": "GitHub OAuth Security Enhancement",
+      "prUrl": "https://github.com/getsentry/sentry/pull/67876",
+      "sourceRepo": "sentry",
+      "language": "python",
+      "goldenComments": 3,
+      "matchedComments": 0,
+      "unmatchedComments": 3,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Null reference if github_authenticated_user state is missing",
+        "OAuth state uses pipeline.signature (static) instead of a per-request random value",
+        "The code attempts to access integration.metadata[sender][login] without checking for the existence o"
+      ]
+    },
+    {
+      "prTitle": "Replays Self-Serve Bulk Delete System",
+      "prUrl": "https://github.com/ai-code-review-evaluation/sentry-greptile/pull/5",
+      "sourceRepo": "sentry",
+      "language": "python",
+      "goldenComments": 3,
+      "matchedComments": 0,
+      "unmatchedComments": 3,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Breaking changes in error response format",
+        "Detector validator uses wrong key when updating type",
+        "Using zip(error_ids, events.values()) assumes the get_multi result preserves the input order; dict v"
+      ]
+    },
+    {
+      "prTitle": "Span Buffer Multiprocess Enhancement with Health Monitoring",
+      "prUrl": "https://github.com/getsentry/sentry/pull/93824",
+      "sourceRepo": "sentry",
+      "language": "python",
+      "goldenComments": 5,
+      "matchedComments": 0,
+      "unmatchedComments": 5,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Inconsistent metric tagging with 'shard' and 'shards'",
+        "Fixed sleep in tests can be flaky; wait on condition instead",
+        "Because flusher processes are created via multiprocessing.get_context('spawn').Process, they are ins",
+        "Sleep in test_consumer.py won’t actually wait because time.sleep was monkeypatched above; consider r",
+        "Breaking out of the loop when the deadline has elapsed can skip terminating remaining flusher proces"
+      ]
+    },
+    {
+      "prTitle": "feat(ecosystem): Implement cross-system issue synchronization",
+      "prUrl": "https://github.com/getsentry/sentry/pull/77754",
+      "sourceRepo": "sentry",
+      "language": "python",
+      "goldenComments": 4,
+      "matchedComments": 0,
+      "unmatchedComments": 4,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "Shared mutable default in dataclass timestamp",
+        "The method name has a typo: test_from_dict_inalid_data should be test_from_dict_invalid_data.",
+        "Method name says 'empty_array' but tests empty dict - consider renaming to 'test_from_dict_empty_dic",
+        "to_dict() returns a datetime for queued; if this dict is passed in task kwargs (e.g., via apply_asyn"
+      ]
+    },
+    {
+      "prTitle": "ref(crons): Reorganize incident creation / issue occurrence logic",
+      "prUrl": "https://github.com/getsentry/sentry/pull/80528",
+      "sourceRepo": "sentry",
+      "language": "python",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The function modifies the config variable to include display values but then returns the original mo",
+        "The code fetches MonitorCheckIn objects by ID when the required data already exists in previous_chec"
+      ]
+    },
+    {
+      "prTitle": "feat(uptime): Add ability to use queues to manage parallelism",
+      "prUrl": "https://github.com/getsentry/sentry/pull/95633",
+      "sourceRepo": "sentry",
+      "language": "python",
+      "goldenComments": 3,
+      "matchedComments": 0,
+      "unmatchedComments": 3,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "The queue.shutdown() method with 'immediate=False' parameter may not exist in the standard Python qu",
+        "The magic number 50 for max_wait is used repeatedly throughout the tests. Consider extracting this a",
+        "The test test_thread_queue_parallel_error_handling has a docstring that doesn't match the test imple"
+      ]
+    },
+    {
+      "prTitle": "feat(workflow_engine): Add in hook for producing occurrences from the stateful detector",
+      "prUrl": "https://github.com/getsentry/sentry/pull/80168",
+      "sourceRepo": "sentry",
+      "language": "python",
+      "goldenComments": 2,
+      "matchedComments": 0,
+      "unmatchedComments": 2,
+      "falsePositives": 0,
+      "precision": 1,
+      "recall": 0,
+      "findings": [],
+      "matches": [],
+      "missed": [
+        "MetricAlertDetectorHandler inherits from StatefulDetectorHandler but only contains pass, failing to ",
+        "Docstring says this returns a list of DetectorEvaluationResult, but the method now returns a dict ke"
+      ]
+    }
+  ]
+}

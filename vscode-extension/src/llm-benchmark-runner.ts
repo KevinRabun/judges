@@ -480,7 +480,7 @@ async function runPerJudgeBatched(
           fp = 0,
           fn = 0;
         for (const entry of checkpoint.perJudgeResults) {
-          tp += entry.result.detectedRuleIds.length - entry.result.falsePositiveRuleIds.length;
+          tp += entry.result.expectedRuleIds.length - entry.result.missedRuleIds.length;
           fp += entry.result.falsePositiveRuleIds.length;
           fn += entry.result.missedRuleIds.length;
         }
@@ -513,6 +513,7 @@ export async function runLlmBenchmark(
   onProgress: (p: BenchmarkProgress) => void,
   storageUri: vscode.Uri,
   chatModel?: vscode.LanguageModelChat,
+  externalCases?: BenchmarkCase[],
 ): Promise<BenchmarkRunResult> {
   const cfg = readConfig();
   if (!cfg.enabled) {
@@ -549,9 +550,12 @@ export async function runLlmBenchmark(
   }
 
   // 3. Select stratified sample
-  const cases = selectStratifiedSample(BENCHMARK_CASES, cfg.sampleSize);
+  const casePool = externalCases ?? BENCHMARK_CASES;
+  const cases = externalCases
+    ? externalCases // Use all external cases (no sampling)
+    : selectStratifiedSample(casePool, cfg.sampleSize);
   const sampleCaseIds = cases.map((c: BenchmarkCase) => c.id);
-  log(`Selected ${cases.length} stratified cases from ${BENCHMARK_CASES.length} total`);
+  log(`Selected ${cases.length} cases from ${casePool.length} total${externalCases ? " (external benchmark)" : ""}`);
 
   // 4. Check for checkpoint
   try {

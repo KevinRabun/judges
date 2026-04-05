@@ -2,6 +2,27 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.129.0] — 2026-04-05
+
+### Added
+- **External benchmark registry** — Unified framework for running third-party benchmarks against Judges with per-suite scoring and composite scorecards. Adapters self-register; new benchmarks can be added by implementing `ExternalBenchmarkAdapter`.
+- **OpenSSF CVE Benchmark adapter** (`openssf-cve`) — 200+ real-world JS/TS CVEs with CWE→judge-prefix mapping, pre-patch detection, and post-patch false-positive checking. Converts CVEs to `BenchmarkCase[]` for LLM pipeline integration.
+- **Martian Code Review Benchmark adapter** (`martian-code-review`) — 50 PRs from Sentry (Python), Grafana (Go), Cal.com (TypeScript), Discourse (Ruby), Keycloak (Java) with human-curated golden comments. Fetches actual PR diffs from GitHub and converts to `BenchmarkCase[]` for L2 LLM evaluation.
+- **CLI commands** — `judges external-benchmark run|list|report` with `--suite`, `--repo`, `--format` options. `judges openssf-cve run|convert` for standalone OpenSSF runs.
+- **VS Code: Run External Benchmark** command — QuickPick UI for selecting benchmark suites, L1/L2 evaluation mode picker, auto-detects repos, status bar progress, composite markdown report.
+- **LLM benchmark: external case support** — `runLlmBenchmark()` now accepts optional `externalCases` parameter to evaluate third-party benchmark data through the LLM judge pipeline.
+
+### Fixed
+- **LLM benchmark running F1 discrepancy** — Running F1 in output channel now uses `expectedRuleIds.length - missedRuleIds.length` for TPs (matching the final report), instead of `detectedRuleIds.length - falsePositiveRuleIds.length` which inflated the running score by counting acceptable-but-not-expected detections as TPs.
+- **LLM benchmark status bar alignment** — Status bar now reports case-level progress matching the output channel after checkpoint resume.
+- **Resume log message** — Output channel logs a summary on checkpoint restore.
+
+### Changed
+- **20 benchmark amendments codified** — Self-teaching precision amendments baked into judge `.judge.md` files for: FPR, INTENT, SWDEV, LOGIC, ERR, CFG, FW, COMPAT, DOC, CLOUD, RATE, DB, REL, MAINT, AGENT, SCALE, API, I18N, TEST, HALLU.
+
+### Tests
+- 3,646 tests passing, 0 failures. 32 new tests covering external benchmark registry, OpenSSF adapter, Martian adapter (PR conversion, diff extraction, prefix inference, validation), composite reporting.
+
 ## [3.128.3] — 2026-04-05
 
 ### Fixed

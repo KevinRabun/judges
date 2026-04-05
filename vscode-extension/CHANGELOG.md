@@ -4,6 +4,17 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.129.0] — 2026-04-05
+
+### Added
+- **Run External Benchmark** command — QuickPick UI to select from OpenSSF CVE Benchmark, Martian Code Review Bench, or run all suites. Supports L1 (deterministic) and L2 (LLM) evaluation modes.
+- **LLM evaluation of external benchmarks** — Fetches real PR diffs from GitHub and runs them through the LLM judge pipeline for meaningful code-review scores.
+- **External case support in LLM benchmark runner** — `runLlmBenchmark()` accepts external `BenchmarkCase[]` for third-party benchmark evaluation.
+
+### Fixed
+- **Running F1 score discrepancy** — Output channel F1 now matches the final report. See [core CHANGELOG](../../CHANGELOG.md).
+- **Status bar progress alignment** — Matches output channel case counts after resume.
+
 ## [3.128.3] — 2026-04-05
 
 ### Fixed

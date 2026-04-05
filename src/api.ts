@@ -416,6 +416,10 @@ export {
 export type { LlmBenchmarkSnapshot, LlmCaseResult } from "./commands/llm-benchmark.js";
 export type { LlmFinding, ValidationResult } from "./probabilistic/llm-response-validator.js";
 
+// ─── External Benchmarks ────────────────────────────────────────────────────
+
+export { convertAllToBenchmarkCases as convertMartianToBenchmarkCases } from "./commands/martian-code-review-benchmark.js";
+
 // ─── LLM Benchmark Optimizer (Self-Teaching) ────────────────────────────────
 
 export type {

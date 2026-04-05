@@ -2,7 +2,7 @@
   "name": "judges-panel",
   "displayName": "Judges Panel",
   "description": "45 judges evaluate AI-generated code for security, cost, and quality — inline diagnostics, quick-fixes, and auto-configured MCP server for Copilot deep review.",
-  "version": "3.128.3",
+  "version": "3.129.0",
   "publisher": "kevinrabun",
   "license": "MIT",
   "icon": "icon.png",
@@ -156,6 +156,16 @@
       {
         "command": "judges.stopLlmBenchmark",
         "title": "Judges: Stop LLM Benchmark",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "judges.runExternalBenchmark",
+        "title": "Judges: Run External Benchmark",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "judges.stopExternalBenchmark",
+        "title": "Judges: Stop External Benchmark",
         "icon": "$(debug-stop)"
       },
       {
