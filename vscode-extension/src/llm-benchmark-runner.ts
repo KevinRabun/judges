@@ -514,6 +514,8 @@ export async function runLlmBenchmark(
   storageUri: vscode.Uri,
   chatModel?: vscode.LanguageModelChat,
   externalCases?: BenchmarkCase[],
+  /** File prefix for output files (default: "llm"). External benchmarks use their suite ID. */
+  filePrefix?: string,
 ): Promise<BenchmarkRunResult> {
   const cfg = readConfig();
   if (!cfg.enabled) {
@@ -630,7 +632,8 @@ export async function runLlmBenchmark(
   const reportMarkdown = formatStandaloneBenchmarkReport(snapshot);
   const snapshotJson = JSON.stringify(snapshot, null, 2);
   const fullResponses = Object.fromEntries(_fullResponses);
-  await writeOutputFiles(storageUri, snapshotJson, reportMarkdown, fullResponses);
+  const prefix = filePrefix ?? "llm";
+  await writeOutputFiles(storageUri, snapshotJson, reportMarkdown, prefix, fullResponses);
   await deleteCheckpoint();
 
   // 7. Self-teaching: generate amendments from FP patterns for next run
@@ -671,16 +674,17 @@ async function writeOutputFiles(
   dir: vscode.Uri,
   snapshot: string,
   report: string,
+  prefix: string,
   fullResponses?: Record<string, string>,
 ): Promise<void> {
   const enc = new TextEncoder();
-  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(dir, "llm-snapshot-latest.json"), enc.encode(snapshot));
-  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(dir, "llm-benchmark-report.md"), enc.encode(report));
+  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(dir, `${prefix}-snapshot-latest.json`), enc.encode(snapshot));
+  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(dir, `${prefix}-benchmark-report.md`), enc.encode(report));
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(dir, `llm-snapshot-${ts}.json`), enc.encode(snapshot));
+  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(dir, `${prefix}-snapshot-${ts}.json`), enc.encode(snapshot));
   if (fullResponses && Object.keys(fullResponses).length > 0) {
     await vscode.workspace.fs.writeFile(
-      vscode.Uri.joinPath(dir, "llm-responses-latest.json"),
+      vscode.Uri.joinPath(dir, `${prefix}-responses-latest.json`),
       enc.encode(JSON.stringify(fullResponses, null, 2)),
     );
   }
@@ -689,7 +693,10 @@ async function writeOutputFiles(
 /**
  * Copy benchmark results from extension storage to the workspace benchmarks/ folder.
  */
-export async function saveResultsToWorkspace(storageUri: vscode.Uri): Promise<vscode.Uri | undefined> {
+export async function saveResultsToWorkspace(
+  storageUri: vscode.Uri,
+  filePrefix = "llm",
+): Promise<vscode.Uri | undefined> {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri;
   if (!root) {
     vscode.window.showWarningMessage("No workspace folder open.");
@@ -703,7 +710,11 @@ export async function saveResultsToWorkspace(storageUri: vscode.Uri): Promise<vs
     /* exists */
   }
 
-  for (const name of ["llm-snapshot-latest.json", "llm-benchmark-report.md", "llm-responses-latest.json"]) {
+  for (const name of [
+    `${filePrefix}-snapshot-latest.json`,
+    `${filePrefix}-benchmark-report.md`,
+    `${filePrefix}-responses-latest.json`,
+  ]) {
     try {
       const data = await vscode.workspace.fs.readFile(vscode.Uri.joinPath(storageUri, name));
       await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(benchmarksDir, name), data);
@@ -712,7 +723,7 @@ export async function saveResultsToWorkspace(storageUri: vscode.Uri): Promise<vs
     }
   }
 
-  return vscode.Uri.joinPath(benchmarksDir, "llm-benchmark-report.md");
+  return vscode.Uri.joinPath(benchmarksDir, `${filePrefix}-benchmark-report.md`);
 }
 
 // Internal test hooks

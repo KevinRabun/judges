@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.129.2] — 2026-04-05
+
+### Fixed
+- **Benchmark output isolation** — Each benchmark writes to its own files (`llm-*`, `martian-code-review-*`, etc.) instead of overwriting a shared set. See [core CHANGELOG](../../CHANGELOG.md).
+
 ## [3.129.1] — 2026-04-05
 
 ### Fixed

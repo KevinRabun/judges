@@ -195,6 +195,7 @@ export async function runExternalBenchmarkUI(token: vscode.CancellationToken, st
           storageUri!,
           undefined, // use default model
           cases, // pass external cases
+          suite.suiteId, // unique file prefix per benchmark
         );
 
         log(`\n  ✅ ${suite.suiteName} LLM evaluation complete`);

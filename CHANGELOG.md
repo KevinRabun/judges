@@ -2,6 +2,14 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.129.2] — 2026-04-05
+
+### Fixed
+- **Benchmark output isolation** — Each benchmark (internal, OpenSSF CVE, Martian, etc.) now writes to its own set of output files using a unique prefix (`llm-`, `openssf-cve-`, `martian-code-review-`, etc.). Reports no longer overwrite each other. `writeOutputFiles` and `saveResultsToWorkspace` accept a `filePrefix` parameter.
+
+### Tests
+- 3,656 tests passing, 0 failures.
+
 ## [3.129.1] — 2026-04-05
 
 ### Fixed
