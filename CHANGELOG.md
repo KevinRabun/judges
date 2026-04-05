@@ -2,6 +2,14 @@
 
 All notable changes to **@kevinrabun/judges** are documented here.
 
+## [3.129.4] — 2026-04-05
+
+### Added
+- **Code review mode for LLM judges** — External benchmark cases now inject a `CODE_REVIEW_MODE_DIRECTIVE` that overrides the precision/suppression mandates when evaluating PR diffs. Key changes: CLEAN_CODE_GATE is disabled (well-structured code CAN have review-worthy concerns), confidence threshold lowered from 80% → 60%, absence-based findings are valid (this is a complete change set), behavior regressions are explicitly flagged (removed checks, weakened validation), and the LLM is instructed to report at least one finding per domain if any concern exists. Internal benchmark cases are unaffected.
+
+### Tests
+- 3,656 tests passing, 0 failures.
+
 ## [3.129.3] — 2026-04-05
 
 ### Changed

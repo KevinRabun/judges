@@ -4,6 +4,11 @@ All notable changes to the **Judges Panel** VS Code extension will be documented
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.129.4] — 2026-04-05
+
+### Added
+- **Code review mode** — External benchmarks use relaxed prompt directives optimized for PR diff review. See [core CHANGELOG](../../CHANGELOG.md).
+
 ## [3.129.3] — 2026-04-05
 
 ### Changed

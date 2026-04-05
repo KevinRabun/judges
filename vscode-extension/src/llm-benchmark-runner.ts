@@ -427,6 +427,7 @@ async function runPerJudgeBatched(
   onProgress: (p: BenchmarkProgress) => void,
   checkpoint: BatchCheckpoint,
   amendments?: PromptAmendment[],
+  reviewMode = false,
 ): Promise<LlmCaseResult[]> {
   const caseRuleIds: string[][] = cases.map(() => []);
   const caseResponses: string[][] = cases.map(() => []);
@@ -471,7 +472,7 @@ async function runPerJudgeBatched(
         const judgeChunk = judges.slice(jStart, jStart + concurrency);
         const chunkResults = await Promise.all(
           judgeChunk.map(async (judge) => {
-            const prompt = constructPerJudgePrompt(judge, tc.code, tc.language, [], amendments);
+            const prompt = constructPerJudgePrompt(judge, tc.code, tc.language, [], amendments, reviewMode);
             const response = await sendPrompt(model, prompt, token, cfg);
             const validation = extractValidatedLlmFindings(response, getValidRulePrefixes());
             const ruleIds = validation.ruleIds.length ? validation.ruleIds : parseLlmRuleIds(response);
@@ -651,7 +652,18 @@ export async function runLlmBenchmark(
   }
   log("Starting per-judge benchmark…");
   onProgress({ message: "Running per-judge benchmark…", completed: 0, total: 1 });
-  const results = await runPerJudgeBatched(model, cases, token, cfg, onProgress, checkpoint, amendmentStore.amendments);
+  const isReviewMode = !!externalCases;
+  if (isReviewMode) log("Review mode enabled — using code-review prompt directives");
+  const results = await runPerJudgeBatched(
+    model,
+    cases,
+    token,
+    cfg,
+    onProgress,
+    checkpoint,
+    amendmentStore.amendments,
+    isReviewMode,
+  );
   const duration = Math.round((Date.now() - startTime) / 1000);
   log(`Benchmark complete: ${duration}s total, ${_totalCalls} calls, ${_totalEmpty} empty`);
 

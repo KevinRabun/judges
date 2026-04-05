@@ -292,12 +292,30 @@ export function extractValidatedLlmFindings(response: string, prefixes?: Set<str
  * Uses condensed criteria (adversarial mandate stripped) plus shared mandates,
  * mirroring the tribunal architecture for consistency and better precision.
  */
+/**
+ * Review-mode directive injected into per-judge prompts for external code-review
+ * benchmarks. Overrides the precision/suppression mandates to match the code-review
+ * task: flag design concerns, behavior regressions, and subtle issues that a senior
+ * human reviewer would catch — not just CVE-class vulnerabilities.
+ */
+export const CODE_REVIEW_MODE_DIRECTIVE = `CODE REVIEW MODE (this is a pull request diff review — OVERRIDES the SINGLE-FILE LIMITATION and adjusts the PRECISION MANDATE):
+- You are reviewing a pull request diff, not an isolated code snippet. The code shows WHAT CHANGED in a real codebase.
+- Lines starting with \`-\` were REMOVED. Lines starting with \`+\` were ADDED. Lines starting with \`@@\` are hunk headers with line numbers. Unchanged lines provide context.
+- BEHAVIOR REGRESSIONS: Flag any removed validation, removed error handling, removed security checks, weakened conditions, or relaxed constraints. If a check existed before and was removed or weakened, that IS a finding.
+- DESIGN CONCERNS: Flag cache invalidation gaps, missing transaction boundaries, race conditions in concurrent access, incorrect type checks (e.g. isinstance against wrong base class), and architectural issues visible in the diff.
+- ABSENCE IS VALID: Unlike single-file review, this is a complete change set. Missing error handling for new code paths, missing validation on new inputs, and missing tests for new functionality ARE valid findings.
+- LOWER CONFIDENCE THRESHOLD: Report findings at ≥60% confidence (not the usual ≥80%). Code review catches potential problems early — a "worth investigating" concern is valuable even if not certain.
+- SEVERITY CALIBRATION: In code review, a "Medium" finding means "a senior reviewer would comment on this." A "High" finding means "this should be fixed before merge." A "Critical" finding means "this will cause a production incident."
+- DO NOT SUPPRESS: The FINAL GATE and CLEAN CODE GATE do not apply in review mode. Well-structured code can still have review-worthy concerns (e.g., a well-written function that introduces a subtle race condition).
+- REPORT AT LEAST ONE FINDING if you identify ANY concern within your domain — even if it's only medium severity. An empty report should mean "I genuinely found nothing in my domain," not "I suppressed everything below high confidence."`;
+
 export function constructPerJudgePrompt(
   judge: JudgeDefinition,
   code: string,
   language: string,
   contextSnippets: string[] = [],
   amendments?: PromptAmendment[],
+  reviewMode = false,
 ): string {
   const persona = judge.systemPrompt.substring(0, judge.systemPrompt.indexOf("\n\n"));
   const criteria = getCondensedCriteria(judge.systemPrompt);
@@ -307,15 +325,20 @@ export function constructPerJudgePrompt(
   // Filter amendments to only those relevant to this judge
   const relevantAmendments = (amendments ?? []).filter((a) => a.judgePrefix === judge.rulePrefix);
   const amendmentSection = formatAmendmentSection(relevantAmendments);
+  const reviewModeSection = reviewMode ? `${CODE_REVIEW_MODE_DIRECTIVE}\n\n` : "";
+  const evaluationTask = reviewMode
+    ? `Please review the following ${language} pull request diff for issues within your domain:\n\n\`\`\`${language}\n${code}\n\`\`\``
+    : `Please evaluate the following ${language} code:\n\n\`\`\`${language}\n${code}\n\`\`\``;
   return (
     `${persona}\n\n` +
     `${SHARED_ADVERSARIAL_MANDATE}\n\n` +
     `${PRECISION_MANDATE}\n\n` +
+    reviewModeSection +
     (amendmentSection ? `${amendmentSection}\n` : "") +
     contextSection +
     `${criteria}\n\n` +
-    `${CLEAN_CODE_GATE}\n\n` +
-    `Please evaluate the following ${language} code:\n\n\`\`\`${language}\n${code}\n\`\`\`` +
+    (reviewMode ? "" : `${CLEAN_CODE_GATE}\n\n`) +
+    evaluationTask +
     `\n\nProvide your evaluation as structured findings with rule IDs (prefix: ${judge.rulePrefix}-), severity levels (critical/high/medium/low/info), descriptions, and actionable recommendations. If no issues meet the confidence threshold, report zero findings explicitly. End with an overall score (0-100) and verdict (pass/warning/fail).`
   );
 }
