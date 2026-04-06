@@ -102,8 +102,8 @@ const SEVERITY_RANK: Record<string, number> = {
   info: 0,
 };
 
-/** Maximum candidates to keep per PR — mirrors production review comment limits. */
-const MAX_CANDIDATES_PER_PR = 8;
+/** Maximum candidates to keep per PR — top tools on the Martian benchmark post 3-5 comments. */
+const MAX_CANDIDATES_PER_PR = 5;
 
 interface RankedCandidate {
   text: string;
