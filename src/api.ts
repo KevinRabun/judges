@@ -103,6 +103,7 @@ export type { FindingDiff, NetChangeGateOptions, NetChangeGateResult, Evaluation
 
 // ─── Adaptive Judge Selection ────────────────────────────────────────────────
 export { selectJudges } from "./evaluators/judge-selector.js";
+export { getRelevantJudges } from "./commands/smart-select.js";
 
 // ─── Evaluation Session ─────────────────────────────────────────────────────
 export { EvaluationSession, getGlobalSession, resetGlobalSession } from "./evaluation-session.js";

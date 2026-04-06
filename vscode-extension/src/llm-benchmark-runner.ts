@@ -13,7 +13,7 @@
 
 import * as vscode from "vscode";
 import process from "node:process";
-import { JUDGES, BENCHMARK_CASES } from "@kevinrabun/judges/api";
+import { JUDGES, BENCHMARK_CASES, getRelevantJudges } from "@kevinrabun/judges/api";
 import type { BenchmarkCase, LlmBenchmarkSnapshot, LlmCaseResult } from "@kevinrabun/judges/api";
 import {
   parseLlmRuleIds,
@@ -375,43 +375,24 @@ let _fullResponses: Map<string, string> = new Map();
 // ─── Per-Judge Execution ────────────────────────────────────────────────────
 
 /**
- * Core judges for external code-review benchmarks.
- * These cover the most common issue categories found in human code reviews.
- * Used when the case comes from an external benchmark (approximate prefix mapping)
- * to ensure we don't miss findings just because the expected→prefix heuristic
- * mapped to a different judge than the one that would actually catch the issue.
+ * Select which judges to run for a benchmark case.
+ *
+ * - Internal cases: strict prefix match (exact expected rule IDs)
+ * - External cases: content-based adaptive selection using the same
+ *   smart-select logic used in production `judges review`. Analyzes
+ *   the code's language, patterns, and imports to pick only relevant
+ *   judges — typically 5-8 instead of all 45.
  */
-const EXTERNAL_BENCHMARK_CORE_PREFIXES = new Set([
-  "CYBER", // Injection, XSS, SSRF, deserialization
-  "SEC", // General security posture
-  "AUTH", // Authentication & authorization
-  "ERR", // Error handling, null safety
-  "CONC", // Concurrency, race conditions
-  "DB", // Database, queries, N+1
-  "LOGIC", // Semantic correctness, type checks
-  "MAINT", // Maintainability, code quality
-  "PERF", // Performance
-  "REL", // Reliability, graceful shutdown
-  "OBS", // Observability, logging
-  "TEST", // Testing quality
-  "CFG", // Configuration, secrets
-  "DATA", // Data security
-  "FW", // Framework safety
-  "COMPAT", // Backwards compatibility
-]);
-
 function selectRelevantJudges(tc: BenchmarkCase): JudgeDefinition[] {
   // Clean cases (no expected findings) → run all judges
   if (tc.expectedRuleIds.length === 0) return [...JUDGES];
 
-  // External benchmark cases → run the broad code-review core set
-  // so findings from any relevant judge can match the approximate golden→prefix mapping
+  // External benchmark cases → adaptive content-based selection
   if (tc.aiSource && tc.aiSource !== "gpt-4" && tc.aiSource !== "claude" && tc.aiSource !== "copilot") {
+    const relevantIds = new Set(getRelevantJudges(tc.language, tc.code));
+    // Also ensure any judge matching expected prefixes is included
     const expectedPrefixes = new Set(tc.expectedRuleIds.map((r: string) => r.split("-")[0]));
-    // Union of expected prefixes + code-review core set
-    return JUDGES.filter(
-      (j: JudgeDefinition) => expectedPrefixes.has(j.rulePrefix) || EXTERNAL_BENCHMARK_CORE_PREFIXES.has(j.rulePrefix),
-    );
+    return JUDGES.filter((j: JudgeDefinition) => relevantIds.has(j.id) || expectedPrefixes.has(j.rulePrefix));
   }
 
   // Internal benchmark cases → strict prefix match (exact expected rule IDs)
