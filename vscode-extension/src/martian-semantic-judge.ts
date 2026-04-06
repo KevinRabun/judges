@@ -94,8 +94,25 @@ async function judgeMatch(
 
 // ─── Candidate Extraction ───────────────────────────────────────────────────
 
+const SEVERITY_RANK: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+  info: 0,
+};
+
+/** Maximum candidates to keep per PR — mirrors production review comment limits. */
+const MAX_CANDIDATES_PER_PR = 8;
+
+interface RankedCandidate {
+  text: string;
+  severity: number;
+  ruleId: string;
+}
+
 function extractCandidatesFromResponse(rawResponse: string): string[] {
-  const candidates: string[] = [];
+  const ranked: RankedCandidate[] = [];
   const seen = new Set<string>();
 
   // Split on finding headers
@@ -108,6 +125,10 @@ function extractCandidatesFromResponse(rawResponse: string): string[] {
     const ruleId = headerMatch[1];
     const title = headerMatch[2].trim().replace(/\*+$/g, "").trim();
 
+    // Extract severity
+    const sevMatch = block.match(/\*?\*?Severity\*?\*?[:\s]+\*?\*?(\w+)/i);
+    const severity = SEVERITY_RANK[(sevMatch?.[1] ?? "medium").toLowerCase()] ?? 2;
+
     // Extract description
     let description = "";
     const descMatch = block.match(
@@ -117,16 +138,18 @@ function extractCandidatesFromResponse(rawResponse: string): string[] {
       description = descMatch[1].replace(/\n/g, " ").replace(/\s+/g, " ").trim().slice(0, 500);
     }
 
-    const candidate = description ? `${title}: ${description}` : title;
+    const text = description ? `${title}: ${description}` : title;
 
-    const key = candidate.toLowerCase().replace(/\s+/g, " ").slice(0, 100);
-    if (!seen.has(key) && candidate.length > 10) {
+    const key = text.toLowerCase().replace(/\s+/g, " ").slice(0, 100);
+    if (!seen.has(key) && text.length > 10) {
       seen.add(key);
-      candidates.push(candidate);
+      ranked.push({ text, severity, ruleId });
     }
   }
 
-  return candidates;
+  // Sort by severity (highest first), then keep top N
+  ranked.sort((a, b) => b.severity - a.severity);
+  return ranked.slice(0, MAX_CANDIDATES_PER_PR).map((r) => r.text);
 }
 
 // ─── Main Evaluation ────────────────────────────────────────────────────────

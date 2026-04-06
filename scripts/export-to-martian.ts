@@ -69,12 +69,29 @@ interface MartianBenchmarkEntry {
 
 // ─── Finding Extraction ─────────────────────────────────────────────────────
 
+const SEVERITY_RANK: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+  info: 0,
+};
+
+/** Maximum candidates to keep per PR — mirrors production review comment limits. */
+const MAX_CANDIDATES_PER_PR = 8;
+
+interface RankedCandidate {
+  text: string;
+  severity: number;
+}
+
 /**
  * Extract individual issue candidates from a multi-judge LLM response.
- * Parses the structured findings format used by Judges' per-judge prompts.
+ * Ranks by severity and caps at MAX_CANDIDATES_PER_PR to match how
+ * production code review tools limit their output.
  */
 function extractCandidatesFromResponse(rawResponse: string): string[] {
-  const candidates: string[] = [];
+  const ranked: RankedCandidate[] = [];
   const seen = new Set<string>();
 
   // Pattern 1: "### RULE-NNN: Title" or "**RULE-NNN: Title**" or "RULE-NNN — Title"
@@ -82,11 +99,14 @@ function extractCandidatesFromResponse(rawResponse: string): string[] {
 
   for (const block of findingBlocks) {
     // Match the rule ID and title
-    const headerMatch = block.match(/^###?\s+\*?\*?([A-Z]{2,}-\d{3})[:\s—\-]+(.+?)(?:\*\*)?$/m);
+    const headerMatch = block.match(/^###?\s+\*?\*?([A-Z]{2,}-\d{3})[:\s—-]+(.+?)(?:\*\*)?$/m);
     if (!headerMatch) continue;
 
-    const ruleId = headerMatch[1];
     const title = headerMatch[2].trim().replace(/\*+$/g, "").trim();
+
+    // Extract severity
+    const sevMatch = block.match(/\*?\*?Severity\*?\*?[:\s]+\*?\*?(\w+)/i);
+    const severity = SEVERITY_RANK[(sevMatch?.[1] ?? "medium").toLowerCase()] ?? 2;
 
     // Extract the description/evidence section
     let description = "";
@@ -100,22 +120,21 @@ function extractCandidatesFromResponse(rawResponse: string): string[] {
     }
 
     // Build the candidate string
-    const candidate = description ? `[${ruleId}] ${title}: ${description}` : `[${ruleId}] ${title}`;
+    const candidate = description ? `${title}: ${description}` : title;
 
     // Deduplicate by normalized content
     const key = candidate.toLowerCase().replace(/\s+/g, " ").slice(0, 100);
-    if (!seen.has(key)) {
+    if (!seen.has(key) && candidate.length > 10) {
       seen.add(key);
-      candidates.push(candidate);
+      ranked.push({ text: candidate, severity });
     }
   }
 
   // Pattern 2: Fallback — extract from "Findings" sections if pattern 1 found nothing
-  if (candidates.length === 0) {
+  if (ranked.length === 0) {
     const findingsMatch = rawResponse.match(/##?\s*Findings\s*\n([\s\S]*?)(?=\n##?\s|$)/gi);
     if (findingsMatch) {
       for (const section of findingsMatch) {
-        // Look for bullet points or numbered items
         const items = section.match(/[-*]\s+\*?\*?([A-Z]{2,}-\d{3})[:\s—-]+(.+)/g);
         if (items) {
           for (const item of items) {
@@ -124,9 +143,9 @@ function extractCandidatesFromResponse(rawResponse: string): string[] {
               .replace(/\*+/g, "")
               .trim();
             const key = cleaned.toLowerCase().slice(0, 100);
-            if (!seen.has(key)) {
+            if (!seen.has(key) && cleaned.length > 10) {
               seen.add(key);
-              candidates.push(cleaned);
+              ranked.push({ text: cleaned, severity: 2 }); // default medium
             }
           }
         }
@@ -134,10 +153,9 @@ function extractCandidatesFromResponse(rawResponse: string): string[] {
     }
   }
 
-  // Pattern 3: Last resort — extract any "No findings" responses as empty
-  // (don't add noise for judges that correctly said "PASS")
-
-  return candidates;
+  // Sort by severity (highest first), cap at MAX_CANDIDATES_PER_PR
+  ranked.sort((a, b) => b.severity - a.severity);
+  return ranked.slice(0, MAX_CANDIDATES_PER_PR).map((r) => r.text);
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────
