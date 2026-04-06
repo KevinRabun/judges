@@ -7,6 +7,7 @@ import { registerChatParticipant } from "./chat-participant";
 import { registerLmTools } from "./lm-tool";
 import { runLlmBenchmark, saveResultsToWorkspace } from "./llm-benchmark-runner";
 import { runExternalBenchmarkUI } from "./external-benchmark-runner";
+import { runMartianSemanticJudge } from "./martian-semantic-judge";
 import type { Finding } from "@kevinrabun/judges/api";
 import { getGlobalSession } from "@kevinrabun/judges/api";
 
@@ -425,6 +426,22 @@ export function activate(context: vscode.ExtensionContext): void {
         setTimeout(() => statusBar.dispose(), 10_000);
         stopDisposable.dispose();
         showOutputDisposable.dispose();
+        cts.dispose();
+      }
+    }),
+
+    // ─── Martian Semantic Judge (honest scoring) ─────────────────────────
+    vscode.commands.registerCommand("judges.scoreMartianBenchmark", async () => {
+      const cts = new vscode.CancellationTokenSource();
+      try {
+        await runMartianSemanticJudge(cts.token, context.globalStorageUri);
+      } catch (error) {
+        if (!(error instanceof vscode.CancellationError)) {
+          vscode.window.showErrorMessage(
+            `Martian scoring failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      } finally {
         cts.dispose();
       }
     }),
