@@ -165,21 +165,40 @@ export async function runExternalBenchmarkUI(token: vscode.CancellationToken, st
 
   // ── LLM Evaluation Mode ──
   if (evaluationMode === "llm") {
-    // Convert external benchmark data to BenchmarkCase[] and run through LLM pipeline
     const { runLlmBenchmark } = await import("./llm-benchmark-runner");
-    // @ts-expect-error — export added in current release, dist types may be stale
-    const { convertMartianToBenchmarkCases } = await import("@kevinrabun/judges/api");
 
     for (const { suite, repoPath } of suiteConfigs) {
       if (token.isCancellationRequested) break;
 
       log(`\n━━━ ${suite.suiteName} (LLM L2) ━━━`);
       log(`Repo: ${repoPath}`);
-      log(`Fetching PR diffs from GitHub and converting to benchmark cases...`);
 
       try {
-        const cases = convertMartianToBenchmarkCases(repoPath);
-        log(`Converted ${cases.length} PRs into benchmark cases`);
+        let cases: any[];
+
+        if (suite.suiteId === "openssf-cve") {
+          // OpenSSF: load pre-prepared cases from benchmarks/openssf-l2-cases.json
+          const { readFileSync, existsSync: fsExists } = await import("fs");
+          const { resolve: pathResolve } = await import("path");
+          const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+          const casesPath = pathResolve(workspaceRoot, "benchmarks", "openssf-l2-cases.json");
+
+          if (!fsExists(casesPath)) {
+            log(`  ⚠️ OpenSSF L2 cases not found at ${casesPath}`);
+            log(`  Run: npx tsx scripts/prepare-openssf-l2-cases.ts`);
+            continue;
+          }
+
+          cases = JSON.parse(readFileSync(casesPath, "utf-8"));
+          log(`Loaded ${cases.length} pre-prepared CVE cases`);
+        } else {
+          // Martian: fetch PR diffs and convert on the fly
+          log(`Fetching PR diffs from GitHub and converting to benchmark cases...`);
+          // @ts-expect-error — export added in current release, dist types may be stale
+          const { convertMartianToBenchmarkCases } = await import("@kevinrabun/judges/api");
+          cases = convertMartianToBenchmarkCases(repoPath);
+          log(`Converted ${cases.length} PRs into benchmark cases`);
+        }
 
         if (cases.length === 0) {
           log(`  ⚠️ No cases could be converted — skipping`);
