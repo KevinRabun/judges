@@ -100,7 +100,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Post Judges summary comment
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           REVIEW_SUCCESS: ${{ steps.review_result.outputs.success }}
           REVIEW_FILES: ${{ steps.review_result.outputs.files }}
